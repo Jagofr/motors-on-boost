@@ -1,0 +1,9 @@
+-cp src
+-lib heaps
+-lib format
+-main Main
+-js web/game.js
+-dce full
+-D webgl
+-D analyzer-optimize
+-D resourcesPath=res
