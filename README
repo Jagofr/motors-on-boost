@@ -1,0 +1,229 @@
+# M.O.B. // Motors on Boost
+
+<div align="center">
+
+![Haxe](https://img.shields.io/badge/Haxe-4.3%2B-FA7E0A?style=for-the-badge&logo=haxe&logoColor=white)
+![Heaps.io](https://img.shields.io/badge/Engine-Heaps.io-00E5FF?style=for-the-badge&logo=opengl&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Web%20%2F%20PWA-111418?style=for-the-badge&logo=pwa&logoColor=00E5FF)
+![Graphics](https://img.shields.io/badge/Graphics-WebGL%202.0-990000?style=for-the-badge&logo=webgl&logoColor=white)
+![Status](https://img.shields.io/badge/Status-Active%20Prototype-FF9800?style=for-the-badge)
+![License](https://img.shields.io/badge/License-Proprietary%20%2F%20All%20Rights%20Reserved-red?style=for-the-badge)
+![Controller](https://img.shields.io/badge/Input-Gamepad%20%26%20Keyboard-4CAF50?style=for-the-badge&logo=gamepad&logoColor=white)
+![Audio](https://img.shields.io/badge/Audio-Web%20Audio%20Synth-9C27B0?style=for-the-badge)
+![AI Collaboration](https://img.shields.io/badge/AI%20Engineering-Google%20Gemini%203.8%20Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)
+
+<p align="center">
+  <strong>High-octane browser-native arcade highway racing prototype.</strong><br>
+  Built from scratch with <strong>Haxe</strong> and <strong>Heaps.io</strong>, engineered for ultra-responsive 60+ FPS browser performance without third-party runtimes.
+</p>
+
+[Overview](#overview) • [Key Features](#key-features) • [Architecture](#architecture--systems) • [Controls](#controls--hardware-support) • [Installation](#installation--setup) • [Repository Governance](#repository-governance--ip) • [Credits](#credits--attributions)
+
+</div>
+
+---
+
+## Overview
+
+**M.O.B. (Motors on Boost)** is an aggressive arcade highway racing baseline inspired by legendary mid-2000s classics—principally *Need for Speed: Most Wanted (2005)* and *Burnout Revenge (2005)*. 
+
+Engineered directly on top of Haxe 4.3+ and the Heaps.io framework, **M.O.B.** runs natively in modern Chromium, Gecko, and WebKit browsers via hardware-accelerated WebGL 2.0. The engine combines custom raycast vehicle dynamics, high-speed lateral drift modeling, procedural endless multi-lane highway track generation, autonomous highway traffic AI, dynamic trauma-based camera shake, and a built-in Web Audio procedural tone synthesizer into an installable Progressive Web Application (PWA).
+
+This project represents the primary WebGL foundation of the *M.O.B.* racing line, setting the architectural foundation for upcoming sister iterations (such as the planned Godot-powered desktop title, *M.O.B. // Sektr*).
+
+---
+
+## Key Features
+
+* **Arcade Vehicle Handling**: Custom suspension physics with raycast ground clamping, steering rack smoothing, tire slip curves, dynamic counter-steering drift logic, and high-velocity nitrous acceleration.
+* **Trauma-Based Chase Camera**: Spring-arm third-person chase camera featuring velocity-aligned look-ahead, speed-dependent FOV stretching, and non-linear rotational camera trauma triggered by drift snaps, nitro boost, and near-misses.
+* **Autonomous Highway Traffic AI**: Multi-lane procedural obstacle vehicles traversing route waypoints with dynamic spatial proximity checks, lane-following, and collision boundaries.
+* **Cinematic 3-Stage Boot Sequence**:
+  1. **Studio Splash**: Developer and publisher branding with smooth alpha curves (`intro/jagofr-rvl-splash.webp`).
+  2. **Engine Splash**: Heaps.io and Haxe engine recognition (`intro/heaps-haxe-splash.webp`).
+  3. **Locked Preload & Disclaimer**: Mandatory legal, health, and open-source acknowledgments acting as an asynchronous background loading barrier with aligned attribution logos.
+  4. **Showcase Cross-Fade**: A 1.2-second smooth curtain cross-fade transitioning directly to the rotating 3D vehicle showcase and pulsating splash screen.
+* **Procedural Vector Iconography (`UIIcons.hx`)**: Resolution-independent vector UI symbols drawn on the fly via `h2d.Graphics` and cached into `h2d.Tile` textures, bypassing TrueType variable-font rasterization limitations.
+* **Bumper-Navigated Glassmorphic UI**: High-contrast UI featuring edge-triggered bumper/tab navigation (`LB`/`RB` or `Q`/`E`), discrete block audio volume gauges (`■` / `□`), and real-time graphics adjustments.
+* **Dual-Scheme Hardware Diagrams**: Procedural vector controller diagrams (PXN P50L / standard Xbox layouts) and keyboard diagrams with in-game button remapping and device isolation modes (`Both`, `Keyboard Only`, `Gamepad Only`).
+* **Web Audio Synthesis Engine**: Custom square, sawtooth, and noise tone generators producing procedural engine RPM frequency modulation, tire screeches, and UI chime sound effects without external audio files.
+* **State Persistence**: Browser `LocalStorage` caching for hardware graphics levels, audio channels, and mid-run race checkpoints.
+
+---
+
+## Architecture & Systems
+
+```
+                              ┌────────────────────────┐
+                              │        Main.hx         │
+                              │  (Boot & State Machine) │
+                              └───────────┬────────────┘
+                                          │
+            ┌─────────────────────────────┼────────────────────────────┐
+            ▼                             ▼                            ▼
+  ┌───────────────────┐         ┌───────────────────┐        ┌───────────────────┐
+  │   IntroSequence   │         │    Physics & 3D   │        │     UI & Audio    │
+  ├───────────────────┤         ├───────────────────┤        ├───────────────────┤
+  │ • Studio Splash   │         │ • CarPhysics.hx   │        │ • UIManager.hx    │
+  │ • Engine Splash   │         │ • Track.hx        │        │ • UIIcons.hx      │
+  │ • Disclaimer/FOSS │         │ • TrafficSystem.hx│        │ • ControlDiagrams │
+  │ • Async Preload   │         │ • ChaseCamera.hx  │        │ • AudioManager.hx │
+  │ • Showcase Curtain│         │ • GraphicsManager │        │ • SaveSystem.hx   │
+  └───────────────────┘         └───────────────────┘        └───────────────────┘
+```
+
+### Module Breakdown
+
+| Module | Location | Responsibility |
+|---|---|---|
+| **Entry Point** | `src/Main.hx` | Boot state machine, canvas resize lifecycle, showcase rotation, and async asset loading. |
+| **Physics** | `src/physics/CarPhysics.hx` | Velocity integration, lateral tire slip friction, chassis roll/pitch, and drift transitions. |
+| **World** | `src/world/Track.hx` | Procedural multi-lane spline road generation, asphalt shaders, and ground lift constants. |
+| **Traffic** | `src/entities/TrafficSystem.hx` | Autonomous obstacle spawning, waypoint trajectory math, and collision volumes. |
+| **Vehicle Mesh** | `src/entities/CarMesh.hx` | Procedural 3D chassis geometry, materials, and steerable front wheel assemblies. |
+| **Camera** | `src/core/ChaseCamera.hx` | Damped spring chase camera with dynamic FOV dilation and non-linear trauma shake decay. |
+| **UI Management** | `src/core/UIManager.hx` | Menus, sliders, credits view, bumper tab navigation, and modal containment. |
+| **Vector Icons** | `src/core/UIIcons.hx` | Procedural vector icon generation via `h2d.Graphics` cached to `h2d.Tile`. |
+| **Input Handler** | `src/input/InputController.hx` | Edge-detection polling for Gamepad API and keyboard with remapping registers. |
+| **Audio Synth** | `src/core/AudioManager.hx` | Web Audio tone synthesis for engine frequencies, tire friction, and UI beeps. |
+| **Persistence** | `src/core/SaveSystem.hx` | Serialization of graphics settings, audio gains, and in-progress race saves. |
+
+---
+
+## Project Structure
+
+```text
+├── CHANGELOG.md                   # Chronological version changelog
+├── CONTRIBUTING.md                # Project contribution and governance terms
+├── LICENSE                        # Custom proprietary software license
+├── SECURITY.md                    # Security vulnerability reporting policy
+├── compile.hxml                   # Haxe compiler build configuration
+├── changelogs/                    # Detailed milestone release records
+│   └── 2026-10-06-v0.1.0-initial.md
+├── res/                           # Embedded assets
+│   └── fonts/
+│       ├── StackSansHeadline-VariableFont_wght.ttf
+│       └── symbols.ttf
+├── src/
+│   ├── Main.hx                    # Entry point & intro sequence controller
+│   ├── core/
+│   │   ├── AudioManager.hx        # Sound synthesis and gain staging
+│   │   ├── ChaseCamera.hx         # Spring-arm chase camera with trauma shake
+│   │   ├── ControlDiagrams.hx     # Procedural controller & keyboard visualizer
+│   │   ├── FontManager.hx         # Font loading and typography registry
+│   │   ├── GraphicsManager.hx     # Render scale, shadow, and lighting pipeline
+│   │   ├── SaveSystem.hx          # LocalStorage persistence for settings & state
+│   │   ├── UIIcons.hx             # Vector UI icon renderer & tile cache
+│   │   └── UIManager.hx           # UI views, bumper tabs, sliders, and HUD
+│   ├── entities/
+│   │   ├── CarMesh.hx             # Procedural player vehicle geometry & wheels
+│   │   └── TrafficSystem.hx       # Highway traffic spawning & waypoint AI
+│   ├── input/
+│   │   └── InputController.hx     # Gamepad/keyboard polling & edge detection
+│   ├── physics/
+│   │   └── CarPhysics.hx          # Vehicle handling, friction & drift physics
+│   └── world/
+│       └── Track.hx               # Procedural highway geometry & lift constants
+└── web/                           # Production web root & PWA distribution bundle
+    ├── index.html                 # App shell with noscript fallback & canvas
+    ├── manifest.json              # Web App Manifest (standalone landscape)
+    ├── sw.js                      # Cache-first Service Worker
+    ├── game.js                    # Compiled JavaScript bundle (generated)
+    ├── icon-192.png               # High-DPI PWA icon (192x192)
+    ├── icon-512.png               # High-DPI PWA icon (512x512)
+    └── intro/                     # Sequential splash branding
+        ├── jagofr-rvl-splash.webp # Studio & developer splash graphic (1080p)
+        ├── heaps-haxe-splash.webp # Heaps engine splash graphic (1080p)
+        └── icons/                 # Screen 3 attribution badge logos
+            ├── logo_haxe.webp
+            ├── logo_heaps.webp
+            └── logo_webgl.webp
+```
+
+---
+
+## Controls & Hardware Support
+
+### Default Key Bindings
+
+| Action | Primary Keyboard | Secondary Keyboard | Gamepad (Xbox / Standard) |
+|---|---|---|---|
+| **Throttle (Gas)** | `W` | `Up Arrow` | `RT` (Right Trigger) |
+| **Brake / Reverse** | `S` | `Down Arrow` | `LT` (Left Trigger) |
+| **Steer Left** | `A` | `Left Arrow` | Left Stick (X-Axis) / D-Pad Left |
+| **Steer Right** | `D` | `Right Arrow` | Left Stick (X-Axis) / D-Pad Right |
+| **Handbrake (Drift)** | `Space` | — | `B` / `RB` (Right Bumper) |
+| **Nitro Boost** | `Left Shift` | — | `A` / `LB` (Left Bumper) |
+| **Pause / Menu** | `Escape` | — | `Start` / `Menu` |
+| **UI Navigate** | `W` / `S` / `A` / `D` | Arrow Keys | D-Pad / Left Stick |
+| **Tab Switch (LB/RB)** | `Q` (Prev) / `E` (Next) | — | `LB` (Prev) / `RB` (Next) |
+| **Confirm / Select** | `Enter` | `Space` | `A` (Bottom Face Button) |
+| **Back / Cancel** | `Backspace` | `Escape` | `B` (Right Face Button) |
+
+### Device Isolation Mode
+Under **Options $\to$ Keyboard / Gamepad**, players can toggle between `BOTH ACTIVE`, `KEYBOARD ONLY`, or `GAMEPAD ONLY` to prevent multi-device interference during intense driving sessions.
+
+---
+
+## Installation & Setup
+
+### Prerequisites
+1. **Haxe Compiler:** [Haxe 4.3.0+](https://haxe.org/download/)
+2. **Heaps Engine Library:**
+   ```bash
+   haxelib install heaps
+   ```
+
+### 1. Compilation
+Build the production JavaScript bundle from the root of the project:
+```bash
+haxe compile.hxml
+```
+The output file `web/game.js` will be created or updated automatically.
+
+### 2. Running Locally
+Because WebGL, Web Audio, Service Workers, and Canvas WebP decoding require a valid HTTP origin, serve the `web/` directory using any local development server:
+
+#### Using Python 3:
+```bash
+cd web
+python -m http.server 8000
+```
+
+#### Using Node.js (`npx`):
+```bash
+npx serve web
+```
+
+Navigate to `http://localhost:8000` in any modern Chromium, Firefox, or WebKit browser.
+
+---
+
+## Repository Governance & IP
+
+This repository is maintained as an **in-house commercial prototype**. 
+
+* **Contributions**: External contributions, unsolicited pull requests, and public feature branches are **strictly not accepted**. Please review [`CONTRIBUTING.md`](./CONTRIBUTING.md) for further details.
+* **License**: All custom source code, shaders, procedural track logic, vehicle handling models, audio synthesizers, and graphic assets are licensed under a **Strict Proprietary License**. See [`LICENSE`](./LICENSE) for terms.
+* **Security**: For responsible disclosure of vulnerabilities or defects, please consult [`SECURITY.md`](./SECURITY.md).
+
+---
+
+## Credits & Attributions
+
+* **Lead Architect & Technical Designer:** Gerard "Jamie" (Jagofr) Francis
+* **Published & Developed In-House By:** RvL // ROGUE
+* **AI Engineering Collaboration:** Google Gemini 3.8 Flash
+* **Engine Framework:** [Heaps.io](https://heaps.io/) by Nicolas Cannasse / Haxe Foundation (MIT License)
+* **Typography & Icons:**
+  * *Stack Sans Headline* (SIL Open Font License)
+  * *Material Symbols Sharp* (Apache License 2.0)
+* **Homage & Gameplay Inspiration:**
+  * *Need for Speed: Most Wanted (2005)* (Electronic Arts / Criterion Games)
+  * *Burnout Revenge (2005)* (Electronic Arts / Criterion Games)
+
+---
+
+<div align="center">
+  <sub>M.O.B. (Motors on Boost) is an original interactive project. All custom codebases, vehicles, handling physics, procedural tracks, and visual designs are the proprietary intellectual property of the creators. All rights reserved.</sub>
+</div>
