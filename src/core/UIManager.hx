@@ -383,7 +383,7 @@ class UIManager extends Object {
         creditsContainer = new Object(this);
 
         creditsTitle = new Text(FontManager.heroFont, creditsContainer);
-        creditsTitle.text = "M.O.B. (MOTORS ON BOOST)";
+        creditsTitle.text = "M.O.B. // MOTORS ON BOOST";
         creditsTitle.textColor = 0xFF9800;
 
         // Lead Developer Section

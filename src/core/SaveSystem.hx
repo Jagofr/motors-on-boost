@@ -36,7 +36,8 @@ typedef GameSaveData = {
 }
 
 class SaveSystem {
-    static inline var STORAGE_KEY:String = "burnout_overdrive_save_v1";
+    static inline var STORAGE_KEY:String = "mob_motors_on_boost_save_v1";
+    static inline var LEGACY_STORAGE_KEY:String = "burnout_overdrive_save_v1";
 
     public static function getDefaultGraphics():GraphicsSettings {
         return {
@@ -58,8 +59,12 @@ class SaveSystem {
 
     public static function load():GameSaveData {
         #if js
-        try {
-            var raw = js.Browser.getLocalStorage().getItem(STORAGE_KEY);
+         try {
+            var storage = js.Browser.getLocalStorage();
+            var raw = storage.getItem(STORAGE_KEY);
+            if (raw == null) {
+                raw = storage.getItem(LEGACY_STORAGE_KEY);
+            }
             if (raw != null) {
                 var data:GameSaveData = Json.parse(raw);
                 return data;

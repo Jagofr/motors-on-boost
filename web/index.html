@@ -2,132 +2,101 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>M.O.B. // Motors on Boost</title>
 
-  <!-- PWA & Mobile Meta Tags -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <meta name="description" content="High-octane arcade highway racing prototype built with Haxe and Heaps.io" />
-  <meta name="theme-color" content="#00E5FF" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  
-  <!-- Apple Web App Meta -->
+  <!-- Web App Manifest -->
+  <link rel="manifest" href="manifest.json" />
+
+  <!-- iOS / Apple Specific PWA Tags -->
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="M.O.B." />
 
-  <!-- Favicons, Icons, and Manifest -->
-  <link rel="manifest" href="./manifest.json" />
-  <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png" />
-  <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png" />
-  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <!-- iOS Home Screen Icons (iOS ignores manifest icons) -->
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="./icons/icon-512.png" />
 
   <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
+    html, body {
       margin: 0;
       padding: 0;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
-    }
-
-    html, body {
       width: 100%;
       height: 100%;
       overflow: hidden;
-      background-color: #1A1F26;
+      background-color: #000;
       touch-action: none;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
     #webgl {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* iOS & Mobile Landscape Enforcement Overlay */
+    #rotate-device-overlay {
+      display: none;
       position: fixed;
       top: 0;
       left: 0;
       width: 100vw;
       height: 100vh;
-      display: block;
-      outline: none;
-      border: 0;
-    }
-
-    noscript {
-      position: fixed;
-      inset: 0;
-      display: flex;
+      background-color: #08080c;
+      color: #fff;
+      z-index: 999999;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      background-color: #111418;
-      z-index: 99999;
-      padding: 24px;
-    }
-
-    .noscript-card {
-      max-width: 460px;
-      padding: 36px 32px;
-      background: #181D26;
-      border: 2px solid #00E5FF;
-      border-radius: 12px;
-      box-shadow: 0 0 24px rgba(0, 229, 255, 0.25);
       text-align: center;
-      color: #E6EDF3;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 20px;
+      box-sizing: border-box;
     }
 
-    .noscript-title {
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: 2px;
-      color: #FF9800;
+    #rotate-device-overlay .rotate-icon {
+      font-size: 54px;
       margin-bottom: 16px;
+      animation: rotate-pulse 2s infinite ease-in-out;
+    }
+
+    #rotate-device-overlay h2 {
+      margin: 0 0 8px 0;
+      font-size: 1.4rem;
+      letter-spacing: 0.1em;
       text-transform: uppercase;
+      color: #ff0055;
     }
 
-    .noscript-body {
-      font-size: 15px;
-      line-height: 1.6;
-      color: #A0B2C6;
-      margin-bottom: 24px;
+    #rotate-device-overlay p {
+      margin: 0;
+      font-size: 0.95rem;
+      color: #8892b0;
     }
 
-    .noscript-tag {
-      display: inline-block;
-      padding: 6px 14px;
-      background: rgba(0, 229, 255, 0.12);
-      border: 1px solid #00E5FF;
-      border-radius: 6px;
-      color: #00E5FF;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 1px;
+    @keyframes rotate-pulse {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(-90deg); }
+    }
+
+    /* Trigger shield when in portrait mode on mobile viewports */
+    @media screen and (orientation: portrait) and (max-width: 1024px) {
+      #rotate-device-overlay {
+        display: flex;
+      }
     }
   </style>
 </head>
 <body>
-  <noscript>
-    <div class="noscript-card">
-      <div class="noscript-title">JavaScript Required</div>
-      <p class="noscript-body">
-        <strong>M.O.B. (Motors on Boost)</strong> utilizes WebGL, Web Audio, and the Gamepad API to run directly in your browser. Please enable JavaScript to launch the game.
-      </p>
-      <div class="noscript-tag">ENGINE HALTED</div>
-    </div>
-  </noscript>
+  <!-- Portrait Lock Fallback Banner -->
+  <div id="rotate-device-overlay">
+    <div class="rotate-icon">📱 ↷</div>
+    <h2>Rotate Device</h2>
+    <p>Please turn your iPhone to landscape mode to drive.</p>
+  </div>
 
   <canvas id="webgl"></canvas>
-
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((reg) => {
-            console.log('ServiceWorker registered with scope:', reg.scope);
-          })
-          .catch((err) => {
-            console.warn('ServiceWorker registration failed:', err);
-          });
-      });
-    }
-  </script>
-  <script src="./game.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>

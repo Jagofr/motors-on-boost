@@ -1,4 +1,4 @@
-# M.O.B. // Motors on Boost
+# M.O.B. // MOTORS ON BOOST
 
 <div align="center">
 
@@ -94,15 +94,16 @@ This project represents the primary WebGL foundation of the *M.O.B.* racing line
 
 ```text
 ├── CHANGELOG.md                   # Chronological version changelog
-├── CONTRIBUTING.md                # Project contribution and governance terms
+├── CONTRIBUTING                   # Project contribution and governance terms
 ├── LICENSE                        # Custom proprietary software license
+├── README                         # This README document
 ├── SECURITY.md                    # Security vulnerability reporting policy
 ├── compile.hxml                   # Haxe compiler build configuration
 ├── changelogs/                    # Detailed milestone release records
 │   └── 2026-10-06-v0.1.0-initial.md
 ├── res/                           # Embedded assets
 │   └── fonts/
-│       ├── StackSansHeadline-VariableFont_wght.ttf
+│       ├── stack_sans.ttf
 │       └── symbols.ttf
 ├── src/
 │   ├── Main.hx                    # Entry point & intro sequence controller
@@ -129,8 +130,9 @@ This project represents the primary WebGL foundation of the *M.O.B.* racing line
     ├── manifest.json              # Web App Manifest (standalone landscape)
     ├── sw.js                      # Cache-first Service Worker
     ├── game.js                    # Compiled JavaScript bundle (generated)
-    ├── icon-192.png               # High-DPI PWA icon (192x192)
-    ├── icon-512.png               # High-DPI PWA icon (512x512)
+    ├── icons/
+    │   ├── icon-192.png            # High-DPI PWA icon (192x192)
+    │   └── icon-512.png            # High-DPI PWA icon (512x512)
     └── intro/                     # Sequential splash branding
         ├── jagofr-rvl-splash.webp # Studio & developer splash graphic (1080p)
         ├── heaps-haxe-splash.webp # Heaps engine splash graphic (1080p)

@@ -3100,7 +3100,7 @@ core_UIManager.prototype = $extend(h2d_Object.prototype,{
 		var _gthis = this;
 		this.splashContainer = new h2d_Object(this);
 		this.splashTitle = new h2d_Text(core_FontManager.heroFont,this.splashContainer);
-		this.splashTitle.set_text("BURNOUT // OVERDRIVE");
+		this.splashTitle.set_text("M.O.B. // MOTORS ON BOOST");
 		this.splashTitle.set_textColor(16750592);
 		this.splashPrompt = new h2d_Text(core_FontManager.titleFont,this.splashContainer);
 		this.splashPrompt.set_text("PRESS ANY BUTTON OR CLICK TO ENTER");
@@ -3334,7 +3334,7 @@ core_UIManager.prototype = $extend(h2d_Object.prototype,{
 		var _gthis = this;
 		this.creditsContainer = new h2d_Object(this);
 		this.creditsTitle = new h2d_Text(core_FontManager.heroFont,this.creditsContainer);
-		this.creditsTitle.set_text("BURNOUT // OVERDRIVE");
+		this.creditsTitle.set_text("M.O.B. (MOTORS ON BOOST)");
 		this.creditsTitle.set_textColor(16750592);
 		this.creditsLeadTitle = new h2d_Text(core_FontManager.regularFont,this.creditsContainer);
 		this.creditsLeadTitle.set_text("LEAD ARCHITECT & TECHNICAL DESIGNER");

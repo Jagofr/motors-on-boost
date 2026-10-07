@@ -1,0 +1,110 @@
+Folder PATH listing for volume Google Drive
+Volume serial number is 1983-1116
+G:.
+|   compile.hxml
+|   README
+|   .gitignore
+|   CHANGELOG.md
+|   LICENSE
+|   CONTRIBUTING
+|   SECURITY.md
+|   folder_structure.txt
+|   
++---src
+|   |   Main.hx
+|   |   
+|   +---core
+|   |       ChaseCamera.hx
+|   |       UIManager.hx
+|   |       ControlDiagrams.hx
+|   |       AudioManager.hx
+|   |       SaveSystem.hx
+|   |       GraphicsManager.hx
+|   |       FontManager.hx
+|   |       UIIcons.hx
+|   |       
+|   +---input
+|   |       InputController.hx
+|   |       
+|   +---physics
+|   |       CarPhysics.hx
+|   |       SplineMath.hx
+|   |       
+|   +---entities
+|   |       CarMesh.hx
+|   |       TrafficSystem.hx
+|   |       TrafficCarMesh.hx
+|   |       
+|   \---world
+|           Track.hx
+|           
++---res
+|   +---fonts
+|   |       stack_sans.ttf
+|   |       symbols.ttf
+|   |       
+|   \---intro
+|       |   heaps-haxe-splash.webp
+|       |   jagofr-rvl-splash.webp
+|       |   
+|       +---unoptimized
+|       |   |   jagofr-rvl-spash.jpg
+|       |   |   heaps-haxe-splash.jpg
+|       |   |   
+|       |   \---icons
+|       |           logo_heaps.png
+|       |           logo_haxe.png
+|       |           logo_webgl.png
+|       |           
+|       \---icons
+|               logo_webgl.webp
+|               logo_haxe.webp
+|               logo_heaps.webp
+|               
++---web
+|   |   index.html
+|   |   manifest.json
+|   |   sw.js
+|   |   game.js
+|   |   web.config
+|   |   
+|   +---icons
+|   |       icon-192.png
+|   |       icon-512.png
+|   |       
+|   \---intro
+|       |   heaps-haxe-splash.webp
+|       |   jagofr-rvl-splash.webp
+|       |   
+|       +---unoptimized
+|       |   |   jagofr-rvl-spash.jpg
+|       |   |   heaps-haxe-splash.jpg
+|       |   |   
+|       |   \---icons
+|       |           logo_heaps.png
+|       |           logo_haxe.png
+|       |           logo_webgl.png
+|       |           
+|       \---icons
+|               logo_webgl.webp
+|               logo_haxe.webp
+|               logo_heaps.webp
+|               
++---.agents
+|   +---agents
+|   |   \---haxe-heaps-expert
+|   |           agent.md
+|   |           
+|   \---skills
+|       \---haxe-heaps-architecture
+|               SKILL.md
+|               
++---changelogs
+|       2026-10-06-v0.1.0-initial.md
+|       
++---docs
+|       DOCS.md
+|       
+\---.vscode
+        tasks.json
+        

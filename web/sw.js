@@ -1,11 +1,11 @@
-const CACHE_NAME = 'mob-motors-on-boost-v1';
+const CACHE_NAME = 'mob-motors-on-boost-v1-1';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './game.js',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png'
+  './icons/icon-192.png',
+  './icons/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {

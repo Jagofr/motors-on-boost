@@ -1,4 +1,4 @@
-# High-Speed Arcade Racing Engine — Systems & Parameter Reference
+# M.O.B. // MOTORS ON BOOST — Systems & Parameter Reference
 
 This ledger records active tuning variables across physics, input, track geometry, and traffic simulation.
 
@@ -71,5 +71,5 @@ This ledger records active tuning variables across physics, input, track geometr
 | `Render Scale` | `0.25x, 0.334x, 0.5x, 0.75x, 1.0x, 2.0x, 3.0x, 4.0x` | In-Game & Menu | Viewport internal framebuffer scale. |
 
 ### PWA Storage Spec (`localStorage`):
-- Key: `burnout_overdrive_save_v1`
+- Key: `mob_motors_on_boost_save_v1` (with fallback reading for `burnout_overdrive_save_v1`)
 - Preserves: `hasActiveRun`, `posX`, `posY`, `posZ`, `yaw`, `forwardSpeed`, `masterVol`, `musicVol`, `sfxVol`, and `graphics` profile.
