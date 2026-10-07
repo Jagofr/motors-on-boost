@@ -2744,7 +2744,11 @@ core_SaveSystem.getDefaultGraphics = function() {
 };
 core_SaveSystem.load = function() {
 	try {
-		var raw = js_Browser.getLocalStorage().getItem("burnout_overdrive_save_v1");
+		var storage = js_Browser.getLocalStorage();
+		var raw = storage.getItem("mob_motors_on_boost_save_v1");
+		if(raw == null) {
+			raw = storage.getItem("burnout_overdrive_save_v1");
+		}
 		if(raw != null) {
 			return JSON.parse(raw);
 		}
@@ -2755,7 +2759,7 @@ core_SaveSystem.load = function() {
 core_SaveSystem.save = function(data) {
 	try {
 		var raw = JSON.stringify(data);
-		js_Browser.getLocalStorage().setItem("burnout_overdrive_save_v1",raw);
+		js_Browser.getLocalStorage().setItem("mob_motors_on_boost_save_v1",raw);
 	} catch( _g ) {
 	}
 };
@@ -3334,7 +3338,7 @@ core_UIManager.prototype = $extend(h2d_Object.prototype,{
 		var _gthis = this;
 		this.creditsContainer = new h2d_Object(this);
 		this.creditsTitle = new h2d_Text(core_FontManager.heroFont,this.creditsContainer);
-		this.creditsTitle.set_text("M.O.B. (MOTORS ON BOOST)");
+		this.creditsTitle.set_text("M.O.B. // MOTORS ON BOOST");
 		this.creditsTitle.set_textColor(16750592);
 		this.creditsLeadTitle = new h2d_Text(core_FontManager.regularFont,this.creditsContainer);
 		this.creditsLeadTitle.set_text("LEAD ARCHITECT & TECHNICAL DESIGNER");
