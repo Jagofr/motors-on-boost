@@ -4,18 +4,26 @@ This ledger records active tuning variables across physics, input, track geometr
 
 ---
 
-## 1. Longitudinal & Drift Dynamics (`src/physics/CarPhysics.hx`)
+## 1. Raycast Suspension & Arcade Vehicle Dynamics (`src/physics/CarPhysics.hx` & `CarConfig.hx`)
 
-| Parameter | Current Value | Target Range (NFS MW 2005) | Description / Impact |
+| Parameter | Current Value | Target Range | Description / Impact |
 |---|---|---|---|
 | `TOP_SPEED` | `68.0` m/s (~245 km/h) | `62.0 - 70.0` | Base maximum speed under normal engine throttle. |
 | `BOOST_TOP_SPEED` | `88.0` m/s (~316 km/h) | `82.0 - 90.0` | Maximum velocity ceiling during active nitrous injection. |
-| `ACCELERATION` | `28.0` m/s² | `22.0 - 26.0` | Engine torque curve bite. Lower values convey heavier curb weight. |
-| `BOOST_ACCEL` | `48.0` m/s² | `40.0 - 50.0` | Forward surge when nitrous is engaged. |
-| `BRAKING` | `38.0` m/s² | `36.0 - 44.0` | Foot-brake deceleration rate. |
-| `STEER_AUTHORITY` | `2.2` | `1.8 - 2.2` | Cornering turn-in response at moderate-to-high speeds. |
-| `DRIFT_YAW_RATE` | `3.2` | `2.8 - 3.4` | Rotation angular velocity once lateral traction breaks. |
-| `DRIFT_STICKINESS` | `0.88` | `0.88 - 0.92` | Lateral velocity damping factor per tick while in a slide. |
+| `ACCELERATION` | `28.0` m/s² | `24.0 - 30.0` | Engine torque bite. Scaled by shift disengagement latency. |
+| `BOOST_ACCEL` | `48.0` m/s² | `42.0 - 52.0` | Forward surge when nitrous oxide is engaged. |
+| `BRAKING` | `38.0` m/s² | `36.0 - 44.0` | Threshold foot-brake deceleration rate. |
+| `suspension.restLength` | `0.45` m | `0.40 - 0.50` | Unloaded spring height from chassis to road contact. |
+| `suspension.springRate` | `32000.0` N/m | `28000 - 36000` | Linear spring stiffness for road surface tracking. |
+| `suspension.damping` | `2600.0` Ns/m | `2200 - 3000` | Shock absorber viscous compression/rebound damping. |
+| `suspension.antiRollStiffness` | `9500.0` N/m | `8000 - 12000` | Transverse anti-roll bar torque preventing unnatural roll. |
+| `tires.peakSlipAngle` | `0.16` rad (~9.2°) | `0.14 - 0.18` | Slip angle at which lateral tire adhesion peaks. |
+| `tires.baseLateralStiffness` | `34.0` | `30.0 - 38.0` | Baseline cornering stiffness in linear slip region. |
+| `drift.lateralStiffnessScale` | `0.35` (35%) | `0.30 - 0.40` | Lateral grip scale during active drift slide. |
+| `drift.counterSteerTorque` | `3.4` | `2.8 - 3.8` | Artificial yaw torque assist when counter-steering slide. |
+| `drift.forwardBiasRate` | `3.8` | `3.0 - 4.5` | Momentum blending rate aligning velocity to vehicle heading. |
+| `drivetrain.gearRatios` | `[3.40, 2.20, 1.55, 1.18, 0.92, 0.76]` | Progressive 6-speed | Progressive gear reductions with final drive `3.73`. |
+| `drivetrain.idleRPM / redlineRPM` | `1000.0 / 8000.0` | `1000 / 8000` | Engine flywheel RPM limits and shift window (`3400 - 7200`). |
 
 ---
 
@@ -43,16 +51,30 @@ This ledger records active tuning variables across physics, input, track geometr
 
 ---
 
-## 4. Traffic Flow & Collision Management (`src/entities/TrafficSystem.hx`)
+## 4. Visual Shaders & Environment Architecture (`src/graphics/` & `src/world/`)
+
+| System / Shader | File | Key Parameters | Description |
+|---|---|---|---|
+| Radial Motion Blur | `RadialBlurShader.hx` | `blurOrigin: Vec2`, `blurIntensity: Float` | Screen-space 8-tap directional blur active at speeds > 140 km/h. |
+| Post-Process Pass | `PostProcessRenderer.hx` | Extends `h3d.scene.fwd.Renderer` | Offscreen buffer pass executed only when blur is active (zero idle overhead). |
+| Skybox Gradient | `Skybox.hx` | `topColor: #1052B8, horizonColor: #7AC2F2` | Geodesic celestial dome synchronized dynamically with camera position. |
+| Solar Directional Light | `Main.hx` | Pos: `(350, -250, 140)`, Dir: `(-0.55, 0.78, -0.32)` | Directional sunlight placed at the tallest south-east point of the map. |
+
+---
+
+## 5. Chase Camera & Collision Trauma (`src/camera/ChaseCamera.hx`)
 
 | Parameter | Current Value | Description / Impact |
 |---|---|---|
-| `PLAYER_RADIUS` | `1.6` m | Radial hull threshold for player vehicle. |
-| `TRAFFIC_RADIUS` | `1.5` m | Radial hull threshold for civilian traffic vehicles. |
-| `TRAFFIC_FOLLOW_BUFFER` | `10.0` m | Ahead scan distance where trailing vehicles brake to match speed. |
-| `LANE_OFFSET` | `±4.8` m | Left-hand traffic offsets: Same-direction = `-4.8m`, Oncoming = `+4.8m`. |
+| `BASE_FOV` | `65.0°` | Base vertical field of view angle when cruising. |
+| `MAX_SPEED_FOV` | `85.0°` | Smoothly dilated FOV angle at terminal velocity (+5° under nitrous). |
+| `MAX_TRAUMA_CEILING` | `0.55` | Clamped maximum trauma ceiling preventing violent screen disorientation. |
+| `TRAUMA_DECAY_RATE` | `3.8` | Rapid exponential decay settling trauma crisp and punchy. |
+| `accelPullBack` | Dynamic (`0.0 - 2.5m`) | Spring-damped camera pull-back during forward acceleration surges. |
 
-## 5. Graphics Pipeline & PWA Storage Architecture (`src/graphics/GraphicsManager.hx` & `src/save/SaveSystem.hx`)
+---
+
+## 6. Graphics Pipeline & PWA Storage Architecture (`src/graphics/GraphicsManager.hx` & `src/save/SaveSystem.hx`)
 
 | Setting | Options / Values | Scope / Availability | Impact |
 |---|---|---|---|
@@ -72,15 +94,15 @@ This ledger records active tuning variables across physics, input, track geometr
 | `UI Resolution` | `720p (HD), 1080p (FHD), 1440p (2K), 2160p (4K), Native / Match Window` | In-Game & Menu | 2D scene coordinate scale and layout projection. |
 
 ### PWA Storage Spec (`localStorage`):
-- Version: `2` (Application Release: `v0.1.4`, Build: `148`)
-- Primary Key: `mob_motors_on_boost_save_v2`
-- Backwards-Compatible Fallback Keys: `mob_motors_on_boost_save_v1`, `burnout_overdrive_save_v1`
-- Forward Migration: Older save records are loaded, schema-migrated to version 2 with default `uiResolution`, stamped with `buildNumber: 148`, and committed back to `mob_motors_on_boost_save_v2`.
+- Version: `3` (Application Release: `v0.2.0`, Build: `3`)
+- Primary Key: `mob_motors_on_boost_save_v3`
+- Backwards-Compatible Fallback Keys: `mob_motors_on_boost_save_v2`, `mob_motors_on_boost_save_v1`, `burnout_overdrive_save_v1`
+- Forward Migration: Older save records are loaded, schema-migrated to version 3 with default `uiResolution`, stamped with `buildNumber: 3`, and committed back to `mob_motors_on_boost_save_v3`.
 - Preserves: `version`, `buildNumber`, `hasActiveRun`, `posX`, `posY`, `posZ`, `yaw`, `forwardSpeed`, `masterVol`, `musicVol`, `sfxVol`, and `graphics` profile.
 
 ---
 
-## 6. Mobile Multi-Touch Virtual Controls HUD (`src/ui/components/TouchControlsHUD.hx`)
+## 7. Mobile Multi-Touch Virtual Controls HUD (`src/ui/components/TouchControlsHUD.hx`)
 
 | Component | Dimensions / Bounds | Screen Placement | Geometry Model / Detection |
 |---|---|---|---|

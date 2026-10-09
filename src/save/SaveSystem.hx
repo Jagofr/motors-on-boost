@@ -105,9 +105,12 @@ typedef GameSaveData = {
  */
 class SaveSystem {
     /** Current save schema version identifier for forward migrations. */
-    public static inline var SAVE_VERSION:Int = 2;
+    public static inline var SAVE_VERSION:Int = 3;
 
-    /** Primary localStorage storage key for Motors on Boost v2 schema. */
+    /** Primary localStorage storage key for Motors on Boost v3 schema. */
+    static inline var STORAGE_KEY_V3:String = "mob_motors_on_boost_save_v3";
+
+    /** Backwards-compatible storage key for v2 schema. */
     static inline var STORAGE_KEY_V2:String = "mob_motors_on_boost_save_v2";
 
     /** Backwards-compatible storage key for v1 schema. */
@@ -150,16 +153,22 @@ class SaveSystem {
         #if js
         try {
             var storage = js.Browser.getLocalStorage();
-            var raw = storage.getItem(STORAGE_KEY_V2);
+            var raw = storage.getItem(STORAGE_KEY_V3);
             var isLegacy = false;
 
-            // Step 1: Fallback reading from v1 key if v2 not found
+            // Step 1: Fallback reading from v2 key if v3 not found
+            if (raw == null) {
+                raw = storage.getItem(STORAGE_KEY_V2);
+                if (raw != null) isLegacy = true;
+            }
+
+            // Step 2: Fallback reading from v1 key if v2 not found
             if (raw == null) {
                 raw = storage.getItem(STORAGE_KEY_V1);
                 if (raw != null) isLegacy = true;
             }
 
-            // Step 2: Fallback reading from prototype key if still not found
+            // Step 3: Fallback reading from prototype key if still not found
             if (raw == null) {
                 raw = storage.getItem(LEGACY_STORAGE_KEY);
                 if (raw != null) isLegacy = true;
@@ -168,12 +177,12 @@ class SaveSystem {
             if (raw != null) {
                 var data:GameSaveData = Json.parse(raw);
 
-                // Step 3: Forward migration: ensure uiResolution default
+                // Step 4: Forward migration: ensure uiResolution default
                 if (data.graphics != null && data.graphics.uiResolution == null) {
                     data.graphics.uiResolution = "720p (HD)";
                 }
 
-                // Step 4: Schema version migration to v2
+                // Step 5: Schema version migration to v3
                 if (data.version == null || data.version < SAVE_VERSION || isLegacy) {
                     data.version = SAVE_VERSION;
                     data.buildNumber = Version.BUILD;
@@ -210,8 +219,8 @@ class SaveSystem {
 
             var raw = Json.stringify(data);
             var storage = js.Browser.getLocalStorage();
-            storage.setItem(STORAGE_KEY_V2, raw);
-            storage.setItem(STORAGE_KEY_V1, raw); // Backwards compatibility mirror
+            storage.setItem(STORAGE_KEY_V3, raw);
+            storage.setItem(STORAGE_KEY_V2, raw); // Backwards compatibility mirror
         } catch (e:haxe.Exception) {}
         #end
     }

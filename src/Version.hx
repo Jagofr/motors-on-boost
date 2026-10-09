@@ -5,11 +5,11 @@ package;
  * Centralized single source of truth for semantic versioning, build number, and release tagging.
  */
 class Version {
-    /** Semantic version string: Major.Minor.Patch */
-    public static inline var NUMBER:String = "0.1.4";
+    /** Semantic version string: Major.Minor.Patch (Patch reset to 0 on minor version bump) */
+    public static inline var NUMBER:String = "0.2.0";
 
-    /** Monotonically increasing build compilation counter. */
-    public static inline var BUILD:Int = 148;
+    /** Monotonically increasing build compilation counter reset for v0.2.0 milestone. */
+    public static inline var BUILD:Int = 3;
 
     /** Human-readable release designation. */
     public static inline var CHANNEL:String = "Alpha";

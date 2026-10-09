@@ -4,6 +4,40 @@ All notable changes to **M.O.B. (Motors on Boost)** will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-09
+### Added
+- **First-Principles Arcade Raycast Vehicle Dynamics (`CarPhysics.hx`)**:
+  - Four-wheel independent spring-damper suspension integration along road contact normals: `F = (k * (restLength - currentLength) - c * suspVelocity) * contactNormal`.
+  - Opposing anti-roll bar torque across front and rear wheel pairs preventing unnatural body roll while preserving suspension travel.
+  - Separated longitudinal propulsion from lateral cornering grip with slip angle calculation `alpha = atan2(vLateral, |vForward|)` clamped through a normalized Pacejka-like grip saturation curve.
+  - Complete Arcade Drift State Machine with handbrake and tap-brake initiation, scaled lateral tire stiffness (35% baseline), counter-steer torque injection, and forward velocity vector biasing for momentum-preserving slides without snap-back spinouts.
+  - Powertrain simulation: Dynamic flywheel engine RPM calculation, progressive 6-speed gear ratios, automatic transmission up/down-shift logic, and simulated limited-slip differential (LSD).
+- **Runtime Vehicle Configuration Schema (`CarConfig.hx`)**:
+  - Strongly typed, serializable vehicle configuration schema defining curb weight, moment of inertia tensor, suspension spring/damper constants, gear ratios, tire friction parameters, and drift assist multipliers.
+  - Full JSON parsing and dumping support (`CarConfig.fromJson`, `CarConfig.toJson`) enabling runtime vehicle tuning without recompilation.
+- **Chase Camera Refinement & Toned-Down Shake (`ChaseCamera.hx`)**:
+  - Spring-damped target lag with dynamic acceleration pull-back during forward surge and nitrous injection.
+  - Dynamic speed-dependent Field of View (FOV) smoothly expanding from 65° base to 85° at terminal velocity.
+  - Substantially softened collision impulses: clamped peak trauma ceiling to 0.55, dampened translational/rotational offsets, and applied rapid exponential decay (`3.8 * dt`) for punchy, non-disorienting hits.
+- **High-Speed Radial Motion Blur Screen Shader (`RadialBlurShader.hx` & `PostProcessRenderer.hx`)**:
+  - Screen-space radial directional blur pass implemented in HxSL (`h3d.shader.ScreenShader`) centered on the vehicle horizon/vanishing point.
+  - Runtime dynamic parameters for `blurOrigin` and `blurIntensity` scaled automatically with vehicle speed.
+  - Clean registration into `s3d.renderer` through custom `PostProcessRenderer` utilizing offscreen render target passes with zero overhead during low-speed cruising.
+- **Procedural Atmospheric Gradient Blue Skybox (`Skybox.hx`)**:
+  - High-density celestial dome sphere with custom HxSL shader blending deep azure zenith blue (`#1052B8`), bright atmospheric horizon cyan (`#7AC2F2`), and dusk nadir tones.
+  - Synchronized dynamically with camera translation for an infinite celestial horizon.
+- **Apex Summit Solar Lighting**:
+  - Re-positioned scene directional sunlight to the highest south-east point of the map (`X: +350, Y: -250, Z: 140`) casting solar illumination across the circuit.
+- **Save System v3 Schema & Forward Migration (`SaveSystem.hx`)**:
+  - Bumped schema to `SAVE_VERSION = 3` with active storage key `mob_motors_on_boost_save_v3`.
+  - Seamless forward migration preserving player settings from v2, v1, and legacy prototype keys.
+- **PWA Service Worker Cache**:
+  - Bumped cache to `mob-motors-on-boost-v2-0` in `sw.js` and updated script cache buster to `game.js?v=0.2.0`.
+
+### Fixed
+- **Track Obstruction Cleanup (`Track.hx`)**:
+  - Removed overlapping scenery skyscraper object at `(X: 295, Y: 130)` that clipped across 9 circuit waypoints without collision.
+
 ---
 
 ## [0.1.4] - 2026-10-09

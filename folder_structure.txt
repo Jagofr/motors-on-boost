@@ -27,11 +27,14 @@ G:.
 |   |       
 |   +---graphics
 |   |       GraphicsManager.hx
+|   |       PostProcessRenderer.hx
+|   |       RadialBlurShader.hx
 |   |       
 |   +---input
 |   |       InputController.hx
 |   |       
 |   +---physics
+|   |       CarConfig.hx
 |   |       CarPhysics.hx
 |   |       SplineMath.hx
 |   |       
@@ -72,6 +75,7 @@ G:.
 |   |               SplashView.hx
 |   |               
 |   \---world
+|           Skybox.hx
 |           Track.hx
 |           
 +---res

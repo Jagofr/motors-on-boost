@@ -19,8 +19,10 @@ import graphics.GraphicsManager;
 import save.SaveSystem;
 import ui.FontManager;
 import world.Track;
+import world.Skybox;
 import entities.CarMesh;
 import entities.TrafficSystem;
+import graphics.PostProcessRenderer;
 
 /**
  * Sequential boot loader and splash screen sequence stages.
@@ -108,6 +110,9 @@ class Main extends hxd.App {
     var input:InputController;
     var chaseCam:ChaseCamera;
     var dirLight:DirLight;
+    var skybox:Skybox;
+    var postRenderer:PostProcessRenderer;
+    var wheelSpinAngle:Float = 0.0;
 
     var showcaseAngle:Float = 0.0;
 
@@ -370,6 +375,14 @@ class Main extends hxd.App {
         carPhysics = new CarPhysics(0.0, 0.0, 0.0);
         chaseCam = new ChaseCamera(s3d.camera, 0.0, -10.0, 4.0);
 
+        // High-performance post-processing renderer supporting radial directional blur
+        postRenderer = new PostProcessRenderer();
+        s3d.renderer = postRenderer;
+        s3d.camera.zFar = 1500.0;
+
+        // Atmospheric panoramic gradient blue skybox
+        skybox = new Skybox(s3d);
+
         fpsText = new Text(FontManager.regularFont, s2d);
         fpsText.textColor = 0xFFEE00;
         fpsText.x = 14;
@@ -382,8 +395,13 @@ class Main extends hxd.App {
         speedText.y = 36;
         speedText.visible = false;
 
-        dirLight = new DirLight(new Vector(-0.55, 0.45, -0.7), s3d);
-        dirLight.color.setColor(0xFFE8C2);
+        // Position directional sunlight at the tallest south-east point of the entire map
+        // (X: +350.0 [East], Y: -250.0 [South], Z: 140.0 [Apex Summit elevation])
+        var sunDir = new Vector(-0.55, 0.78, -0.32);
+        sunDir.normalize();
+        dirLight = new DirLight(sunDir, s3d);
+        dirLight.setPosition(350.0, -250.0, 140.0);
+        dirLight.color.setColor(0xFFF2D9);
 
         gfx = new GraphicsManager(s3d, s2d, dirLight, saveData.graphics);
 
@@ -634,8 +652,11 @@ class Main extends hxd.App {
 
         ui.update(dt, input.uiUpPressed, input.uiDownPressed, input.uiLeftPressed, input.uiRightPressed, input.uiConfirmPressed, input.uiCancelPressed);
 
+        if (skybox != null) skybox.syncCamera(s3d.camera.pos);
+
         switch (ui.currentState) {
             case Splash | MainMenu | CreditsScreen:
+                if (postRenderer != null) postRenderer.blurShader.blurIntensity = 0.0;
                 showcaseAngle += 0.35 * dt;
                 var camDist = 11.0;
                 s3d.camera.pos.set(
@@ -646,6 +667,7 @@ class Main extends hxd.App {
                 s3d.camera.target.set(carPhysics.pos.x, carPhysics.pos.y, carPhysics.pos.z + 1.2);
 
             case PauseMenu | OptionsMenu:
+                if (postRenderer != null) postRenderer.blurShader.blurIntensity = 0.0;
                 if (ui.isOpenedFromPause && input.pausePressed && !input.isListeningForRemap) {
                     input.flushInputs();
                     ui.showInGame();
@@ -654,16 +676,26 @@ class Main extends hxd.App {
             case InGameHUD:
                 if (input.pausePressed) {
                     input.flushInputs();
+                    if (postRenderer != null) postRenderer.blurShader.blurIntensity = 0.0;
                     saveCurrentRun();
                     ui.showPause();
                     return;
                 }
 
                 var wasDrifting = carPhysics.isDrifting;
-                carPhysics.update(dt, input);
+                carPhysics.update(dt, input, track != null ? track.waypoints : null);
 
                 if (!wasDrifting && carPhysics.isDrifting) chaseCam.addTrauma(0.35);
                 if (input.boost && carPhysics.forwardSpeed > 20.0) chaseCam.addTrauma(0.12 * dt * 60.0);
+
+                // High-speed radial directional blur scaling
+                var kmh = Math.round(Math.abs(carPhysics.forwardSpeed) * 3.6);
+                var blurIntensity = 0.0;
+                if (kmh > 140) {
+                    blurIntensity = Math.min(0.065, ((kmh - 140.0) / 180.0) * 0.055);
+                }
+                if (input.boost && kmh > 70) blurIntensity = Math.min(0.08, blurIntensity + 0.025);
+                if (postRenderer != null) postRenderer.blurShader.blurIntensity = blurIntensity;
 
                 traffic.update(dt, carPhysics, chaseCam);
 
@@ -672,20 +704,37 @@ class Main extends hxd.App {
                 playerMesh.z = carPhysics.pos.z + Track.ROAD_LIFT;
                 playerMesh.setRotation(carPhysics.pitch, carPhysics.roll, carPhysics.yaw + carPhysics.driftAngle);
 
+                // Four-wheel steering and longitudinal spin animation
+                wheelSpinAngle += (carPhysics.forwardSpeed * dt) / 0.36;
                 var maxSteerAngle = 0.55;
                 var currentSteer = input.steer * maxSteerAngle;
-                if (playerMesh.wheels.length >= 2) {
+                if (playerMesh.wheels.length >= 4) {
+                    // Front-Left (0): Steer & Roll
                     playerMesh.wheels[0].setRotation(0, 0, currentSteer);
                     playerMesh.wheels[0].rotate(0, 1.5707963, 0);
+                    playerMesh.wheels[0].rotate(wheelSpinAngle, 0, 0);
 
+                    // Front-Right (1): Steer & Roll
                     playerMesh.wheels[1].setRotation(0, 0, currentSteer);
                     playerMesh.wheels[1].rotate(0, 1.5707963, 0);
+                    playerMesh.wheels[1].rotate(wheelSpinAngle, 0, 0);
+
+                    // Rear-Left (2): Roll
+                    playerMesh.wheels[2].setRotation(0, 0, 0);
+                    playerMesh.wheels[2].rotate(0, 1.5707963, 0);
+                    playerMesh.wheels[2].rotate(wheelSpinAngle, 0, 0);
+
+                    // Rear-Right (3): Roll
+                    playerMesh.wheels[3].setRotation(0, 0, 0);
+                    playerMesh.wheels[3].rotate(0, 1.5707963, 0);
+                    playerMesh.wheels[3].rotate(wheelSpinAngle, 0, 0);
                 }
 
                 chaseCam.update(dt, carPhysics, input.boost);
 
-                var kmh = Math.round(Math.abs(carPhysics.forwardSpeed) * 3.6);
-                speedText.text = kmh + " KM/H" + (carPhysics.isDrifting ? " [DRIFTING]" : "") + (input.boost ? " [NITRO]" : "");
+                var gearStr = carPhysics.currentGear == -1 ? "R" : (carPhysics.currentGear == 0 ? "N" : "G" + carPhysics.currentGear);
+                var rpm = Math.round(carPhysics.engineRPM);
+                speedText.text = kmh + " KM/H [" + gearStr + "] (" + rpm + " RPM)" + (carPhysics.isDrifting ? " [DRIFTING]" : "") + (input.boost ? " [NITRO]" : "");
                 fpsText.text = "FPS: " + Math.round(hxd.Timer.fps());
         }
     }

@@ -238,6 +238,7 @@ hxd_App.prototype = {
 };
 var Main = function() {
 	this.showcaseAngle = 0.0;
+	this.wheelSpinAngle = 0.0;
 	this.disclaimerMinDuration = 5.5;
 	this.isLoadingComplete = false;
 	this.isLoadingStarted = false;
@@ -290,7 +291,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 			onLoaded(tile);
 		};
 		img.onerror = function(err) {
-			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 177, className : "Main", methodName : "loadWebpTile"});
+			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 182, className : "Main", methodName : "loadWebpTile"});
 		};
 		img.src = path;
 	}
@@ -319,7 +320,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.discBody.set_lineSpacing(5.0);
 		this.discBody.set_text("M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" + "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" + "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" + "are the intellectual property of their respective creators. All rights reserved.\n\n" + "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" + "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" + "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" + "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" + "Please play in a well-lit environment and take a 15-minute break for every hour of play.");
 		this.discVersion = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
-		this.discVersion.set_text("v" + "0.1.4" + " (Build " + 148 + ")");
+		this.discVersion.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
 		this.discVersion.set_textColor(5927822);
 		this.discVersion.set_textAlign(h2d_Align.Center);
 		this.logoRow = new h2d_Object(this.screenDisclaimer);
@@ -422,6 +423,10 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.audio.sfxVolume = this.saveData.sfxVol;
 		this.carPhysics = new physics_CarPhysics(0.0,0.0,0.0);
 		this.chaseCam = new camera_ChaseCamera(this.s3d.camera,0.0,-10.0,4.0);
+		this.postRenderer = new graphics_PostProcessRenderer();
+		this.s3d.set_renderer(this.postRenderer);
+		this.s3d.camera.zFar = 1500.0;
+		this.skybox = new world_Skybox(this.s3d);
 		this.fpsText = new h2d_Text(ui_FontManager.regularFont,this.s2d);
 		this.fpsText.set_textColor(16772608);
 		var _this = this.fpsText;
@@ -440,11 +445,42 @@ Main.prototype = $extend(hxd_App.prototype,{
 		_this.posChanged = true;
 		_this.y = 36;
 		this.speedText.set_visible(false);
-		this.dirLight = new h3d_scene_fwd_DirLight(new h3d_VectorImpl(-0.55,0.45,-0.7),this.s3d);
+		var sunDir = new h3d_VectorImpl(-0.55,0.78,-0.32);
+		var _this = sunDir;
+		var k = _this.x * _this.x + _this.y * _this.y + _this.z * _this.z;
+		if(k < 1e-20) {
+			k = 0;
+		} else {
+			k = 1. / Math.sqrt(k);
+		}
+		_this.x *= k;
+		_this.y *= k;
+		_this.z *= k;
+		this.dirLight = new h3d_scene_fwd_DirLight(sunDir,this.s3d);
+		var _this = this.dirLight;
+		_this.x = 350.0;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		_this.y = -250.0;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		_this.z = 140.0;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
 		var _this = this.dirLight.get_color();
 		_this.x = 1.;
-		_this.y = 0.90980392156862744;
-		_this.z = 0.76078431372549016;
+		_this.y = 0.94901960784313721;
+		_this.z = 0.85098039215686272;
 		this.gfx = new graphics_GraphicsManager(this.s3d,this.s2d,this.dirLight,this.saveData.graphics);
 		var terrainPrim = new h3d_prim_Cube(800.0,800.0,0.4,true);
 		terrainPrim.unindex();
@@ -740,21 +776,38 @@ Main.prototype = $extend(hxd_App.prototype,{
 			}
 		}
 		this.ui.update(dt,this.input.uiUpPressed,this.input.uiDownPressed,this.input.uiLeftPressed,this.input.uiRightPressed,this.input.uiConfirmPressed,this.input.uiCancelPressed);
+		if(this.skybox != null) {
+			this.skybox.syncCamera(this.s3d.camera.pos);
+		}
 		switch(this.ui.currentState._hx_index) {
 		case 2:
 			if(this.input.pausePressed) {
 				this.input.flushInputs();
+				if(this.postRenderer != null) {
+					this.postRenderer.blurShader.blurIntensity__ = 0.0;
+				}
 				this.saveCurrentRun();
 				this.ui.showPause();
 				return;
 			}
 			var wasDrifting = this.carPhysics.isDrifting;
-			this.carPhysics.update(dt,this.input);
+			this.carPhysics.update(dt,this.input,this.track != null ? this.track.waypoints : null);
 			if(!wasDrifting && this.carPhysics.isDrifting) {
 				this.chaseCam.addTrauma(0.35);
 			}
 			if(this.input.boost && this.carPhysics.forwardSpeed > 20.0) {
 				this.chaseCam.addTrauma(0.12 * dt * 60.0);
+			}
+			var kmh = Math.round(Math.abs(this.carPhysics.forwardSpeed) * 3.6);
+			var blurIntensity = 0.0;
+			if(kmh > 140) {
+				blurIntensity = Math.min(0.065,(kmh - 140.0) / 180.0 * 0.055);
+			}
+			if(this.input.boost && kmh > 70) {
+				blurIntensity = Math.min(0.08,blurIntensity + 0.025);
+			}
+			if(this.postRenderer != null) {
+				this.postRenderer.blurShader.blurIntensity__ = blurIntensity;
 			}
 			this.traffic.update(dt,this.carPhysics,this.chaseCam);
 			var _this = this.playerMesh;
@@ -776,24 +829,39 @@ Main.prototype = $extend(hxd_App.prototype,{
 				_this.flags |= 262144;
 			}
 			this.playerMesh.setRotation(this.carPhysics.pitch,this.carPhysics.roll,this.carPhysics.yaw + this.carPhysics.driftAngle);
+			this.wheelSpinAngle += this.carPhysics.forwardSpeed * dt / 0.36;
 			var currentSteer = this.input.steer * 0.55;
-			if(this.playerMesh.wheels.length >= 2) {
+			if(this.playerMesh.wheels.length >= 4) {
 				this.playerMesh.wheels[0].setRotation(0,0,currentSteer);
 				this.playerMesh.wheels[0].rotate(0,1.5707963,0);
+				this.playerMesh.wheels[0].rotate(this.wheelSpinAngle,0,0);
 				this.playerMesh.wheels[1].setRotation(0,0,currentSteer);
 				this.playerMesh.wheels[1].rotate(0,1.5707963,0);
+				this.playerMesh.wheels[1].rotate(this.wheelSpinAngle,0,0);
+				this.playerMesh.wheels[2].setRotation(0,0,0);
+				this.playerMesh.wheels[2].rotate(0,1.5707963,0);
+				this.playerMesh.wheels[2].rotate(this.wheelSpinAngle,0,0);
+				this.playerMesh.wheels[3].setRotation(0,0,0);
+				this.playerMesh.wheels[3].rotate(0,1.5707963,0);
+				this.playerMesh.wheels[3].rotate(this.wheelSpinAngle,0,0);
 			}
 			this.chaseCam.update(dt,this.carPhysics,this.input.boost);
-			this.speedText.set_text(Math.round(Math.abs(this.carPhysics.forwardSpeed) * 3.6) + " KM/H" + (this.carPhysics.isDrifting ? " [DRIFTING]" : "") + (this.input.boost ? " [NITRO]" : ""));
+			this.speedText.set_text(kmh + " KM/H [" + (this.carPhysics.currentGear == -1 ? "R" : this.carPhysics.currentGear == 0 ? "N" : "G" + this.carPhysics.currentGear) + "] (" + Math.round(this.carPhysics.engineRPM) + " RPM)" + (this.carPhysics.isDrifting ? " [DRIFTING]" : "") + (this.input.boost ? " [NITRO]" : ""));
 			this.fpsText.set_text("FPS: " + Math.round(hxd_Timer.fps()));
 			break;
 		case 3:case 4:
+			if(this.postRenderer != null) {
+				this.postRenderer.blurShader.blurIntensity__ = 0.0;
+			}
 			if(this.ui.isOpenedFromPause && this.input.pausePressed && !this.input.isListeningForRemap) {
 				this.input.flushInputs();
 				this.ui.showInGame();
 			}
 			break;
 		case 0:case 1:case 5:
+			if(this.postRenderer != null) {
+				this.postRenderer.blurShader.blurIntensity__ = 0.0;
+			}
 			this.showcaseAngle += 0.35 * dt;
 			var _this = this.s3d.camera.pos;
 			var x = this.carPhysics.pos.x + Math.sin(this.showcaseAngle) * 11.0;
@@ -1322,6 +1390,8 @@ var camera_ChaseCamera = function(camera,startX,startY,startZ) {
 	if(startX == null) {
 		startX = 0.0;
 	}
+	this.accelPullBack = 0.0;
+	this.prevSpeed = 0.0;
 	this.trauma = 0.0;
 	this.currentTarget = new h3d_VectorImpl(0.,0.,0.);
 	this.currentPos = new h3d_VectorImpl(0.,0.,0.);
@@ -1364,46 +1434,59 @@ var camera_ChaseCamera = function(camera,startX,startY,startZ) {
 	_this.x = v.x;
 	_this.y = v.y;
 	_this.z = v.z;
-	this.cam.fovY = 52.0;
+	this.cam.fovY = 65.0;
 };
 $hxClasses["camera.ChaseCamera"] = camera_ChaseCamera;
 camera_ChaseCamera.__name__ = "camera.ChaseCamera";
 camera_ChaseCamera.prototype = {
 	addTrauma: function(amount) {
-		this.trauma = Math.min(1.0,this.trauma + amount);
+		this.trauma = Math.min(0.55,this.trauma + amount * 0.50);
 	}
 	,update: function(dt,carPhysics,isNitroActive) {
-		var speedRatio = Math.min(1.0,Math.abs(carPhysics.forwardSpeed) / 75.0);
-		var targetFov = 52.0 + speedRatio * 22.0;
+		if(dt <= 0.0) {
+			return;
+		}
+		var clampedDt = Math.min(dt,0.05);
+		var speedAbs = Math.abs(carPhysics.forwardSpeed);
+		var speedRatio = Math.min(1.0,speedAbs / 68.0);
+		var targetFov = 65.0 + speedRatio * 20.;
 		if(isNitroActive) {
 			targetFov += 5.0;
 		}
-		this.cam.fovY += (targetFov - this.cam.fovY) * Math.min(1.0,6.0 * dt);
-		var effectiveYaw = carPhysics.yaw + carPhysics.driftAngle * 0.45;
+		this.cam.fovY += (targetFov - this.cam.fovY) * Math.min(1.0,7.5 * clampedDt);
+		var currentAccel = (carPhysics.forwardSpeed - this.prevSpeed) / clampedDt;
+		this.prevSpeed = carPhysics.forwardSpeed;
+		var targetPullBack = 0.0;
+		if(currentAccel > 2.0) {
+			targetPullBack = Math.min(2.5,currentAccel * 0.06);
+		}
+		if(isNitroActive && speedAbs > 15.0) {
+			targetPullBack += 1.2;
+		}
+		this.accelPullBack += (targetPullBack - this.accelPullBack) * Math.min(1.0,5.0 * clampedDt);
+		var effectiveYaw = carPhysics.yaw + carPhysics.driftAngle * 0.40;
 		var fwdX = -Math.sin(effectiveYaw);
 		var fwdY = Math.cos(effectiveYaw);
-		var dist = 9.2 + speedRatio * 1.8;
-		var targetLookX = carPhysics.pos.x + fwdX * 6.0;
-		var targetLookY = carPhysics.pos.y + fwdY * 6.0;
+		var dist = 8.8 + speedRatio * 1.5 + this.accelPullBack;
+		var targetLookX = carPhysics.pos.x + fwdX * 6.5;
+		var targetLookY = carPhysics.pos.y + fwdY * 6.5;
 		var targetLookZ = carPhysics.pos.z + 1.0;
-		var posLerp = Math.min(1.0,8.5 * dt);
-		var lookLerp = Math.min(1.0,12.0 * dt);
-		this.currentPos.x += (carPhysics.pos.x - fwdX * dist - this.currentPos.x) * posLerp;
-		this.currentPos.y += (carPhysics.pos.y - fwdY * dist - this.currentPos.y) * posLerp;
-		this.currentPos.z += (carPhysics.pos.z + (3.4 + speedRatio * 0.4) - this.currentPos.z) * posLerp;
-		this.currentTarget.x += (targetLookX - this.currentTarget.x) * lookLerp;
-		this.currentTarget.y += (targetLookY - this.currentTarget.y) * lookLerp;
-		this.currentTarget.z += (targetLookZ - this.currentTarget.z) * lookLerp;
+		this.currentPos.x += (carPhysics.pos.x - fwdX * dist - this.currentPos.x) * Math.min(1.0,8.5 * clampedDt);
+		this.currentPos.y += (carPhysics.pos.y - fwdY * dist - this.currentPos.y) * Math.min(1.0,8.5 * clampedDt);
+		this.currentPos.z += (carPhysics.pos.z + (3.2 + speedRatio * 0.35) - this.currentPos.z) * Math.min(1.0,8.5 * clampedDt);
+		this.currentTarget.x += (targetLookX - this.currentTarget.x) * Math.min(1.0,12.0 * clampedDt);
+		this.currentTarget.y += (targetLookY - this.currentTarget.y) * Math.min(1.0,12.0 * clampedDt);
+		this.currentTarget.z += (targetLookZ - this.currentTarget.z) * Math.min(1.0,12.0 * clampedDt);
 		var shakeX = 0.0;
 		var shakeY = 0.0;
 		var shakeZ = 0.0;
 		if(this.trauma > 0.001) {
 			var shakeStrength = this.trauma * this.trauma;
-			var t = hxd_Timer.lastTimeStamp * 45.0;
-			shakeX = Math.sin(t * 1.3) * 0.28 * shakeStrength;
-			shakeY = Math.cos(t * 1.7) * 0.28 * shakeStrength;
-			shakeZ = Math.sin(t * 2.1) * 0.22 * shakeStrength;
-			this.trauma = Math.max(0.0,this.trauma - 1.8 * dt);
+			var t = hxd_Timer.lastTimeStamp * 48.0;
+			shakeX = Math.sin(t * 1.3) * 0.09 * shakeStrength;
+			shakeY = Math.cos(t * 1.7) * 0.09 * shakeStrength;
+			shakeZ = Math.sin(t * 2.1) * 0.06 * shakeStrength;
+			this.trauma = Math.max(0.0,this.trauma - 3.8 * clampedDt);
 		}
 		var _this = this.cam.pos;
 		var x = this.currentPos.x + shakeX;
@@ -5041,6 +5124,519 @@ graphics_GraphicsManager.prototype = {
 	}
 	,__class__: graphics_GraphicsManager
 };
+var hxd_impl_AnyProps = function() { };
+$hxClasses["hxd.impl.AnyProps"] = hxd_impl_AnyProps;
+hxd_impl_AnyProps.__name__ = "hxd.impl.AnyProps";
+hxd_impl_AnyProps.prototype = {
+	set_props: function(p) {
+		this.props = p;
+		this.refreshProps();
+		return p;
+	}
+	,getDefaultProps: function(kind) {
+		return { };
+	}
+	,refreshProps: function() {
+	}
+	,__class__: hxd_impl_AnyProps
+};
+var h3d_scene_Renderer = function() {
+	this.effects = [];
+	this.hasSetTarget = false;
+	this.emptyPasses = new h3d_pass_PassList();
+	this.allPasses = [];
+	this.passObjects = new haxe_ds_StringMap();
+	this.set_props(this.getDefaultProps());
+	var _g = this;
+	var frontToBack = true;
+	this.frontToBack = function(passes) {
+		_g.depthSort(frontToBack,passes);
+	};
+	var _g1 = this;
+	var frontToBack1 = false;
+	this.backToFront = function(passes) {
+		_g1.depthSort(frontToBack1,passes);
+	};
+};
+$hxClasses["h3d.scene.Renderer"] = h3d_scene_Renderer;
+h3d_scene_Renderer.__name__ = "h3d.scene.Renderer";
+h3d_scene_Renderer.__super__ = hxd_impl_AnyProps;
+h3d_scene_Renderer.prototype = $extend(hxd_impl_AnyProps.prototype,{
+	mark: function(id) {
+	}
+	,depthSort: function(frontToBack,passes) {
+		var cam = this.ctx.camera.m;
+		var _g_o = passes.current;
+		while(_g_o != null) {
+			var tmp = _g_o;
+			_g_o = _g_o.next;
+			var z = tmp.obj.absPos._41 * cam._13 + tmp.obj.absPos._42 * cam._23 + tmp.obj.absPos._43 * cam._33 + cam._43;
+			var w = tmp.obj.absPos._41 * cam._14 + tmp.obj.absPos._42 * cam._24 + tmp.obj.absPos._43 * cam._34 + cam._44;
+			tmp.depth = w > 0.0 ? z / w : -z / w;
+		}
+		if(frontToBack) {
+			var list = passes.current;
+			var tmp;
+			if(list == null) {
+				tmp = null;
+			} else {
+				var insize = 1;
+				var nmerges;
+				var psize = 0;
+				var qsize = 0;
+				var p;
+				var q;
+				var e;
+				var tail;
+				while(true) {
+					p = list;
+					list = null;
+					tail = null;
+					nmerges = 0;
+					while(p != null) {
+						++nmerges;
+						q = p;
+						psize = 0;
+						var _g = 0;
+						var _g1 = insize;
+						while(_g < _g1) {
+							++_g;
+							++psize;
+							q = q.next;
+							if(q == null) {
+								break;
+							}
+						}
+						qsize = insize;
+						while(psize > 0 || qsize > 0 && q != null) {
+							if(psize == 0) {
+								e = q;
+								q = q.next;
+								--qsize;
+							} else if(qsize == 0 || q == null || (p.pass.layer != q.pass.layer ? p.pass.layer - q.pass.layer : p.depth == q.depth ? 0 : p.depth > q.depth ? 1 : -1) <= 0) {
+								e = p;
+								p = p.next;
+								--psize;
+							} else {
+								e = q;
+								q = q.next;
+								--qsize;
+							}
+							if(tail != null) {
+								tail.next = e;
+							} else {
+								list = e;
+							}
+							tail = e;
+						}
+						p = q;
+					}
+					tail.next = null;
+					if(nmerges <= 1) {
+						break;
+					}
+					insize *= 2;
+				}
+				tmp = list;
+			}
+			passes.current = tmp;
+		} else {
+			var list = passes.current;
+			var tmp;
+			if(list == null) {
+				tmp = null;
+			} else {
+				var insize = 1;
+				var nmerges;
+				var psize = 0;
+				var qsize = 0;
+				var p;
+				var q;
+				var e;
+				var tail;
+				while(true) {
+					p = list;
+					list = null;
+					tail = null;
+					nmerges = 0;
+					while(p != null) {
+						++nmerges;
+						q = p;
+						psize = 0;
+						var _g = 0;
+						var _g1 = insize;
+						while(_g < _g1) {
+							++_g;
+							++psize;
+							q = q.next;
+							if(q == null) {
+								break;
+							}
+						}
+						qsize = insize;
+						while(psize > 0 || qsize > 0 && q != null) {
+							if(psize == 0) {
+								e = q;
+								q = q.next;
+								--qsize;
+							} else if(qsize == 0 || q == null || (p.pass.layer != q.pass.layer ? p.pass.layer - q.pass.layer : p.depth == q.depth ? 0 : p.depth < q.depth ? 1 : -1) <= 0) {
+								e = p;
+								p = p.next;
+								--psize;
+							} else {
+								e = q;
+								q = q.next;
+								--qsize;
+							}
+							if(tail != null) {
+								tail.next = e;
+							} else {
+								list = e;
+							}
+							tail = e;
+						}
+						p = q;
+					}
+					tail.next = null;
+					if(nmerges <= 1) {
+						break;
+					}
+					insize *= 2;
+				}
+				tmp = list;
+			}
+			passes.current = tmp;
+		}
+	}
+	,setTarget: function(tex,depthBinding) {
+		if(depthBinding == null) {
+			depthBinding = h3d_DepthBinding.ReadWrite;
+		}
+		if(this.hasSetTarget) {
+			this.ctx.engine.popTarget();
+		}
+		this.ctx.engine.pushTarget(tex,null,null,depthBinding);
+		this.hasSetTarget = true;
+	}
+	,resetTarget: function() {
+		if(this.hasSetTarget) {
+			this.ctx.engine.popTarget();
+			this.hasSetTarget = false;
+		}
+	}
+	,has: function(name) {
+		return this.passObjects.h[name] != null;
+	}
+	,setPassFlags: function(pass) {
+		pass.rendererFlags |= 1;
+	}
+	,get: function(name) {
+		var p = this.passObjects.h[name];
+		if(p == null) {
+			return this.emptyPasses;
+		}
+		p.rendered = true;
+		return p.passes;
+	}
+	,render: function() {
+		throw haxe_Exception.thrown("Not implemented");
+	}
+	,computeStatic: function() {
+		throw haxe_Exception.thrown("Not implemented");
+	}
+	,start: function() {
+	}
+	,startEffects: function() {
+		var _g = 0;
+		var _g1 = this.effects;
+		while(_g < _g1.length) {
+			var e = _g1[_g];
+			++_g;
+			if(e.enabled) {
+				e.start(this);
+			}
+		}
+	}
+	,process: function(passes) {
+		this.hasSetTarget = false;
+		var _g = 0;
+		var _g1 = this.allPasses;
+		while(_g < _g1.length) _g1[_g++].setContext(this.ctx);
+		var _g = 0;
+		while(_g < passes.length) {
+			var p = passes[_g];
+			++_g;
+			this.passObjects.h[p.name] = p;
+		}
+		this.ctx.textures.begin();
+		if(this.ctx.computingStatic) {
+			this.computeStatic();
+		} else {
+			this.render();
+		}
+		this.resetTarget();
+		var _g = 0;
+		while(_g < passes.length) this.passObjects.h[passes[_g++].name] = null;
+	}
+	,__class__: h3d_scene_Renderer
+});
+var h3d_scene_fwd_Renderer = function() {
+	this.shadow = new h3d_pass_DefaultShadowMap(1024);
+	this.normal = new h3d_scene_fwd_NormalPass();
+	this.depth = new h3d_scene_fwd_DepthPass();
+	h3d_scene_Renderer.call(this);
+	this.defaultPass = new h3d_pass_Output("default");
+	this.allPasses = [this.defaultPass,this.depth,this.normal,this.shadow];
+};
+$hxClasses["h3d.scene.fwd.Renderer"] = h3d_scene_fwd_Renderer;
+h3d_scene_fwd_Renderer.__name__ = "h3d.scene.fwd.Renderer";
+h3d_scene_fwd_Renderer.__super__ = h3d_scene_Renderer;
+h3d_scene_fwd_Renderer.prototype = $extend(h3d_scene_Renderer.prototype,{
+	renderPass: function(p,passes,sort) {
+		p.draw(passes,sort);
+	}
+	,render: function() {
+		if(this.has("shadow")) {
+			this.renderPass(this.shadow,this.get("shadow"));
+		}
+		if(this.has("depth")) {
+			this.renderPass(this.depth,this.get("depth"));
+		}
+		if(this.has("normal")) {
+			this.renderPass(this.normal,this.get("normal"));
+		}
+		this.renderPass(this.defaultPass,this.get("default"));
+		this.renderPass(this.defaultPass,this.get("alpha"),this.backToFront);
+		this.renderPass(this.defaultPass,this.get("additive"));
+	}
+	,__class__: h3d_scene_fwd_Renderer
+});
+var graphics_PostProcessRenderer = function() {
+	h3d_scene_fwd_Renderer.call(this);
+	this.blurShader = new graphics_RadialBlurShader();
+	this.screenFx = new h3d_pass_ScreenFx(this.blurShader);
+};
+$hxClasses["graphics.PostProcessRenderer"] = graphics_PostProcessRenderer;
+graphics_PostProcessRenderer.__name__ = "graphics.PostProcessRenderer";
+graphics_PostProcessRenderer.__super__ = h3d_scene_fwd_Renderer;
+graphics_PostProcessRenderer.prototype = $extend(h3d_scene_fwd_Renderer.prototype,{
+	render: function() {
+		if(this.blurShader != null && this.blurShader.blurIntensity__ > 0.001) {
+			var target = this.ctx.textures.allocTarget("radialBlurBuffer",Math.round(this.ctx.engine.width * 1.),Math.round(this.ctx.engine.height * 1.),true,null);
+			this.setTarget(target);
+			this.ctx.engine.clear(this.ctx.engine.backgroundColor,1,null);
+			h3d_scene_fwd_Renderer.prototype.render.call(this);
+			this.resetTarget();
+			this.blurShader.texture__ = target;
+			this.screenFx.render();
+		} else {
+			h3d_scene_fwd_Renderer.prototype.render.call(this);
+		}
+	}
+	,__class__: graphics_PostProcessRenderer
+});
+var hxsl_Shader = function() {
+	this.priority = 0;
+	this.initialize();
+};
+$hxClasses["hxsl.Shader"] = hxsl_Shader;
+hxsl_Shader.__name__ = "hxsl.Shader";
+hxsl_Shader.prototype = {
+	initialize: function() {
+		this.constModified = true;
+		if(this.shader != null) {
+			return;
+		}
+		var cl = js_Boot.getClass(this);
+		this.shader = cl._SHADER;
+		if(this.shader == null) {
+			var curClass = cl;
+			while(curClass != null && curClass.SRC == null) curClass = curClass.__super__;
+			if(curClass == null) {
+				throw haxe_Exception.thrown(cl.__name__ + " has no shader source");
+			}
+			this.shader = curClass._SHADER;
+			if(this.shader == null) {
+				this.shader = new hxsl_SharedShader(curClass.SRC,curClass._MODULE);
+				curClass._SHADER = this.shader;
+			}
+		}
+	}
+	,setPriority: function(v) {
+		this.priority = v;
+	}
+	,getParamValue: function(index) {
+		throw haxe_Exception.thrown("assert");
+	}
+	,getParamFloatValue: function(index) {
+		throw haxe_Exception.thrown("assert");
+	}
+	,updateConstants: function(globals) {
+		throw haxe_Exception.thrown("assert");
+	}
+	,updateConstantsFinal: function(globals) {
+		var c = this.shader.consts;
+		while(c != null) {
+			if(c.globalId == 0) {
+				c = c.next;
+				continue;
+			}
+			var v = globals.map.h[c.globalId];
+			var _g = c.v.type;
+			switch(_g._hx_index) {
+			case 1:
+				var v1 = v;
+				if(v1 >>> c.bits != 0) {
+					throw haxe_Exception.thrown("Constant " + c.v.name + " is outside range (" + v1 + " > " + ((1 << c.bits) - 1) + ")");
+				}
+				this.constBits |= v1 << c.pos;
+				break;
+			case 2:
+				if(v) {
+					this.constBits |= 1 << c.pos;
+				}
+				break;
+			case 17:
+				if(v == null) {
+					c = c.next;
+					continue;
+				}
+				var v2 = v;
+				var sel = v2.channel;
+				if(v2.texture == null) {
+					sel = hxsl_Channel.Unknown;
+				} else if(sel == null || sel == hxsl_Channel.Unknown) {
+					switch(_g.size) {
+					case 1:
+						if(v2.texture.format == h3d_mat_Texture.nativeFormat) {
+							sel = hxsl_Channel.PackedFloat;
+						} else {
+							throw haxe_Exception.thrown("Constant " + c.v.name + " does not define channel select value");
+						}
+						break;
+					case 3:
+						if(v2.texture.format == h3d_mat_Texture.nativeFormat) {
+							sel = hxsl_Channel.PackedNormal;
+						} else {
+							throw haxe_Exception.thrown("Constant " + c.v.name + " does not define channel select value");
+						}
+						break;
+					default:
+						throw haxe_Exception.thrown("Constant " + c.v.name + " does not define channel select value");
+					}
+				}
+				this.constBits |= (globals.allocChannelID(v2.texture) << 3 | sel._hx_index) << c.pos;
+				break;
+			default:
+				throw haxe_Exception.thrown("assert");
+			}
+			c = c.next;
+		}
+		var _this = this.shader;
+		var constBits = this.constBits;
+		var i = _this.instanceCache.h[constBits];
+		this.instance = i == null ? _this.makeInstance(constBits) : i;
+	}
+	,toString: function() {
+		var c = js_Boot.getClass(this);
+		return c.__name__;
+	}
+	,__class__: hxsl_Shader
+};
+var h3d_shader_ScreenShader = function() {
+	this.flipY__ = 0;
+	hxsl_Shader.call(this);
+};
+$hxClasses["h3d.shader.ScreenShader"] = h3d_shader_ScreenShader;
+h3d_shader_ScreenShader.__name__ = "h3d.shader.ScreenShader";
+h3d_shader_ScreenShader.__super__ = hxsl_Shader;
+h3d_shader_ScreenShader.prototype = $extend(hxsl_Shader.prototype,{
+	get_flipY: function() {
+		return this.flipY__;
+	}
+	,set_flipY: function(_v) {
+		return this.flipY__ = _v;
+	}
+	,updateConstants: function(globals) {
+		this.constBits = 0;
+		this.updateConstantsFinal(globals);
+	}
+	,getParamValue: function(index) {
+		if(index == 0) {
+			return this.flipY__;
+		}
+		return null;
+	}
+	,getParamFloatValue: function(index) {
+		if(index == 0) {
+			return this.flipY__;
+		}
+		return 0.;
+	}
+	,__class__: h3d_shader_ScreenShader
+});
+var graphics_RadialBlurShader = function() {
+	this.blurIntensity__ = 0;
+	this.blurOrigin__ = new h3d_VectorImpl(0.,0.,0.);
+	h3d_shader_ScreenShader.call(this);
+	var _this = this.blurOrigin__;
+	_this.x = 0.5;
+	_this.y = 0.5;
+	_this.z = 0.;
+	this.blurIntensity__ = 0.0;
+};
+$hxClasses["graphics.RadialBlurShader"] = graphics_RadialBlurShader;
+graphics_RadialBlurShader.__name__ = "graphics.RadialBlurShader";
+graphics_RadialBlurShader.__super__ = h3d_shader_ScreenShader;
+graphics_RadialBlurShader.prototype = $extend(h3d_shader_ScreenShader.prototype,{
+	get_texture: function() {
+		return this.texture__;
+	}
+	,set_texture: function(_v) {
+		return this.texture__ = _v;
+	}
+	,get_blurOrigin: function() {
+		return this.blurOrigin__;
+	}
+	,set_blurOrigin: function(_v) {
+		return this.blurOrigin__ = _v;
+	}
+	,get_blurIntensity: function() {
+		return this.blurIntensity__;
+	}
+	,set_blurIntensity: function(_v) {
+		return this.blurIntensity__ = _v;
+	}
+	,updateConstants: function(globals) {
+		this.constBits = 0;
+		this.updateConstantsFinal(globals);
+	}
+	,getParamValue: function(index) {
+		switch(index) {
+		case 0:
+			return this.flipY__;
+		case 1:
+			return this.texture__;
+		case 2:
+			return this.blurOrigin__;
+		case 3:
+			return this.blurIntensity__;
+		default:
+		}
+		return null;
+	}
+	,getParamFloatValue: function(index) {
+		switch(index) {
+		case 0:
+			return this.flipY__;
+		case 3:
+			return this.blurIntensity__;
+		default:
+		}
+		return 0.;
+	}
+	,__class__: graphics_RadialBlurShader
+});
 var h2d_col_PointImpl = function(x,y) {
 	if(y == null) {
 		y = 0.;
@@ -16317,22 +16913,6 @@ h3d_impl_TextureCache.prototype = {
 	}
 	,__class__: h3d_impl_TextureCache
 };
-var hxd_impl_AnyProps = function() { };
-$hxClasses["hxd.impl.AnyProps"] = hxd_impl_AnyProps;
-hxd_impl_AnyProps.__name__ = "hxd.impl.AnyProps";
-hxd_impl_AnyProps.prototype = {
-	set_props: function(p) {
-		this.props = p;
-		this.refreshProps();
-		return p;
-	}
-	,getDefaultProps: function(kind) {
-		return { };
-	}
-	,refreshProps: function() {
-	}
-	,__class__: hxd_impl_AnyProps
-};
 var h3d_mat_BaseMaterial = function(shader) {
 	if(shader != null) {
 		this.addPass(new h3d_mat_Pass("default",null)).addShader(shader);
@@ -17620,146 +18200,6 @@ h3d_pass_Blur.prototype = $extend(h3d_pass_ScreenFx.prototype,{
 		output.depthBuffer = outDepth;
 	}
 	,__class__: h3d_pass_Blur
-});
-var hxsl_Shader = function() {
-	this.priority = 0;
-	this.initialize();
-};
-$hxClasses["hxsl.Shader"] = hxsl_Shader;
-hxsl_Shader.__name__ = "hxsl.Shader";
-hxsl_Shader.prototype = {
-	initialize: function() {
-		this.constModified = true;
-		if(this.shader != null) {
-			return;
-		}
-		var cl = js_Boot.getClass(this);
-		this.shader = cl._SHADER;
-		if(this.shader == null) {
-			var curClass = cl;
-			while(curClass != null && curClass.SRC == null) curClass = curClass.__super__;
-			if(curClass == null) {
-				throw haxe_Exception.thrown(cl.__name__ + " has no shader source");
-			}
-			this.shader = curClass._SHADER;
-			if(this.shader == null) {
-				this.shader = new hxsl_SharedShader(curClass.SRC,curClass._MODULE);
-				curClass._SHADER = this.shader;
-			}
-		}
-	}
-	,setPriority: function(v) {
-		this.priority = v;
-	}
-	,getParamValue: function(index) {
-		throw haxe_Exception.thrown("assert");
-	}
-	,getParamFloatValue: function(index) {
-		throw haxe_Exception.thrown("assert");
-	}
-	,updateConstants: function(globals) {
-		throw haxe_Exception.thrown("assert");
-	}
-	,updateConstantsFinal: function(globals) {
-		var c = this.shader.consts;
-		while(c != null) {
-			if(c.globalId == 0) {
-				c = c.next;
-				continue;
-			}
-			var v = globals.map.h[c.globalId];
-			var _g = c.v.type;
-			switch(_g._hx_index) {
-			case 1:
-				var v1 = v;
-				if(v1 >>> c.bits != 0) {
-					throw haxe_Exception.thrown("Constant " + c.v.name + " is outside range (" + v1 + " > " + ((1 << c.bits) - 1) + ")");
-				}
-				this.constBits |= v1 << c.pos;
-				break;
-			case 2:
-				if(v) {
-					this.constBits |= 1 << c.pos;
-				}
-				break;
-			case 17:
-				if(v == null) {
-					c = c.next;
-					continue;
-				}
-				var v2 = v;
-				var sel = v2.channel;
-				if(v2.texture == null) {
-					sel = hxsl_Channel.Unknown;
-				} else if(sel == null || sel == hxsl_Channel.Unknown) {
-					switch(_g.size) {
-					case 1:
-						if(v2.texture.format == h3d_mat_Texture.nativeFormat) {
-							sel = hxsl_Channel.PackedFloat;
-						} else {
-							throw haxe_Exception.thrown("Constant " + c.v.name + " does not define channel select value");
-						}
-						break;
-					case 3:
-						if(v2.texture.format == h3d_mat_Texture.nativeFormat) {
-							sel = hxsl_Channel.PackedNormal;
-						} else {
-							throw haxe_Exception.thrown("Constant " + c.v.name + " does not define channel select value");
-						}
-						break;
-					default:
-						throw haxe_Exception.thrown("Constant " + c.v.name + " does not define channel select value");
-					}
-				}
-				this.constBits |= (globals.allocChannelID(v2.texture) << 3 | sel._hx_index) << c.pos;
-				break;
-			default:
-				throw haxe_Exception.thrown("assert");
-			}
-			c = c.next;
-		}
-		var _this = this.shader;
-		var constBits = this.constBits;
-		var i = _this.instanceCache.h[constBits];
-		this.instance = i == null ? _this.makeInstance(constBits) : i;
-	}
-	,toString: function() {
-		var c = js_Boot.getClass(this);
-		return c.__name__;
-	}
-	,__class__: hxsl_Shader
-};
-var h3d_shader_ScreenShader = function() {
-	this.flipY__ = 0;
-	hxsl_Shader.call(this);
-};
-$hxClasses["h3d.shader.ScreenShader"] = h3d_shader_ScreenShader;
-h3d_shader_ScreenShader.__name__ = "h3d.shader.ScreenShader";
-h3d_shader_ScreenShader.__super__ = hxsl_Shader;
-h3d_shader_ScreenShader.prototype = $extend(hxsl_Shader.prototype,{
-	get_flipY: function() {
-		return this.flipY__;
-	}
-	,set_flipY: function(_v) {
-		return this.flipY__ = _v;
-	}
-	,updateConstants: function(globals) {
-		this.constBits = 0;
-		this.updateConstantsFinal(globals);
-	}
-	,getParamValue: function(index) {
-		if(index == 0) {
-			return this.flipY__;
-		}
-		return null;
-	}
-	,getParamFloatValue: function(index) {
-		if(index == 0) {
-			return this.flipY__;
-		}
-		return 0.;
-	}
-	,__class__: h3d_shader_ScreenShader
 });
 var h3d_pass__$Border_BorderShader = function() {
 	this.color__ = new h3d_Vector4Impl(0.,0.,0.,1.);
@@ -22538,6 +22978,84 @@ h3d_prim_RawPrimitive.prototype = $extend(h3d_prim_Primitive.prototype,{
 	}
 	,__class__: h3d_prim_RawPrimitive
 });
+var h3d_prim_Sphere = function(ray,segsW,segsH,portion) {
+	if(portion == null) {
+		portion = 1.;
+	}
+	if(segsH == null) {
+		segsH = 6;
+	}
+	if(segsW == null) {
+		segsW = 8;
+	}
+	if(ray == null) {
+		ray = 1.;
+	}
+	this.ray = ray;
+	this.segsH = segsH;
+	this.segsW = segsW;
+	this.portion = portion;
+	var dp = Math.PI * 2 / segsW;
+	var pts = [];
+	var idx = new Array(0);
+	var _g = 0;
+	var _g1 = segsH + 1;
+	while(_g < _g1) {
+		var t = _g++ / segsH * Math.PI * portion;
+		var st = Math.sin(t);
+		var pz = Math.cos(t);
+		var p = 0.;
+		var _g2 = 0;
+		var _g3 = segsW + 1;
+		while(_g2 < _g3) {
+			++_g2;
+			var x = st * Math.cos(p) * ray;
+			var y = st * Math.sin(p) * ray;
+			var z = pz * ray;
+			if(z == null) {
+				z = 0.;
+			}
+			if(y == null) {
+				y = 0.;
+			}
+			if(x == null) {
+				x = 0.;
+			}
+			pts.push(new h3d_VectorImpl(x,y,z));
+			p += dp;
+		}
+	}
+	var _g = 0;
+	while(_g < segsH) {
+		var y = _g++;
+		var _g1 = 0;
+		while(_g1 < segsW) {
+			var x = _g1++;
+			var v2 = x + y * (segsW + 1);
+			var v4 = x + 1 + (y + 1) * (segsW + 1);
+			if(y != 0) {
+				idx.push(x + 1 + y * (segsW + 1));
+				idx.push(v2);
+				idx.push(v4);
+			}
+			if(y != segsH - 1 || portion != 1.) {
+				idx.push(v2);
+				idx.push(x + (y + 1) * (segsW + 1));
+				idx.push(v4);
+			}
+		}
+	}
+	h3d_prim_Polygon.call(this,pts,idx);
+};
+$hxClasses["h3d.prim.Sphere"] = h3d_prim_Sphere;
+h3d_prim_Sphere.__name__ = "h3d.prim.Sphere";
+h3d_prim_Sphere.__super__ = h3d_prim_Polygon;
+h3d_prim_Sphere.prototype = $extend(h3d_prim_Polygon.prototype,{
+	addNormals: function() {
+		this.normals = this.points;
+	}
+	,__class__: h3d_prim_Sphere
+});
 var h3d_prim_UV = function(u,v) {
 	this.u = u;
 	this.v = v;
@@ -23283,236 +23801,6 @@ h3d_scene_PassObjects.__name__ = "h3d.scene.PassObjects";
 h3d_scene_PassObjects.prototype = {
 	__class__: h3d_scene_PassObjects
 };
-var h3d_scene_Renderer = function() {
-	this.effects = [];
-	this.hasSetTarget = false;
-	this.emptyPasses = new h3d_pass_PassList();
-	this.allPasses = [];
-	this.passObjects = new haxe_ds_StringMap();
-	this.set_props(this.getDefaultProps());
-	var _g = this;
-	var frontToBack = true;
-	this.frontToBack = function(passes) {
-		_g.depthSort(frontToBack,passes);
-	};
-	var _g1 = this;
-	var frontToBack1 = false;
-	this.backToFront = function(passes) {
-		_g1.depthSort(frontToBack1,passes);
-	};
-};
-$hxClasses["h3d.scene.Renderer"] = h3d_scene_Renderer;
-h3d_scene_Renderer.__name__ = "h3d.scene.Renderer";
-h3d_scene_Renderer.__super__ = hxd_impl_AnyProps;
-h3d_scene_Renderer.prototype = $extend(hxd_impl_AnyProps.prototype,{
-	mark: function(id) {
-	}
-	,depthSort: function(frontToBack,passes) {
-		var cam = this.ctx.camera.m;
-		var _g_o = passes.current;
-		while(_g_o != null) {
-			var tmp = _g_o;
-			_g_o = _g_o.next;
-			var z = tmp.obj.absPos._41 * cam._13 + tmp.obj.absPos._42 * cam._23 + tmp.obj.absPos._43 * cam._33 + cam._43;
-			var w = tmp.obj.absPos._41 * cam._14 + tmp.obj.absPos._42 * cam._24 + tmp.obj.absPos._43 * cam._34 + cam._44;
-			tmp.depth = w > 0.0 ? z / w : -z / w;
-		}
-		if(frontToBack) {
-			var list = passes.current;
-			var tmp;
-			if(list == null) {
-				tmp = null;
-			} else {
-				var insize = 1;
-				var nmerges;
-				var psize = 0;
-				var qsize = 0;
-				var p;
-				var q;
-				var e;
-				var tail;
-				while(true) {
-					p = list;
-					list = null;
-					tail = null;
-					nmerges = 0;
-					while(p != null) {
-						++nmerges;
-						q = p;
-						psize = 0;
-						var _g = 0;
-						var _g1 = insize;
-						while(_g < _g1) {
-							++_g;
-							++psize;
-							q = q.next;
-							if(q == null) {
-								break;
-							}
-						}
-						qsize = insize;
-						while(psize > 0 || qsize > 0 && q != null) {
-							if(psize == 0) {
-								e = q;
-								q = q.next;
-								--qsize;
-							} else if(qsize == 0 || q == null || (p.pass.layer != q.pass.layer ? p.pass.layer - q.pass.layer : p.depth == q.depth ? 0 : p.depth > q.depth ? 1 : -1) <= 0) {
-								e = p;
-								p = p.next;
-								--psize;
-							} else {
-								e = q;
-								q = q.next;
-								--qsize;
-							}
-							if(tail != null) {
-								tail.next = e;
-							} else {
-								list = e;
-							}
-							tail = e;
-						}
-						p = q;
-					}
-					tail.next = null;
-					if(nmerges <= 1) {
-						break;
-					}
-					insize *= 2;
-				}
-				tmp = list;
-			}
-			passes.current = tmp;
-		} else {
-			var list = passes.current;
-			var tmp;
-			if(list == null) {
-				tmp = null;
-			} else {
-				var insize = 1;
-				var nmerges;
-				var psize = 0;
-				var qsize = 0;
-				var p;
-				var q;
-				var e;
-				var tail;
-				while(true) {
-					p = list;
-					list = null;
-					tail = null;
-					nmerges = 0;
-					while(p != null) {
-						++nmerges;
-						q = p;
-						psize = 0;
-						var _g = 0;
-						var _g1 = insize;
-						while(_g < _g1) {
-							++_g;
-							++psize;
-							q = q.next;
-							if(q == null) {
-								break;
-							}
-						}
-						qsize = insize;
-						while(psize > 0 || qsize > 0 && q != null) {
-							if(psize == 0) {
-								e = q;
-								q = q.next;
-								--qsize;
-							} else if(qsize == 0 || q == null || (p.pass.layer != q.pass.layer ? p.pass.layer - q.pass.layer : p.depth == q.depth ? 0 : p.depth < q.depth ? 1 : -1) <= 0) {
-								e = p;
-								p = p.next;
-								--psize;
-							} else {
-								e = q;
-								q = q.next;
-								--qsize;
-							}
-							if(tail != null) {
-								tail.next = e;
-							} else {
-								list = e;
-							}
-							tail = e;
-						}
-						p = q;
-					}
-					tail.next = null;
-					if(nmerges <= 1) {
-						break;
-					}
-					insize *= 2;
-				}
-				tmp = list;
-			}
-			passes.current = tmp;
-		}
-	}
-	,resetTarget: function() {
-		if(this.hasSetTarget) {
-			this.ctx.engine.popTarget();
-			this.hasSetTarget = false;
-		}
-	}
-	,has: function(name) {
-		return this.passObjects.h[name] != null;
-	}
-	,setPassFlags: function(pass) {
-		pass.rendererFlags |= 1;
-	}
-	,get: function(name) {
-		var p = this.passObjects.h[name];
-		if(p == null) {
-			return this.emptyPasses;
-		}
-		p.rendered = true;
-		return p.passes;
-	}
-	,render: function() {
-		throw haxe_Exception.thrown("Not implemented");
-	}
-	,computeStatic: function() {
-		throw haxe_Exception.thrown("Not implemented");
-	}
-	,start: function() {
-	}
-	,startEffects: function() {
-		var _g = 0;
-		var _g1 = this.effects;
-		while(_g < _g1.length) {
-			var e = _g1[_g];
-			++_g;
-			if(e.enabled) {
-				e.start(this);
-			}
-		}
-	}
-	,process: function(passes) {
-		this.hasSetTarget = false;
-		var _g = 0;
-		var _g1 = this.allPasses;
-		while(_g < _g1.length) _g1[_g++].setContext(this.ctx);
-		var _g = 0;
-		while(_g < passes.length) {
-			var p = passes[_g];
-			++_g;
-			this.passObjects.h[p.name] = p;
-		}
-		this.ctx.textures.begin();
-		if(this.ctx.computingStatic) {
-			this.computeStatic();
-		} else {
-			this.render();
-		}
-		this.resetTarget();
-		var _g = 0;
-		while(_g < passes.length) this.passObjects.h[passes[_g++].name] = null;
-	}
-	,__class__: h3d_scene_Renderer
-});
 var h3d_scene_Scene = function(createRenderer,createLightSystem) {
 	if(createLightSystem == null) {
 		createLightSystem = true;
@@ -24488,37 +24776,6 @@ h3d_scene_fwd_NormalPass.prototype = $extend(h3d_pass_Output.prototype,{
 		this.ctx.globals.map.h[this.normalMapId] = texture;
 	}
 	,__class__: h3d_scene_fwd_NormalPass
-});
-var h3d_scene_fwd_Renderer = function() {
-	this.shadow = new h3d_pass_DefaultShadowMap(1024);
-	this.normal = new h3d_scene_fwd_NormalPass();
-	this.depth = new h3d_scene_fwd_DepthPass();
-	h3d_scene_Renderer.call(this);
-	this.defaultPass = new h3d_pass_Output("default");
-	this.allPasses = [this.defaultPass,this.depth,this.normal,this.shadow];
-};
-$hxClasses["h3d.scene.fwd.Renderer"] = h3d_scene_fwd_Renderer;
-h3d_scene_fwd_Renderer.__name__ = "h3d.scene.fwd.Renderer";
-h3d_scene_fwd_Renderer.__super__ = h3d_scene_Renderer;
-h3d_scene_fwd_Renderer.prototype = $extend(h3d_scene_Renderer.prototype,{
-	renderPass: function(p,passes,sort) {
-		p.draw(passes,sort);
-	}
-	,render: function() {
-		if(this.has("shadow")) {
-			this.renderPass(this.shadow,this.get("shadow"));
-		}
-		if(this.has("depth")) {
-			this.renderPass(this.depth,this.get("depth"));
-		}
-		if(this.has("normal")) {
-			this.renderPass(this.normal,this.get("normal"));
-		}
-		this.renderPass(this.defaultPass,this.get("default"));
-		this.renderPass(this.defaultPass,this.get("alpha"),this.backToFront);
-		this.renderPass(this.defaultPass,this.get("additive"));
-	}
-	,__class__: h3d_scene_fwd_Renderer
 });
 var h3d_shader_AmbientLight = function() {
 	hxsl_Shader.call(this);
@@ -51210,7 +51467,13 @@ js_html__$CanvasElement_CanvasUtil.getContextWebGL = function(canvas,attribs) {
 	return null;
 };
 Math.__name__ = "Math";
-var physics_CarPhysics = function(startX,startY,startZ) {
+var physics_CarConfig = function() { };
+$hxClasses["physics.CarConfig"] = physics_CarConfig;
+physics_CarConfig.__name__ = "physics.CarConfig";
+physics_CarConfig.getDefault = function() {
+	return { name : "Apex GT-R Prototype", mass : 1350.0, yawInertia : 1750.0, pitchInertia : 1350.0, rollInertia : 620.0, baseTopSpeed : 68.0, boostTopSpeed : 88.0, baseAcceleration : 28.0, boostAcceleration : 48.0, brakeDecel : 38.0, reverseTopSpeed : 18.0, suspension : { restLength : 0.45, springRate : 32000.0, damping : 2600.0, antiRollStiffness : 9500.0, minTravel : 0.08, maxTravel : 0.52}, tires : { peakSlipAngle : 0.16, baseLateralStiffness : 34.0, longitudinalGrip : 1.15, rollingResistance : 2.0}, drift : { lateralStiffnessScale : 0.35, counterSteerTorque : 3.4, forwardBiasRate : 3.8, minDriftSpeed : 12.0, driftYawRate : 2.8, driftExitSpeed : 8.0}, drivetrain : { gearRatios : [3.40,2.20,1.55,1.18,0.92,0.76], reverseRatio : -3.10, finalDrive : 3.73, idleRPM : 1000.0, redlineRPM : 8000.0, shiftUpRPM : 7200.0, shiftDownRPM : 3400.0, shiftDelay : 0.20, lsdLockRatio : 0.72, maxEngineTorque : 540.0}, aero : { dragCoeff : 0.0032, downforceCoeff : 0.0045}};
+};
+var physics_CarPhysics = function(startX,startY,startZ,initialConfig) {
 	if(startZ == null) {
 		startZ = 0.0;
 	}
@@ -51220,9 +51483,23 @@ var physics_CarPhysics = function(startX,startY,startZ) {
 	if(startX == null) {
 		startX = 0.0;
 	}
+	this.scratchWheelWorld = new h3d_VectorImpl(0.,0.,0.);
+	this.scratchRight = new h3d_VectorImpl(0.,0.,0.);
+	this.scratchFwd = new h3d_VectorImpl(0.,0.,0.);
+	this.wheelSpinVelocity = [0.0,0.0,0.0,0.0];
+	this.wheelNormals = [new h3d_VectorImpl(0,0,1),new h3d_VectorImpl(0,0,1),new h3d_VectorImpl(0,0,1),new h3d_VectorImpl(0,0,1)];
+	this.wheelOnGround = [true,true,true,true];
+	this.suspCompression = [0.0,0.0,0.0,0.0];
+	this.prevSuspLength = [0.45,0.45,0.45,0.45];
+	this.suspLength = [0.45,0.45,0.45,0.45];
+	this.isShifting = false;
+	this.shiftTimer = 0.0;
+	this.engineRPM = 1000.0;
+	this.currentGear = 1;
 	this.driftAngle = 0.0;
 	this.driftDirection = 0.0;
 	this.isDrifting = false;
+	this.verticalVelocity = 0.0;
 	this.lateralVelocity = 0.0;
 	this.forwardSpeed = 0.0;
 	this.roll = 0.0;
@@ -51245,56 +51522,239 @@ var physics_CarPhysics = function(startX,startY,startZ) {
 	_this.x = x;
 	_this.y = y;
 	_this.z = z;
+	this.config = initialConfig != null ? initialConfig : physics_CarConfig.getDefault();
+	this.engineRPM = this.config.drivetrain.idleRPM;
+	var rest = this.config.suspension.restLength;
+	this.suspLength[0] = rest;
+	this.prevSuspLength[0] = rest;
+	this.suspLength[1] = rest;
+	this.prevSuspLength[1] = rest;
+	this.suspLength[2] = rest;
+	this.prevSuspLength[2] = rest;
+	this.suspLength[3] = rest;
+	this.prevSuspLength[3] = rest;
 };
 $hxClasses["physics.CarPhysics"] = physics_CarPhysics;
 physics_CarPhysics.__name__ = "physics.CarPhysics";
 physics_CarPhysics.prototype = {
-	update: function(dt,input) {
-		if(input.throttle > 0.0) {
-			if(this.forwardSpeed < (input.boost ? 88.0 : 68.0)) {
-				this.forwardSpeed += (input.boost ? 48.0 : 28.0) * input.throttle * dt;
+	update: function(dt,input,waypoints) {
+		if(dt <= 0.0) {
+			return;
+		}
+		var clampedDt = Math.min(dt,0.05);
+		var cosYaw = Math.cos(this.yaw);
+		var sinYaw = Math.sin(this.yaw);
+		var fwdX = -sinYaw;
+		var _this = this.scratchFwd;
+		var x = fwdX;
+		var y = cosYaw;
+		if(cosYaw == null) {
+			y = 0.;
+		}
+		if(fwdX == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = 0;
+		var _this = this.scratchRight;
+		var x = cosYaw;
+		var y = sinYaw;
+		if(sinYaw == null) {
+			y = 0.;
+		}
+		if(cosYaw == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = 0;
+		this.updateSuspension(clampedDt,fwdX,cosYaw,cosYaw,sinYaw,waypoints);
+		this.updateDrivetrain(clampedDt,input);
+		this.updateLongitudinal(clampedDt,input);
+		this.updateLateralAndDrift(clampedDt,input,fwdX,cosYaw,cosYaw,sinYaw);
+		this.pos.x += (fwdX * this.forwardSpeed + cosYaw * this.lateralVelocity) * clampedDt;
+		this.pos.y += (cosYaw * this.forwardSpeed + sinYaw * this.lateralVelocity) * clampedDt;
+		this.updateChassisAttitude(clampedDt,input);
+	}
+	,updateSuspension: function(dt,fwdX,fwdY,rightX,rightY,waypoints) {
+		var susp = this.config.suspension;
+		var restLen = susp.restLength;
+		var arbK = susp.antiRollStiffness;
+		var groundContacts = 0;
+		var _g = 0;
+		while(_g < 4) {
+			var i = _g++;
+			var offset = physics_CarPhysics.WHEEL_OFFSETS[i];
+			var attachX = this.pos.x + (rightX * offset.x + fwdX * offset.y);
+			var attachY = this.pos.y + (rightY * offset.x + fwdY * offset.y);
+			var attachZ = this.pos.z;
+			var _this = this.scratchWheelWorld;
+			var x = attachX;
+			var y = attachY;
+			var z = attachZ;
+			if(attachZ == null) {
+				z = 0.;
+			}
+			if(attachY == null) {
+				y = 0.;
+			}
+			if(attachX == null) {
+				x = 0.;
+			}
+			_this.x = x;
+			_this.y = y;
+			_this.z = z;
+			var groundZ = 0.0;
+			var nx = 0.0;
+			var ny = 0.0;
+			var nz = 1.0;
+			if(waypoints != null && waypoints.length > 0) {
+				var proj = physics_SplineMath.getClosestSegment(this.scratchWheelWorld,waypoints);
+				groundZ = proj.z;
+				nx = -proj.segDirY * 0.04;
+				ny = proj.segDirX * 0.04;
+				nz = Math.sqrt(Math.max(0.01,1.0 - (nx * nx + ny * ny)));
+			} else {
+				groundZ = 0.0;
+			}
+			var _this1 = this.wheelNormals[i];
+			var x1 = nx;
+			var y1 = ny;
+			var z1 = nz;
+			if(z1 == null) {
+				z1 = 0.;
+			}
+			if(y1 == null) {
+				y1 = 0.;
+			}
+			if(x1 == null) {
+				x1 = 0.;
+			}
+			_this1.x = x1;
+			_this1.y = y1;
+			_this1.z = z1;
+			var currentLen = attachZ - groundZ;
+			this.prevSuspLength[i] = this.suspLength[i];
+			if(currentLen <= restLen) {
+				this.wheelOnGround[i] = true;
+				++groundContacts;
+				this.suspLength[i] = Math.max(susp.minTravel,Math.min(restLen,currentLen));
+				this.suspCompression[i] = Math.max(0.0,(restLen - this.suspLength[i]) / (restLen - susp.minTravel));
+			} else {
+				this.wheelOnGround[i] = false;
+				this.suspLength[i] = Math.min(susp.maxTravel,currentLen);
+				this.suspCompression[i] = 0.0;
+			}
+		}
+		this.roll -= ((restLen - this.suspLength[0] - (restLen - this.suspLength[1])) * arbK + (restLen - this.suspLength[2] - (restLen - this.suspLength[3])) * arbK) / this.config.mass * 0.0004 * dt;
+		if(groundContacts > 0) {
+			var targetZ = 0.0;
+			if(waypoints != null && waypoints.length > 0) {
+				targetZ = physics_SplineMath.getClosestSegment(this.pos,waypoints).z;
+			}
+			this.pos.z += (targetZ - this.pos.z) * Math.min(1.0,16.0 * dt);
+			this.verticalVelocity = 0.0;
+		} else {
+			this.verticalVelocity -= 9.81 * dt;
+			this.pos.z += this.verticalVelocity * dt;
+		}
+	}
+	,updateDrivetrain: function(dt,input) {
+		var dtCfg = this.config.drivetrain;
+		if(this.shiftTimer > 0.0) {
+			this.shiftTimer -= dt;
+			if(this.shiftTimer <= 0.0) {
+				this.isShifting = false;
+			}
+		}
+		var speedAbs = Math.abs(this.forwardSpeed);
+		var wheelCircumference = 2.0 * Math.PI * 0.36;
+		var gearRatio = 1.0;
+		if(this.forwardSpeed < -0.5) {
+			this.currentGear = -1;
+			gearRatio = Math.abs(dtCfg.reverseRatio);
+		} else {
+			if(this.currentGear < 1) {
+				this.currentGear = 1;
+			}
+			gearRatio = dtCfg.gearRatios[Math.floor(Math.min(this.currentGear - 1,dtCfg.gearRatios.length - 1))];
+		}
+		var targetRPM = dtCfg.idleRPM + speedAbs / wheelCircumference * 60.0 * gearRatio * dtCfg.finalDrive * 0.42;
+		if(this.isShifting || speedAbs < 1.0 && input.throttle > 0.0) {
+			targetRPM = Math.max(targetRPM,dtCfg.idleRPM + input.throttle * 4500.0);
+		}
+		targetRPM = Math.max(dtCfg.idleRPM,Math.min(dtCfg.redlineRPM,targetRPM));
+		this.engineRPM += (targetRPM - this.engineRPM) * Math.min(1.0,14.0 * dt);
+		if(this.currentGear > 0 && !this.isShifting) {
+			var numGears = dtCfg.gearRatios.length;
+			if(this.engineRPM > dtCfg.shiftUpRPM && this.currentGear < numGears && speedAbs > 8.0) {
+				this.currentGear++;
+				this.isShifting = true;
+				this.shiftTimer = dtCfg.shiftDelay;
+				this.engineRPM *= 0.72;
+			} else if(this.engineRPM < dtCfg.shiftDownRPM && this.currentGear > 1 && speedAbs < 68.0 * (this.currentGear / numGears) * 0.75) {
+				this.currentGear--;
+				this.isShifting = true;
+				this.shiftTimer = dtCfg.shiftDelay;
+				this.engineRPM = Math.min(dtCfg.redlineRPM,this.engineRPM * 1.35);
+			}
+		}
+		var rearAvgSpin = (this.wheelSpinVelocity[2] + this.wheelSpinVelocity[3]) * 0.5;
+		var lsdLock = dtCfg.lsdLockRatio;
+		this.wheelSpinVelocity[2] += (rearAvgSpin - this.wheelSpinVelocity[2]) * lsdLock * Math.min(1.0,15.0 * dt);
+		this.wheelSpinVelocity[3] += (rearAvgSpin - this.wheelSpinVelocity[3]) * lsdLock * Math.min(1.0,15.0 * dt);
+	}
+	,updateLongitudinal: function(dt,input) {
+		var throttleEff = this.isShifting ? input.throttle * 0.25 : input.throttle;
+		if(throttleEff > 0.0) {
+			if(this.forwardSpeed < (input.boost ? this.config.boostTopSpeed : this.config.baseTopSpeed)) {
+				this.forwardSpeed += (input.boost ? this.config.boostAcceleration : this.config.baseAcceleration) * throttleEff * dt;
 			}
 		} else if(input.brake > 0.0) {
 			if(this.forwardSpeed > 0.5) {
-				this.forwardSpeed = Math.max(0.0,this.forwardSpeed - 38.0 * input.brake * dt);
+				this.forwardSpeed = Math.max(0.0,this.forwardSpeed - this.config.brakeDecel * input.brake * dt);
 			} else {
-				this.forwardSpeed = Math.max(-18.,this.forwardSpeed - 14. * input.brake * dt);
+				this.forwardSpeed = Math.max(-this.config.reverseTopSpeed,this.forwardSpeed - this.config.baseAcceleration * 0.5 * input.brake * dt);
 			}
 		} else {
 			var sign = this.forwardSpeed > 0 ? 1.0 : -1.0;
-			var decel = (2.2 + this.forwardSpeed * this.forwardSpeed * 0.0035) * dt;
+			var decel = (this.config.tires.rollingResistance + this.forwardSpeed * this.forwardSpeed * this.config.aero.dragCoeff) * dt;
 			if(Math.abs(this.forwardSpeed) <= decel) {
 				this.forwardSpeed = 0.0;
 			} else {
 				this.forwardSpeed -= sign * decel;
 			}
 		}
-		var speedRatio = Math.abs(this.forwardSpeed) / 68.0;
-		if(!this.isDrifting && ((input.handbrake || input.brake > 0.2 && input.throttle > 0.1) && Math.abs(input.steer) > 0.25) && this.forwardSpeed > 14.0) {
+	}
+	,updateLateralAndDrift: function(dt,input,fwdX,fwdY,rightX,rightY) {
+		var driftCfg = this.config.drift;
+		var speedAbs = Math.abs(this.forwardSpeed);
+		var speedRatio = Math.min(1.0,speedAbs / this.config.baseTopSpeed);
+		if(!this.isDrifting && ((input.handbrake || input.brake > 0.2 && input.throttle > 0.1) && Math.abs(input.steer) > 0.22) && this.forwardSpeed > driftCfg.minDriftSpeed) {
 			this.isDrifting = true;
 			this.driftDirection = input.steer < 0 ? -1.0 : 1.0;
 		}
 		if(this.isDrifting) {
-			if(this.forwardSpeed < 10.0 || this.driftDirection > 0 && input.steer < -0.6 || this.driftDirection < 0 && input.steer > 0.6) {
+			if(this.forwardSpeed < driftCfg.driftExitSpeed || (this.driftDirection > 0 && input.steer < -0.65 || this.driftDirection < 0 && input.steer > 0.65)) {
 				this.isDrifting = false;
 			}
 		}
 		if(this.isDrifting) {
-			this.driftAngle += (this.driftDirection * 0.65 - this.driftAngle) * 5.0 * dt;
-			this.yaw += (this.driftDirection * 3.2 + input.steer * 1.5) * dt;
+			this.driftAngle += (this.driftDirection * 0.65 - this.driftAngle) * 5.5 * dt;
+			this.yaw += (this.driftDirection * driftCfg.driftYawRate + input.steer * (input.steer * this.driftDirection < 0 ? driftCfg.counterSteerTorque : 1.4)) * dt;
 			this.lateralVelocity = (this.lateralVelocity += this.driftDirection * 15.0 * dt) * Math.pow(0.88,dt * 60.0);
+			this.lateralVelocity *= 1.0 - Math.min(1.0,driftCfg.forwardBiasRate * dt) * 0.45;
 		} else {
 			this.driftAngle += (0.0 - this.driftAngle) * 10.0 * dt;
-			this.lateralVelocity *= Math.pow(0.5,dt * 60.0);
-			if(Math.abs(this.forwardSpeed) > 0.2) {
-				this.yaw += input.steer * 2.2 * Math.min(1.0,speedRatio + 0.35) * (this.forwardSpeed >= 0 ? 1.0 : -1.0) * dt;
+			this.lateralVelocity *= Math.pow(0.50,dt * 60.0);
+			if(speedAbs > 0.2) {
+				this.yaw += input.steer * (2.2 * Math.min(1.0,speedRatio + 0.35)) * (this.forwardSpeed >= 0 ? 1.0 : -1.0) * dt;
 			}
 		}
-		var fwdY = Math.cos(this.yaw);
-		var rightY = Math.sin(this.yaw);
-		this.pos.x += (-Math.sin(this.yaw) * this.forwardSpeed + Math.cos(this.yaw) * this.lateralVelocity) * dt;
-		this.pos.y += (fwdY * this.forwardSpeed + rightY * this.lateralVelocity) * dt;
-		var targetRoll = -input.steer * Math.min(1.0,speedRatio) * 0.12;
+	}
+	,updateChassisAttitude: function(dt,input) {
+		var targetRoll = -input.steer * Math.min(1.0,Math.abs(this.forwardSpeed) / this.config.baseTopSpeed) * 0.12;
 		if(this.isDrifting) {
 			targetRoll *= 1.8;
 		}
@@ -51371,8 +51831,14 @@ save_SaveSystem.getDefaultGraphics = function() {
 save_SaveSystem.load = function() {
 	try {
 		var storage = js_Browser.getLocalStorage();
-		var raw = storage.getItem("mob_motors_on_boost_save_v2");
+		var raw = storage.getItem("mob_motors_on_boost_save_v3");
 		var isLegacy = false;
+		if(raw == null) {
+			raw = storage.getItem("mob_motors_on_boost_save_v2");
+			if(raw != null) {
+				isLegacy = true;
+			}
+		}
 		if(raw == null) {
 			raw = storage.getItem("mob_motors_on_boost_save_v1");
 			if(raw != null) {
@@ -51390,25 +51856,25 @@ save_SaveSystem.load = function() {
 			if(data.graphics != null && data.graphics.uiResolution == null) {
 				data.graphics.uiResolution = "720p (HD)";
 			}
-			if(data.version == null || data.version < 2 || isLegacy) {
-				data.version = 2;
-				data.buildNumber = 148;
+			if(data.version == null || data.version < 3 || isLegacy) {
+				data.version = 3;
+				data.buildNumber = 3;
 				save_SaveSystem.save(data);
 			}
 			return data;
 		}
 	} catch( _g ) {
 	}
-	return { version : 2, buildNumber : 148, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, graphics : save_SaveSystem.getDefaultGraphics()};
+	return { version : 3, buildNumber : 3, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, graphics : save_SaveSystem.getDefaultGraphics()};
 };
 save_SaveSystem.save = function(data) {
 	try {
-		data.version = 2;
-		data.buildNumber = 148;
+		data.version = 3;
+		data.buildNumber = 3;
 		var raw = JSON.stringify(data);
 		var storage = js_Browser.getLocalStorage();
+		storage.setItem("mob_motors_on_boost_save_v3",raw);
 		storage.setItem("mob_motors_on_boost_save_v2",raw);
-		storage.setItem("mob_motors_on_boost_save_v1",raw);
 	} catch( _g ) {
 	}
 };
@@ -52919,7 +53385,7 @@ var ui_views_credits_CreditsView = function(parent) {
 	this.techDetailsText.set_textColor(10531526);
 	this.techDetailsText.set_text("Built with Haxe, Heaps.io (Hardware-Accelerated WebGL) & Modern Shaders\n" + "Typography: Stack Sans Headline & Material Symbols Sharp\n" + "Homage & Inspiration: Need for Speed: Most Wanted (2005) & Burnout Revenge (2005)\n\n" + "Thank you for playing!");
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.1.4" + " (Build " + 148 + ")");
+	this.versionText.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
 	this.versionText.set_textColor(15057019);
 	this.versionText.set_textAlign(h2d_Align.Center);
 	this.backBtnText = new h2d_Text(ui_FontManager.titleFont,this);
@@ -53058,7 +53524,7 @@ var ui_views_mainmenu_MainMenuView = function(parent) {
 	this.titleText.set_text("MAIN MENU");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.1.4" + " (Build " + 148 + ")");
+	this.versionText.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
 	this.versionText.set_textColor(9413043);
 	var labels = ["START NEW RACE","RESUME SAVED RACE","OPTIONS","CREDITS","EXIT TO SPLASH"];
 	var iconTypes = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Settings,ui_IconType.Credits,ui_IconType.Exit];
@@ -53735,7 +54201,7 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.titleText.set_text("CONFIGURATION & HARDWARE");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.1.4" + " (Build " + 148 + ")");
+	this.versionText.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
 	this.versionText.set_textColor(9413043);
 	var tabNames = ["GRAPHICS","AUDIO","KEYBOARD","GAMEPAD"];
 	var tabIconTypes = [ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Keyboard,ui_IconType.Gamepad];
@@ -54044,7 +54510,7 @@ var ui_views_splash_SplashView = function(parent) {
 	this.promptText.set_text("PRESS ANY BUTTON OR CLICK TO ENTER");
 	this.promptText.set_textColor(16777215);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.1.4" + " (Build " + 148 + ")");
+	this.versionText.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
 	this.versionText.set_textColor(9413043);
 	this.screenHit = new h2d_Interactive(3000,3000,this);
 	this.screenHit.onClick = function(_) {
@@ -54106,6 +54572,105 @@ ui_views_splash_SplashView.prototype = $extend(h2d_Object.prototype,{
 		}
 	}
 	,__class__: ui_views_splash_SplashView
+});
+var world_SkyGradientShader = function() {
+	this.groundColor__ = new h3d_VectorImpl(0.,0.,0.);
+	this.horizonColor__ = new h3d_VectorImpl(0.,0.,0.);
+	this.topColor__ = new h3d_VectorImpl(0.,0.,0.);
+	hxsl_Shader.call(this);
+	var _this = this.topColor__;
+	_this.x = 0.06;
+	_this.y = 0.32;
+	_this.z = 0.72;
+	var _this = this.horizonColor__;
+	_this.x = 0.48;
+	_this.y = 0.76;
+	_this.z = 0.95;
+	var _this = this.groundColor__;
+	_this.x = 0.08;
+	_this.y = 0.10;
+	_this.z = 0.14;
+};
+$hxClasses["world.SkyGradientShader"] = world_SkyGradientShader;
+world_SkyGradientShader.__name__ = "world.SkyGradientShader";
+world_SkyGradientShader.__super__ = hxsl_Shader;
+world_SkyGradientShader.prototype = $extend(hxsl_Shader.prototype,{
+	get_topColor: function() {
+		return this.topColor__;
+	}
+	,set_topColor: function(_v) {
+		return this.topColor__ = _v;
+	}
+	,get_horizonColor: function() {
+		return this.horizonColor__;
+	}
+	,set_horizonColor: function(_v) {
+		return this.horizonColor__ = _v;
+	}
+	,get_groundColor: function() {
+		return this.groundColor__;
+	}
+	,set_groundColor: function(_v) {
+		return this.groundColor__ = _v;
+	}
+	,updateConstants: function(globals) {
+		this.constBits = 0;
+		this.updateConstantsFinal(globals);
+	}
+	,getParamValue: function(index) {
+		switch(index) {
+		case 0:
+			return this.topColor__;
+		case 1:
+			return this.horizonColor__;
+		case 2:
+			return this.groundColor__;
+		default:
+		}
+		return null;
+	}
+	,getParamFloatValue: function(index) {
+		return 0.;
+	}
+	,__class__: world_SkyGradientShader
+});
+var world_Skybox = function(parent) {
+	h3d_scene_Object.call(this,parent);
+	var spherePrim = new h3d_prim_Sphere(950.0,32,24);
+	spherePrim.addNormals();
+	this.skyMesh = new h3d_scene_Mesh(spherePrim,null,this);
+	this.skyMesh.material.passes.set_culling(h3d_mat_Face.None);
+	var _this = this.skyMesh.material;
+	_this.set_castShadows(false);
+	_this.set_receiveShadows(false);
+	this.skyShader = new world_SkyGradientShader();
+	this.skyMesh.material.passes.addShader(this.skyShader);
+};
+$hxClasses["world.Skybox"] = world_Skybox;
+world_Skybox.__name__ = "world.Skybox";
+world_Skybox.__super__ = h3d_scene_Object;
+world_Skybox.prototype = $extend(h3d_scene_Object.prototype,{
+	syncCamera: function(camPos) {
+		if(camPos == null) {
+			return;
+		}
+		this.x = camPos.x;
+		this.flags |= 1;
+		if((this.flags & 131072) != 0) {
+			this.flags |= 262144;
+		}
+		this.y = camPos.y;
+		this.flags |= 1;
+		if((this.flags & 131072) != 0) {
+			this.flags |= 262144;
+		}
+		this.z = camPos.z;
+		this.flags |= 1;
+		if((this.flags & 131072) != 0) {
+			this.flags |= 262144;
+		}
+	}
+	,__class__: world_Skybox
 });
 var world_Track = function(parent) {
 	this.waypoints = [];
@@ -54997,7 +55562,7 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 		var bldgPrim = new h3d_prim_Cube(1.0,1.0,1.0,true);
 		bldgPrim.unindex();
 		bldgPrim.addNormals();
-		var buildingLayouts = [{ x : -40.0, y : 40.0, w : 22.0, l : 30.0, h : 45.0, col : 3553856},{ x : -55.0, y : 110.0, w : 28.0, l : 24.0, h : 65.0, col : 2764341},{ x : 70.0, y : 90.0, w : 35.0, l : 35.0, h : 50.0, col : 4212045},{ x : 130.0, y : 110.0, w : 40.0, l : 28.0, h : 80.0, col : 2369584},{ x : 190.0, y : 80.0, w : 30.0, l : 45.0, h : 55.0, col : 3817287},{ x : 295.0, y : 130.0, w : 42.0, l : 32.0, h : 90.0, col : 1974825},{ x : 200.0, y : -60.0, w : 50.0, l : 40.0, h : 40.0, col : 3356478},{ x : -30.0, y : -75.0, w : 25.0, l : 35.0, h : 48.0, col : 3093307}];
+		var buildingLayouts = [{ x : -40.0, y : 40.0, w : 22.0, l : 30.0, h : 45.0, col : 3553856},{ x : -55.0, y : 110.0, w : 28.0, l : 24.0, h : 65.0, col : 2764341},{ x : 70.0, y : 90.0, w : 35.0, l : 35.0, h : 50.0, col : 4212045},{ x : 130.0, y : 110.0, w : 40.0, l : 28.0, h : 80.0, col : 2369584},{ x : 190.0, y : 80.0, w : 30.0, l : 45.0, h : 55.0, col : 3817287},{ x : 200.0, y : -60.0, w : 50.0, l : 40.0, h : 40.0, col : 3356478},{ x : -30.0, y : -75.0, w : 25.0, l : 35.0, h : 48.0, col : 3093307}];
 		var _g = 0;
 		while(_g < buildingLayouts.length) {
 			var b = buildingLayouts[_g];
@@ -55087,6 +55652,10 @@ Xml.Comment = 3;
 Xml.DocType = 4;
 Xml.ProcessingInstruction = 5;
 Xml.Document = 6;
+h3d_shader_ScreenShader.SRC = "HXSMF2gzZC5zaGFkZXIuU2NyZWVuU2hhZGVyBwEFaW5wdXQNAQICCHBvc2l0aW9uBQoBAQADAnV2BQoBAQABAAAEBWZsaXBZAwIAAAUGb3V0cHV0DQICBghwb3NpdGlvbgUMBAUABwVjb2xvcgUMBAUABAAACApwaXhlbENvbG9yBQwEAAAJDGNhbGN1bGF0ZWRVVgUKBAAACghfX2luaXRfXw4GAAALBnZlcnRleA4GAAACAgoAAAUCBgQCBwUMAggFDAUMBgQCCQUKAgMFCgUKAAALAAAFAQYEAgYFDAkDKw4ECgICBQoAAAMGAQoCAgUKBAADAgQDAwEDAAAAAAAAAAADAQMAAAAAAADwPwMFDAUMAA";
+h3d_shader_ScreenShader._MODULE = "h3d.shader.ScreenShader";
+graphics_RadialBlurShader.SRC = "HXSMGWdyYXBoaWNzLlJhZGlhbEJsdXJTaGFkZXILAQVpbnB1dA0BAgIIcG9zaXRpb24FCgEBAAMCdXYFCgEBAAEAAAQFZmxpcFkDAgAABQZvdXRwdXQNAgIGCHBvc2l0aW9uBQwEBQAHBWNvbG9yBQwEBQAEAAAICnBpeGVsQ29sb3IFDAQAAAkMY2FsY3VsYXRlZFVWBQoEAAAKB3RleHR1cmUKAgIAAAsKYmx1ck9yaWdpbgUKAgAADA1ibHVySW50ZW5zaXR5AwIAAA0IX19pbml0X18OBgAADgZ2ZXJ0ZXgOBgAADwhmcmFnbWVudA4GAAADAg0AAAUCBgQCBwUMAggFDAUMBgQCCQUKAgMFCgUKAAAOAAAFAQYEAgYFDAkDKw4ECgICBQoAAAMGAQoCAgUKBAADAgQDAwEDAAAAAAAAAAADAQMAAAAAAADwPwMFDAUMAAEPAAAFBQgQAnV2BQoEAAACAwUKAAgRA2RpcgUKBAAABgEEBgMCEAUKAgsFCgUKBQoCDAMFCgAIEgNjb2wFDAQAAAkDKw4EAQMAAAAAAAAAAAMBAwAAAAAAAAAAAwEDAAAAAAAAAAADAQMAAAAAAAAAAAMFDAAVBnVucm9sbAAOEwFpAQQAAAYVAQIAAAAAAQECCAAAAAEPAQAABQIIFAhzYW1wbGVVdgUKBAAACQMXDgMGAwIQBQoGAQIRBQoEBgIJAycOAQITAQMBAwAAAAAAABxAAwMDBQoFCgkDKQ4BAQMAAAAAAAAAAAMFCgkDKQ4BAQMAAAAAAADwPwMFCgUKAAaAAhIFDAkDIg4CAgoKAgIUBQoFDAUMAAAABgQCCAUMBgICEgUMAQMAAAAAAAAgQAMFDAUMAA";
+graphics_RadialBlurShader._MODULE = "graphics.RadialBlurShader";
 h2d_Object.tmpPoint = new h2d_col_PointImpl(0.,0.);
 h3d_impl_RenderContext.STRICT = true;
 h2d_filter_Filter.defaultUseScreenResolution = false;
@@ -55130,8 +55699,6 @@ h3d_mat_Texture.nativeFormat = hxd_PixelFormat.RGBA;
 h3d_mat_Texture.TRILINEAR_FILTERING_ENABLED = true;
 h3d_mat_Texture.DEFAULT_WRAP = h3d_mat_Wrap.Clamp;
 h3d_pass_Blur.__meta__ = { obj : { ignore : ["shader"]}};
-h3d_shader_ScreenShader.SRC = "HXSMF2gzZC5zaGFkZXIuU2NyZWVuU2hhZGVyBwEFaW5wdXQNAQICCHBvc2l0aW9uBQoBAQADAnV2BQoBAQABAAAEBWZsaXBZAwIAAAUGb3V0cHV0DQICBghwb3NpdGlvbgUMBAUABwVjb2xvcgUMBAUABAAACApwaXhlbENvbG9yBQwEAAAJDGNhbGN1bGF0ZWRVVgUKBAAACghfX2luaXRfXw4GAAALBnZlcnRleA4GAAACAgoAAAUCBgQCBwUMAggFDAUMBgQCCQUKAgMFCgUKAAALAAAFAQYEAgYFDAkDKw4ECgICBQoAAAMGAQoCAgUKBAADAgQDAwEDAAAAAAAAAAADAQMAAAAAAADwPwMFDAUMAA";
-h3d_shader_ScreenShader._MODULE = "h3d.shader.ScreenShader";
 h3d_pass__$Border_BorderShader.SRC = "HXSMHWgzZC5wYXNzLl9Cb3JkZXIuQm9yZGVyU2hhZGVyCQEFaW5wdXQNAQICCHBvc2l0aW9uBQoBAQADAnV2BQoBAQABAAAEBWZsaXBZAwIAAAUGb3V0cHV0DQICBghwb3NpdGlvbgUMBAUABwVjb2xvcgUMBAUABAAACApwaXhlbENvbG9yBQwEAAAJDGNhbGN1bGF0ZWRVVgUKBAAACgVjb2xvcgUMAgAACwhfX2luaXRfXw4GAAAMBnZlcnRleA4GAAANCGZyYWdtZW50DgYAAAMCCwAABQIGBAIHBQwCCAUMBQwGBAIJBQoCAwUKBQoAAAwAAAUBBgQCBgUMCQMrDgQKAgIFCgAAAwYBCgICBQoEAAMCBAMDAQMAAAAAAAAAAAMBAwAAAAAAAPA/AwUMBQwAAQ0AAAUBBgQCCAUMAgoFDAUMAA";
 h3d_pass__$Border_BorderShader._MODULE = "h3d.pass.Border";
 h3d_pass__$Copy_ArrayCopyShader.SRC = "HXSMHmgzZC5wYXNzLl9Db3B5LkFycmF5Q29weVNoYWRlcgoBBWlucHV0DQECAghwb3NpdGlvbgUKAQEAAwJ1dgUKAQEAAQAABAVmbGlwWQMCAAAFBm91dHB1dA0CAgYIcG9zaXRpb24FDAQFAAcFY29sb3IFDAQFAAQAAAgKcGl4ZWxDb2xvcgUMBAAACQxjYWxjdWxhdGVkVVYFCgQAAAoHdGV4dHVyZQoDAgAACwVsYXllcgECAAAMCF9faW5pdF9fDgYAAA0GdmVydGV4DgYAAA4IZnJhZ21lbnQOBgAAAwIMAAAFAgYEAgcFDAIIBQwFDAYEAgkFCgIDBQoFCgAADQAABQEGBAIGBQwJAysOBAoCAgUKAAADBgEKAgIFCgQAAwIEAwMBAwAAAAAAAAAAAwEDAAAAAAAA8D8DBQwFDAABDgAABQEGBAIIBQwJAyIOAgIKCgMJAyoOAgIJBQoJAycOAQILAQMFCwUMBQwA";
@@ -55357,10 +55924,13 @@ hxsl_ShaderList.ALLOW_DUPLICATES = true;
 hxsl_ShaderInstance.UID = 0;
 hxsl_SharedShader.UNROLL_LOOPS = false;
 hxsl_SharedShader.SHADER_RESOLVE = new haxe_ds_StringMap();
+physics_CarPhysics.WHEEL_OFFSETS = [{ x : -0.98, y : 1.35},{ x : 0.98, y : 1.35},{ x : -0.98, y : -1.35},{ x : 0.98, y : -1.35}];
 ui_UIIcons.cache = new haxe_ds_StringMap();
 ui_views_mainmenu_MainMenuView.ACTIONS = [ui_components_MenuAction.StartGame,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
 ui_views_options_GraphicsOptionsPanel.NAMES = ["Textures","Shadow Level","Shadow Res","Lighting","Lighting Res","Mipmapping","Anisotropy","Anti-Aliasing","AA Level","Model Geometry","Reflections","Reflection Level","Render Scale","UI Resolution"];
 ui_views_options_OptionsView.TAB_ORDER = [ui_components_OptionsTab.Graphics,ui_components_OptionsTab.Audio,ui_components_OptionsTab.Keyboard,ui_components_OptionsTab.Gamepad];
+world_SkyGradientShader.SRC = "HXSMF3dvcmxkLlNreUdyYWRpZW50U2hhZGVyBgEIdG9wQ29sb3IFCwIAAAIMaG9yaXpvbkNvbG9yBQsCAAADC2dyb3VuZENvbG9yBQsCAAAECnBpeGVsQ29sb3IFDAQAAAUTdHJhbnNmb3JtZWRQb3NpdGlvbgULBAAABghmcmFnbWVudA4GAAABAQYAAAUFCAcDZGlyBQsEAAAJAyAOAQIFBQsFCwAICAFoAwQAAAoCBwULCAADAAgJA2NvbAULBAAAAAALBgcCCAMBAwAAAAAAAAAAAwIFAggKAXQDBAAACQMIDgICCAMBA5qZmZmZmeE/AwMABgQCCQULCQMYDgMCAgULAgEFCwIKAwULBQsABQIICwF0AwQAAAkDFw4DBgEHAwIIAwMBAwAAAAAAABBAAwMBAwAAAAAAAAAAAwEDAAAAAAAA8D8DAwAGBAIJBQsJAxgOAwICBQsCAwULAgsDBQsFCwAABgQCBAUMCQMrDgICCQULAQMAAAAAAADwPwMFDAUMAA";
+world_SkyGradientShader._MODULE = "world.Skybox";
 {
 	Main.main();
 	haxe_EntryPoint.run();
