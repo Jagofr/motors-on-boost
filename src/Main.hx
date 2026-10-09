@@ -11,29 +11,53 @@ import h2d.Tile;
 
 import input.InputController;
 import physics.CarPhysics;
-import core.ChaseCamera;
-import core.UIManager;
-import core.AudioManager;
-import core.GraphicsManager;
-import core.SaveSystem;
-import core.FontManager;
+import camera.ChaseCamera;
+import ui.UIManager;
+import ui.components.UIEnums.MenuAction;
+import audio.AudioManager;
+import graphics.GraphicsManager;
+import save.SaveSystem;
+import ui.FontManager;
 import world.Track;
 import entities.CarMesh;
 import entities.TrafficSystem;
 
+/**
+ * Sequential boot loader and splash screen sequence stages.
+ */
 enum IntroState {
+    /** Null or uninitialized state. */
     None;
+
+    /** Studio production splash screen (RvL // Rogue). */
     Studio;
+
+    /** Engine and language splash screen (Haxe & Heaps.io). */
     Engine;
+
+    /** Legal disclosures, attribution notices, and health advisory screen. */
     Disclaimer;
+
+    /** Splash sequence finished; transferred to 3D game showcase. */
     Complete;
 }
 
+/**
+ * Top-level application lifecycle state.
+ */
 enum AppState {
+    /** Boot sequence running intro splash screens. */
     IntroSequence;
+
+    /** Interactive 3D gameplay and user interface system active. */
     InGameUI;
 }
 
+/**
+ * Main application entry point for M.O.B. (Motors on Boost).
+ * Manages boot splash sequencing, WebP texture decoding, 3D scene initialization,
+ * car physics updates, third-person spring-arm camera tracking, and UI lifecycle.
+ */
 class Main extends hxd.App {
     var appState:AppState = IntroSequence;
     var introState:IntroState = Studio;
@@ -57,6 +81,10 @@ class Main extends hxd.App {
     // Splash Bitmaps loaded via WebP decoder
     var studioSplashBmp:Bitmap;
     var engineSplashBmp:Bitmap;
+    var discHeader:Text;
+    var discBody:Text;
+    var discVersion:Text;
+    var logoRow:Object;
     var discLogos:Array<Bitmap> = [];
 
     // Background Asset Pre-loading
@@ -97,14 +125,30 @@ class Main extends hxd.App {
         FontManager.init();
         input = new InputController();
 
+        // Responsive High-DPI & Multi-Resolution UI Scaling
+        // Target virtual baseline: 1280x720. AutoZoom scales UI elements, fonts,
+        // and interactive touch hitboxes proportionally on 2K/4K and mobile Retina displays.
+        s2d.scaleMode = AutoZoom(1280, 720, false);
+
         buildIntroScreens();
         setIntroScreen(Studio);
+
+        #if js
+        untyped js.Browser.window.app = this;
+        #end
     }
 
     // =========================================================================
     // NATIVE WEBP DECODER (DOM Image -> Canvas -> Bytes -> Heaps Texture -> Tile)
     // =========================================================================
 
+    /**
+     * Decodes WebP image assets natively using an offscreen HTML5 canvas buffer pipeline.
+     * Extracts RGBA byte buffers and uploads them into hardware Heaps textures.
+     *
+     * @param path Relative path to the WebP image asset.
+     * @param onLoaded Callback invoked with the decoded Heaps `h2d.Tile`.
+     */
     function loadWebpTile(path:String, onLoaded:Tile->Void) {
         #if js
         var img = new js.html.Image();
@@ -162,33 +206,35 @@ class Main extends hxd.App {
             layoutIntro();
         });
 
-        // 3. Disclaimer Screen
+        // 3. Trademark & Disclosure Notice Screen
         screenDisclaimer = new Object(introContainer);
 
-        var discHeader = new Text(FontManager.titleFont, screenDisclaimer);
-        discHeader.text = "IMPORTANT NOTICES & DISCLAIMERS";
-        discHeader.textColor = 0xFFEE00;
-        discHeader.name = "header";
+        discHeader = new Text(FontManager.titleFont, screenDisclaimer);
+        discHeader.text = "TRADEMARK & LEGAL DISCLOSURES";
+        discHeader.textColor = 0x00E5FF;
+        discHeader.textAlign = Center;
 
-        var discBody = new Text(FontManager.regularFont, screenDisclaimer);
-        discBody.textColor = 0xD0DCE8;
+        discBody = new Text(FontManager.regularFont, screenDisclaimer);
+        discBody.textColor = 0xC2D1E0;
         discBody.textAlign = Center;
-        discBody.maxWidth = 880;
+        discBody.lineSpacing = 5.0;
         discBody.text = 
-            "DEVELOPMENT & IN-HOUSE PUBLISHING\n" +
-            "Developed by Gerard \"Jamie\" (Jagofr) Francis.\n" +
-            "Published and developed in-house by RvL // ROGUE, with assistance by Google Gemini 3.8 Flash.\n\n" +
-            "COMMUNITY ASSET & FOSS DISCLOSURE\n" +
-            "Built with Haxe and Heaps.io. Typography provided under the SIL Open Font License and Apache 2.0.\n\n" +
-            "INTELLECTUAL PROPERTY NOTICE\n" +
-            "All custom codebases, vehicles, handling physics, procedural tracks, and original visual designs\n" +
-            "are the intellectual property of the creators. All rights reserved.\n\n" +
-            "HEALTHY GAMING ADVISORY\n" +
-            "Please take a 15-minute break for every 1 hour of playtime.";
-        discBody.name = "body";
+            "M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" +
+            "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" +
+            "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" +
+            "are the intellectual property of their respective creators. All rights reserved.\n\n" +
+            "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" +
+            "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" +
+            "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" +
+            "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" +
+            "Please play in a well-lit environment and take a 15-minute break for every hour of play.";
 
-        var logoRow = new Object(screenDisclaimer);
-        logoRow.name = "logoRow";
+        discVersion = new Text(FontManager.regularFont, screenDisclaimer);
+        discVersion.text = Version.DISPLAY;
+        discVersion.textColor = 0x5A738E;
+        discVersion.textAlign = Center;
+
+        logoRow = new Object(screenDisclaimer);
 
         var logoPaths = [
             "intro/icons/logo_haxe.webp",
@@ -273,7 +319,7 @@ class Main extends hxd.App {
                     introAlpha = 1.0 - Math.min(1.0, fadeProgress);
                     
                     screenDisclaimer.alpha = introAlpha;
-                    introBg.alpha = introAlpha;
+                    introBg.alpha = 1.0; // Keep background completely black as text fades out
                 } else {
                     finishIntroSequence();
                     return;
@@ -297,8 +343,8 @@ class Main extends hxd.App {
         showcaseFadeTimer = 0.0;
 
         showcaseCurtain = new Bitmap(Tile.fromColor(0x000000, 1, 1, 1.0), s2d);
-        showcaseCurtain.scaleX = hxd.Window.getInstance().width;
-        showcaseCurtain.scaleY = hxd.Window.getInstance().height;
+        showcaseCurtain.scaleX = s2d.width;
+        showcaseCurtain.scaleY = s2d.height;
 
         if (ui != null) {
             ui.visible = true;
@@ -339,7 +385,7 @@ class Main extends hxd.App {
         dirLight = new DirLight(new Vector(-0.55, 0.45, -0.7), s3d);
         dirLight.color.setColor(0xFFE8C2);
 
-        gfx = new GraphicsManager(s3d, dirLight, saveData.graphics);
+        gfx = new GraphicsManager(s3d, s2d, dirLight, saveData.graphics);
 
         var terrainPrim = new Cube(800.0, 800.0, 0.4, true);
         terrainPrim.unindex();
@@ -363,6 +409,9 @@ class Main extends hxd.App {
         isLoadingComplete = true;
     }
 
+    /**
+     * Repositions the player vehicle to the race track starting grid line.
+     */
     function resetCarToStartLine() {
         carPhysics.pos.set(0.0, 0.0, 0.0);
         carPhysics.yaw = 1.5707963;
@@ -376,6 +425,9 @@ class Main extends hxd.App {
         playerMesh.setRotation(0, 0, 0);
     }
 
+    /**
+     * Serializes active race progress, coordinates, audio settings, and graphics profiles to storage.
+     */
     function saveCurrentRun() {
         saveData.hasActiveRun = true;
         saveData.playerState = {
@@ -393,6 +445,11 @@ class Main extends hxd.App {
         ui.setHasActiveSave(true);
     }
 
+    /**
+     * Dispatches user menu selections (Start, Resume, Options, Credits, Quit).
+     *
+     * @param action Selected MenuAction enum variant.
+     */
     function handleMenuAction(action:MenuAction) {
         input.flushInputs();
 
@@ -439,8 +496,8 @@ class Main extends hxd.App {
     }
 
     function layoutIntro() {
-        var sw = hxd.Window.getInstance().width;
-        var sh = hxd.Window.getInstance().height;
+        var sw = s2d != null ? s2d.width : hxd.Window.getInstance().width;
+        var sh = s2d != null ? s2d.height : hxd.Window.getInstance().height;
 
         if (introBg != null) {
             introBg.scaleX = sw;
@@ -455,41 +512,70 @@ class Main extends hxd.App {
             scaleAndCenterSplash(engineSplashBmp, sw, sh);
         }
 
-        var discHeader = screenDisclaimer.getObjectByName("header");
-        var discBody = screenDisclaimer.getObjectByName("body");
-        var logoRow = screenDisclaimer.getObjectByName("logoRow");
-
         if (discHeader != null && discBody != null) {
-            var dh = cast(discHeader, Text);
-            var db = cast(discBody, Text);
+            // Responsive line constraints ensuring text stays nicely proportioned
+            var maxTextWidth = Math.min(sw * 0.88, 960.0);
+            discHeader.maxWidth = maxTextWidth;
+            discBody.maxWidth = maxTextWidth;
 
-            dh.x = (sw - dh.textWidth) * 0.5;
-            dh.y = sh * 0.12;
+            var headerGap = 16.0;
+            var logoGap = 22.0;
 
-            db.x = (sw - db.textWidth) * 0.5;
-            db.y = sh * 0.24;
-        }
+            var targetIconHeight = Math.min(38.0, sh * 0.06);
+            var logoSpacing = 32.0; // very light spacing horizontally
+            var totalLogoWidth = 0.0;
 
-        if (logoRow != null && discLogos.length > 0) {
-            var targetIconHeight = 44.0;
-            var spacing = 64.0;
-            var totalWidth = 0.0;
-
-            for (bmp in discLogos) {
-                var s = targetIconHeight / bmp.tile.height;
-                bmp.scaleX = s;
-                bmp.scaleY = s;
-                totalWidth += (bmp.tile.width * s);
+            if (logoRow != null && discLogos.length > 0) {
+                for (bmp in discLogos) {
+                    if (bmp.tile != null) {
+                        var s = targetIconHeight / bmp.tile.height;
+                        bmp.scaleX = s;
+                        bmp.scaleY = s;
+                        totalLogoWidth += (bmp.tile.width * s);
+                    }
+                }
+                totalLogoWidth += logoSpacing * (discLogos.length - 1);
             }
-            totalWidth += spacing * (discLogos.length - 1);
+            if (Math.isNaN(totalLogoWidth)) totalLogoWidth = 0.0;
 
-            var currX = (sw - totalWidth) * 0.5;
-            var rowY = sh * 0.82;
+            var hHeight = discHeader.textHeight;
+            if (Math.isNaN(hHeight) || hHeight <= 0) hHeight = 36.0;
 
-            for (bmp in discLogos) {
-                bmp.x = currX;
-                bmp.y = rowY;
-                currX += (bmp.tile.width * bmp.scaleX) + spacing;
+            var bHeight = discBody.textHeight;
+            if (Math.isNaN(bHeight) || bHeight <= 0) bHeight = 320.0;
+
+            var vGap = 14.0;
+            var vHeight = (discVersion != null) ? discVersion.textHeight : 0.0;
+            if (Math.isNaN(vHeight)) vHeight = 20.0;
+
+            var totalBlockHeight = hHeight + headerGap + bHeight + (discLogos.length > 0 ? (logoGap + targetIconHeight) : 0.0) + (discVersion != null ? (vGap + vHeight) : 0.0);
+            if (Math.isNaN(totalBlockHeight) || totalBlockHeight <= 0) totalBlockHeight = 400.0;
+
+            var blockStartY = Math.max(16.0, (sh - totalBlockHeight) * 0.5);
+            if (Math.isNaN(blockStartY)) blockStartY = 24.0;
+
+            discHeader.x = (sw - maxTextWidth) * 0.5;
+            discHeader.y = blockStartY;
+
+            discBody.x = (sw - maxTextWidth) * 0.5;
+            discBody.y = discHeader.y + hHeight + headerGap;
+
+            var rowY = discBody.y + bHeight + logoGap;
+            if (logoRow != null && discLogos.length > 0) {
+                var currX = (sw - totalLogoWidth) * 0.5;
+                if (Math.isNaN(currX)) currX = (sw - 200.0) * 0.5;
+
+                for (bmp in discLogos) {
+                    bmp.x = currX;
+                    bmp.y = rowY;
+                    currX += (bmp.tile.width * bmp.scaleX) + logoSpacing;
+                }
+            }
+
+            if (discVersion != null) {
+                discVersion.maxWidth = maxTextWidth;
+                discVersion.x = (sw - maxTextWidth) * 0.5;
+                discVersion.y = (discLogos.length > 0) ? (rowY + targetIconHeight + vGap) : (discBody.y + bHeight + vGap);
             }
         }
     }
@@ -497,12 +583,16 @@ class Main extends hxd.App {
     override function onResize() {
         super.onResize();
 
-        if (s2d != null) s2d.checkResize();
-        if (gfx != null) gfx.applyRenderScale();
+        if (gfx != null) {
+            gfx.applyRenderScale();
+            gfx.applyUIResolution();
+        } else if (s2d != null) {
+            s2d.checkResize();
+        }
 
-        if (showcaseCurtain != null) {
-            showcaseCurtain.scaleX = hxd.Window.getInstance().width;
-            showcaseCurtain.scaleY = hxd.Window.getInstance().height;
+        if (showcaseCurtain != null && s2d != null) {
+            showcaseCurtain.scaleX = s2d.width;
+            showcaseCurtain.scaleY = s2d.height;
         }
 
         if (appState == IntroSequence) {

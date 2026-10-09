@@ -9,19 +9,48 @@ import h3d.Vector;
 import hxd.IndexBuffer;
 import physics.SplineMath;
 
+/**
+ * Procedural circuit track builder and environment generator.
+ * Generates continuous Catmull-Rom roadbed ribbon geometry, asphalt surface mesh,
+ * continuous galvanized Armco guardrails, vertical steel support stanchions,
+ * and background urban skyscraper geometry.
+ */
 class Track extends Object {
+    /** High-density discrete Catmull-Rom spline waypoints defining track centerline. */
     public var waypoints:Array<Vector> = [];
+
+    /** Asphalt road surface polygon ribbon mesh. */
     public var roadMesh:Mesh;
+
+    /** Gravel and concrete sub-base foundation ribbon mesh. */
     public var bedMesh:Mesh;
+
+    /** Continuous left-hand side steel barrier ribbon mesh. */
     public var leftRailMesh:Mesh;
+
+    /** Continuous right-hand side steel barrier ribbon mesh. */
     public var rightRailMesh:Mesh;
 
+    /** Total roadway width in meters across all four lanes. */
     public static inline var ROAD_WIDTH:Float = 20.0;
+
+    /** Distance from track centerline to outer edge of asphalt. */
     public static inline var HALF_WIDTH:Float = 10.0;
+
+    /** Additional gravel shoulder width extending past asphalt borders. */
     public static inline var BED_EXTRA_WIDTH:Float = 4.0;
+
+    /** Vertical elevation offset preventing coplanar Z-fighting between asphalt and sub-base. */
     public static inline var ROAD_LIFT:Float = 0.06;
+
+    /** Height of steel barrier guardrails above the asphalt plane in meters. */
     public static inline var RAIL_HEIGHT:Float = 0.65;
 
+    /**
+     * Constructs and synthesizes the procedural circuit world.
+     *
+     * @param parent Optional parent 3D scene graph node.
+     */
     public function new(?parent:Object) {
         super(parent);
         buildCircuitWaypoints();
@@ -31,6 +60,9 @@ class Track extends Object {
         buildCityscape();
     }
 
+    /**
+     * Interpolates control keypoints using cubic Catmull-Rom splines into dense waypoint arrays.
+     */
     function buildCircuitWaypoints() {
         var rawNodes = [
             new Vector(0,    0,    0),
@@ -65,6 +97,9 @@ class Track extends Object {
         }
     }
 
+    /**
+     * Generates the gravel sub-base shoulder foundation mesh underlying the roadway.
+     */
     function buildRoadBed() {
         var count = waypoints.length;
         var pts:Array<Point> = [];
@@ -104,6 +139,9 @@ class Track extends Object {
         bedMesh.material.color.setColor(0x1B1E24);
     }
 
+    /**
+     * Generates the asphalt 4-lane driving ribbon surface polygon mesh.
+     */
     function buildRoadRibbon() {
         var count = waypoints.length;
         var pts:Array<Point> = [];
@@ -138,11 +176,14 @@ class Track extends Object {
 
         var poly = new Polygon(pts, idxBuf);
         poly.addNormals();
-
         roadMesh = new Mesh(poly, this);
         roadMesh.material.color.setColor(0x282D35);
     }
 
+    /**
+     * Builds continuous extruded steel Armco crash barriers along both track boundaries,
+     * including vertical galvanized posts spaced at regular intervals.
+     */
     function buildContinuousGuardrails() {
         var count = waypoints.length;
 
@@ -178,6 +219,7 @@ class Track extends Object {
             var i2 = ((i + 1) % count) * 2;
             var i3 = i2 + 1;
 
+            // Double-sided quad winding for inner and outer visibility
             leftIdx.push(i0); leftIdx.push(i2); leftIdx.push(i1);
             leftIdx.push(i1); leftIdx.push(i2); leftIdx.push(i3);
             leftIdx.push(i0); leftIdx.push(i1); leftIdx.push(i2);
@@ -199,6 +241,7 @@ class Track extends Object {
         rightRailMesh = new Mesh(polyR, this);
         rightRailMesh.material.color.setColor(0x9EACB8);
 
+        // Vertical support stanchion post geometry
         var postPrim = new Cube(0.25, 0.25, RAIL_HEIGHT + 0.1, true);
         postPrim.unindex();
         postPrim.addNormals();
@@ -226,6 +269,9 @@ class Track extends Object {
         }
     }
 
+    /**
+     * Builds skyline skyscrapers surrounding the track to furnish parallax depth.
+     */
     function buildCityscape() {
         var bldgPrim = new Cube(1.0, 1.0, 1.0, true);
         bldgPrim.unindex();

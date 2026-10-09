@@ -1,19 +1,36 @@
-package core;
+package ui;
 
 import h2d.Object;
 import h2d.Graphics;
 import h2d.Text;
 
+/**
+ * Procedural hardware layout and diagram generator for physical input controllers.
+ * Draws vector schematic representations of Nintendo BayX / Xbox gamepad controllers
+ * and desktop WASD / Arrow keyboard layouts with dynamic callouts.
+ */
 class ControlDiagrams extends Object {
+    /** Vector graphics canvas for controller contours, buttons, and callout lines. */
     var g:Graphics;
+
+    /** Container object holding interactive text label callouts. */
     var labelsContainer:Object;
 
+    /**
+     * Instantiates the hardware diagram visualizer component.
+     *
+     * @param parent Optional parent 2D scene graph node.
+     */
     public function new(?parent:Object) {
         super(parent);
         g = new Graphics(this);
         labelsContainer = new Object(this);
     }
 
+    /**
+     * Renders an exploded vector schematic diagram of an ergonomic gamepad controller.
+     * Highlights triggers, bumpers, analog thumbsticks, directional pad, and face buttons.
+     */
     public function drawGamepadLayout() {
         g.clear();
         labelsContainer.removeChildren();
@@ -21,7 +38,7 @@ class ControlDiagrams extends Object {
         var cx = 0.0;
         var cy = 0.0;
 
-        // 1. PXN P50L Outer Body Contour
+        // 1. Gamepad Outer Body Ergonomic Grip Silhouette
         g.beginFill(0x21252B);
         g.lineStyle(2.5, 0x00E5FF, 0.95);
 
@@ -41,7 +58,7 @@ class ControlDiagrams extends Object {
         g.curveTo(cx - 140, cy - 69, cx - 95, cy - 70);
         g.endFill();
 
-        // 2. Exploded Triggers (LT/RT) & Bumpers (LB/RB)
+        // 2. Exploded Triggers (LT / RT) & Shoulder Bumpers (LB / RB)
         g.beginFill(0x2E3440);
         g.lineStyle(2.0, 0x61AFEF, 0.95);
         g.drawRoundedRect(cx - 142, cy - 112, 58, 18, 6);
@@ -54,7 +71,7 @@ class ControlDiagrams extends Object {
         g.moveTo(cx - 111, cy - 75); g.lineTo(cx - 111, cy - 69);
         g.moveTo(cx + 111, cy - 75); g.lineTo(cx + 111, cy - 69);
 
-        // 3. Thumbsticks
+        // 3. Left & Right Analog Thumbsticks
         var lStickX = cx - 88;
         var lStickY = cy - 22;
         g.beginFill(0x181B20);
@@ -77,7 +94,7 @@ class ControlDiagrams extends Object {
         g.drawCircle(rStickX, rStickY, 6);
         g.endFill();
 
-        // 4. Directional D-Pad
+        // 4. Directional D-Pad Cluster
         var dX = cx - 44;
         var dY = cy + 24;
         g.beginFill(0x181B20);
@@ -91,7 +108,7 @@ class ControlDiagrams extends Object {
         g.drawRoundedRect(dX - 7, dY - 21, 14, 42, 5);
         g.endFill();
 
-        // 5. Action Face Buttons (BayX Layout)
+        // 5. Action Face Buttons (BayX / ABXY Layout)
         var fX = cx + 96;
         var fY = cy - 22;
         var bRadius = 10.0;
@@ -122,7 +139,7 @@ class ControlDiagrams extends Object {
             txt.y = bl.y;
         }
 
-        // 6. Center Console Cluster
+        // 6. Center Console Select / Start / Home Cluster
         g.beginFill(0x282C34);
         g.lineStyle(1.5, 0xABB2BF, 0.9);
         g.drawRoundedRect(cx - 38, cy - 46, 20, 10, 5);
@@ -149,7 +166,7 @@ class ControlDiagrams extends Object {
         }
         g.endFill();
 
-        // 7. Exploded Callout Guidelines & Labels
+        // 7. Exploded Callout Guidelines & Explanatory Labels
         var callouts = [
             { x1: cx - 113, y1: cy - 112, x2: cx - 200, y2: cy - 118, text: "LT: Brake / Reverse" },
             { x1: cx - 111, y1: cy - 89,  x2: cx - 200, y2: cy - 84,  text: "LB: Nitro Boost" },
@@ -176,6 +193,10 @@ class ControlDiagrams extends Object {
         }
     }
 
+    /**
+     * Renders a vector schematic diagram of the keyboard driving setup.
+     * Highlights WASD clusters, spacebar handbrake, shift nitro, and alternate arrow keys.
+     */
     public function drawKeyboardLayout() {
         g.clear();
         labelsContainer.removeChildren();
@@ -183,11 +204,13 @@ class ControlDiagrams extends Object {
         var cx = 0.0;
         var cy = 0.0;
 
+        // Base keyboard backing plate
         g.beginFill(0x21252B);
         g.lineStyle(2.5, 0x98C379, 0.85);
         g.drawRoundedRect(cx - 200, cy - 85, 400, 175, 16);
         g.endFill();
 
+        // WASD keycaps cluster
         var wasd = [
             { key: "W", x: cx - 110, y: cy - 45, w: 28, h: 28 },
             { key: "A", x: cx - 142, y: cy - 12, w: 28, h: 28 },
@@ -207,6 +230,7 @@ class ControlDiagrams extends Object {
             t.y = k.y + 6;
         }
 
+        // Spacebar keycap
         g.drawRoundedRect(cx - 60, cy + 38, 120, 24, 6);
         var spaceTxt = new Text(FontManager.regularFont, labelsContainer);
         spaceTxt.text = "SPACE";
@@ -215,6 +239,7 @@ class ControlDiagrams extends Object {
         spaceTxt.x = cx - 24;
         spaceTxt.y = cy + 42;
 
+        // Left shift keycap
         g.drawRoundedRect(cx - 180, cy + 22, 50, 24, 6);
         var shiftTxt = new Text(FontManager.regularFont, labelsContainer);
         shiftTxt.text = "SHIFT";
@@ -223,6 +248,7 @@ class ControlDiagrams extends Object {
         shiftTxt.x = cx - 172;
         shiftTxt.y = cy + 26;
 
+        // Arrow navigation keycaps
         var arrows = [
             { key: "▲", x: cx + 110, y: cy - 12, w: 26, h: 26 },
             { key: "◄", x: cx + 80,  y: cy + 18, w: 26, h: 26 },
@@ -240,6 +266,7 @@ class ControlDiagrams extends Object {
             t.y = a.y + 5;
         }
 
+        // Exploded callout indicators and text descriptions
         var callouts = [
             { x1: cx - 110, y1: cy - 45, x2: cx - 110, y2: cy - 80, text: "W / UP: Throttle (Gas)" },
             { x1: cx - 142, y1: cy - 12, x2: cx - 210, y2: cy - 35, text: "A / D: Steering Rack" },

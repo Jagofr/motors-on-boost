@@ -12,16 +12,21 @@ G:.
 |   
 +---src
 |   |   Main.hx
+|   |   Version.hx
 |   |   
-|   +---core
-|   |       ChaseCamera.hx
-|   |       UIManager.hx
-|   |       ControlDiagrams.hx
+|   +---audio
 |   |       AudioManager.hx
-|   |       SaveSystem.hx
+|   |       
+|   +---camera
+|   |       ChaseCamera.hx
+|   |       
+|   +---entities
+|   |       CarMesh.hx
+|   |       TrafficCarMesh.hx
+|   |       TrafficSystem.hx
+|   |       
+|   +---graphics
 |   |       GraphicsManager.hx
-|   |       FontManager.hx
-|   |       UIIcons.hx
 |   |       
 |   +---input
 |   |       InputController.hx
@@ -30,11 +35,42 @@ G:.
 |   |       CarPhysics.hx
 |   |       SplineMath.hx
 |   |       
-|   +---entities
-|   |       CarMesh.hx
-|   |       TrafficSystem.hx
-|   |       TrafficCarMesh.hx
+|   +---save
+|   |       SaveSystem.hx
 |   |       
+|   +---ui
+|   |   |   ControlDiagrams.hx
+|   |   |   FontManager.hx
+|   |   |   UIBuilder.hx
+|   |   |   UIIcons.hx
+|   |   |   UIManager.hx
+|   |   |   
+|   |   +---components
+|   |   |       CardBackplate.hx
+|   |   |       MenuItemRow.hx
+|   |   |       TouchControlsHUD.hx
+|   |   |       UIEnums.hx
+|   |   |       UITheme.hx
+|   |   |       
+|   |   \---views
+|   |       +---credits
+|   |       |       CreditsView.hx
+|   |       |       
+|   |       +---mainmenu
+|   |       |       MainMenuView.hx
+|   |       |       
+|   |       +---options
+|   |       |       AudioOptionsPanel.hx
+|   |       |       ControlsOptionsPanel.hx
+|   |       |       GraphicsOptionsPanel.hx
+|   |       |       OptionsView.hx
+|   |       |       
+|   |       +---pause
+|   |       |       PauseMenuView.hx
+|   |       |       
+|   |       \---splash
+|   |               SplashView.hx
+|   |               
 |   \---world
 |           Track.hx
 |           

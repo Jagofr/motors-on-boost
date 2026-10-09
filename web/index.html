@@ -97,6 +97,21 @@
   </div>
 
   <canvas id="webgl"></canvas>
-  <script src="game.js"></script>
+  <script src="game.js?v=0.1.4"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => {
+            console.log('[PWA] Service Worker registered successfully with scope:', reg.scope);
+            // Proactively check for live updates on every session
+            reg.update();
+          })
+          .catch((err) => {
+            console.warn('[PWA] Service Worker registration failed:', err);
+          });
+      });
+    }
+  </script>
 </body>
 </html>

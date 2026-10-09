@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.1.4] - 2026-10-09
+### Added
+- **Centralized Version Metadata (`Version.hx`)**: Single source of truth defining semantic version `0.1.4`, build counter `148`, release channel, and standardized display badges (`v0.1.4 (Build 148)`).
+- **Persistent Version Badges Across All 5 Core UI Screens**:
+  - *Trademark Disclaimer Screen*: Centered version & build label below attribution logos.
+  - *Title Splash Screen*: Version badge below pulsating entrance prompt.
+  - *Main Menu*: Version footer centered at screen bottom.
+  - *Options Screen*: Version badge placed in upper-right header of options card.
+  - *Credits Screen*: Prominent version & build designation above navigation return.
+- **Save System v2 Schema & Forward Migration (`SaveSystem.hx`)**:
+  - Upgraded active persistence key to `mob_motors_on_boost_save_v2`.
+  - Added seamless automated migration for records originating from `mob_motors_on_boost_save_v1` and prototype saves.
+  - Stamped save records with `version: 2` and `buildNumber: 148`.
+- **Mobile Multi-Touch Virtual Driving Controls (`TouchControlsHUD.hx`)**:
+  - Camera-aware coordinate projection mapping canvas buffer pixels into 2D scene space through `s2d.interactiveCamera.eventToCamera()`.
+  - Zero-allocation scratch instances (`scratchPoint`, `scratchEvent`) eliminating per-touch garbage collector pressure.
+  - Euclidean distance-to-center evaluation for action capsules (GAS, BRAKE, NITRO, DRIFT) eliminating hit-test overlap bias.
+  - Independent touch identifier tracking (`activeTouches: Map<Int, String>`) enabling concurrent acceleration, steering, and nitrous boost actuation without input cancellations.
+  - Browser `touchcancel` event handler providing fail-safe input register resets on OS gesture interrupts.
+- **Decoupled 3D Graphics & UI Resolution Scaling**:
+  - Independent 3D rendering resolution scaling separate from UI layout dimensions.
+  - Configurable 2D UI resolution presets (`720p`, `1080p`, `1440p`, `2160p`, `Native / Match Window`) using Heaps `AutoZoom`.
+
+### Fixed
+- **Invisible Text on High-DPI Displays**: Fixed missing `baseLine` property on TrueType font descriptors in `FontManager.hx`, restoring crisp text across high-DPI displays.
+- **Vehicle Mesh Artifacts (`CarMesh.hx`)**: Resolved polygon clipping and geometry misalignment, increasing vertex density across wheel arches, chassis lines, and spoiler.
+- **Intro Transition Sequence**: Fixed transition from trademark disclaimer screen to 3D rotating showcase with clean, fully opaque black curtain cross-fading.
+- **PWA Service Worker Cache**: Bumped cache name to `mob-motors-on-boost-v1-4` in `sw.js` and added cache-busting tag `?v=0.1.4` in `index.html`.
+
+---
+
 ## [0.1.0] - 2026-10-06
 ### Added
 - Core Haxe 4.3+ and Heaps.io (WebGL 2.0 / JavaScript) architecture.
