@@ -41,6 +41,9 @@ class UIBuilder extends Object {
     public var optionsView:OptionsView;
     public var creditsView:CreditsView;
 
+    /** In-game cyber telemetry HUD overlay. */
+    public var inGameHUDView:ui.views.hud.InGameHUDView;
+
     /** In-game virtual touch driving controls HUD overlay. */
     public var touchControlsHUD:TouchControlsHUD;
 
@@ -68,11 +71,15 @@ class UIBuilder extends Object {
         optionsView = new OptionsView(input, gfxSettings, this);
         creditsView = new CreditsView(this);
 
-        // 4. Mobile touch driving controls HUD
+        // 4. In-game cyber telemetry HUD
+        inGameHUDView = new ui.views.hud.InGameHUDView(this);
+        inGameHUDView.visible = false;
+
+        // 5. Mobile touch driving controls HUD
         touchControlsHUD = new TouchControlsHUD(input, this);
         touchControlsHUD.visible = false;
 
-        // 5. Footer navigation hint text
+        // 6. Footer navigation hint text
         helpText = new Text(FontManager.regularFont, this);
         helpText.textColor = UITheme.COLOR_TEXT_MUTED;
     }
@@ -128,6 +135,7 @@ class UIBuilder extends Object {
         if (pauseMenuView != null && pauseMenuView.visible) pauseMenuView.layout(sw, sh);
         if (optionsView != null && optionsView.visible) optionsView.layout(sw, sh);
         if (creditsView != null && creditsView.visible) creditsView.layout(sw, sh);
+        if (inGameHUDView != null && inGameHUDView.visible) inGameHUDView.layout(sw, sh);
         if (touchControlsHUD != null && touchControlsHUD.visible) touchControlsHUD.layout(sw, sh);
 
         if (helpText != null) {

@@ -19,6 +19,9 @@ class UITheme {
     /** Vibrant racing orange used for hero branding logos and game titles. */
     public static inline var COLOR_ACCENT_ORANGE:Int = 0xFF9800;
 
+    /** Warning orange accent used for drifting and high-intensity boost states. */
+    public static inline var COLOR_ORANGE_WARNING:Int = 0xFF9800;
+
     /** Primary active text color for focused options and high-contrast headings. */
     public static inline var COLOR_TEXT_ACTIVE:Int = 0x00E5FF;
 
@@ -131,7 +134,7 @@ class UITheme {
     public static inline var ICON_SIZE_CREDITS:Int = 28;
 
     /** Options and overlay back button interactive width. */
-    public static inline var BACK_BUTTON_WIDTH:Float = 260.0;
+    public static inline var BACK_BUTTON_WIDTH:Float = 100.0;
 
     /** Options and overlay back button interactive height. */
     public static inline var BACK_BUTTON_HEIGHT:Float = 40.0;

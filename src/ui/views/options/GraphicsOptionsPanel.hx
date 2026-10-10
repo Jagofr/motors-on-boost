@@ -46,6 +46,25 @@ class GraphicsOptionsPanel extends Object {
     /** Callback invoked when UI resolution changes so the parent options view and UI can immediately re-layout. */
     public var onUIResolutionChanged:Void->Void;
 
+    /** Current vertical scroll offset for compact displays. */
+    public var scrollOffset:Int = 0;
+
+    /** Maximum visible option rows fitting in the modal card. */
+    public var maxVisibleRows:Int = 14;
+
+    /** Visual scroll upward indicator hint. */
+    var scrollUpHint:Text;
+
+    /** Visual scroll downward indicator hint. */
+    var scrollDownHint:Text;
+
+    var cachedSw:Float = 1280.0;
+    var cachedSh:Float = 720.0;
+    var cachedCardX:Float = 0.0;
+    var cachedCardY:Float = 0.0;
+    var cachedCardW:Float = 920.0;
+    var cachedCardH:Float = 580.0;
+
     /**
      * Instantiates the graphics options configuration subpanel.
      *
@@ -55,6 +74,16 @@ class GraphicsOptionsPanel extends Object {
     public function new(gfxSettings:GraphicsSettings, ?parent:Object) {
         super(parent);
         this.settings = gfxSettings;
+
+        scrollUpHint = new Text(FontManager.regularFont, this);
+        scrollUpHint.text = "^  MORE OPTIONS ABOVE  ^";
+        scrollUpHint.textColor = UITheme.COLOR_ACCENT_GOLD;
+        scrollUpHint.visible = false;
+
+        scrollDownHint = new Text(FontManager.regularFont, this);
+        scrollDownHint.text = "v  MORE OPTIONS BELOW  v";
+        scrollDownHint.textColor = UITheme.COLOR_ACCENT_GOLD;
+        scrollDownHint.visible = false;
 
         for (i in 0...NAMES.length) {
             var txt = new Text(FontManager.regularFont, this);
@@ -69,6 +98,12 @@ class GraphicsOptionsPanel extends Object {
             };
             inter.onClick = function(_) {
                 if (visible) cycleOption(i, 1);
+            };
+            inter.onWheel = function(e:hxd.Event) {
+                if (visible) {
+                    if (e.wheelDelta > 0) scroll(-1);
+                    else if (e.wheelDelta < 0) scroll(1);
+                }
             };
             interactives.push(inter);
         }
@@ -149,14 +184,43 @@ class GraphicsOptionsPanel extends Object {
     }
 
     /**
-     * Navigates cursor up or down.
+     * Navigates cursor up or down with automated viewport scrolling.
      *
      * @param dir Navigation offset (-1 or +1).
      */
     public function navigate(dir:Int) {
         selectedIndex = (selectedIndex + dir + items.length) % items.length;
         AudioManager.inst.playMenuBeep(380, 0.04);
+        adjustScrollForSelected();
+        layoutCached();
         updateStyles();
+    }
+
+    /**
+     * Scrolls the visible option rows up or down.
+     *
+     * @param dir Scroll direction delta (-1 or +1).
+     */
+    public function scroll(dir:Int) {
+        var maxScroll = Math.max(0, items.length - maxVisibleRows);
+        scrollOffset = Math.round(Math.max(0, Math.min(maxScroll, scrollOffset + dir)));
+        layoutCached();
+        updateStyles();
+    }
+
+    /**
+     * Adjusts scroll offset so the currently selected row stays visible in the viewport.
+     */
+    function adjustScrollForSelected() {
+        if (selectedIndex < scrollOffset) {
+            scrollOffset = selectedIndex;
+        } else if (selectedIndex >= scrollOffset + maxVisibleRows) {
+            scrollOffset = selectedIndex - maxVisibleRows + 1;
+        }
+    }
+
+    function layoutCached() {
+        layout(cachedSw, cachedSh, cachedCardX, cachedCardY, cachedCardW, cachedCardH);
     }
 
     /**
@@ -214,20 +278,54 @@ class GraphicsOptionsPanel extends Object {
      * @param cardH Modal card height.
      */
     public function layout(sw:Float, sh:Float, cardX:Float = 0, cardY:Float = 0, cardW:Float = 0, cardH:Float = 0) {
-        var effectiveCardX = (cardW > 0) ? cardX : (sw - UITheme.OPTIONS_CARD_WIDTH) * 0.5;
-        var effectiveCardY = (cardH > 0) ? cardY : sh * 0.16;
-        var effectiveCardW = (cardW > 0) ? cardW : UITheme.OPTIONS_CARD_WIDTH;
-        var startY = effectiveCardY + 74.0;
+        cachedSw = sw;
+        cachedSh = sh;
+        cachedCardX = (cardW > 0) ? cardX : (sw - UITheme.OPTIONS_CARD_WIDTH) * 0.5;
+        cachedCardY = (cardH > 0) ? cardY : sh * 0.16;
+        cachedCardW = (cardW > 0) ? cardW : UITheme.OPTIONS_CARD_WIDTH;
+        cachedCardH = (cardH > 0) ? cardH : UITheme.OPTIONS_CARD_HEIGHT;
+
+        var availableH = cachedCardH - 110.0;
+        maxVisibleRows = Math.floor(availableH / ROW_HEIGHT);
+        if (maxVisibleRows < 4) maxVisibleRows = 4;
+        if (maxVisibleRows > items.length) maxVisibleRows = items.length;
+
+        adjustScrollForSelected();
+
+        var startY = cachedCardY + 68.0;
 
         for (i in 0...items.length) {
             var item = items[i];
             var inter = interactives[i];
-            item.x = (sw - item.textWidth) * 0.5;
-            item.y = startY + (i * ROW_HEIGHT);
-            inter.x = effectiveCardX + (effectiveCardW - ROW_WIDTH) * 0.5;
-            inter.y = item.y;
-            inter.width = ROW_WIDTH;
-            inter.height = ROW_HEIGHT;
+            var isVisible = (i >= scrollOffset && i < scrollOffset + maxVisibleRows);
+            item.visible = isVisible;
+            inter.visible = isVisible;
+
+            if (isVisible) {
+                var rowY = startY + ((i - scrollOffset) * ROW_HEIGHT);
+                item.x = (sw - item.textWidth) * 0.5;
+                item.y = rowY;
+                inter.x = cachedCardX + (cachedCardW - ROW_WIDTH) * 0.5;
+                inter.y = rowY;
+                inter.width = Math.min(ROW_WIDTH, cachedCardW - 40.0);
+                inter.height = ROW_HEIGHT;
+            }
+        }
+
+        if (scrollUpHint != null) {
+            scrollUpHint.visible = (scrollOffset > 0);
+            if (scrollUpHint.visible) {
+                scrollUpHint.x = (sw - scrollUpHint.textWidth) * 0.5;
+                scrollUpHint.y = startY - 20.0;
+            }
+        }
+
+        if (scrollDownHint != null) {
+            scrollDownHint.visible = (scrollOffset + maxVisibleRows < items.length);
+            if (scrollDownHint.visible) {
+                scrollDownHint.x = (sw - scrollDownHint.textWidth) * 0.5;
+                scrollDownHint.y = startY + (maxVisibleRows * ROW_HEIGHT) + 2.0;
+            }
         }
     }
 }

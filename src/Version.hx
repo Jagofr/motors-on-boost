@@ -6,10 +6,10 @@ package;
  */
 class Version {
     /** Semantic version string: Major.Minor.Patch (Incremented by +0.0.1) */
-    public static inline var NUMBER:String = "0.2.1";
+    public static inline var NUMBER:String = "0.2.2";
 
-    /** Monotonically increasing build compilation counter iterated for v0.2.1 release. */
-    public static inline var BUILD:Int = 4;
+    /** Monotonically increasing build compilation counter iterated for v0.2.2 release. */
+    public static inline var BUILD:Int = 5;
 
     /** Human-readable release designation. */
     public static inline var CHANNEL:String = "Alpha";
@@ -21,5 +21,5 @@ class Version {
     public static inline var SHORT:String = "v" + NUMBER;
 
     /** Build release date. */
-    public static inline var BUILD_DATE:String = "2026-10-09";
+    public static inline var BUILD_DATE:String = "2026-10-10";
 }

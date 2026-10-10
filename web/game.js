@@ -237,6 +237,9 @@ hxd_App.prototype = {
 	,__class__: hxd_App
 };
 var Main = function() {
+	this.totalLaps = 3;
+	this.currentLap = 1;
+	this.raceTimer = 0.0;
 	this.showcaseAngle = 0.0;
 	this.rearWheelSpinAngle = 0.0;
 	this.wheelSpinAngle = 0.0;
@@ -292,7 +295,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 			onLoaded(tile);
 		};
 		img.onerror = function(err) {
-			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 183, className : "Main", methodName : "loadWebpTile"});
+			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 186, className : "Main", methodName : "loadWebpTile"});
 		};
 		img.src = path;
 	}
@@ -321,7 +324,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.discBody.set_lineSpacing(5.0);
 		this.discBody.set_text("M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" + "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" + "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" + "are the intellectual property of their respective creators. All rights reserved.\n\n" + "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" + "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" + "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" + "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" + "Please play in a well-lit environment and take a 15-minute break for every hour of play.");
 		this.discVersion = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
-		this.discVersion.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
+		this.discVersion.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
 		this.discVersion.set_textColor(5927822);
 		this.discVersion.set_textAlign(h2d_Align.Center);
 		this.logoRow = new h2d_Object(this.screenDisclaimer);
@@ -418,6 +421,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 	,startBackgroundLoading: function() {
 		this.isLoadingStarted = true;
 		this.saveData = save_SaveSystem.load();
+		this.input.steerSensitivity = this.saveData.steerSensitivity != null && this.saveData.steerSensitivity > 0.0 ? this.saveData.steerSensitivity : 1.0;
 		this.audio = new audio_AudioManager();
 		this.audio.masterVolume = this.saveData.masterVol;
 		this.audio.musicVolume = this.saveData.musicVol;
@@ -482,7 +486,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		_this.x = 1.;
 		_this.y = 0.94901960784313721;
 		_this.z = 0.85098039215686272;
-		this.gfx = new graphics_GraphicsManager(this.s3d,this.s2d,this.dirLight,this.saveData.graphics);
+		this.gfx = new graphics_GraphicsManager(this.s3d,this.s2d,this.dirLight,this.saveData.graphics,this.postRenderer);
 		var terrainPrim = new h3d_prim_Cube(800.0,800.0,0.4,true);
 		terrainPrim.unindex();
 		terrainPrim.addNormals();
@@ -516,6 +520,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.ui = new ui_UIManager(this.input,this.saveData.graphics,this.saveData.hasActiveRun,this.s2d);
 		this.ui.set_visible(false);
 		this.ui.onMenuAction = $bind(this,this.handleMenuAction);
+		this.ui.builder.inGameHUDView.initWaypoints(this.track.waypoints);
 		this.resetCarToStartLine();
 		this.isLoadingComplete = true;
 	}
@@ -528,6 +533,8 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.carPhysics.forwardSpeed = 0.0;
 		this.carPhysics.lateralVelocity = 0.0;
 		this.carPhysics.isDrifting = false;
+		this.carPhysics.boostFuel = 1.0;
+		this.carPhysics.isBoosting = false;
 		var _this = this.playerMesh;
 		_this.x = 0.0;
 		_this.flags |= 1;
@@ -554,6 +561,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.saveData.masterVol = this.audio.masterVolume;
 		this.saveData.musicVol = this.audio.musicVolume;
 		this.saveData.sfxVol = this.audio.sfxVolume;
+		this.saveData.steerSensitivity = this.input.steerSensitivity;
 		this.saveData.graphics = this.ui.gfxSettings;
 		save_SaveSystem.save(this.saveData);
 		this.ui.setHasActiveSave(true);
@@ -563,9 +571,9 @@ Main.prototype = $extend(hxd_App.prototype,{
 		switch(action._hx_index) {
 		case 0:
 			this.resetCarToStartLine();
+			this.raceTimer = 0.0;
+			this.currentLap = 1;
 			this.ui.showInGame();
-			this.fpsText.set_visible(true);
-			this.speedText.set_visible(true);
 			break;
 		case 1:
 			if(this.saveData.hasActiveRun) {
@@ -589,8 +597,6 @@ Main.prototype = $extend(hxd_App.prototype,{
 				this.carPhysics.forwardSpeed = this.saveData.playerState.forwardSpeed;
 			}
 			this.ui.showInGame();
-			this.fpsText.set_visible(true);
-			this.speedText.set_visible(true);
 			break;
 		case 2:
 			break;
@@ -599,8 +605,6 @@ Main.prototype = $extend(hxd_App.prototype,{
 			break;
 		case 4:
 			this.saveCurrentRun();
-			this.fpsText.set_visible(false);
-			this.speedText.set_visible(false);
 			this.ui.showMainMenu();
 			break;
 		}
@@ -847,9 +851,9 @@ Main.prototype = $extend(hxd_App.prototype,{
 				this.playerMesh.wheels[3].rotate(0,1.5707963,0);
 				this.playerMesh.wheels[3].rotate(this.rearWheelSpinAngle,0,0);
 			}
-			this.chaseCam.update(dt,this.carPhysics,this.input.boost);
-			this.speedText.set_text(kmh + " KM/H [" + (this.carPhysics.currentGear == -1 ? "R" : this.carPhysics.currentGear == 0 ? "N" : "G" + this.carPhysics.currentGear) + "] (" + Math.round(this.carPhysics.engineRPM) + " RPM)" + (this.carPhysics.isDrifting ? " [DRIFTING]" : "") + (this.input.boost ? " [NITRO]" : ""));
-			this.fpsText.set_text("FPS: " + Math.round(hxd_Timer.fps()));
+			this.chaseCam.update(dt,this.carPhysics,this.carPhysics.isBoosting);
+			this.raceTimer += dt;
+			this.ui.builder.inGameHUDView.updateTelemetry(dt,this.carPhysics,kmh,this.carPhysics.isBoosting,this.raceTimer,this.currentLap,this.totalLaps);
 			break;
 		case 3:case 4:
 			if(this.postRenderer != null) {
@@ -5029,12 +5033,13 @@ format_tools_Inflate.__name__ = "format.tools.Inflate";
 format_tools_Inflate.run = function(bytes) {
 	return haxe_zip_Uncompress.run(bytes);
 };
-var graphics_GraphicsManager = function(s3d,s2d,light,initialSettings) {
+var graphics_GraphicsManager = function(s3d,s2d,light,initialSettings,post) {
 	graphics_GraphicsManager.inst = this;
 	this.s3d = s3d;
 	this.s2d = s2d;
 	this.light = light;
 	this.settings = initialSettings;
+	this.postRenderer = post != null ? post : ((s3d.renderer) instanceof graphics_PostProcessRenderer) ? s3d.renderer : null;
 	this.applyAll();
 };
 $hxClasses["graphics.GraphicsManager"] = graphics_GraphicsManager;
@@ -5045,12 +5050,16 @@ graphics_GraphicsManager.prototype = {
 		this.applyUIResolution();
 		this.applyShadows();
 		this.applyLighting();
+		this.applyTexturesAndFiltering();
 	}
 	,applyRenderScale: function() {
+		if(this.postRenderer != null) {
+			this.postRenderer.renderScale = this.settings.renderScale;
+		}
 		var engine = h3d_Engine.CURRENT;
 		var win = hxd_Window.getInstance();
 		if(engine != null && win != null) {
-			engine.resize(Math.round(win.get_width() * this.settings.renderScale),Math.round(win.get_height() * this.settings.renderScale));
+			engine.resize(win.get_width(),win.get_height());
 		}
 	}
 	,applyUIResolution: function() {
@@ -5092,37 +5101,77 @@ graphics_GraphicsManager.prototype = {
 		if(this.light == null) {
 			return;
 		}
+		var fwd;
+		if(this.s3d != null && this.s3d.lightSystem != null) {
+			var value = this.s3d.lightSystem;
+			fwd = ((value) instanceof h3d_scene_fwd_LightSystem) ? value : null;
+		} else {
+			fwd = null;
+		}
 		switch(this.settings.lightingLevel) {
 		case "High":
 			var _this = this.light.get_color();
 			_this.x = 1.;
 			_this.y = 0.94117647058823528;
 			_this.z = 0.81568627450980391;
+			if(fwd != null) {
+				var _this = fwd.ambientLight;
+				_this.x = 0.29803921568627451;
+				_this.y = 0.36862745098039218;
+				_this.z = 0.44705882352941179;
+			}
 			break;
 		case "Low":
 			var _this = this.light.get_color();
 			_this.x = 0.8666666666666667;
 			_this.y = 0.81568627450980391;
 			_this.z = 0.69019607843137254;
+			if(fwd != null) {
+				var _this = fwd.ambientLight;
+				_this.x = 0.14117647058823529;
+				_this.y = 0.17647058823529413;
+				_this.z = 0.2196078431372549;
+			}
 			break;
 		case "Medium":
 			var _this = this.light.get_color();
 			_this.x = 1.;
 			_this.y = 0.90980392156862744;
 			_this.z = 0.76078431372549016;
+			if(fwd != null) {
+				var _this = fwd.ambientLight;
+				_this.x = 0.2196078431372549;
+				_this.y = 0.27843137254901962;
+				_this.z = 0.33725490196078434;
+			}
 			break;
 		case "Ultra (RTX/Path)":
 			var _this = this.light.get_color();
 			_this.x = 1.;
 			_this.y = 0.97254901960784312;
 			_this.z = 0.90980392156862744;
+			if(fwd != null) {
+				var _this = fwd.ambientLight;
+				_this.x = 0.37254901960784315;
+				_this.y = 0.46274509803921571;
+				_this.z = 0.55686274509803924;
+			}
 			break;
 		default:
 			var _this = this.light.get_color();
 			_this.x = 1.;
 			_this.y = 0.90980392156862744;
 			_this.z = 0.76078431372549016;
+			if(fwd != null) {
+				var _this = fwd.ambientLight;
+				_this.x = 0.2196078431372549;
+				_this.y = 0.27843137254901962;
+				_this.z = 0.33725490196078434;
+			}
 		}
+	}
+	,applyTexturesAndFiltering: function() {
+		h3d_Engine.ANTIALIASING = this.settings.aaType != "None" ? this.settings.aaLevel : 0;
 	}
 	,__class__: graphics_GraphicsManager
 };
@@ -5414,6 +5463,7 @@ h3d_scene_fwd_Renderer.prototype = $extend(h3d_scene_Renderer.prototype,{
 	,__class__: h3d_scene_fwd_Renderer
 });
 var graphics_PostProcessRenderer = function() {
+	this.renderScale = 1.0;
 	h3d_scene_fwd_Renderer.call(this);
 	this.blurShader = new graphics_RadialBlurShader();
 	this.screenFx = new h3d_pass_ScreenFx(this.blurShader);
@@ -5423,8 +5473,12 @@ graphics_PostProcessRenderer.__name__ = "graphics.PostProcessRenderer";
 graphics_PostProcessRenderer.__super__ = h3d_scene_fwd_Renderer;
 graphics_PostProcessRenderer.prototype = $extend(h3d_scene_fwd_Renderer.prototype,{
 	render: function() {
-		if(this.blurShader != null && this.blurShader.blurIntensity__ > 0.001) {
-			var target = this.ctx.textures.allocTarget("radialBlurBuffer",Math.round(this.ctx.engine.width * 1.),Math.round(this.ctx.engine.height * 1.),true,null);
+		if(Math.abs(this.renderScale - 1.0) > 0.001 || this.blurShader != null && this.blurShader.blurIntensity__ > 0.001) {
+			var size = this.renderScale;
+			if(size == null) {
+				size = 1.;
+			}
+			var target = this.ctx.textures.allocTarget("scene3dBuffer",Math.round(this.ctx.engine.width * size),Math.round(this.ctx.engine.height * size),true,null);
 			this.setTarget(target);
 			this.ctx.engine.clear(this.ctx.engine.backgroundColor,1,null);
 			h3d_scene_fwd_Renderer.prototype.render.call(this);
@@ -51109,6 +51163,7 @@ input_InputBindings.prototype = {
 	,__class__: input_InputBindings
 };
 var input_InputController = function() {
+	this.steerSensitivity = 1.0;
 	this.isTouchActive = false;
 	this.touchBoost = false;
 	this.touchHandbrake = false;
@@ -51382,6 +51437,7 @@ input_InputController.prototype = {
 		if(this.touchBoost) {
 			this.boost = true;
 		}
+		this.steer = Math.max(-1.0,Math.min(1.0,this.steer * this.steerSensitivity));
 	}
 	,handleRemappingCapture: function() {
 		if(!this.listeningForGamepad) {
@@ -51494,6 +51550,8 @@ var physics_CarPhysics = function(startX,startY,startZ,initialConfig) {
 	this.suspCompression = [0.0,0.0,0.0,0.0];
 	this.prevSuspLength = [0.45,0.45,0.45,0.45];
 	this.suspLength = [0.45,0.45,0.45,0.45];
+	this.isBoosting = false;
+	this.boostFuel = 1.0;
 	this.isShifting = false;
 	this.shiftTimer = 0.0;
 	this.engineRPM = 1000.0;
@@ -51572,6 +51630,15 @@ physics_CarPhysics.prototype = {
 		_this.y = y;
 		_this.z = 0;
 		this.updateSuspension(clampedDt,fwdX,cosYaw,cosYaw,sinYaw,waypoints);
+		if(input.boost && this.boostFuel > 0.0) {
+			this.boostFuel = Math.max(0.0,this.boostFuel - 0.25 * clampedDt);
+			this.isBoosting = this.boostFuel > 0.0;
+		} else {
+			this.isBoosting = false;
+			if(this.boostFuel < 1.0) {
+				this.boostFuel = Math.min(1.0,this.boostFuel + 0.10 * clampedDt);
+			}
+		}
 		this.updateDrivetrain(clampedDt,input);
 		this.updateLongitudinal(clampedDt,input);
 		this.updateLateralAndDrift(clampedDt,input,fwdX,cosYaw,cosYaw,sinYaw);
@@ -51709,7 +51776,7 @@ physics_CarPhysics.prototype = {
 	}
 	,updateLongitudinal: function(dt,input) {
 		var mu = this.config.tires.groundFriction;
-		var accelRate = (input.boost ? this.config.boostAcceleration : this.config.baseAcceleration) * mu;
+		var accelRate = (this.isBoosting ? this.config.boostAcceleration : this.config.baseAcceleration) * mu;
 		var throttleEff = this.isShifting ? input.throttle * 0.25 : input.throttle;
 		var speedAbs = Math.abs(this.forwardSpeed);
 		if(speedAbs < 8.0 && throttleEff > 0.75) {
@@ -51719,7 +51786,7 @@ physics_CarPhysics.prototype = {
 			accelRate *= Math.max(0.65,1.0 - burnoutRatio * 0.35);
 		}
 		if(throttleEff > 0.0) {
-			if(this.forwardSpeed < (input.boost ? this.config.boostTopSpeed : this.config.baseTopSpeed)) {
+			if(this.forwardSpeed < (this.isBoosting ? this.config.boostTopSpeed : this.config.baseTopSpeed)) {
 				this.forwardSpeed += accelRate * throttleEff * dt;
 			}
 		} else if(input.brake > 0.0) {
@@ -51870,8 +51937,14 @@ save_SaveSystem.getDefaultGraphics = function() {
 save_SaveSystem.load = function() {
 	try {
 		var storage = js_Browser.getLocalStorage();
-		var raw = storage.getItem("mob_motors_on_boost_save_v3");
+		var raw = storage.getItem("mob_motors_on_boost_save_v4");
 		var isLegacy = false;
+		if(raw == null) {
+			raw = storage.getItem("mob_motors_on_boost_save_v3");
+			if(raw != null) {
+				isLegacy = true;
+			}
+		}
 		if(raw == null) {
 			raw = storage.getItem("mob_motors_on_boost_save_v2");
 			if(raw != null) {
@@ -51895,25 +51968,31 @@ save_SaveSystem.load = function() {
 			if(data.graphics != null && data.graphics.uiResolution == null) {
 				data.graphics.uiResolution = "720p (HD)";
 			}
-			if(data.version == null || data.version < 3 || isLegacy) {
-				data.version = 3;
-				data.buildNumber = 4;
+			if(data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
+				data.steerSensitivity = 1.0;
+			}
+			if(data.version == null || data.version < 4 || isLegacy) {
+				data.version = 4;
+				data.buildNumber = 5;
 				save_SaveSystem.save(data);
 			}
 			return data;
 		}
 	} catch( _g ) {
 	}
-	return { version : 3, buildNumber : 4, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, graphics : save_SaveSystem.getDefaultGraphics()};
+	return { version : 4, buildNumber : 5, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, steerSensitivity : 1.0, graphics : save_SaveSystem.getDefaultGraphics()};
 };
 save_SaveSystem.save = function(data) {
 	try {
-		data.version = 3;
-		data.buildNumber = 4;
+		data.version = 4;
+		data.buildNumber = 5;
+		if(data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
+			data.steerSensitivity = 1.0;
+		}
 		var raw = JSON.stringify(data);
 		var storage = js_Browser.getLocalStorage();
+		storage.setItem("mob_motors_on_boost_save_v4",raw);
 		storage.setItem("mob_motors_on_boost_save_v3",raw);
-		storage.setItem("mob_motors_on_boost_save_v2",raw);
 	} catch( _g ) {
 	}
 };
@@ -52230,6 +52309,8 @@ var ui_UIBuilder = function(input,gfxSettings,hasSave,parent) {
 	this.pauseMenuView = new ui_views_pause_PauseMenuView(this);
 	this.optionsView = new ui_views_options_OptionsView(input,gfxSettings,this);
 	this.creditsView = new ui_views_credits_CreditsView(this);
+	this.inGameHUDView = new ui_views_hud_InGameHUDView(this);
+	this.inGameHUDView.set_visible(false);
 	this.touchControlsHUD = new ui_components_TouchControlsHUD(input,this);
 	this.touchControlsHUD.set_visible(false);
 	this.helpText = new h2d_Text(ui_FontManager.regularFont,this);
@@ -52290,6 +52371,9 @@ ui_UIBuilder.prototype = $extend(h2d_Object.prototype,{
 		}
 		if(this.creditsView != null && this.creditsView.visible) {
 			this.creditsView.layout(sw,sh);
+		}
+		if(this.inGameHUDView != null && this.inGameHUDView.visible) {
+			this.inGameHUDView.layout(sw,sh);
 		}
 		if(this.touchControlsHUD != null && this.touchControlsHUD.visible) {
 			this.touchControlsHUD.layout(sw,sh);
@@ -52635,6 +52719,7 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 		this.builder.pauseMenuView.set_visible(false);
 		this.builder.optionsView.set_visible(false);
 		this.builder.creditsView.set_visible(false);
+		this.builder.inGameHUDView.set_visible(false);
 		this.builder.touchControlsHUD.set_visible(false);
 		this.builder.helpText.set_visible(false);
 		this.layout();
@@ -52649,6 +52734,7 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 		this.builder.pauseMenuView.set_visible(false);
 		this.builder.optionsView.set_visible(false);
 		this.builder.creditsView.set_visible(false);
+		this.builder.inGameHUDView.set_visible(false);
 		this.builder.touchControlsHUD.set_visible(false);
 		this.builder.helpText.set_text("[Up / Down / D-Pad] Select    [A / Enter] Confirm");
 		this.builder.helpText.set_visible(true);
@@ -52664,6 +52750,7 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 		this.builder.pauseMenuView.set_visible(false);
 		this.builder.optionsView.set_visible(false);
 		this.builder.creditsView.set_visible(false);
+		this.builder.inGameHUDView.set_visible(true);
 		this.builder.helpText.set_visible(false);
 		this.builder.touchControlsHUD.set_visible(this.inputRef.isTouchActive);
 		this.builder.touchControlsHUD.resetTouchStates();
@@ -52679,6 +52766,7 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 		this.builder.pauseMenuView.activate();
 		this.builder.optionsView.set_visible(false);
 		this.builder.creditsView.set_visible(false);
+		this.builder.inGameHUDView.set_visible(false);
 		this.builder.touchControlsHUD.set_visible(false);
 		this.builder.touchControlsHUD.resetTouchStates();
 		this.builder.helpText.set_text("[Up / Down] Select    [A / Enter] Confirm    [B / Esc] Resume");
@@ -52696,6 +52784,7 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 		this.builder.pauseMenuView.set_visible(false);
 		this.builder.optionsView.activate(fromPause);
 		this.builder.creditsView.set_visible(false);
+		this.builder.inGameHUDView.set_visible(false);
 		this.builder.touchControlsHUD.set_visible(false);
 		this.builder.touchControlsHUD.resetTouchStates();
 		this.builder.helpText.set_text("[LB / RB / Q / E] Switch Tabs    [Left / Right] Value    [B / Esc] Back");
@@ -52712,6 +52801,7 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 		this.builder.pauseMenuView.set_visible(false);
 		this.builder.optionsView.set_visible(false);
 		this.builder.creditsView.activate();
+		this.builder.inGameHUDView.set_visible(false);
 		this.builder.touchControlsHUD.set_visible(false);
 		this.builder.touchControlsHUD.resetTouchStates();
 		this.builder.helpText.set_text("[B / Esc / Enter] Return to Main Menu");
@@ -52805,8 +52895,23 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 				} else if(uiDown) {
 					opt.controlsPanel.navigate(1);
 				}
+				if(opt.controlsPanel.remapIndex == 0) {
+					if(uiLeft) {
+						opt.controlsPanel.adjustSensitivity(-0.02);
+					}
+					if(uiRight) {
+						opt.controlsPanel.adjustSensitivity(0.02);
+					}
+				}
 				if(uiConfirm) {
 					opt.controlsPanel.triggerRemapEntry(opt.controlsPanel.remapIndex);
+				}
+			} else {
+				if(uiLeft) {
+					opt.controlsPanel.adjustSensitivity(-0.02);
+				}
+				if(uiRight) {
+					opt.controlsPanel.adjustSensitivity(0.02);
 				}
 			}
 			if(uiCancel) {
@@ -52850,10 +52955,15 @@ ui_components_CardBackplate.drawPauseMenu = function(g,sw,sh,selectedIdx) {
 	g.drawRoundedRect(cardX + 24,sh * 0.38 + selectedIdx * 54.0 - 4,452.,44,8);
 };
 ui_components_CardBackplate.drawOptionsMenu = function(g,sw,sh,activeTabIdx,tabCount) {
-	g.drawRoundedRect((sw - 920.0) * 0.5,sh * 0.16,920.0,580.0,16.0);
+	var cardW = Math.min(920.0,sw - 24.0);
+	var cardH = Math.min(580.0,sh - sh * 0.16 - 16.0);
+	var cardY = Math.max(12.0,(sh - cardH) * 0.5);
+	g.drawRoundedRect((sw - cardW) * 0.5,cardY,cardW,cardH,16.0);
+	var tabSpacing = Math.min(170.0,(cardW - 140.0) / tabCount);
+	var tabBtnW = Math.min(150.0,tabSpacing - 8.0);
 	g.beginFill(58879,0.18);
 	g.lineStyle(2.0,58879,0.9);
-	g.drawRoundedRect((sw - tabCount * 170.0) * 0.5 + activeTabIdx * 170.0 + 6,sh * 0.18 - 4,150,42,8);
+	g.drawRoundedRect((sw - tabCount * tabSpacing) * 0.5 + activeTabIdx * tabSpacing + 4,cardY + 12.0,tabBtnW,42,8);
 };
 ui_components_CardBackplate.drawCreditsScreen = function(g,sw,sh) {
 	var cardX = (sw - 860.0) * 0.5;
@@ -53361,34 +53471,46 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		var cy = this.nitroY;
 		var radius = this.nitroRadius;
 		var isPressed = this.isBoostPressed;
-		this.canvas.beginFill(58879,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.5,58879,isPressed ? 0.95 : 0.65);
+		this.canvas.beginFill(396824,isPressed ? 0.88 : 0.55);
+		this.canvas.lineStyle(2.5,58879,isPressed ? 1.0 : 0.70);
 		this.canvas.drawCircle(cx,cy,radius);
 		this.canvas.endFill();
+		this.canvas.lineStyle(1.0,16777215,isPressed ? 0.35 : 0.12);
+		this.canvas.drawCircle(cx,cy,radius - 4.0);
+		this.drawFlameGraphic(this.nitroX,this.nitroY - 6.0,this.nitroRadius * 0.42,this.isBoostPressed);
 		var cx = this.gasX;
 		var cy = this.gasY;
 		var radius = this.gasRadius;
 		var isPressed = this.isGasPressed;
-		this.canvas.beginFill(10011513,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.5,10011513,isPressed ? 0.95 : 0.65);
+		this.canvas.beginFill(396824,isPressed ? 0.88 : 0.55);
+		this.canvas.lineStyle(2.5,10011513,isPressed ? 1.0 : 0.70);
 		this.canvas.drawCircle(cx,cy,radius);
 		this.canvas.endFill();
+		this.canvas.lineStyle(1.0,16777215,isPressed ? 0.35 : 0.12);
+		this.canvas.drawCircle(cx,cy,radius - 4.0);
+		this.drawPedalGraphic(this.gasX,this.gasY - 6.0,this.gasRadius * 0.55,this.gasRadius * 0.68,this.isGasPressed);
 		var cx = this.brakeX;
 		var cy = this.brakeY;
 		var radius = this.brakeRadius;
 		var isPressed = this.isBrakePressed;
-		this.canvas.beginFill(14707829,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.5,14707829,isPressed ? 0.95 : 0.65);
+		this.canvas.beginFill(396824,isPressed ? 0.88 : 0.55);
+		this.canvas.lineStyle(2.5,14707829,isPressed ? 1.0 : 0.70);
 		this.canvas.drawCircle(cx,cy,radius);
 		this.canvas.endFill();
+		this.canvas.lineStyle(1.0,16777215,isPressed ? 0.35 : 0.12);
+		this.canvas.drawCircle(cx,cy,radius - 4.0);
+		this.drawBrakeDiscGraphic(this.brakeX,this.brakeY - 5.0,this.brakeRadius,this.isBrakePressed);
 		var cx = this.driftX;
 		var cy = this.driftY;
 		var radius = this.driftRadius;
 		var isPressed = this.isHandbrakePressed;
-		this.canvas.beginFill(16772608,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.5,16772608,isPressed ? 0.95 : 0.65);
+		this.canvas.beginFill(396824,isPressed ? 0.88 : 0.55);
+		this.canvas.lineStyle(2.5,16772608,isPressed ? 1.0 : 0.70);
 		this.canvas.drawCircle(cx,cy,radius);
 		this.canvas.endFill();
+		this.canvas.lineStyle(1.0,16777215,isPressed ? 0.35 : 0.12);
+		this.canvas.drawCircle(cx,cy,radius - 4.0);
+		this.drawHandbrakeGraphic(this.driftX,this.driftY - 5.0,this.driftRadius * 0.65,this.isHandbrakePressed);
 		var borderAlpha = this.isPausePressed ? 0.95 : 0.65;
 		this.canvas.beginFill(12767712,this.isPausePressed ? 0.72 : 0.28);
 		this.canvas.lineStyle(2.0,12767712,borderAlpha);
@@ -53397,36 +53519,137 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 	}
 	,drawAnalogStick: function() {
 		var isGrabbed = this.stickPointerId != null;
-		var borderAlpha = isGrabbed ? 0.85 : 0.45;
-		this.canvas.beginFill(58879,isGrabbed ? 0.38 : 0.22);
+		var borderAlpha = isGrabbed ? 0.90 : 0.50;
+		this.canvas.beginFill(396824,isGrabbed ? 0.45 : 0.28);
 		this.canvas.lineStyle(2.0,58879,borderAlpha);
 		this.canvas.drawCircle(this.stickBaseX,this.stickBaseY,this.stickBaseRadius);
 		this.canvas.endFill();
-		this.canvas.lineStyle(1.5,58879,borderAlpha * 0.6);
+		this.canvas.lineStyle(1.0,58879,borderAlpha * 0.4);
+		this.canvas.drawCircle(this.stickBaseX,this.stickBaseY,this.stickBaseRadius - 6.0);
+		this.canvas.lineStyle(1.5,58879,borderAlpha * 0.7);
 		var _this = this.canvas;
-		var x = this.stickBaseX - this.stickBaseRadius + 8.0;
+		var x = this.stickBaseX - this.stickBaseRadius + 6.0;
 		var y = this.stickBaseY;
 		_this.flush();
 		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
 		var _this = this.canvas;
-		var x = this.stickBaseX - this.stickBaseRadius + 20.0;
+		var x = this.stickBaseX - this.stickBaseRadius + 16.0;
 		var y = this.stickBaseY;
 		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
 		var _this = this.canvas;
-		var x = this.stickBaseX + this.stickBaseRadius - 20.0;
+		var x = this.stickBaseX + this.stickBaseRadius - 16.0;
 		var y = this.stickBaseY;
 		_this.flush();
 		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
 		var _this = this.canvas;
-		var x = this.stickBaseX + this.stickBaseRadius - 8.0;
+		var x = this.stickBaseX + this.stickBaseRadius - 6.0;
 		var y = this.stickBaseY;
 		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
 		this.canvas.beginFill(58879,0.45);
 		this.canvas.drawCircle(this.stickBaseX,this.stickBaseY,4.0);
 		this.canvas.endFill();
 		this.canvas.beginFill(58879,isGrabbed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.5,58879,isGrabbed ? 0.95 : 0.65);
+		this.canvas.lineStyle(2.5,58879,isGrabbed ? 0.98 : 0.65);
 		this.canvas.drawCircle(this.stickKnobX,this.stickKnobY,this.stickKnobRadius);
+		this.canvas.endFill();
+		this.canvas.beginFill(16777215,isGrabbed ? 0.95 : 0.60);
+		this.canvas.drawCircle(this.stickKnobX,this.stickKnobY,5.0);
+		this.canvas.endFill();
+	}
+	,drawFlameGraphic: function(cx,cy,size,isPressed) {
+		this.canvas.beginFill(isPressed ? 16746496 : 58879,0.90);
+		var _this = this.canvas;
+		var y = cy - size;
+		_this.flush();
+		_this.addVertex(cx,y,_this.curR,_this.curG,_this.curB,_this.curA,cx * _this.ma + y * _this.mc + _this.mx,cx * _this.mb + y * _this.md + _this.my);
+		this.canvas.curveTo(cx + size * 0.6,cy - size * 0.2,cx + size * 0.6,cy + size * 0.4);
+		this.canvas.curveTo(cx + size * 0.6,cy + size,cx,cy + size);
+		this.canvas.curveTo(cx - size * 0.6,cy + size,cx - size * 0.6,cy + size * 0.4);
+		this.canvas.curveTo(cx - size * 0.6,cy - size * 0.2,cx,cy - size);
+		this.canvas.endFill();
+		this.canvas.beginFill(isPressed ? 16777062 : 16777215,0.95);
+		var _this = this.canvas;
+		var y = cy - size * 0.2;
+		_this.flush();
+		_this.addVertex(cx,y,_this.curR,_this.curG,_this.curB,_this.curA,cx * _this.ma + y * _this.mc + _this.mx,cx * _this.mb + y * _this.md + _this.my);
+		this.canvas.curveTo(cx + size * 0.3,cy + size * 0.2,cx + size * 0.3,cy + size * 0.6);
+		this.canvas.curveTo(cx + size * 0.3,cy + size * 0.8,cx,cy + size * 0.8);
+		this.canvas.curveTo(cx - size * 0.3,cy + size * 0.8,cx - size * 0.3,cy + size * 0.6);
+		this.canvas.curveTo(cx - size * 0.3,cy + size * 0.2,cx,cy - size * 0.2);
+		this.canvas.endFill();
+	}
+	,drawPedalGraphic: function(cx,cy,w,h,isPressed) {
+		var pedalColor = isPressed ? 65416 : 10011513;
+		this.canvas.beginFill(1582128,0.90);
+		this.canvas.lineStyle(1.5,pedalColor,0.90);
+		this.canvas.drawRoundedRect(cx - w * 0.5,cy - h * 0.5,w,h,4.0);
+		this.canvas.endFill();
+		this.canvas.lineStyle(1.5,pedalColor,0.70);
+		var _this = this.canvas;
+		var x = cx - w * 0.32;
+		var y = cy - h * 0.24;
+		_this.flush();
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+		var _this = this.canvas;
+		var x = cx + w * 0.32;
+		var y = cy - h * 0.24;
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+		var _this = this.canvas;
+		var x = cx - w * 0.32;
+		_this.flush();
+		_this.addVertex(x,cy,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + cy * _this.mc + _this.mx,x * _this.mb + cy * _this.md + _this.my);
+		var _this = this.canvas;
+		var x = cx + w * 0.32;
+		_this.addVertex(x,cy,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + cy * _this.mc + _this.mx,x * _this.mb + cy * _this.md + _this.my);
+		var _this = this.canvas;
+		var x = cx - w * 0.32;
+		var y = cy + h * 0.24;
+		_this.flush();
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+		var _this = this.canvas;
+		var x = cx + w * 0.32;
+		var y = cy + h * 0.24;
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+	}
+	,drawBrakeDiscGraphic: function(cx,cy,radius,isPressed) {
+		this.canvas.lineStyle(2.0,8951976,0.75);
+		this.canvas.drawCircle(cx,cy,radius * 0.60);
+		this.canvas.drawCircle(cx,cy,radius * 0.28);
+		this.canvas.beginFill(396824,0.95);
+		var ang = 0 * (Math.PI / 3.0);
+		this.canvas.drawCircle(cx + Math.cos(ang) * (radius * 0.44),cy + Math.sin(ang) * (radius * 0.44),1.8);
+		var ang = Math.PI / 3.0;
+		this.canvas.drawCircle(cx + Math.cos(ang) * (radius * 0.44),cy + Math.sin(ang) * (radius * 0.44),1.8);
+		var ang = 2 * (Math.PI / 3.0);
+		this.canvas.drawCircle(cx + Math.cos(ang) * (radius * 0.44),cy + Math.sin(ang) * (radius * 0.44),1.8);
+		var ang = 3 * (Math.PI / 3.0);
+		this.canvas.drawCircle(cx + Math.cos(ang) * (radius * 0.44),cy + Math.sin(ang) * (radius * 0.44),1.8);
+		var ang = 4 * (Math.PI / 3.0);
+		this.canvas.drawCircle(cx + Math.cos(ang) * (radius * 0.44),cy + Math.sin(ang) * (radius * 0.44),1.8);
+		var ang = 5 * (Math.PI / 3.0);
+		this.canvas.drawCircle(cx + Math.cos(ang) * (radius * 0.44),cy + Math.sin(ang) * (radius * 0.44),1.8);
+		this.canvas.endFill();
+		this.canvas.beginFill(isPressed ? 16711731 : 14707829,0.95);
+		this.canvas.lineStyle(1.5,16737911,0.95);
+		this.canvas.drawRoundedRect(cx + radius * 0.20,cy - radius * 0.55,radius * 0.44,radius * 0.55,3.0);
+		this.canvas.endFill();
+	}
+	,drawHandbrakeGraphic: function(cx,cy,size,isPressed) {
+		this.canvas.lineStyle(2.0,16772608,0.85);
+		var _this = this.canvas;
+		var x = cx - size * 0.55;
+		var y = cy + size * 0.35;
+		_this.flush();
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+		this.canvas.curveTo(cx - size * 0.15,cy - size * 0.25,cx + size * 0.35,cy - size * 0.35);
+		var _this = this.canvas;
+		var x = cx - size * 0.35;
+		var y = cy + size * 0.55;
+		_this.flush();
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+		this.canvas.curveTo(cx,cy - size * 0.05,cx + size * 0.55,cy - size * 0.15);
+		this.canvas.beginFill(16772608,0.95);
+		this.canvas.drawCircle(cx - size * 0.10,cy + size * 0.10,2.5);
 		this.canvas.endFill();
 	}
 	,layout: function(sw,sh) {
@@ -53447,9 +53670,8 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		_this.posChanged = true;
 		_this.x = v;
 		var _this = this.nitroText;
-		var v = this.nitroY - this.nitroText.get_textHeight() * 0.5;
 		_this.posChanged = true;
-		_this.y = v;
+		_this.y = this.nitroY + 6.0;
 		this.gasRadius = 44.0;
 		this.gasX = sw - 28.0 - this.gasRadius - 16.0;
 		this.gasY = sh - 28.0 - this.gasRadius - 16.0;
@@ -53458,9 +53680,8 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		_this.posChanged = true;
 		_this.x = v;
 		var _this = this.gasText;
-		var v = this.gasY - this.gasText.get_textHeight() * 0.5;
 		_this.posChanged = true;
-		_this.y = v;
+		_this.y = this.gasY + 9.0;
 		this.brakeRadius = 36.0;
 		this.brakeX = this.gasX - this.gasRadius - this.brakeRadius - 32.0;
 		this.brakeY = this.gasY;
@@ -53469,9 +53690,8 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		_this.posChanged = true;
 		_this.x = v;
 		var _this = this.brakeText;
-		var v = this.brakeY - this.brakeText.get_textHeight() * 0.5;
 		_this.posChanged = true;
-		_this.y = v;
+		_this.y = this.brakeY + 7.0;
 		this.driftRadius = 38.0;
 		this.driftX = (this.gasX + this.brakeX) * 0.5;
 		this.driftY = this.gasY - this.gasRadius - this.driftRadius - 24.0;
@@ -53480,9 +53700,8 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		_this.posChanged = true;
 		_this.x = v;
 		var _this = this.driftText;
-		var v = this.driftY - this.driftText.get_textHeight() * 0.5;
 		_this.posChanged = true;
-		_this.y = v;
+		_this.y = this.driftY + 8.0;
 		this.pauseW = 48.0;
 		this.pauseH = 44.0;
 		this.pauseX = sw - this.pauseW - 28.0;
@@ -53557,7 +53776,7 @@ var ui_views_credits_CreditsView = function(parent) {
 	this.techDetailsText.set_textColor(10531526);
 	this.techDetailsText.set_text("Built with Haxe, Heaps.io (Hardware-Accelerated WebGL) & Modern Shaders\n" + "Typography: Stack Sans Headline & Material Symbols Sharp\n" + "Homage & Inspiration: Need for Speed: Most Wanted (2005) & Burnout Revenge (2005)\n\n" + "Thank you for playing!");
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
+	this.versionText.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
 	this.versionText.set_textColor(15057019);
 	this.versionText.set_textAlign(h2d_Align.Center);
 	this.backBtnText = new h2d_Text(ui_FontManager.titleFont,this);
@@ -53686,6 +53905,364 @@ ui_views_credits_CreditsView.prototype = $extend(h2d_Object.prototype,{
 	}
 	,__class__: ui_views_credits_CreditsView
 });
+var ui_views_hud_InGameHUDView = function(parent) {
+	this.lastFps = -999;
+	this.lastDriftState = false;
+	this.lastTimeSeconds = -999;
+	this.lastTotalLaps = -999;
+	this.lastLap = -999;
+	this.lastBoostPct = -999;
+	this.lastRpm = -999;
+	this.lastGear = -999;
+	this.lastKmh = -999;
+	this.minimapPoints = [];
+	this.mapMaxY = 280.0;
+	this.mapMinY = -80.0;
+	this.mapMaxX = 310.0;
+	this.mapMinX = -30.0;
+	this.minimapH = 140.0;
+	this.minimapW = 160.0;
+	this.minimapY = 148.0;
+	this.minimapX = 24.0;
+	this.screenH = 720.0;
+	this.screenW = 1280.0;
+	h2d_Object.call(this,parent);
+	this.canvas = new h2d_Graphics(this);
+	this.speedText = new h2d_Text(ui_FontManager.heroFont,this);
+	this.speedText.set_textColor(16777215);
+	this.unitText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.unitText.set_text("KM/H");
+	this.unitText.set_textColor(58879);
+	this.gearText = new h2d_Text(ui_FontManager.titleFont,this);
+	this.gearText.set_textColor(16772608);
+	this.driftText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.driftText.set_text("DRIFT");
+	this.driftText.set_textColor(16750592);
+	this.driftText.set_visible(false);
+	this.lapText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.lapText.set_textColor(12767712);
+	this.timeText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.timeText.set_textColor(58879);
+	this.rpmText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.rpmText.set_textColor(58879);
+	this.boostText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.boostText.set_textColor(58879);
+	this.fpsText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.fpsText.set_textColor(16772608);
+};
+$hxClasses["ui.views.hud.InGameHUDView"] = ui_views_hud_InGameHUDView;
+ui_views_hud_InGameHUDView.__name__ = "ui.views.hud.InGameHUDView";
+ui_views_hud_InGameHUDView.__super__ = h2d_Object;
+ui_views_hud_InGameHUDView.prototype = $extend(h2d_Object.prototype,{
+	initWaypoints: function(waypoints) {
+		this.minimapPoints = [];
+		if(waypoints == null || waypoints.length == 0) {
+			return;
+		}
+		var minX = 999999.0;
+		var maxX = -999999.0;
+		var minY = 999999.0;
+		var maxY = -999999.0;
+		var _g = 0;
+		while(_g < waypoints.length) {
+			var w = waypoints[_g];
+			++_g;
+			if(w.x < minX) {
+				minX = w.x;
+			}
+			if(w.x > maxX) {
+				maxX = w.x;
+			}
+			if(w.y < minY) {
+				minY = w.y;
+			}
+			if(w.y > maxY) {
+				maxY = w.y;
+			}
+		}
+		var padX = (maxX - minX) * 0.08;
+		var padY = (maxY - minY) * 0.08;
+		this.mapMinX = minX - padX;
+		this.mapMaxX = maxX + padX;
+		this.mapMinY = minY - padY;
+		this.mapMaxY = maxY + padY;
+		var rangeX = this.mapMaxX - this.mapMinX;
+		var rangeY = this.mapMaxY - this.mapMinY;
+		if(rangeX <= 0) {
+			rangeX = 1.0;
+		}
+		if(rangeY <= 0) {
+			rangeY = 1.0;
+		}
+		var _g = 0;
+		while(_g < waypoints.length) {
+			var w = waypoints[_g];
+			++_g;
+			this.minimapPoints.push({ x : (w.x - this.mapMinX) / rangeX, y : (w.y - this.mapMinY) / rangeY});
+		}
+	}
+	,updateTelemetry: function(dt,car,kmh,isBoosting,lapTimer,currentLap,totalLaps) {
+		if(!this.visible || car == null) {
+			return;
+		}
+		if(kmh != this.lastKmh) {
+			this.lastKmh = kmh;
+			this.speedText.set_text(kmh == null ? "null" : "" + kmh);
+		}
+		if(car.currentGear != this.lastGear) {
+			this.lastGear = car.currentGear;
+			this.gearText.set_text(this.lastGear == -1 ? "R" : this.lastGear == 0 ? "N" : "G" + this.lastGear);
+		}
+		if(car.isDrifting != this.lastDriftState) {
+			this.lastDriftState = car.isDrifting;
+			this.driftText.set_visible(this.lastDriftState);
+		}
+		var curSeconds = Math.floor(lapTimer);
+		if(curSeconds != this.lastTimeSeconds || currentLap != this.lastLap || totalLaps != this.lastTotalLaps) {
+			this.lastTimeSeconds = curSeconds;
+			this.lastLap = currentLap;
+			this.lastTotalLaps = totalLaps;
+			this.lapText.set_text("LAP " + currentLap + "/" + totalLaps);
+			var m = Math.floor(curSeconds / 60);
+			var s = curSeconds % 60;
+			var cs = Math.floor((lapTimer - curSeconds) * 100);
+			this.timeText.set_text((m < 10 ? "0" + m : m == null ? "null" : "" + m) + ":" + (s < 10 ? "0" + s : s == null ? "null" : "" + s) + "." + (cs < 10 ? "0" + cs : cs == null ? "null" : "" + cs));
+		}
+		var rpm = Math.round(car.engineRPM);
+		if(rpm != this.lastRpm) {
+			this.lastRpm = rpm;
+			this.rpmText.set_text(rpm + " RPM");
+		}
+		var boostPct = Math.round(car.boostFuel * 100.0);
+		if(boostPct != this.lastBoostPct) {
+			this.lastBoostPct = boostPct;
+			this.boostText.set_text(boostPct + "% NITRO");
+		}
+		this.boostText.set_textColor(isBoosting ? 16750592 : 58879);
+		var fps = Math.round(hxd_Timer.fps());
+		if(fps != this.lastFps) {
+			this.lastFps = fps;
+			this.fpsText.set_text("FPS: " + fps);
+		}
+		this.renderGauges(car,isBoosting);
+	}
+	,renderGauges: function(car,isBoosting) {
+		this.canvas.clear();
+		this.canvas.beginFill(396824,0.78);
+		this.canvas.lineStyle(2.0,58879,0.85);
+		var _this = this.canvas;
+		_this.flush();
+		_this.addVertex(38.,20.0,_this.curR,_this.curG,_this.curB,_this.curA,38. * _this.ma + 20.0 * _this.mc + _this.mx,38. * _this.mb + 20.0 * _this.md + _this.my);
+		var _this = this.canvas;
+		_this.addVertex(234.,20.0,_this.curR,_this.curG,_this.curB,_this.curA,234. * _this.ma + 20.0 * _this.mc + _this.mx,234. * _this.mb + 20.0 * _this.md + _this.my);
+		var _this = this.canvas;
+		_this.addVertex(220.,94.,_this.curR,_this.curG,_this.curB,_this.curA,220. * _this.ma + 94. * _this.mc + _this.mx,220. * _this.mb + 94. * _this.md + _this.my);
+		var _this = this.canvas;
+		_this.addVertex(24.0,94.,_this.curR,_this.curG,_this.curB,_this.curA,24.0 * _this.ma + 94. * _this.mc + _this.mx,24.0 * _this.mb + 94. * _this.md + _this.my);
+		var _this = this.canvas;
+		_this.addVertex(38.,20.0,_this.curR,_this.curG,_this.curB,_this.curA,38. * _this.ma + 20.0 * _this.mc + _this.mx,38. * _this.mb + 20.0 * _this.md + _this.my);
+		this.canvas.endFill();
+		this.canvas.lineStyle(1.5,58879,0.35);
+		var _this = this.canvas;
+		_this.flush();
+		_this.addVertex(154.,30.,_this.curR,_this.curG,_this.curB,_this.curA,154. * _this.ma + 30. * _this.mc + _this.mx,154. * _this.mb + 30. * _this.md + _this.my);
+		var _this = this.canvas;
+		_this.addVertex(144.2,84.,_this.curR,_this.curG,_this.curB,_this.curA,144.2 * _this.ma + 84. * _this.mc + _this.mx,144.2 * _this.mb + 84. * _this.md + _this.my);
+		var _this = this.speedText;
+		_this.posChanged = true;
+		_this.x = 48.;
+		var _this = this.speedText;
+		_this.posChanged = true;
+		_this.y = 32.;
+		var _this = this.unitText;
+		_this.posChanged = true;
+		_this.x = 164.;
+		var _this = this.unitText;
+		_this.posChanged = true;
+		_this.y = 36.;
+		var _this = this.gearText;
+		_this.posChanged = true;
+		_this.x = 164.;
+		var _this = this.gearText;
+		_this.posChanged = true;
+		_this.y = 56.;
+		var _this = this.driftText;
+		_this.posChanged = true;
+		_this.x = 242.;
+		var _this = this.driftText;
+		_this.posChanged = true;
+		_this.y = 48.;
+		this.canvas.beginFill(396824,0.70);
+		this.canvas.lineStyle(1.5,1981014,0.75);
+		this.canvas.drawRoundedRect(24.0,102.,200.,36.0,6.0);
+		this.canvas.endFill();
+		var _this = this.lapText;
+		_this.posChanged = true;
+		_this.x = 38.;
+		var _this = this.lapText;
+		_this.posChanged = true;
+		_this.y = 111.;
+		var _this = this.timeText;
+		var v = 224. - this.timeText.get_textWidth() - 14.0;
+		_this.posChanged = true;
+		_this.x = v;
+		var _this = this.timeText;
+		_this.posChanged = true;
+		_this.y = 111.;
+		this.minimapX = 24.0;
+		this.minimapY = 148.;
+		this.minimapW = 200.;
+		this.minimapH = 130.0;
+		this.canvas.beginFill(264464,0.65);
+		this.canvas.lineStyle(1.5,1584450,0.80);
+		this.canvas.drawRoundedRect(this.minimapX,this.minimapY,this.minimapW,this.minimapH,6.0);
+		this.canvas.endFill();
+		var n = this.minimapPoints.length;
+		if(n > 2) {
+			var mapDrawW = this.minimapW - 32.;
+			var mapDrawH = this.minimapH - 32.;
+			this.canvas.lineStyle(2.0,58879,0.45);
+			var firstPt = this.minimapPoints[0];
+			var p0X = this.minimapX + 16.0 + firstPt.x * mapDrawW;
+			var p0Y = this.minimapY + this.minimapH - 16.0 - firstPt.y * mapDrawH;
+			var _this = this.canvas;
+			_this.flush();
+			_this.addVertex(p0X,p0Y,_this.curR,_this.curG,_this.curB,_this.curA,p0X * _this.ma + p0Y * _this.mc + _this.mx,p0X * _this.mb + p0Y * _this.md + _this.my);
+			var _g = 1;
+			while(_g < n) {
+				var pt = this.minimapPoints[_g++];
+				var px = this.minimapX + 16.0 + pt.x * mapDrawW;
+				var py = this.minimapY + this.minimapH - 16.0 - pt.y * mapDrawH;
+				var _this = this.canvas;
+				_this.addVertex(px,py,_this.curR,_this.curG,_this.curB,_this.curA,px * _this.ma + py * _this.mc + _this.mx,px * _this.mb + py * _this.md + _this.my);
+			}
+			var _this = this.canvas;
+			_this.addVertex(p0X,p0Y,_this.curR,_this.curG,_this.curB,_this.curA,p0X * _this.ma + p0Y * _this.mc + _this.mx,p0X * _this.mb + p0Y * _this.md + _this.my);
+			var rangeX = this.mapMaxX - this.mapMinX;
+			var rangeY = this.mapMaxY - this.mapMinY;
+			if(rangeX > 0 && rangeY > 0) {
+				var dotX = this.minimapX + 16.0 + (car.pos.x - this.mapMinX) / rangeX * mapDrawW;
+				var dotY = this.minimapY + this.minimapH - 16.0 - (car.pos.y - this.mapMinY) / rangeY * mapDrawH;
+				this.canvas.beginFill(58879,0.35);
+				this.canvas.drawCircle(dotX,dotY,6.5);
+				this.canvas.endFill();
+				this.canvas.beginFill(16777215,1.0);
+				this.canvas.lineStyle(1.5,58879,1.0);
+				this.canvas.drawCircle(dotX,dotY,3.5);
+				this.canvas.endFill();
+				var headX = dotX - Math.sin(car.yaw) * 9.0;
+				var headY = dotY - Math.cos(car.yaw) * 9.0;
+				this.canvas.lineStyle(2.0,16769126,1.0);
+				var _this = this.canvas;
+				_this.flush();
+				_this.addVertex(dotX,dotY,_this.curR,_this.curG,_this.curB,_this.curA,dotX * _this.ma + dotY * _this.mc + _this.mx,dotX * _this.mb + dotY * _this.md + _this.my);
+				var _this = this.canvas;
+				_this.addVertex(headX,headY,_this.curR,_this.curG,_this.curB,_this.curA,headX * _this.ma + headY * _this.mc + _this.mx,headX * _this.mb + headY * _this.md + _this.my);
+			}
+		}
+		var rpmCenterCenterX = this.screenW * 0.5;
+		var idleRpm = car.config.drivetrain.idleRPM;
+		var rpmRatio = (car.engineRPM - idleRpm) / (car.config.drivetrain.redlineRPM - idleRpm);
+		rpmRatio = Math.max(0.0,Math.min(1.0,rpmRatio));
+		this.drawArc(rpmCenterCenterX,120.0,110.0,2.45,4.52,5.0,1122867,0.55);
+		this.drawArc(rpmCenterCenterX,120.0,110.0,2.45,4.52 * rpmRatio,6.0,rpmRatio > 0.86 ? 14707829 : rpmRatio > 0.68 ? 16772608 : 58879,0.95);
+		var _g = 0;
+		while(_g < 9) {
+			var frac = _g++ / 8;
+			var angle = 2.45 + frac * 4.52;
+			this.canvas.lineStyle(frac == 0 || frac == 1.0 || frac > 0.85 ? 2.5 : 1.5,frac > 0.86 ? 14707829 : 8296884,0.80);
+			var _this = this.canvas;
+			var x = rpmCenterCenterX + Math.cos(angle) * 102.;
+			var y = 120.0 + Math.sin(angle) * 102.;
+			_this.flush();
+			_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+			var _this1 = this.canvas;
+			var x1 = rpmCenterCenterX + Math.cos(angle) * 118.;
+			var y1 = 120.0 + Math.sin(angle) * 118.;
+			_this1.addVertex(x1,y1,_this1.curR,_this1.curG,_this1.curB,_this1.curA,x1 * _this1.ma + y1 * _this1.mc + _this1.mx,x1 * _this1.mb + y1 * _this1.md + _this1.my);
+		}
+		var _this = this.rpmText;
+		var v = rpmCenterCenterX - this.rpmText.get_textWidth() * 0.5;
+		_this.posChanged = true;
+		_this.x = v;
+		var _this = this.rpmText;
+		_this.posChanged = true;
+		_this.y = 48.0;
+		var boostCenterX = this.screenW * 0.5;
+		var boostCenterY = this.screenH - 42.0;
+		var boostFuelRatio = Math.max(0.0,Math.min(1.0,car.boostFuel));
+		this.drawArc(boostCenterX,boostCenterY,100.0,3.65,2.10,5.0,925746,0.60);
+		this.drawArc(boostCenterX,boostCenterY,100.0,3.65,2.10 * boostFuelRatio,6.0,isBoosting ? 16750592 : 58879,0.95);
+		this.drawFlameIcon(boostCenterX,boostCenterY - 24.0,isBoosting);
+		var _this = this.boostText;
+		var v = boostCenterX - this.boostText.get_textWidth() * 0.5;
+		_this.posChanged = true;
+		_this.x = v;
+		var _this = this.boostText;
+		_this.posChanged = true;
+		_this.y = boostCenterY - 10.0;
+	}
+	,drawArc: function(cx,cy,radius,startAngle,sweep,thickness,color,alpha) {
+		if(sweep <= 0.001) {
+			return;
+		}
+		var steps = Math.floor(Math.max(4.0,sweep * 16.0));
+		this.canvas.lineStyle(thickness,color,alpha);
+		var first = true;
+		var _g = 0;
+		var _g1 = steps + 1;
+		while(_g < _g1) {
+			var a = startAngle + _g++ / steps * sweep;
+			var px = cx + Math.cos(a) * radius;
+			var py = cy + Math.sin(a) * radius;
+			if(first) {
+				var _this = this.canvas;
+				_this.flush();
+				_this.addVertex(px,py,_this.curR,_this.curG,_this.curB,_this.curA,px * _this.ma + py * _this.mc + _this.mx,px * _this.mb + py * _this.md + _this.my);
+				first = false;
+			} else {
+				var _this1 = this.canvas;
+				_this1.addVertex(px,py,_this1.curR,_this1.curG,_this1.curB,_this1.curA,px * _this1.ma + py * _this1.mc + _this1.mx,px * _this1.mb + py * _this1.md + _this1.my);
+			}
+		}
+	}
+	,drawFlameIcon: function(cx,cy,isBoosting) {
+		this.canvas.beginFill(isBoosting ? 16746496 : 58879,isBoosting ? 0.95 : 0.70);
+		var _this = this.canvas;
+		var y = cy - 14.0;
+		_this.flush();
+		_this.addVertex(cx,y,_this.curR,_this.curG,_this.curB,_this.curA,cx * _this.ma + y * _this.mc + _this.mx,cx * _this.mb + y * _this.md + _this.my);
+		this.canvas.curveTo(cx + 8.0,cy - 4.0,cx + 8.0,cy + 4.0);
+		this.canvas.curveTo(cx + 8.0,cy + 12.0,cx,cy + 12.0);
+		this.canvas.curveTo(cx - 8.0,cy + 12.0,cx - 8.0,cy + 4.0);
+		this.canvas.curveTo(cx - 8.0,cy - 4.0,cx,cy - 14.0);
+		this.canvas.endFill();
+		this.canvas.beginFill(isBoosting ? 16777062 : 16777215,0.95);
+		var _this = this.canvas;
+		var y = cy - 4.0;
+		_this.flush();
+		_this.addVertex(cx,y,_this.curR,_this.curG,_this.curB,_this.curA,cx * _this.ma + y * _this.mc + _this.mx,cx * _this.mb + y * _this.md + _this.my);
+		this.canvas.curveTo(cx + 4.0,cy + 2.0,cx + 4.0,cy + 7.0);
+		this.canvas.curveTo(cx + 4.0,cy + 10.0,cx,cy + 10.0);
+		this.canvas.curveTo(cx - 4.0,cy + 10.0,cx - 4.0,cy + 7.0);
+		this.canvas.curveTo(cx - 4.0,cy + 2.0,cx,cy - 4.0);
+		this.canvas.endFill();
+	}
+	,layout: function(sw,sh) {
+		this.screenW = sw;
+		this.screenH = sh;
+		if(this.fpsText != null) {
+			var _this = this.fpsText;
+			var v = sw - this.fpsText.get_textWidth() - 24.0;
+			_this.posChanged = true;
+			_this.x = v;
+			var _this = this.fpsText;
+			_this.posChanged = true;
+			_this.y = 16.0;
+		}
+	}
+	,__class__: ui_views_hud_InGameHUDView
+});
 var ui_views_mainmenu_MainMenuView = function(parent) {
 	this.hasActiveSave = false;
 	this.selectedIndex = 0;
@@ -53696,7 +54273,7 @@ var ui_views_mainmenu_MainMenuView = function(parent) {
 	this.titleText.set_text("MAIN MENU");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
+	this.versionText.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
 	this.versionText.set_textColor(9413043);
 	var labels = ["START NEW RACE","RESUME SAVED RACE","OPTIONS","CREDITS","EXIT TO SPLASH"];
 	var iconTypes = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Settings,ui_IconType.Credits,ui_IconType.Exit];
@@ -53986,7 +54563,7 @@ var ui_views_options_ControlsOptionsPanel = function(input,parent) {
 	this.diagramViewer = new ui_ControlDiagrams(this);
 	this.remapContainer = new h2d_Object(this);
 	var _g = 0;
-	while(_g < 7) {
+	while(_g < 8) {
 		var i = [_g++];
 		var txt = new h2d_Text(ui_FontManager.regularFont,this.remapContainer);
 		this.remapItems.push(txt);
@@ -54054,7 +54631,11 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		this.updateControlHeaderButtons();
 	}
 	,triggerRemapEntry: function(idx) {
-		if(idx == 6) {
+		if(idx == 0) {
+			this.adjustSensitivity(this.inputRef.steerSensitivity >= 0.99 ? -1.0 : 0.02);
+			return;
+		}
+		if(idx == 7) {
 			audio_AudioManager.inst.playMenuBeep(320,0.08);
 			if(this.currentTab == ui_components_OptionsTab.Keyboard) {
 				this.inputRef.bindings.resetKeyboardDefaults();
@@ -54068,7 +54649,17 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		audio_AudioManager.inst.playMenuBeep(640,0.1);
 		this.remapStatusNotice.set_text("PRESS ANY " + (isGamepad ? "BUTTON" : "KEY") + "...");
 		this.remapStatusNotice.set_visible(true);
-		this.inputRef.startListening([input_InputAction.Throttle,input_InputAction.Brake,input_InputAction.SteerLeft,input_InputAction.SteerRight,input_InputAction.Handbrake,input_InputAction.Boost][idx],isGamepad);
+		this.inputRef.startListening([input_InputAction.Throttle,input_InputAction.Brake,input_InputAction.SteerLeft,input_InputAction.SteerRight,input_InputAction.Handbrake,input_InputAction.Boost][idx - 1],isGamepad);
+	}
+	,adjustSensitivity: function(delta) {
+		var sens = Math.round((this.inputRef.steerSensitivity + delta) * 50) / 50.0;
+		sens = Math.max(0.0,Math.min(1.0,sens));
+		this.inputRef.steerSensitivity = sens;
+		audio_AudioManager.inst.playMenuBeep(420 + sens * 240,0.04);
+		this.updateRemapStyles();
+		var d = save_SaveSystem.load();
+		d.steerSensitivity = sens;
+		save_SaveSystem.save(d);
 	}
 	,navigate: function(dir) {
 		this.remapIndex = (this.remapIndex + dir + this.remapItems.length) % this.remapItems.length;
@@ -54078,7 +54669,7 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	,updateRemapStyles: function() {
 		var isGamepad = this.currentTab == ui_components_OptionsTab.Gamepad;
 		var b = this.inputRef.bindings;
-		var labels = ["Throttle (Gas):       " + (isGamepad ? input_InputController.getGamepadBtnName(b.padGas) : input_InputController.getKeyName(b.keyGas)),"Brake / Reverse:      " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBrake) : input_InputController.getKeyName(b.keyBrake)),"Steer Left:           " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyLeft)),"Steer Right:          " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyRight)),"Handbrake (Drift):    " + (isGamepad ? input_InputController.getGamepadBtnName(b.padHandbrake) : input_InputController.getKeyName(b.keyHandbrake)),"Nitro Boost:          " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBoost) : input_InputController.getKeyName(b.keyBoost)),"[RESET TO DEFAULTS]"];
+		var labels = ["Steering Sensitivity: " + Math.round(this.inputRef.steerSensitivity * 100) + "%  [ < / > ]","Throttle (Gas):       " + (isGamepad ? input_InputController.getGamepadBtnName(b.padGas) : input_InputController.getKeyName(b.keyGas)),"Brake / Reverse:      " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBrake) : input_InputController.getKeyName(b.keyBrake)),"Steer Left:           " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyLeft)),"Steer Right:          " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyRight)),"Handbrake (Drift):    " + (isGamepad ? input_InputController.getGamepadBtnName(b.padHandbrake) : input_InputController.getKeyName(b.keyHandbrake)),"Nitro Boost:          " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBoost) : input_InputController.getKeyName(b.keyBoost)),"[RESET TO DEFAULTS]"];
 		var _g = 0;
 		var _g1 = this.remapItems.length;
 		while(_g < _g1) {
@@ -54088,7 +54679,7 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 				item.set_textColor(58879);
 				item.set_text("> " + labels[i] + " <");
 			} else {
-				item.set_textColor(i == 6 ? 15057019 : 12767712);
+				item.set_textColor(i == 7 ? 15057019 : 12767712);
 				item.set_text("  " + labels[i] + "  ");
 			}
 		}
@@ -54184,6 +54775,14 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	,__class__: ui_views_options_ControlsOptionsPanel
 });
 var ui_views_options_GraphicsOptionsPanel = function(gfxSettings,parent) {
+	this.cachedCardH = 580.0;
+	this.cachedCardW = 920.0;
+	this.cachedCardY = 0.0;
+	this.cachedCardX = 0.0;
+	this.cachedSh = 720.0;
+	this.cachedSw = 1280.0;
+	this.maxVisibleRows = 14;
+	this.scrollOffset = 0;
 	this.isOpenedFromPause = false;
 	this.selectedIndex = 0;
 	this.interactives = [];
@@ -54191,6 +54790,14 @@ var ui_views_options_GraphicsOptionsPanel = function(gfxSettings,parent) {
 	var _gthis = this;
 	h2d_Object.call(this,parent);
 	this.settings = gfxSettings;
+	this.scrollUpHint = new h2d_Text(ui_FontManager.regularFont,this);
+	this.scrollUpHint.set_text("^  MORE OPTIONS ABOVE  ^");
+	this.scrollUpHint.set_textColor(16772608);
+	this.scrollUpHint.set_visible(false);
+	this.scrollDownHint = new h2d_Text(ui_FontManager.regularFont,this);
+	this.scrollDownHint.set_text("v  MORE OPTIONS BELOW  v");
+	this.scrollDownHint.set_textColor(16772608);
+	this.scrollDownHint.set_visible(false);
 	var _g = 0;
 	var _g1 = ui_views_options_GraphicsOptionsPanel.NAMES.length;
 	while(_g < _g1) {
@@ -54213,6 +54820,17 @@ var ui_views_options_GraphicsOptionsPanel = function(gfxSettings,parent) {
 				}
 			};
 		})(i);
+		inter.onWheel = (function() {
+			return function(e) {
+				if(_gthis.visible) {
+					if(e.wheelDelta > 0) {
+						_gthis.scroll(-1);
+					} else if(e.wheelDelta < 0) {
+						_gthis.scroll(1);
+					}
+				}
+			};
+		})();
 		this.interactives.push(inter);
 	}
 };
@@ -54302,7 +54920,24 @@ ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	,navigate: function(dir) {
 		this.selectedIndex = (this.selectedIndex + dir + this.items.length) % this.items.length;
 		audio_AudioManager.inst.playMenuBeep(380,0.04);
+		this.adjustScrollForSelected();
+		this.layoutCached();
 		this.updateStyles();
+	}
+	,scroll: function(dir) {
+		this.scrollOffset = Math.round(Math.max(0,Math.min(Math.max(0,this.items.length - this.maxVisibleRows),this.scrollOffset + dir)));
+		this.layoutCached();
+		this.updateStyles();
+	}
+	,adjustScrollForSelected: function() {
+		if(this.selectedIndex < this.scrollOffset) {
+			this.scrollOffset = this.selectedIndex;
+		} else if(this.selectedIndex >= this.scrollOffset + this.maxVisibleRows) {
+			this.scrollOffset = this.selectedIndex - this.maxVisibleRows + 1;
+		}
+	}
+	,layoutCached: function() {
+		this.layout(this.cachedSw,this.cachedSh,this.cachedCardX,this.cachedCardY,this.cachedCardW,this.cachedCardH);
 	}
 	,updateStyles: function() {
 		var s = this.settings;
@@ -54337,26 +54972,68 @@ ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		if(cardX == null) {
 			cardX = 0;
 		}
-		var effectiveCardX = cardW > 0 ? cardX : (sw - 920.0) * 0.5;
-		var effectiveCardW = cardW > 0 ? cardW : 920.0;
-		var startY = (cardH > 0 ? cardY : sh * 0.16) + 74.0;
+		this.cachedSw = sw;
+		this.cachedSh = sh;
+		this.cachedCardX = cardW > 0 ? cardX : (sw - 920.0) * 0.5;
+		this.cachedCardY = cardH > 0 ? cardY : sh * 0.16;
+		this.cachedCardW = cardW > 0 ? cardW : 920.0;
+		this.cachedCardH = cardH > 0 ? cardH : 580.0;
+		this.maxVisibleRows = Math.floor((this.cachedCardH - 110.0) / 28.0);
+		if(this.maxVisibleRows < 4) {
+			this.maxVisibleRows = 4;
+		}
+		if(this.maxVisibleRows > this.items.length) {
+			this.maxVisibleRows = this.items.length;
+		}
+		this.adjustScrollForSelected();
+		var startY = this.cachedCardY + 68.0;
 		var _g = 0;
 		var _g1 = this.items.length;
 		while(_g < _g1) {
 			var i = _g++;
 			var item = this.items[i];
 			var inter = this.interactives[i];
-			var v = (sw - item.get_textWidth()) * 0.5;
-			item.posChanged = true;
-			item.x = v;
-			item.posChanged = true;
-			item.y = startY + i * 28.0;
-			inter.posChanged = true;
-			inter.x = effectiveCardX + (effectiveCardW - 560.0) * 0.5;
-			inter.posChanged = true;
-			inter.y = item.y;
-			inter.width = 560.0;
-			inter.height = 28.0;
+			var isVisible = i >= this.scrollOffset && i < this.scrollOffset + this.maxVisibleRows;
+			item.set_visible(isVisible);
+			inter.set_visible(isVisible);
+			if(isVisible) {
+				var rowY = startY + (i - this.scrollOffset) * 28.0;
+				var v = (sw - item.get_textWidth()) * 0.5;
+				item.posChanged = true;
+				item.x = v;
+				item.posChanged = true;
+				item.y = rowY;
+				inter.posChanged = true;
+				inter.x = this.cachedCardX + (this.cachedCardW - 560.0) * 0.5;
+				inter.posChanged = true;
+				inter.y = rowY;
+				inter.width = Math.min(560.0,this.cachedCardW - 40.0);
+				inter.height = 28.0;
+			}
+		}
+		if(this.scrollUpHint != null) {
+			this.scrollUpHint.set_visible(this.scrollOffset > 0);
+			if(this.scrollUpHint.visible) {
+				var _this = this.scrollUpHint;
+				var v = (sw - this.scrollUpHint.get_textWidth()) * 0.5;
+				_this.posChanged = true;
+				_this.x = v;
+				var _this = this.scrollUpHint;
+				_this.posChanged = true;
+				_this.y = startY - 20.0;
+			}
+		}
+		if(this.scrollDownHint != null) {
+			this.scrollDownHint.set_visible(this.scrollOffset + this.maxVisibleRows < this.items.length);
+			if(this.scrollDownHint.visible) {
+				var _this = this.scrollDownHint;
+				var v = (sw - this.scrollDownHint.get_textWidth()) * 0.5;
+				_this.posChanged = true;
+				_this.x = v;
+				var _this = this.scrollDownHint;
+				_this.posChanged = true;
+				_this.y = startY + this.maxVisibleRows * 28.0 + 2.0;
+			}
 		}
 	}
 	,__class__: ui_views_options_GraphicsOptionsPanel
@@ -54373,7 +55050,7 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.titleText.set_text("CONFIGURATION & HARDWARE");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
+	this.versionText.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
 	this.versionText.set_textColor(9413043);
 	var tabNames = ["GRAPHICS","AUDIO","KEYBOARD","GAMEPAD"];
 	var tabIconTypes = [ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Keyboard,ui_IconType.Gamepad];
@@ -54397,7 +55074,7 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.backBtnText = new h2d_Text(ui_FontManager.regularFont,this);
 	this.backBtnText.set_text("< BACK");
 	this.backBtnText.set_textColor(58879);
-	this.backInteractive = new h2d_Interactive(260.0,40.0,this);
+	this.backInteractive = new h2d_Interactive(100.0,40.0,this);
 	this.backInteractive.onOver = function(_) {
 		if(_gthis.visible) {
 			_gthis.backBtnText.set_textColor(16772608);
@@ -54472,16 +55149,24 @@ ui_views_options_OptionsView.prototype = $extend(h2d_Object.prototype,{
 		}
 	}
 	,layout: function(sw,sh) {
+		var cardW = Math.min(920.0,sw - 24.0);
+		var cardH = Math.min(580.0,sh - sh * 0.16 - 16.0);
+		var cardX = (sw - cardW) * 0.5;
+		var cardY = Math.max(12.0,(sh - cardH) * 0.5);
 		if(this.titleText != null) {
 			var _this = this.titleText;
 			var v = (sw - this.titleText.get_textWidth()) * 0.5;
 			_this.posChanged = true;
 			_this.x = v;
 			var _this = this.titleText;
+			var v = Math.max(6.0,cardY - this.titleText.get_textHeight() - 6.0);
 			_this.posChanged = true;
-			_this.y = sh * 0.10;
+			_this.y = v;
 		}
-		var tabStartX = (sw - ui_views_options_OptionsView.TAB_ORDER.length * 170.0) * 0.5;
+		var tabSpacing = Math.min(170.0,(cardW - 140.0) / ui_views_options_OptionsView.TAB_ORDER.length);
+		var tabStartX = (sw - ui_views_options_OptionsView.TAB_ORDER.length * tabSpacing) * 0.5;
+		var tabY = cardY + 12.0;
+		var tabBtnW = Math.min(150.0,tabSpacing - 8.0);
 		var _g = 0;
 		var _g1 = ui_views_options_OptionsView.TAB_ORDER.length;
 		while(_g < _g1) {
@@ -54489,58 +55174,55 @@ ui_views_options_OptionsView.prototype = $extend(h2d_Object.prototype,{
 			var ic = this.tabIcons[i];
 			var lbl = this.tabLabels[i];
 			var inter = this.tabInteractives[i];
-			var colX = tabStartX + i * 170.0;
-			var colY = sh * 0.18;
+			var colX = tabStartX + i * tabSpacing;
 			ic.posChanged = true;
-			ic.x = colX + 18;
+			ic.x = colX + 16;
 			ic.posChanged = true;
-			ic.y = colY + 4;
+			ic.y = tabY + 8;
 			lbl.posChanged = true;
-			lbl.x = colX + 48;
+			lbl.x = colX + 44;
 			lbl.posChanged = true;
-			lbl.y = colY + 3;
+			lbl.y = tabY + 7;
 			inter.posChanged = true;
-			inter.x = colX + 6;
+			inter.x = colX + 4;
 			inter.posChanged = true;
-			inter.y = colY - 4;
-			inter.width = 150.0;
+			inter.y = tabY;
+			inter.width = tabBtnW;
 			inter.height = 42.0;
 		}
-		var cardX = (sw - 920.0) * 0.5;
-		var cardY = sh * 0.16;
 		if(this.backBtnText != null && this.backInteractive != null) {
 			var _this = this.backBtnText;
 			_this.posChanged = true;
-			_this.x = cardX + 36;
+			_this.x = cardX + 24;
 			var _this = this.backBtnText;
 			_this.posChanged = true;
-			_this.y = cardY + 22;
+			_this.y = cardY + 20;
 			var _this = this.backInteractive;
 			_this.posChanged = true;
-			_this.x = cardX + 24;
+			_this.x = cardX + 16;
 			var _this = this.backInteractive;
 			_this.posChanged = true;
-			_this.y = cardY + 16;
-			this.backInteractive.width = 260.0;
+			_this.y = cardY + 12;
+			this.backInteractive.width = 100.0;
 			this.backInteractive.height = 40.0;
 		}
 		if(this.versionText != null) {
 			var _this = this.versionText;
-			var v = cardX + 920.0 - this.versionText.get_textWidth() - 36;
+			var v = cardX + cardW - this.versionText.get_textWidth() - 24;
 			_this.posChanged = true;
 			_this.x = v;
 			var _this = this.versionText;
 			_this.posChanged = true;
-			_this.y = cardY + 22;
+			_this.y = cardY + 20;
 		}
 		if(this.gfxPanel != null) {
-			this.gfxPanel.layout(sw,sh,cardX,cardY,920.0,580.0);
+			this.gfxPanel.layout(sw,sh,cardX,cardY,cardW,cardH);
 		}
 		if(this.audioPanel != null) {
-			this.audioPanel.layout(sw,sh,cardX,cardY,920.0,580.0);
+			this.audioPanel.layout(sw,sh,cardX,cardY,cardW,cardH);
 		}
 		if(this.controlsPanel != null) {
-			this.controlsPanel.layout(sw,sh,cardX,cardY,920.0,580.0);
+			this.controlsPanel.layout(sw,sh,cardX,cardY,cardW,cardH);
 		}
 	}
 	,__class__: ui_views_options_OptionsView
@@ -54682,7 +55364,7 @@ var ui_views_splash_SplashView = function(parent) {
 	this.promptText.set_text("PRESS ANY BUTTON OR CLICK TO ENTER");
 	this.promptText.set_textColor(16777215);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
+	this.versionText.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
 	this.versionText.set_textColor(9413043);
 	this.screenHit = new h2d_Interactive(3000,3000,this);
 	this.screenHit.onClick = function(_) {

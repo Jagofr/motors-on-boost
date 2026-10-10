@@ -15,6 +15,9 @@ class PostProcessRenderer extends Renderer {
     /** ScreenFx post-processing executor. */
     var screenFx:ScreenFx<RadialBlurShader>;
 
+    /** Independent 3D scene rendering scale ratio relative to native backbuffer. */
+    public var renderScale:Float = 1.0;
+
     /**
      * Constructs and initializes the post-processing renderer pipeline.
      */
@@ -25,9 +28,10 @@ class PostProcessRenderer extends Renderer {
     }
 
     override function render() {
-        if (blurShader != null && blurShader.blurIntensity > 0.001) {
-            // Allocate offscreen render target matching current engine viewport
-            var target = allocTarget("radialBlurBuffer", true);
+        var needsOffscreen = (Math.abs(renderScale - 1.0) > 0.001) || (blurShader != null && blurShader.blurIntensity > 0.001);
+        if (needsOffscreen) {
+            // Allocate offscreen render target matching current engine viewport scaled by renderScale
+            var target = allocTarget("scene3dBuffer", true, renderScale);
             setTarget(target);
             clear(ctx.engine.backgroundColor, 1);
 
@@ -36,7 +40,7 @@ class PostProcessRenderer extends Renderer {
 
             resetTarget();
 
-            // Execute radial blur screen pass to output display
+            // Execute radial blur screen pass to output display backbuffer
             blurShader.texture = target;
             screenFx.render();
         } else {

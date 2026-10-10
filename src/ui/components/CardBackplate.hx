@@ -60,17 +60,19 @@ class CardBackplate {
      * @param tabCount Total number of options tabs.
      */
     public static function drawOptionsMenu(g:Graphics, sw:Float, sh:Float, activeTabIdx:Int, tabCount:Int) {
-        var cardW = UITheme.OPTIONS_CARD_WIDTH;
-        var cardH = UITheme.OPTIONS_CARD_HEIGHT;
+        var cardW = Math.min(UITheme.OPTIONS_CARD_WIDTH, sw - 24.0);
+        var cardH = Math.min(UITheme.OPTIONS_CARD_HEIGHT, sh - (sh * 0.16) - 16.0);
         var cardX = (sw - cardW) * 0.5;
-        var cardY = sh * 0.16;
+        var cardY = Math.max(12.0, (sh - cardH) * 0.5);
         g.drawRoundedRect(cardX, cardY, cardW, cardH, UITheme.OPTIONS_CARD_RADIUS);
 
-        var tabStartX = (sw - (tabCount * UITheme.OPTIONS_TAB_SPACING)) * 0.5;
-        var tabX = tabStartX + (activeTabIdx * UITheme.OPTIONS_TAB_SPACING);
+        var tabSpacing = Math.min(UITheme.OPTIONS_TAB_SPACING, (cardW - 140.0) / tabCount);
+        var tabStartX = (sw - (tabCount * tabSpacing)) * 0.5;
+        var tabX = tabStartX + (activeTabIdx * tabSpacing);
+        var tabBtnW = Math.min(150.0, tabSpacing - 8.0);
         g.beginFill(UITheme.COLOR_ACCENT_CYAN, UITheme.ALPHA_TAB_FILL);
         g.lineStyle(2.0, UITheme.COLOR_ACCENT_CYAN, 0.9);
-        g.drawRoundedRect(tabX + 6, sh * 0.18 - 4, 150, 42, 8);
+        g.drawRoundedRect(tabX + 4, cardY + 12.0, tabBtnW, 42, 8);
     }
 
     /**

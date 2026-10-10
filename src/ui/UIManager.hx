@@ -23,6 +23,10 @@ class UIManager extends Object {
     /** Composite UI builder assembling modular view packages and backplates. */
     public var builder:UIBuilder;
 
+    /** In-game cyber telemetry HUD overlay reference. */
+    public var inGameHUD(get, never):ui.views.hud.InGameHUDView;
+    inline function get_inGameHUD():ui.views.hud.InGameHUDView return builder.inGameHUDView;
+
     /** Callback invoked upon selecting a menu action. */
     public var onMenuAction:MenuAction->Void;
 
@@ -100,6 +104,7 @@ class UIManager extends Object {
         builder.pauseMenuView.visible = false;
         builder.optionsView.visible = false;
         builder.creditsView.visible = false;
+        builder.inGameHUDView.visible = false;
         builder.touchControlsHUD.visible = false;
         builder.helpText.visible = false;
 
@@ -120,6 +125,7 @@ class UIManager extends Object {
         builder.pauseMenuView.visible = false;
         builder.optionsView.visible = false;
         builder.creditsView.visible = false;
+        builder.inGameHUDView.visible = false;
         builder.touchControlsHUD.visible = false;
 
         builder.helpText.text = "[Up / Down / D-Pad] Select    [A / Enter] Confirm";
@@ -142,6 +148,7 @@ class UIManager extends Object {
         builder.pauseMenuView.visible = false;
         builder.optionsView.visible = false;
         builder.creditsView.visible = false;
+        builder.inGameHUDView.visible = true;
         builder.helpText.visible = false;
 
         // Auto-show touch controls if device has touch capability or touch was registered
@@ -164,6 +171,7 @@ class UIManager extends Object {
         builder.pauseMenuView.activate();
         builder.optionsView.visible = false;
         builder.creditsView.visible = false;
+        builder.inGameHUDView.visible = false;
         builder.touchControlsHUD.visible = false;
         builder.touchControlsHUD.resetTouchStates();
 
@@ -190,6 +198,7 @@ class UIManager extends Object {
         builder.pauseMenuView.visible = false;
         builder.optionsView.activate(fromPause);
         builder.creditsView.visible = false;
+        builder.inGameHUDView.visible = false;
         builder.touchControlsHUD.visible = false;
         builder.touchControlsHUD.resetTouchStates();
 
@@ -213,6 +222,7 @@ class UIManager extends Object {
         builder.pauseMenuView.visible = false;
         builder.optionsView.visible = false;
         builder.creditsView.activate();
+        builder.inGameHUDView.visible = false;
         builder.touchControlsHUD.visible = false;
         builder.touchControlsHUD.resetTouchStates();
 
@@ -287,7 +297,14 @@ class UIManager extends Object {
                 if (opt.controlsPanel.controlViewMode == "Custom") {
                     if (uiUp) opt.controlsPanel.navigate(-1);
                     else if (uiDown) opt.controlsPanel.navigate(1);
+                    if (opt.controlsPanel.remapIndex == 0) {
+                        if (uiLeft) opt.controlsPanel.adjustSensitivity(-0.02);
+                        if (uiRight) opt.controlsPanel.adjustSensitivity(0.02);
+                    }
                     if (uiConfirm) opt.controlsPanel.triggerRemapEntry(opt.controlsPanel.remapIndex);
+                } else {
+                    if (uiLeft) opt.controlsPanel.adjustSensitivity(-0.02);
+                    if (uiRight) opt.controlsPanel.adjustSensitivity(0.02);
                 }
             }
 

@@ -52,6 +52,18 @@ class CarPhysics {
     /** Whether transmission is currently disengaged during a gear transition. */
     public var isShifting:Bool = false;
 
+    /** Remaining nitrous boost fuel capacity in range [0.0, 1.0]. */
+    public var boostFuel:Float = 1.0;
+
+    /** Nitrous fuel burn consumption rate per second while boosting (4.0s full duration). */
+    public static inline var BOOST_DRAIN_RATE:Float = 0.25;
+
+    /** Nitrous fuel automatic regeneration recovery rate per second (10.0s to full tank). */
+    public static inline var BOOST_RECHARGE_RATE:Float = 0.10;
+
+    /** Whether the vehicle is actively consuming nitrous oxide thrust this frame. */
+    public var isBoosting:Bool = false;
+
     /** Active vehicle performance and dynamics tuning configuration. */
     public var config:VehicleConfigData;
 
@@ -210,10 +222,21 @@ class CarPhysics {
         // 1. Raycast Suspension & Anti-Roll Bar Force Simulation
         updateSuspension(clampedDt, fwdX, fwdY, rightX, rightY, waypoints);
 
-        // 2. Drivetrain, Engine RPM & Automatic Transmission Shifting
+        // 2. Nitrous Oxide Fuel Depletion & Regeneration Simulation
+        if (input.boost && boostFuel > 0.0) {
+            boostFuel = Math.max(0.0, boostFuel - BOOST_DRAIN_RATE * clampedDt);
+            isBoosting = (boostFuel > 0.0);
+        } else {
+            isBoosting = false;
+            if (boostFuel < 1.0) {
+                boostFuel = Math.min(1.0, boostFuel + BOOST_RECHARGE_RATE * clampedDt);
+            }
+        }
+
+        // 3. Drivetrain, Engine RPM & Automatic Transmission Shifting
         updateDrivetrain(clampedDt, input);
 
-        // 3. Longitudinal Acceleration & Braking Simulation
+        // 4. Longitudinal Acceleration & Braking Simulation
         updateLongitudinal(clampedDt, input);
 
         // 4. Lateral Tire Adhesion, Slip Angles & Cornering Grip
@@ -402,8 +425,8 @@ class CarPhysics {
      */
     function updateLongitudinal(dt:Float, input:InputController) {
         var mu = config.tires.groundFriction;
-        var maxSpeed = input.boost ? config.boostTopSpeed : config.baseTopSpeed;
-        var accelRate = (input.boost ? config.boostAcceleration : config.baseAcceleration) * mu;
+        var maxSpeed = isBoosting ? config.boostTopSpeed : config.baseTopSpeed;
+        var accelRate = (isBoosting ? config.boostAcceleration : config.baseAcceleration) * mu;
 
         // Drivetrain torque delivery scaled by shift disengagement
         var throttleEff = isShifting ? (input.throttle * 0.25) : input.throttle;

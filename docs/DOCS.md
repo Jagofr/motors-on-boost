@@ -29,13 +29,17 @@ This ledger records active tuning variables across physics, input, track geometr
 | `drift.forwardBiasRate` | `3.8` | `3.0 - 4.5` | Momentum blending rate aligning velocity to vehicle heading. |
 | `drivetrain.gearRatios` | `[3.40, 2.20, 1.55, 1.18, 0.92, 0.76]` | Progressive 6-speed | Progressive gear reductions with final drive `3.73`. |
 | `drivetrain.idleRPM / redlineRPM` | `1000.0 / 8000.0` | `1000 / 8000` | Engine flywheel RPM limits and shift window (`3400 - 7200`). |
+| `boost.capacity` | `1.0` (100%) | `1.0` | Nitrous oxide reservoir capacity. |
+| `boost.drainRate` | `0.25` / s | `0.20 - 0.35` | Nitrous burn rate during active boost (4.0s sustained full boost). |
+| `boost.rechargeRate` | `0.10` / s | `0.05 - 0.15` | Passive idle recharge rate (10.0s empty-to-full). |
 
 ---
 
-## 2. Steering Rack Emulation (`src/input/InputController.hx`)
+## 2. Steering Rack Emulation & Controls (`src/input/InputController.hx` & `src/save/SaveSystem.hx`)
 
 | Parameter | Current Value | Description / Impact |
 |---|---|---|
+| `steerSensitivity` | `1.0` (100%) | Granular steering sensitivity multiplier scalable from 0% to 100% in 2% steps. |
 | `STEER_SPEED` | `4.2` | Turn-in rate for digital keyboard inputs (WASD / Arrows). |
 | `RETURN_SPEED` | `6.5` | Self-centering rate returning wheels to neutral upon key release. |
 | `GAMEPAD_DEADZONE` | `0.12` | Deadzone threshold filtering stick drift on analog gamepads. |

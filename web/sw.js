@@ -5,7 +5,7 @@
  * falling back to local cached assets if offline or if network encounters errors.
  */
 
-const CACHE_NAME = 'mob-motors-on-boost-v2-1';
+const CACHE_NAME = 'mob-motors-on-boost-v2-2';
 
 const ASSETS_TO_CACHE = [
   './',

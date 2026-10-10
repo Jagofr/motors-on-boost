@@ -575,15 +575,19 @@ class TouchControlsHUD extends Object {
 
         // 2. Nitro Boost Button (Left Hand, above joystick)
         drawCircularButton(nitroX, nitroY, nitroRadius, UITheme.COLOR_ACCENT_CYAN, isBoostPressed);
+        drawFlameGraphic(nitroX, nitroY - 6.0, nitroRadius * 0.42, isBoostPressed);
 
         // 3. Gas / Throttle Pad (Right Hand, bottom-right)
         drawCircularButton(gasX, gasY, gasRadius, UITheme.COLOR_GREEN_SUCCESS, isGasPressed);
+        drawPedalGraphic(gasX, gasY - 6.0, gasRadius * 0.55, gasRadius * 0.68, isGasPressed);
 
         // 4. Brake / Reverse Pad (Right Hand, bottom-right inner)
         drawCircularButton(brakeX, brakeY, brakeRadius, UITheme.COLOR_RED_ALERT, isBrakePressed);
+        drawBrakeDiscGraphic(brakeX, brakeY - 5.0, brakeRadius, isBrakePressed);
 
         // 5. Drift / Handbrake Pad (Right Hand, arched above Gas & Brake)
         drawCircularButton(driftX, driftY, driftRadius, UITheme.COLOR_ACCENT_GOLD, isHandbrakePressed);
+        drawHandbrakeGraphic(driftX, driftY - 5.0, driftRadius * 0.65, isHandbrakePressed);
 
         // 6. Pause Button (Top-Right)
         drawPauseButton();
@@ -594,21 +598,25 @@ class TouchControlsHUD extends Object {
      */
     function drawAnalogStick() {
         var isGrabbed = (stickPointerId != null);
-        var baseAlpha = isGrabbed ? 0.38 : 0.22;
-        var borderAlpha = isGrabbed ? 0.85 : 0.45;
+        var baseAlpha = isGrabbed ? 0.45 : 0.28;
+        var borderAlpha = isGrabbed ? 0.90 : 0.50;
 
         // Base circular zone
-        canvas.beginFill(UITheme.COLOR_ACCENT_CYAN, baseAlpha);
+        canvas.beginFill(0x060E18, baseAlpha);
         canvas.lineStyle(2.0, UITheme.COLOR_ACCENT_CYAN, borderAlpha);
         canvas.drawCircle(stickBaseX, stickBaseY, stickBaseRadius);
         canvas.endFill();
 
+        // Outer cyber tick ring
+        canvas.lineStyle(1.0, UITheme.COLOR_ACCENT_CYAN, borderAlpha * 0.4);
+        canvas.drawCircle(stickBaseX, stickBaseY, stickBaseRadius - 6.0);
+
         // Directional crosshair ticks
-        canvas.lineStyle(1.5, UITheme.COLOR_ACCENT_CYAN, borderAlpha * 0.6);
-        canvas.moveTo(stickBaseX - stickBaseRadius + 8.0, stickBaseY);
-        canvas.lineTo(stickBaseX - stickBaseRadius + 20.0, stickBaseY);
-        canvas.moveTo(stickBaseX + stickBaseRadius - 20.0, stickBaseY);
-        canvas.lineTo(stickBaseX + stickBaseRadius - 8.0, stickBaseY);
+        canvas.lineStyle(1.5, UITheme.COLOR_ACCENT_CYAN, borderAlpha * 0.7);
+        canvas.moveTo(stickBaseX - stickBaseRadius + 6.0, stickBaseY);
+        canvas.lineTo(stickBaseX - stickBaseRadius + 16.0, stickBaseY);
+        canvas.moveTo(stickBaseX + stickBaseRadius - 16.0, stickBaseY);
+        canvas.lineTo(stickBaseX + stickBaseRadius - 6.0, stickBaseY);
 
         // Center neutral reference dot
         canvas.beginFill(UITheme.COLOR_ACCENT_CYAN, 0.45);
@@ -617,10 +625,15 @@ class TouchControlsHUD extends Object {
 
         // Movable thumb knob
         var knobAlpha = isGrabbed ? UITheme.ALPHA_TOUCH_PRESSED : UITheme.ALPHA_TOUCH_IDLE;
-        var knobBorderAlpha = isGrabbed ? 0.95 : UITheme.ALPHA_TOUCH_BORDER;
+        var knobBorderAlpha = isGrabbed ? 0.98 : UITheme.ALPHA_TOUCH_BORDER;
         canvas.beginFill(UITheme.COLOR_ACCENT_CYAN, knobAlpha);
         canvas.lineStyle(2.5, UITheme.COLOR_ACCENT_CYAN, knobBorderAlpha);
         canvas.drawCircle(stickKnobX, stickKnobY, stickKnobRadius);
+        canvas.endFill();
+
+        // Inner knob accent dot
+        canvas.beginFill(0xFFFFFF, isGrabbed ? 0.95 : 0.60);
+        canvas.drawCircle(stickKnobX, stickKnobY, 5.0);
         canvas.endFill();
     }
 
@@ -628,12 +641,108 @@ class TouchControlsHUD extends Object {
      * Draws an individual circular action button with radial fill and glowing perimeter.
      */
     inline function drawCircularButton(cx:Float, cy:Float, radius:Float, color:Int, isPressed:Bool) {
-        var fillAlpha = isPressed ? UITheme.ALPHA_TOUCH_PRESSED : UITheme.ALPHA_TOUCH_IDLE;
-        var borderAlpha = isPressed ? 0.95 : UITheme.ALPHA_TOUCH_BORDER;
+        var fillAlpha = isPressed ? 0.88 : 0.55;
+        var borderAlpha = isPressed ? 1.0 : 0.70;
 
-        canvas.beginFill(color, fillAlpha);
+        // Frosted dark glass circular plate
+        canvas.beginFill(0x060E18, fillAlpha);
         canvas.lineStyle(2.5, color, borderAlpha);
         canvas.drawCircle(cx, cy, radius);
+        canvas.endFill();
+
+        // Inner specular ring highlight
+        canvas.lineStyle(1.0, 0xFFFFFF, isPressed ? 0.35 : 0.12);
+        canvas.drawCircle(cx, cy, radius - 4.0);
+    }
+
+    /**
+     * Draws procedural flame icon inside Nitro boost button.
+     */
+    function drawFlameGraphic(cx:Float, cy:Float, size:Float, isPressed:Bool) {
+        var flameColor = isPressed ? 0xFF8800 : UITheme.COLOR_ACCENT_CYAN;
+        var coreColor = isPressed ? 0xFFFF66 : 0xFFFFFF;
+
+        canvas.beginFill(flameColor, 0.90);
+        canvas.moveTo(cx, cy - size);
+        canvas.curveTo(cx + size * 0.6, cy - size * 0.2, cx + size * 0.6, cy + size * 0.4);
+        canvas.curveTo(cx + size * 0.6, cy + size, cx, cy + size);
+        canvas.curveTo(cx - size * 0.6, cy + size, cx - size * 0.6, cy + size * 0.4);
+        canvas.curveTo(cx - size * 0.6, cy - size * 0.2, cx, cy - size);
+        canvas.endFill();
+
+        canvas.beginFill(coreColor, 0.95);
+        canvas.moveTo(cx, cy - size * 0.2);
+        canvas.curveTo(cx + size * 0.3, cy + size * 0.2, cx + size * 0.3, cy + size * 0.6);
+        canvas.curveTo(cx + size * 0.3, cy + size * 0.8, cx, cy + size * 0.8);
+        canvas.curveTo(cx - size * 0.3, cy + size * 0.8, cx - size * 0.3, cy + size * 0.6);
+        canvas.curveTo(cx - size * 0.3, cy + size * 0.2, cx, cy - size * 0.2);
+        canvas.endFill();
+    }
+
+    /**
+     * Draws accelerator throttle pedal icon inside Gas button.
+     */
+    function drawPedalGraphic(cx:Float, cy:Float, w:Float, h:Float, isPressed:Bool) {
+        var pedalColor = isPressed ? 0x00FF88 : UITheme.COLOR_GREEN_SUCCESS;
+
+        canvas.beginFill(0x182430, 0.90);
+        canvas.lineStyle(1.5, pedalColor, 0.90);
+        canvas.drawRoundedRect(cx - (w * 0.5), cy - (h * 0.5), w, h, 4.0);
+        canvas.endFill();
+
+        // Rubber grip ridges
+        canvas.lineStyle(1.5, pedalColor, 0.70);
+        canvas.moveTo(cx - (w * 0.32), cy - (h * 0.24));
+        canvas.lineTo(cx + (w * 0.32), cy - (h * 0.24));
+        canvas.moveTo(cx - (w * 0.32), cy);
+        canvas.lineTo(cx + (w * 0.32), cy);
+        canvas.moveTo(cx - (w * 0.32), cy + (h * 0.24));
+        canvas.lineTo(cx + (w * 0.32), cy + (h * 0.24));
+    }
+
+    /**
+     * Draws disc brake rotor with red caliper inside Brake button.
+     */
+    function drawBrakeDiscGraphic(cx:Float, cy:Float, radius:Float, isPressed:Bool) {
+        // Metallic brake rotor disc
+        canvas.lineStyle(2.0, 0x8898A8, 0.75);
+        canvas.drawCircle(cx, cy, radius * 0.60);
+        canvas.drawCircle(cx, cy, radius * 0.28);
+
+        // Perforated cross-drilled cooling vent holes
+        canvas.beginFill(0x060E18, 0.95);
+        for (i in 0...6) {
+            var ang = i * (Math.PI / 3.0);
+            var hx = cx + Math.cos(ang) * (radius * 0.44);
+            var hy = cy + Math.sin(ang) * (radius * 0.44);
+            canvas.drawCircle(hx, hy, 1.8);
+        }
+        canvas.endFill();
+
+        // Red brake caliper on side
+        canvas.beginFill(isPressed ? 0xFF0033 : UITheme.COLOR_RED_ALERT, 0.95);
+        canvas.lineStyle(1.5, 0xFF6677, 0.95);
+        canvas.drawRoundedRect(cx + (radius * 0.20), cy - (radius * 0.55), radius * 0.44, radius * 0.55, 3.0);
+        canvas.endFill();
+    }
+
+    /**
+     * Draws handbrake drift icon inside Drift button.
+     */
+    function drawHandbrakeGraphic(cx:Float, cy:Float, size:Float, isPressed:Bool) {
+        var driftColor = isPressed ? 0xFFEE00 : UITheme.COLOR_ACCENT_GOLD;
+
+        // Twin skid mark drift arcs
+        canvas.lineStyle(2.0, driftColor, 0.85);
+        canvas.moveTo(cx - (size * 0.55), cy + (size * 0.35));
+        canvas.curveTo(cx - (size * 0.15), cy - (size * 0.25), cx + (size * 0.35), cy - (size * 0.35));
+
+        canvas.moveTo(cx - (size * 0.35), cy + (size * 0.55));
+        canvas.curveTo(cx, cy - (size * 0.05), cx + (size * 0.55), cy - (size * 0.15));
+
+        // Center lever accent
+        canvas.beginFill(driftColor, 0.95);
+        canvas.drawCircle(cx - (size * 0.10), cy + (size * 0.10), 2.5);
         canvas.endFill();
     }
 
@@ -677,28 +786,28 @@ class TouchControlsHUD extends Object {
         nitroX = stickBaseX;
         nitroY = stickBaseY - stickBaseRadius - nitroRadius - 28.0;
         nitroText.x = nitroX - (nitroText.textWidth * 0.5);
-        nitroText.y = nitroY - (nitroText.textHeight * 0.5);
+        nitroText.y = nitroY + 6.0;
 
         // 3. Right Hand: Gas / Throttle Pad (Right thumb)
         gasRadius = 44.0;
         gasX = sw - margin - gasRadius - 16.0;
         gasY = sh - margin - gasRadius - 16.0;
         gasText.x = gasX - (gasText.textWidth * 0.5);
-        gasText.y = gasY - (gasText.textHeight * 0.5);
+        gasText.y = gasY + 9.0;
 
         // 4. Right Hand: Brake / Reverse Pad (Right thumb / fingers)
         brakeRadius = 36.0;
         brakeX = gasX - gasRadius - brakeRadius - 32.0;
         brakeY = gasY;
         brakeText.x = brakeX - (brakeText.textWidth * 0.5);
-        brakeText.y = brakeY - (brakeText.textHeight * 0.5);
+        brakeText.y = brakeY + 7.0;
 
         // 5. Right Hand: Handbrake Drift Pad (Right index finger, arched above Gas & Brake)
         driftRadius = 38.0;
         driftX = (gasX + brakeX) * 0.5;
         driftY = gasY - gasRadius - driftRadius - 24.0;
         driftText.x = driftX - (driftText.textWidth * 0.5);
-        driftText.y = driftY - (driftText.textHeight * 0.5);
+        driftText.y = driftY + 8.0;
 
         // 6. Top Right: Pause Button
         pauseW = 48.0;

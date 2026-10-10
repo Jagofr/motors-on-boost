@@ -97,6 +97,9 @@ typedef GameSaveData = {
 
     /** Active graphics hardware configuration profile. */
     var graphics:GraphicsSettings;
+
+    /** Steering sensitivity multiplier in range [0.0, 1.0] (default 1.0). */
+    var ?steerSensitivity:Float;
 }
 
 /**
@@ -105,9 +108,12 @@ typedef GameSaveData = {
  */
 class SaveSystem {
     /** Current save schema version identifier for forward migrations. */
-    public static inline var SAVE_VERSION:Int = 3;
+    public static inline var SAVE_VERSION:Int = 4;
 
-    /** Primary localStorage storage key for Motors on Boost v3 schema. */
+    /** Primary localStorage storage key for Motors on Boost v4 schema. */
+    static inline var STORAGE_KEY_V4:String = "mob_motors_on_boost_save_v4";
+
+    /** Backwards-compatible storage key for v3 schema. */
     static inline var STORAGE_KEY_V3:String = "mob_motors_on_boost_save_v3";
 
     /** Backwards-compatible storage key for v2 schema. */
@@ -153,22 +159,28 @@ class SaveSystem {
         #if js
         try {
             var storage = js.Browser.getLocalStorage();
-            var raw = storage.getItem(STORAGE_KEY_V3);
+            var raw = storage.getItem(STORAGE_KEY_V4);
             var isLegacy = false;
 
-            // Step 1: Fallback reading from v2 key if v3 not found
+            // Step 1: Fallback reading from v3 key if v4 not found
+            if (raw == null) {
+                raw = storage.getItem(STORAGE_KEY_V3);
+                if (raw != null) isLegacy = true;
+            }
+
+            // Step 2: Fallback reading from v2 key if v3 not found
             if (raw == null) {
                 raw = storage.getItem(STORAGE_KEY_V2);
                 if (raw != null) isLegacy = true;
             }
 
-            // Step 2: Fallback reading from v1 key if v2 not found
+            // Step 3: Fallback reading from v1 key if v2 not found
             if (raw == null) {
                 raw = storage.getItem(STORAGE_KEY_V1);
                 if (raw != null) isLegacy = true;
             }
 
-            // Step 3: Fallback reading from prototype key if still not found
+            // Step 4: Fallback reading from prototype key if still not found
             if (raw == null) {
                 raw = storage.getItem(LEGACY_STORAGE_KEY);
                 if (raw != null) isLegacy = true;
@@ -177,12 +189,17 @@ class SaveSystem {
             if (raw != null) {
                 var data:GameSaveData = Json.parse(raw);
 
-                // Step 4: Forward migration: ensure uiResolution default
+                // Step 5: Forward migration: ensure uiResolution default
                 if (data.graphics != null && data.graphics.uiResolution == null) {
                     data.graphics.uiResolution = "720p (HD)";
                 }
 
-                // Step 5: Schema version migration to v3
+                // Step 6: Forward migration: ensure steerSensitivity default
+                if (data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
+                    data.steerSensitivity = 1.0;
+                }
+
+                // Step 7: Schema version migration to v4
                 if (data.version == null || data.version < SAVE_VERSION || isLegacy) {
                     data.version = SAVE_VERSION;
                     data.buildNumber = Version.BUILD;
@@ -202,6 +219,7 @@ class SaveSystem {
             masterVol: 0.8,
             musicVol: 0.7,
             sfxVol: 0.9,
+            steerSensitivity: 1.0,
             graphics: getDefaultGraphics()
         };
     }
@@ -216,11 +234,14 @@ class SaveSystem {
         try {
             data.version = SAVE_VERSION;
             data.buildNumber = Version.BUILD;
+            if (data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
+                data.steerSensitivity = 1.0;
+            }
 
             var raw = Json.stringify(data);
             var storage = js.Browser.getLocalStorage();
-            storage.setItem(STORAGE_KEY_V3, raw);
-            storage.setItem(STORAGE_KEY_V2, raw); // Backwards compatibility mirror
+            storage.setItem(STORAGE_KEY_V4, raw);
+            storage.setItem(STORAGE_KEY_V3, raw); // Backwards compatibility mirror
         } catch (e:haxe.Exception) {}
         #end
     }

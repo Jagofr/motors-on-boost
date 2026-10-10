@@ -71,6 +71,9 @@ G:.
 |   |       +---pause
 |   |       |       PauseMenuView.hx
 |   |       |       
+|   |       +---hud
+|   |       |       InGameHUDView.hx
+|   |       |       
 |   |       \---splash
 |   |               SplashView.hx
 |   |               

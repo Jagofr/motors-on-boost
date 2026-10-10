@@ -224,6 +224,9 @@ class InputController {
     /** True if touch inputs have been detected on the device. */
     public var isTouchActive:Bool = false;
 
+    /** User configured steering sensitivity scalar in range [0.0, 1.0] (default 1.0). */
+    public var steerSensitivity:Float = 1.0;
+
     /** Steering rate of turn for keyboard keys in units per second. */
     static inline var STEER_SPEED:Float = 4.2;
 
@@ -466,6 +469,9 @@ class InputController {
         if (touchBrake > 0.0) brake = Math.max(brake, touchBrake);
         if (touchHandbrake) handbrake = true;
         if (touchBoost) boost = true;
+
+        // Apply user-configured steering sensitivity scalar [0.0 - 1.0]
+        steer = Math.max(-1.0, Math.min(1.0, steer * steerSensitivity));
     }
 
     /**

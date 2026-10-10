@@ -11,6 +11,7 @@ import input.InputController;
 import input.InputController.InputAction;
 import input.InputController.ExclusiveDevice;
 import audio.AudioManager;
+import save.SaveSystem;
 
 /**
  * Controller and keyboard configuration, schematic diagrams, and custom action remapping subpanel.
@@ -84,7 +85,7 @@ class ControlsOptionsPanel extends Object {
         diagramViewer = new ControlDiagrams(this);
 
         remapContainer = new Object(this);
-        var actions = ["Throttle (Gas)", "Brake / Reverse", "Steer Left", "Steer Right", "Handbrake", "Nitro Boost", "Reset All to Defaults"];
+        var actions = ["Steering Sensitivity", "Throttle (Gas)", "Brake / Reverse", "Steer Left", "Steer Right", "Handbrake", "Nitro Boost", "Reset All to Defaults"];
         for (i in 0...actions.length) {
             var txt = new Text(FontManager.regularFont, remapContainer);
             remapItems.push(txt);
@@ -157,7 +158,14 @@ class ControlsOptionsPanel extends Object {
      * @param idx Action row index.
      */
     public function triggerRemapEntry(idx:Int) {
-        if (idx == 6) {
+        if (idx == 0) {
+            // Cycle sensitivity by +2% or wrap around
+            var next = inputRef.steerSensitivity >= 0.99 ? -1.0 : 0.02;
+            adjustSensitivity(next);
+            return;
+        }
+
+        if (idx == 7) {
             AudioManager.inst.playMenuBeep(320, 0.08);
             if (currentTab == Keyboard) inputRef.bindings.resetKeyboardDefaults();
             else inputRef.bindings.resetGamepadDefaults();
@@ -170,7 +178,24 @@ class ControlsOptionsPanel extends Object {
         AudioManager.inst.playMenuBeep(640, 0.1);
         remapStatusNotice.text = "PRESS ANY " + (isGamepad ? "BUTTON" : "KEY") + "...";
         remapStatusNotice.visible = true;
-        inputRef.startListening(actList[idx], isGamepad);
+        inputRef.startListening(actList[idx - 1], isGamepad);
+    }
+
+    /**
+     * Increments or decrements steering sensitivity by fractional delta (typically 0.02 = 2%).
+     *
+     * @param delta Change amount (-0.02 or +0.02).
+     */
+    public function adjustSensitivity(delta:Float) {
+        var sens = Math.round((inputRef.steerSensitivity + delta) * 50) / 50.0;
+        sens = Math.max(0.0, Math.min(1.0, sens));
+        inputRef.steerSensitivity = sens;
+        AudioManager.inst.playMenuBeep(420 + sens * 240, 0.04);
+        updateRemapStyles();
+
+        var d = SaveSystem.load();
+        d.steerSensitivity = sens;
+        SaveSystem.save(d);
     }
 
     /**
@@ -190,7 +215,9 @@ class ControlsOptionsPanel extends Object {
     public function updateRemapStyles() {
         var isGamepad = (currentTab == Gamepad);
         var b = inputRef.bindings;
+        var sensPct = Math.round(inputRef.steerSensitivity * 100);
         var labels = [
+            "Steering Sensitivity: " + sensPct + "%  [ < / > ]",
             "Throttle (Gas):       " + (isGamepad ? InputController.getGamepadBtnName(b.padGas) : InputController.getKeyName(b.keyGas)),
             "Brake / Reverse:      " + (isGamepad ? InputController.getGamepadBtnName(b.padBrake) : InputController.getKeyName(b.keyBrake)),
             "Steer Left:           " + (isGamepad ? "Left Analog / D-Pad" : InputController.getKeyName(b.keyLeft)),
@@ -206,7 +233,7 @@ class ControlsOptionsPanel extends Object {
                 item.textColor = UITheme.COLOR_ACCENT_CYAN;
                 item.text = "> " + labels[i] + " <";
             } else {
-                item.textColor = (i == 6) ? 0xE5C07B : UITheme.COLOR_TEXT_NORMAL;
+                item.textColor = (i == 7) ? 0xE5C07B : UITheme.COLOR_TEXT_NORMAL;
                 item.text = "  " + labels[i] + "  ";
             }
         }

@@ -189,50 +189,52 @@ class OptionsView extends Object {
      * @param sh Screen height in pixels.
      */
     public function layout(sw:Float, sh:Float) {
+        var cardW = Math.min(UITheme.OPTIONS_CARD_WIDTH, sw - 24.0);
+        var cardH = Math.min(UITheme.OPTIONS_CARD_HEIGHT, sh - (sh * 0.16) - 16.0);
+        var cardX = (sw - cardW) * 0.5;
+        var cardY = Math.max(12.0, (sh - cardH) * 0.5);
+
         if (titleText != null) {
             titleText.x = (sw - titleText.textWidth) * 0.5;
-            titleText.y = sh * 0.10;
+            titleText.y = Math.max(6.0, cardY - titleText.textHeight - 6.0);
         }
 
-        var tabSpacing = UITheme.OPTIONS_TAB_SPACING;
+        var tabSpacing = Math.min(UITheme.OPTIONS_TAB_SPACING, (cardW - 140.0) / TAB_ORDER.length);
         var tabStartX = (sw - (TAB_ORDER.length * tabSpacing)) * 0.5;
+        var tabY = cardY + 12.0;
+        var tabBtnW = Math.min(TAB_BUTTON_WIDTH, tabSpacing - 8.0);
+
         for (i in 0...TAB_ORDER.length) {
             var ic = tabIcons[i];
             var lbl = tabLabels[i];
             var inter = tabInteractives[i];
 
             var colX = tabStartX + (i * tabSpacing);
-            var colY = sh * 0.18;
 
-            ic.x = colX + 18;
-            ic.y = colY + 4;
+            ic.x = colX + 16;
+            ic.y = tabY + 8;
 
-            lbl.x = colX + 48;
-            lbl.y = colY + 3;
+            lbl.x = colX + 44;
+            lbl.y = tabY + 7;
 
-            inter.x = colX + 6;
-            inter.y = colY - 4;
-            inter.width = TAB_BUTTON_WIDTH;
+            inter.x = colX + 4;
+            inter.y = tabY;
+            inter.width = tabBtnW;
             inter.height = TAB_BUTTON_HEIGHT;
         }
 
-        var cardW = UITheme.OPTIONS_CARD_WIDTH;
-        var cardH = UITheme.OPTIONS_CARD_HEIGHT;
-        var cardX = (sw - cardW) * 0.5;
-        var cardY = sh * 0.16;
-
         if (backBtnText != null && backInteractive != null) {
-            backBtnText.x = cardX + 36;
-            backBtnText.y = cardY + 22;
-            backInteractive.x = cardX + 24;
-            backInteractive.y = cardY + 16;
+            backBtnText.x = cardX + 24;
+            backBtnText.y = cardY + 20;
+            backInteractive.x = cardX + 16;
+            backInteractive.y = cardY + 12;
             backInteractive.width = UITheme.BACK_BUTTON_WIDTH;
             backInteractive.height = UITheme.BACK_BUTTON_HEIGHT;
         }
 
         if (versionText != null) {
-            versionText.x = cardX + cardW - versionText.textWidth - 36;
-            versionText.y = cardY + 22;
+            versionText.x = cardX + cardW - versionText.textWidth - 24;
+            versionText.y = cardY + 20;
         }
 
         if (gfxPanel != null) gfxPanel.layout(sw, sh, cardX, cardY, cardW, cardH);

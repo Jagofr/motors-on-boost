@@ -6,6 +6,37 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.2.2] - 2026-10-10
+### Added
+- **In-Game HUD Overhaul (`InGameHUDView.hx`)**:
+  - High-density top-left angled telemetry badge with digital speedometer (`KM/H`), gear indicator (`[G1]` - `[G6]`), and animated `[DRIFTING]` status.
+  - Lap counter (`LAP 1/3`) and high-precision race timer (`MM:SS.MS`).
+  - Real-time circuit minimap with procedural track boundaries and glowing player position indicator with directional heading tick.
+  - Top-center curved tachometer arc gauge with radial tick markers, cyan-to-redline gradient fill, and digital RPM readout.
+  - Bottom-center curved nitro arc gauge with procedural dual-layer flame icon, remaining fuel percentage (`100% NITRO`), and warning states.
+  - Discreet top-right real-time FPS counter.
+- **Limited & Regenerating Nitrous Boost (`CarPhysics.hx`)**:
+  - Nitrous fuel capacity model (`boostFuel`) with active burn drain rate (`0.25/s`, 4.0s full duration) and passive idle recharge rate (`0.10/s`, 10.0s empty-to-full).
+  - Automatic nitrous cutoff upon depletion preventing infinite acceleration.
+- **Steering Sensitivity Controls Setting (`ControlsOptionsPanel.hx`, `SaveSystem.hx`, `InputController.hx`)**:
+  - Fine-grained steering sensitivity setting scalable from 0% to 100% in 2% steps.
+  - Persistent save schema v4 (`mob_motors_on_boost_save_v4`) with seamless forward migration from v1, v2, and v3 saves.
+- **Decoupled 3D Render Scale from 2D UI Resolution (`PostProcessRenderer.hx`, `GraphicsManager.hx`)**:
+  - 3D scene renders to dedicated offscreen render target scaled by `renderScale` (0.50x to 1.50x), leaving 2D canvas backbuffer at native 1:1 window resolution for pin-sharp UI text.
+  - Hooked up lighting preset to `ambientLight` and sun tinting via `h3d.scene.fwd.LightSystem`.
+  - Connected hardware antialiasing to `Engine.ANTIALIASING`.
+- **Responsive UI Layout & Viewport Scrolling**:
+  - Fixed OptionsView Back button hitzone overlap (`BACK_BUTTON_WIDTH = 100.0`), preventing collision with Tab 0 ("GRAPHICS").
+  - Added vertical scrolling (`scrollOffset`, `maxVisibleRows`) with navigation arrows and mouse wheel support in `GraphicsOptionsPanel.hx`.
+  - Dynamic responsive card backplate sizing in `CardBackplate.hx` preventing lower-resolution overflow.
+- **Frosted Glass Touch Controls Aesthetic (`TouchControlsHUD.hx`)**:
+  - Circular frosted glass buttons with procedural vector icons: flame icon for Nitro, accelerator pedal for Gas, disc brake with red caliper for Brake, and drift arc for Handbrake.
+  - True multi-touch concurrency across all simultaneous chords.
+
+*For detailed notes, see [`changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md`](./changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md).*
+
+---
+
 ## [0.2.1] - 2026-10-09
 ### Added
 - **Ergonomic Virtual Touch Driving HUD (`TouchControlsHUD.hx`)**:

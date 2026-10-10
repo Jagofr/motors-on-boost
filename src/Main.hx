@@ -116,6 +116,9 @@ class Main extends hxd.App {
     var rearWheelSpinAngle:Float = 0.0;
 
     var showcaseAngle:Float = 0.0;
+    var raceTimer:Float = 0.0;
+    var currentLap:Int = 1;
+    var totalLaps:Int = 3;
 
     override function init() {
         super.init();
@@ -367,6 +370,7 @@ class Main extends hxd.App {
         isLoadingStarted = true;
 
         saveData = SaveSystem.load();
+        input.steerSensitivity = (saveData.steerSensitivity != null && saveData.steerSensitivity > 0.0) ? saveData.steerSensitivity : 1.0;
 
         audio = new AudioManager();
         audio.masterVolume = saveData.masterVol;
@@ -404,7 +408,7 @@ class Main extends hxd.App {
         dirLight.setPosition(350.0, -250.0, 140.0);
         dirLight.color.setColor(0xFFF2D9);
 
-        gfx = new GraphicsManager(s3d, s2d, dirLight, saveData.graphics);
+        gfx = new GraphicsManager(s3d, s2d, dirLight, saveData.graphics, postRenderer);
 
         var terrainPrim = new Cube(800.0, 800.0, 0.4, true);
         terrainPrim.unindex();
@@ -422,6 +426,7 @@ class Main extends hxd.App {
         ui = new UIManager(input, saveData.graphics, saveData.hasActiveRun, s2d);
         ui.visible = false;
         ui.onMenuAction = handleMenuAction;
+        ui.inGameHUD.initWaypoints(track.waypoints);
 
         resetCarToStartLine();
 
@@ -437,6 +442,8 @@ class Main extends hxd.App {
         carPhysics.forwardSpeed = 0.0;
         carPhysics.lateralVelocity = 0.0;
         carPhysics.isDrifting = false;
+        carPhysics.boostFuel = 1.0;
+        carPhysics.isBoosting = false;
 
         playerMesh.x = 0.0;
         playerMesh.y = 0.0;
@@ -459,6 +466,7 @@ class Main extends hxd.App {
         saveData.masterVol = audio.masterVolume;
         saveData.musicVol = audio.musicVolume;
         saveData.sfxVol = audio.sfxVolume;
+        saveData.steerSensitivity = input.steerSensitivity;
         saveData.graphics = ui.gfxSettings;
         SaveSystem.save(saveData);
         ui.setHasActiveSave(true);
@@ -475,9 +483,9 @@ class Main extends hxd.App {
         switch (action) {
             case StartGame:
                 resetCarToStartLine();
+                raceTimer = 0.0;
+                currentLap = 1;
                 ui.showInGame();
-                fpsText.visible = true;
-                speedText.visible = true;
 
             case ResumeGame:
                 if (saveData.hasActiveRun) {
@@ -486,8 +494,6 @@ class Main extends hxd.App {
                     carPhysics.forwardSpeed = saveData.playerState.forwardSpeed;
                 }
                 ui.showInGame();
-                fpsText.visible = true;
-                speedText.visible = true;
 
             case OpenOptions:
             case OpenCredits:
@@ -495,8 +501,6 @@ class Main extends hxd.App {
 
             case QuitToTitle:
                 saveCurrentRun();
-                fpsText.visible = false;
-                speedText.visible = false;
                 ui.showMainMenu();
         }
     }
@@ -732,12 +736,10 @@ class Main extends hxd.App {
                     playerMesh.wheels[3].rotate(rearWheelSpinAngle, 0, 0);
                 }
 
-                chaseCam.update(dt, carPhysics, input.boost);
+                chaseCam.update(dt, carPhysics, carPhysics.isBoosting);
 
-                var gearStr = carPhysics.currentGear == -1 ? "R" : (carPhysics.currentGear == 0 ? "N" : "G" + carPhysics.currentGear);
-                var rpm = Math.round(carPhysics.engineRPM);
-                speedText.text = kmh + " KM/H [" + gearStr + "] (" + rpm + " RPM)" + (carPhysics.isDrifting ? " [DRIFTING]" : "") + (input.boost ? " [NITRO]" : "");
-                fpsText.text = "FPS: " + Math.round(hxd.Timer.fps());
+                raceTimer += dt;
+                ui.inGameHUD.updateTelemetry(dt, carPhysics, kmh, carPhysics.isBoosting, raceTimer, currentLap, totalLaps);
         }
     }
 
