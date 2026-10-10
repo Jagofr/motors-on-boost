@@ -10,15 +10,20 @@ This ledger records active tuning variables across physics, input, track geometr
 |---|---|---|---|
 | `TOP_SPEED` | `68.0` m/s (~245 km/h) | `62.0 - 70.0` | Base maximum speed under normal engine throttle. |
 | `BOOST_TOP_SPEED` | `88.0` m/s (~316 km/h) | `82.0 - 90.0` | Maximum velocity ceiling during active nitrous injection. |
-| `ACCELERATION` | `28.0` m/s² | `24.0 - 30.0` | Engine torque bite. Scaled by shift disengagement latency. |
+| `ACCELERATION` | `28.0` m/s² | `24.0 - 30.0` | Engine torque bite. Scaled by shift disengagement latency and ground friction. |
 | `BOOST_ACCEL` | `48.0` m/s² | `42.0 - 52.0` | Forward surge when nitrous oxide is engaged. |
-| `BRAKING` | `38.0` m/s² | `36.0 - 44.0` | Threshold foot-brake deceleration rate. |
+| `BRAKING` | `38.0` m/s² | `36.0 - 44.0` | Threshold foot-brake deceleration rate scaled by ground friction. |
 | `suspension.restLength` | `0.45` m | `0.40 - 0.50` | Unloaded spring height from chassis to road contact. |
 | `suspension.springRate` | `32000.0` N/m | `28000 - 36000` | Linear spring stiffness for road surface tracking. |
 | `suspension.damping` | `2600.0` Ns/m | `2200 - 3000` | Shock absorber viscous compression/rebound damping. |
 | `suspension.antiRollStiffness` | `9500.0` N/m | `8000 - 12000` | Transverse anti-roll bar torque preventing unnatural roll. |
+| `suspension.bodyRollScale` | `1.0` | `0.5 - 2.0` | Dynamic chassis roll scaling directly affecting suspension spring compression/extension. |
 | `tires.peakSlipAngle` | `0.16` rad (~9.2°) | `0.14 - 0.18` | Slip angle at which lateral tire adhesion peaks. |
 | `tires.baseLateralStiffness` | `34.0` | `30.0 - 38.0` | Baseline cornering stiffness in linear slip region. |
+| `tires.tireSlipBias` | `-0.45` | `-1.0 to 1.0` | Front vs rear slip bias. Negative = rear bias / oversteer; Positive = front bias / understeer; 0 = neutral. |
+| `tires.groundFriction` | `1.0` | `0.2 - 2.0` | Global ground contact scalar multiplying tire adhesion, braking, and rolling drag. |
+| `tires.wheelspinAmount` | `1.2` | `0.5 - 3.0` | Burnout wheelspin scalar for standstill full-throttle launches and power cornering. |
+| `drift.driftTriggerAngle` | `0.22` rad (~12.6°) | `0.10 - 0.35` | Chassis angle relative to velocity required to engage active drift physics. |
 | `drift.lateralStiffnessScale` | `0.35` (35%) | `0.30 - 0.40` | Lateral grip scale during active drift slide. |
 | `drift.counterSteerTorque` | `3.4` | `2.8 - 3.8` | Artificial yaw torque assist when counter-steering slide. |
 | `drift.forwardBiasRate` | `3.8` | `3.0 - 4.5` | Momentum blending rate aligning velocity to vehicle heading. |

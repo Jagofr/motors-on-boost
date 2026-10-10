@@ -23,6 +23,9 @@ typedef SuspensionConfig = {
 
     /** Maximum allowable spring extension travel in meters before full droop. */
     var maxTravel:Float;
+
+    /** Dynamic chassis roll multiplier affecting suspension lean and spring compression. */
+    var bodyRollScale:Float;
 }
 
 /**
@@ -40,6 +43,15 @@ typedef TireConfig = {
 
     /** Rolling resistance deceleration coefficient in m/s². */
     var rollingResistance:Float;
+
+    /** Front vs rear tire slip bias [-1.0 .. 1.0]. Negative = rear bias / oversteer, Positive = front bias / understeer, 0.0 = neutral. */
+    var tireSlipBias:Float;
+
+    /** Global ground contact friction scalar multiplying tire adhesion and braking. */
+    var groundFriction:Float;
+
+    /** Burnout wheelspin multiplier during standstill launches or full-throttle power corners. */
+    var wheelspinAmount:Float;
 }
 
 /**
@@ -63,6 +75,9 @@ typedef DriftConfig = {
 
     /** Threshold speed in m/s below which an active drift automatically terminates. */
     var driftExitSpeed:Float;
+
+    /** Vehicle body slip angle threshold in radians required to trigger active drift physics. */
+    var driftTriggerAngle:Float;
 }
 
 /**
@@ -195,13 +210,17 @@ class CarConfig {
                 damping: 2600.0,
                 antiRollStiffness: 9500.0,
                 minTravel: 0.08,
-                maxTravel: 0.52
+                maxTravel: 0.52,
+                bodyRollScale: 1.0
             },
             tires: {
                 peakSlipAngle: 0.16,
                 baseLateralStiffness: 34.0,
                 longitudinalGrip: 1.15,
-                rollingResistance: 2.0
+                rollingResistance: 2.0,
+                tireSlipBias: -0.45,
+                groundFriction: 1.0,
+                wheelspinAmount: 1.2
             },
             drift: {
                 lateralStiffnessScale: 0.35,
@@ -209,7 +228,8 @@ class CarConfig {
                 forwardBiasRate: 3.8,
                 minDriftSpeed: 12.0,
                 driftYawRate: 2.8,
-                driftExitSpeed: 8.0
+                driftExitSpeed: 8.0,
+                driftTriggerAngle: 0.22
             },
             drivetrain: {
                 gearRatios: [3.40, 2.20, 1.55, 1.18, 0.92, 0.76],
@@ -264,13 +284,17 @@ class CarConfig {
                     damping: raw.suspension.damping != null ? raw.suspension.damping : def.suspension.damping,
                     antiRollStiffness: raw.suspension.antiRollStiffness != null ? raw.suspension.antiRollStiffness : def.suspension.antiRollStiffness,
                     minTravel: raw.suspension.minTravel != null ? raw.suspension.minTravel : def.suspension.minTravel,
-                    maxTravel: raw.suspension.maxTravel != null ? raw.suspension.maxTravel : def.suspension.maxTravel
+                    maxTravel: raw.suspension.maxTravel != null ? raw.suspension.maxTravel : def.suspension.maxTravel,
+                    bodyRollScale: raw.suspension.bodyRollScale != null ? raw.suspension.bodyRollScale : def.suspension.bodyRollScale
                 } : def.suspension,
                 tires: raw.tires != null ? {
                     peakSlipAngle: raw.tires.peakSlipAngle != null ? raw.tires.peakSlipAngle : def.tires.peakSlipAngle,
                     baseLateralStiffness: raw.tires.baseLateralStiffness != null ? raw.tires.baseLateralStiffness : def.tires.baseLateralStiffness,
                     longitudinalGrip: raw.tires.longitudinalGrip != null ? raw.tires.longitudinalGrip : def.tires.longitudinalGrip,
-                    rollingResistance: raw.tires.rollingResistance != null ? raw.tires.rollingResistance : def.tires.rollingResistance
+                    rollingResistance: raw.tires.rollingResistance != null ? raw.tires.rollingResistance : def.tires.rollingResistance,
+                    tireSlipBias: raw.tires.tireSlipBias != null ? raw.tires.tireSlipBias : def.tires.tireSlipBias,
+                    groundFriction: raw.tires.groundFriction != null ? raw.tires.groundFriction : def.tires.groundFriction,
+                    wheelspinAmount: raw.tires.wheelspinAmount != null ? raw.tires.wheelspinAmount : def.tires.wheelspinAmount
                 } : def.tires,
                 drift: raw.drift != null ? {
                     lateralStiffnessScale: raw.drift.lateralStiffnessScale != null ? raw.drift.lateralStiffnessScale : def.drift.lateralStiffnessScale,
@@ -278,7 +302,8 @@ class CarConfig {
                     forwardBiasRate: raw.drift.forwardBiasRate != null ? raw.drift.forwardBiasRate : def.drift.forwardBiasRate,
                     minDriftSpeed: raw.drift.minDriftSpeed != null ? raw.drift.minDriftSpeed : def.drift.minDriftSpeed,
                     driftYawRate: raw.drift.driftYawRate != null ? raw.drift.driftYawRate : def.drift.driftYawRate,
-                    driftExitSpeed: raw.drift.driftExitSpeed != null ? raw.drift.driftExitSpeed : def.drift.driftExitSpeed
+                    driftExitSpeed: raw.drift.driftExitSpeed != null ? raw.drift.driftExitSpeed : def.drift.driftExitSpeed,
+                    driftTriggerAngle: raw.drift.driftTriggerAngle != null ? raw.drift.driftTriggerAngle : def.drift.driftTriggerAngle
                 } : def.drift,
                 drivetrain: raw.drivetrain != null ? {
                     gearRatios: raw.drivetrain.gearRatios != null ? raw.drivetrain.gearRatios : def.drivetrain.gearRatios,

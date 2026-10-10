@@ -4,6 +4,35 @@ All notable changes to **M.O.B. (Motors on Boost)** will be documented in this f
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+---
+
+## [0.2.1] - 2026-10-09
+### Added
+- **Ergonomic Virtual Touch Driving HUD (`TouchControlsHUD.hx`)**:
+  - Proportional virtual analog steering joystick for left thumb with continuous deflection tracking, directional crosshair ticks, and spring-return centering.
+  - Left-hand Nitrous Boost button placed above the joystick, allowing concurrent steering and boosting with thumb and index fingers.
+  - Enlarged 88px diameter Gas pad positioned in the prime right-thumb rest zone with hit hysteresis to eliminate finger drift drops.
+  - Arched Drift / Handbrake button positioned directly above Gas and Brake, enabling seamless right-hand drift initiation while holding throttle.
+  - Native DOM TouchEvent integration (`touchstart`, `touchmove`, `touchend`, `touchcancel`) with `passive: false` and `preventDefault()` to prevent browser gesture cancellation and desynchronization.
+  - Independent per-touch role mapping (`activeRoles: Map<Int, String>`) enabling full multi-touch concurrency across all simultaneous chords (Gas + Steer, Gas + Nitro, Gas + Drift, Drift + Nitro, Brake + Nitro, Steer + Gas + Nitro + Drift).
+- **Runtime Tunable Driving Physics Architecture (`CarPhysics.hx` & `CarConfig.hx`)**:
+  - `tireSlipBias` (range `[-1.0 .. 1.0]`): Front vs rear tire slip bias. Negative values induce rear-axle breakaway / oversteer drifting; positive values induce front-axle push / understeer; `0.0` provides neutral balanced slip.
+  - Dedicated handbrake breakaway function: immediately reduces rear lateral tire adhesion (`rearGripMult *= 0.20 + (bias + 1.0) * 0.08`), applies longitudinal drag, and injects yaw impulse.
+  - `driftTriggerAngle`: Configurable vehicle slip angle threshold (default `0.22 rad` / `~12.6°`) that automatically engages arcade drift physics upon threshold reach.
+  - `bodyRollScale`: Dynamically scales centrifugal body roll lean affecting suspension spring compression and extension, clamped on flat surfaces to prevent rolling over while allowing track bumps and ramps to pitch/roll the chassis.
+  - `groundFriction`: Global ground contact scalar multiplying tire adhesion, braking, and rolling resistance.
+  - `wheelspinAmount`: Burnout wheelspin simulation for standstill full-throttle launches and power-oversteer cornering exits.
+  - Public runtime properties directly tunable on `CarPhysics`: `tireSlipBias`, `driftTriggerAngle`, `bodyRollScale`, `groundFriction`, `wheelspinAmount`, `baseAcceleration`, `boostAcceleration`.
+- **Burnout Wheelspin Visual Animation (`Main.hx`)**:
+  - Decoupled rear wheel mesh rotation from vehicle ground speed, incorporating dynamic `wheelSpinVelocity` to visually spin rear wheels during full-throttle launches and power slides.
+- **Build & Cache Tracking**:
+  - Bumped semantic version to `0.2.1` and iterated build compilation counter to `Build 4`.
+  - Updated PWA service worker cache name to `mob-motors-on-boost-v2-1` in `sw.js` and updated cache-buster to `game.js?v=0.2.1` in `index.html`.
+
+*For detailed notes, see [`changelogs/2026-10-09-v0.2.1-touch-joystick-physics-tuning.md`](./changelogs/2026-10-09-v0.2.1-touch-joystick-physics-tuning.md).*
+
+---
+
 ## [0.2.0] - 2026-10-09
 ### Added
 - **First-Principles Arcade Raycast Vehicle Dynamics (`CarPhysics.hx`)**:
@@ -31,12 +60,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Save System v3 Schema & Forward Migration (`SaveSystem.hx`)**:
   - Bumped schema to `SAVE_VERSION = 3` with active storage key `mob_motors_on_boost_save_v3`.
   - Seamless forward migration preserving player settings from v2, v1, and legacy prototype keys.
-- **PWA Service Worker Cache**:
-  - Bumped cache to `mob-motors-on-boost-v2-0` in `sw.js` and updated script cache buster to `game.js?v=0.2.0`.
 
 ### Fixed
 - **Track Obstruction Cleanup (`Track.hx`)**:
   - Removed overlapping scenery skyscraper object at `(X: 295, Y: 130)` that clipped across 9 circuit waypoints without collision.
+
+*For detailed notes, see [`changelogs/2026-10-09-v0.2.0-arcade-vehicle-dynamics.md`](./changelogs/2026-10-09-v0.2.0-arcade-vehicle-dynamics.md).*
 
 ---
 
@@ -57,7 +86,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Camera-aware coordinate projection mapping canvas buffer pixels into 2D scene space through `s2d.interactiveCamera.eventToCamera()`.
   - Zero-allocation scratch instances (`scratchPoint`, `scratchEvent`) eliminating per-touch garbage collector pressure.
   - Euclidean distance-to-center evaluation for action capsules (GAS, BRAKE, NITRO, DRIFT) eliminating hit-test overlap bias.
-  - Independent touch identifier tracking (`activeTouches: Map<Int, String>`) enabling concurrent acceleration, steering, and nitrous boost actuation without input cancellations.
   - Browser `touchcancel` event handler providing fail-safe input register resets on OS gesture interrupts.
 - **Decoupled 3D Graphics & UI Resolution Scaling**:
   - Independent 3D rendering resolution scaling separate from UI layout dimensions.
@@ -67,7 +95,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Invisible Text on High-DPI Displays**: Fixed missing `baseLine` property on TrueType font descriptors in `FontManager.hx`, restoring crisp text across high-DPI displays.
 - **Vehicle Mesh Artifacts (`CarMesh.hx`)**: Resolved polygon clipping and geometry misalignment, increasing vertex density across wheel arches, chassis lines, and spoiler.
 - **Intro Transition Sequence**: Fixed transition from trademark disclaimer screen to 3D rotating showcase with clean, fully opaque black curtain cross-fading.
-- **PWA Service Worker Cache**: Bumped cache name to `mob-motors-on-boost-v1-4` in `sw.js` and added cache-busting tag `?v=0.1.4` in `index.html`.
+
+*For detailed notes, see [`changelogs/2026-10-09-v0.1.4-ui-touch-resolution-versioning.md`](./changelogs/2026-10-09-v0.1.4-ui-touch-resolution-versioning.md).*
+
+---
+
+## [0.1.1] - 2026-10-06
+### Changed
+- Completed project-wide refactoring from working title ("BURNOUT // OVERDRIVE") to finalized title **M.O.B. // MOTORS ON BOOST**.
+- Migrated browser `localStorage` persistence key to `mob_motors_on_boost_save_v1` with seamless fallback for existing legacy test saves.
+- Corrected PWA service worker asset paths in `sw.js` to target `./icons/icon-192.png` and `./icons/icon-512.png`.
+- Standardized in-game credits and documentation references.
+
+*For detailed notes, see [`changelogs/2026-10-06-v0.1.1-branding-persistence.md`](./changelogs/2026-10-06-v0.1.1-branding-persistence.md).*
 
 ---
 
@@ -88,10 +128,3 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - Complete in-game attribution screen (Credits) and project `README.md`.
 
 *For detailed subsystem technical notes, see [`changelogs/2026-10-06-v0.1.0-initial.md`](./changelogs/2026-10-06-v0.1.0-initial.md).*
-
-## [0.1.1] - 2026-10-06
-### Changed
-- Completed project-wide refactoring from working title ("BURNOUT // OVERDRIVE") to finalized title **M.O.B. // MOTORS ON BOOST**.
-- Migrated browser `localStorage` persistence key to `mob_motors_on_boost_save_v1` with seamless fallback for existing legacy test saves.
-- Corrected PWA service worker asset paths in `sw.js` to target `./icons/icon-192.png` and `./icons/icon-512.png`.
-- Standardized in-game credits and documentation references.

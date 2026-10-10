@@ -94,6 +94,45 @@ class CarPhysics {
     /** Rotational angular velocity in rad/s for each wheel. */
     public var wheelSpinVelocity:Array<Float> = [0.0, 0.0, 0.0, 0.0];
 
+    // =========================================================================
+    // EASILY TUNABLE DRIVING PHYSICS RUNTIME PROPERTIES
+    // =========================================================================
+
+    /** Front vs rear tire slip bias [-1.0 .. 1.0]. Negative = rear bias / oversteer, Positive = front bias / understeer, 0.0 = neutral. */
+    public var tireSlipBias(get, set):Float;
+    inline function get_tireSlipBias():Float return config.tires.tireSlipBias;
+    inline function set_tireSlipBias(v:Float):Float return config.tires.tireSlipBias = Math.max(-1.0, Math.min(1.0, v));
+
+    /** Vehicle body slip angle threshold in radians required to trigger active drift physics. */
+    public var driftTriggerAngle(get, set):Float;
+    inline function get_driftTriggerAngle():Float return config.drift.driftTriggerAngle;
+    inline function set_driftTriggerAngle(v:Float):Float return config.drift.driftTriggerAngle = Math.max(0.05, v);
+
+    /** Dynamic chassis roll multiplier affecting suspension lean and spring compression. */
+    public var bodyRollScale(get, set):Float;
+    inline function get_bodyRollScale():Float return config.suspension.bodyRollScale;
+    inline function set_bodyRollScale(v:Float):Float return config.suspension.bodyRollScale = Math.max(0.0, v);
+
+    /** Global ground contact friction scalar multiplying tire adhesion and braking. */
+    public var groundFriction(get, set):Float;
+    inline function get_groundFriction():Float return config.tires.groundFriction;
+    inline function set_groundFriction(v:Float):Float return config.tires.groundFriction = Math.max(0.1, v);
+
+    /** Burnout wheelspin multiplier during standstill launches or full-throttle power corners. */
+    public var wheelspinAmount(get, set):Float;
+    inline function get_wheelspinAmount():Float return config.tires.wheelspinAmount;
+    inline function set_wheelspinAmount(v:Float):Float return config.tires.wheelspinAmount = Math.max(0.0, v);
+
+    /** Standard engine acceleration rate in m/s². */
+    public var baseAcceleration(get, set):Float;
+    inline function get_baseAcceleration():Float return config.baseAcceleration;
+    inline function set_baseAcceleration(v:Float):Float return config.baseAcceleration = v;
+
+    /** Nitrous oxide augmented acceleration rate in m/s². */
+    public var boostAcceleration(get, set):Float;
+    inline function get_boostAcceleration():Float return config.boostAcceleration;
+    inline function set_boostAcceleration(v:Float):Float return config.boostAcceleration = v;
+
     // Static fallback constants matching configuration defaults for backwards compatibility
     public static inline var TOP_SPEED:Float = 68.0;
     public static inline var BOOST_TOP_SPEED:Float = 88.0;
@@ -231,7 +270,9 @@ class CarPhysics {
             wheelNormals[i].set(nx, ny, nz);
 
             // Distance from wheel chassis mount to road contact plane
-            var currentLen = attachZ - groundZ;
+            // Incorporate dynamic body roll lean: outer wheels compress and inner wheels extend
+            var rollTravelDelta = offset.x * Math.sin(roll) * config.suspension.bodyRollScale;
+            var currentLen = (attachZ - groundZ) + rollTravelDelta;
             prevSuspLength[i] = suspLength[i];
 
             if (currentLen <= restLen) {
@@ -357,14 +398,27 @@ class CarPhysics {
     }
 
     /**
-     * Integrates longitudinal throttle propulsion, threshold braking, and aerodynamic drag.
+     * Integrates longitudinal throttle propulsion, threshold braking, burnout wheelspin, and aerodynamic drag.
      */
     function updateLongitudinal(dt:Float, input:InputController) {
+        var mu = config.tires.groundFriction;
         var maxSpeed = input.boost ? config.boostTopSpeed : config.baseTopSpeed;
-        var accelRate = input.boost ? config.boostAcceleration : config.baseAcceleration;
+        var accelRate = (input.boost ? config.boostAcceleration : config.baseAcceleration) * mu;
 
         // Drivetrain torque delivery scaled by shift disengagement
         var throttleEff = isShifting ? (input.throttle * 0.25) : input.throttle;
+
+        var speedAbs = Math.abs(forwardSpeed);
+
+        // Standstill or low-speed launch burnout wheelspin
+        var isBurnoutLaunch = (speedAbs < 8.0 && throttleEff > 0.75);
+        if (isBurnoutLaunch) {
+            var burnoutRatio = (1.0 - speedAbs / 8.0) * throttleEff * config.tires.wheelspinAmount;
+            wheelSpinVelocity[2] += burnoutRatio * 140.0 * dt;
+            wheelSpinVelocity[3] += burnoutRatio * 140.0 * dt;
+            // Slight initial slip reduction during heavy burnout
+            accelRate *= Math.max(0.65, 1.0 - burnoutRatio * 0.35);
+        }
 
         if (throttleEff > 0.0) {
             if (forwardSpeed < maxSpeed) {
@@ -374,15 +428,15 @@ class CarPhysics {
         } else if (input.brake > 0.0) {
             if (forwardSpeed > 0.5) {
                 // Progressive service braking
-                forwardSpeed = Math.max(0.0, forwardSpeed - config.brakeDecel * input.brake * dt);
+                forwardSpeed = Math.max(0.0, forwardSpeed - config.brakeDecel * mu * input.brake * dt);
             } else {
                 // Reverse propulsion once stopped
-                forwardSpeed = Math.max(-config.reverseTopSpeed, forwardSpeed - (config.baseAcceleration * 0.5) * input.brake * dt);
+                forwardSpeed = Math.max(-config.reverseTopSpeed, forwardSpeed - (config.baseAcceleration * 0.5) * mu * input.brake * dt);
             }
         } else {
             // Coasting deceleration: rolling resistance + quadratic aerodynamic drag
             var sign = forwardSpeed > 0 ? 1.0 : -1.0;
-            var decel = (config.tires.rollingResistance + (forwardSpeed * forwardSpeed * config.aero.dragCoeff)) * dt;
+            var decel = (config.tires.rollingResistance * mu + (forwardSpeed * forwardSpeed * config.aero.dragCoeff)) * dt;
             if (Math.abs(forwardSpeed) <= decel) {
                 forwardSpeed = 0.0;
             } else {
@@ -392,8 +446,9 @@ class CarPhysics {
     }
 
     /**
-     * Simulates tire slip angle adhesion curves, lateral cornering grip,
-     * arcade drift state transitions, counter-steer torque injection, and forward momentum biasing.
+     * Simulates tire slip angle adhesion curves, lateral cornering grip, front/rear slip bias,
+     * handbrake traction breakaway, drift state transitions, counter-steer torque injection,
+     * cornering wheelspin, and forward momentum biasing.
      */
     function updateLateralAndDrift(dt:Float, input:InputController, fwdX:Float, fwdY:Float, rightX:Float, rightY:Float) {
         var driftCfg = config.drift;
@@ -410,39 +465,89 @@ class CarPhysics {
         var gripFactor = (2.0 * normalizedAlpha) / (1.0 + (normalizedAlpha * normalizedAlpha));
         gripFactor = Math.max(-1.0, Math.min(1.0, gripFactor));
 
-        // 2. Drift State Machine Evaluation
-        var driftTrigger = (input.handbrake || (input.brake > 0.2 && input.throttle > 0.1)) && Math.abs(input.steer) > 0.22;
+        // 2. Front vs Rear Tire Slip Bias:
+        // tireSlipBias [-1.0 .. 1.0]:
+        // Negative = rear bias / oversteer (rear slips more, tail kicks out easily)
+        // Positive = front bias / understeer (front slips more, car pushes wide)
+        // 0.0 = neutral / balanced slip
+        var bias = tireCfg.tireSlipBias;
+        var frontGripMult = (1.0 - bias * 0.40) * tireCfg.groundFriction;
+        var rearGripMult = (1.0 + bias * 0.40) * tireCfg.groundFriction;
 
-        if (!isDrifting && driftTrigger && forwardSpeed > driftCfg.minDriftSpeed) {
-            isDrifting = true;
-            driftDirection = input.steer < 0 ? -1.0 : 1.0;
+        // 3. Proper Handbrake Function:
+        // Immediately breaks rear tire traction, locks rear wheels, and allows tail to swing out
+        if (input.handbrake) {
+            // Cut rear lateral grip dramatically (scaled with rear bias)
+            rearGripMult *= (0.20 + (bias + 1.0) * 0.08);
+
+            // Handbrake drag on longitudinal forward motion
+            if (speedAbs > 0.5) {
+                var hbDecel = 14.0 * tireCfg.groundFriction * dt;
+                if (forwardSpeed > 0) forwardSpeed = Math.max(0.0, forwardSpeed - hbDecel);
+                else forwardSpeed = Math.min(0.0, forwardSpeed + hbDecel);
+            }
+
+            // Induce yaw rotation into the turn if steering or sliding
+            if (speedAbs > 2.0) {
+                var yawSteer = input.steer != 0.0 ? input.steer : (lateralVelocity < 0 ? -0.8 : 0.8);
+                yaw += yawSteer * 3.2 * dt;
+                lateralVelocity += yawSteer * 20.0 * dt;
+            }
         }
 
-        // Exit drift if vehicle drops below exit speed or excessive counter-steer is sustained
+        // 4. Punching Throttle at Harsh Corners (Power Oversteer & Wheelspin):
+        var isPowerTurn = (Math.abs(input.steer) > 0.25 && input.throttle > 0.75 && speedAbs > 4.0);
+        if (isPowerTurn) {
+            var spinKick = input.throttle * tireCfg.wheelspinAmount;
+            wheelSpinVelocity[2] += spinKick * 60.0 * dt;
+            wheelSpinVelocity[3] += spinKick * 60.0 * dt;
+            // Power oversteer loosens rear grip and rotates car into apex
+            rearGripMult *= Math.max(0.25, 1.0 - (tireCfg.wheelspinAmount * 0.35));
+            yaw += input.steer * 1.8 * tireCfg.wheelspinAmount * dt;
+        }
+
+        // 5. Vehicle Chassis Slip Angle & Drift Trigger Evaluation:
+        // carSlipAngle: angle between chassis forward heading and velocity vector
+        var carSlipAngle = Math.atan2(Math.abs(lateralVelocity), Math.max(1.0, speedAbs));
+        var triggerAngle = driftCfg.driftTriggerAngle;
+
+        // Drift Initiation:
+        // Triggers if handbrake is pulled OR if vehicle slip angle reaches or exceeds driftTriggerAngle
+        var driftInitiatedByHandbrake = input.handbrake && Math.abs(input.steer) > 0.15;
+        var driftInitiatedByAngle = (carSlipAngle >= triggerAngle && Math.abs(input.steer) > 0.18);
+        var driftInitiatedByBrakeFlick = (input.brake > 0.2 && input.throttle > 0.1 && Math.abs(input.steer) > 0.22);
+
+        if (!isDrifting && (driftInitiatedByHandbrake || driftInitiatedByAngle || driftInitiatedByBrakeFlick) && speedAbs > driftCfg.minDriftSpeed) {
+            isDrifting = true;
+            driftDirection = (lateralVelocity != 0.0) ? (lateralVelocity < 0.0 ? -1.0 : 1.0) : (input.steer < 0.0 ? -1.0 : 1.0);
+        }
+
+        // Exit drift if vehicle drops below exit speed or aligns back within threshold
         if (isDrifting) {
-            var counterSteeringOut = (driftDirection > 0 && input.steer < -0.65) || (driftDirection < 0 && input.steer > 0.65);
-            if (forwardSpeed < driftCfg.driftExitSpeed || counterSteeringOut) {
+            var counterSteeringOut = (driftDirection > 0 && input.steer < -0.70) || (driftDirection < 0 && input.steer > 0.70);
+            var isStraightenedOut = (carSlipAngle < (triggerAngle * 0.35) && !input.handbrake && Math.abs(input.steer) < 0.10);
+            if (speedAbs < driftCfg.driftExitSpeed || counterSteeringOut || isStraightenedOut) {
                 isDrifting = false;
             }
         }
 
-        // 3. Lateral Cornering & Drift Yaw Simulation
+        // 6. Lateral Cornering & Drift Yaw Simulation
         if (isDrifting) {
             // Target slip angle orientation biased towards slide direction
             var targetAngle = driftDirection * 0.65;
             driftAngle += (targetAngle - driftAngle) * 5.5 * dt;
 
-            // Lateral tire stiffness is scaled down during drift (e.g. 35% of baseline)
-            var lateralStiffness = tireCfg.baseLateralStiffness * driftCfg.lateralStiffnessScale;
+            // Lateral tire stiffness is scaled down during drift (scaled with rear grip)
+            var lateralStiffness = tireCfg.baseLateralStiffness * driftCfg.lateralStiffnessScale * rearGripMult;
 
             // Inject artificial counter-steer-assisted yaw torque:
             // Counter-steering stabilizes slide angle, steering with slide tightens yaw
-            var counterSteerFactor = (input.steer * driftDirection < 0) ? driftCfg.counterSteerTorque : 1.4;
+            var counterSteerFactor = (input.steer * driftDirection < 0) ? driftCfg.counterSteerTorque : 1.5;
             var yawImpulse = (driftDirection * driftCfg.driftYawRate + input.steer * counterSteerFactor) * dt;
             yaw += yawImpulse;
 
             // Lateral slide injection damped by stickiness
-            lateralVelocity += driftDirection * 15.0 * dt;
+            lateralVelocity += driftDirection * (16.0 * (1.0 - bias * 0.25)) * dt;
             lateralVelocity *= Math.pow(0.88, dt * 60.0);
 
             // Forward Velocity Biasing:
@@ -454,11 +559,12 @@ class CarPhysics {
             driftAngle += (0.0 - driftAngle) * 10.0 * dt;
 
             // Normal cornering: standard lateral grip restoring velocity towards zero
-            lateralVelocity *= Math.pow(0.50, dt * 60.0);
+            var gripDecay = Math.pow(Math.max(0.1, 0.50 / frontGripMult), dt * 60.0);
+            lateralVelocity *= gripDecay;
 
-            // Standard Ackermann steering rack cornering authority scaled with speed
+            // Standard Ackermann steering rack cornering authority scaled with speed & front grip
             if (speedAbs > 0.2) {
-                var steerAuthority = 2.2 * Math.min(1.0, speedRatio + 0.35);
+                var steerAuthority = 2.2 * Math.min(1.0, speedRatio + 0.35) * frontGripMult;
                 var fwdSign = forwardSpeed >= 0 ? 1.0 : -1.0;
                 yaw += (input.steer * steerAuthority * fwdSign) * dt;
             }
@@ -467,13 +573,19 @@ class CarPhysics {
 
     /**
      * Calculates dynamic chassis body roll and pitch based on weight transfer and anti-roll bars.
+     * Clamps roll on flat road to prevent full overturn without a track bump or ramp causing it.
      */
     function updateChassisAttitude(dt:Float, input:InputController) {
         var speedRatio = Math.min(1.0, Math.abs(forwardSpeed) / config.baseTopSpeed);
 
-        // Body Roll: Centrifugal lateral weight transfer dampened by anti-roll bar stiffness
-        var targetRoll = -input.steer * speedRatio * 0.12;
-        if (isDrifting) targetRoll *= 1.8;
+        // Body Roll: Centrifugal lateral weight transfer scaled by bodyRollScale
+        var targetRoll = -input.steer * speedRatio * 0.14 * config.suspension.bodyRollScale;
+        if (isDrifting) targetRoll *= 1.7;
+
+        // Clamp roll ceiling on flat surface so car leans deeply without flipping over
+        var maxRoll = 0.25 * Math.min(1.5, Math.max(0.5, config.suspension.bodyRollScale));
+        targetRoll = Math.max(-maxRoll, Math.min(maxRoll, targetRoll));
+
         roll += (targetRoll - roll) * 8.0 * dt;
 
         // Pitch: Longitudinal acceleration squat and braking dive

@@ -238,6 +238,7 @@ hxd_App.prototype = {
 };
 var Main = function() {
 	this.showcaseAngle = 0.0;
+	this.rearWheelSpinAngle = 0.0;
 	this.wheelSpinAngle = 0.0;
 	this.disclaimerMinDuration = 5.5;
 	this.isLoadingComplete = false;
@@ -291,7 +292,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 			onLoaded(tile);
 		};
 		img.onerror = function(err) {
-			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 182, className : "Main", methodName : "loadWebpTile"});
+			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 183, className : "Main", methodName : "loadWebpTile"});
 		};
 		img.src = path;
 	}
@@ -320,7 +321,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.discBody.set_lineSpacing(5.0);
 		this.discBody.set_text("M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" + "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" + "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" + "are the intellectual property of their respective creators. All rights reserved.\n\n" + "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" + "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" + "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" + "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" + "Please play in a well-lit environment and take a 15-minute break for every hour of play.");
 		this.discVersion = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
-		this.discVersion.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
+		this.discVersion.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
 		this.discVersion.set_textColor(5927822);
 		this.discVersion.set_textAlign(h2d_Align.Center);
 		this.logoRow = new h2d_Object(this.screenDisclaimer);
@@ -830,6 +831,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 			}
 			this.playerMesh.setRotation(this.carPhysics.pitch,this.carPhysics.roll,this.carPhysics.yaw + this.carPhysics.driftAngle);
 			this.wheelSpinAngle += this.carPhysics.forwardSpeed * dt / 0.36;
+			this.rearWheelSpinAngle += (this.carPhysics.forwardSpeed / 0.36 + this.carPhysics.wheelSpinVelocity[2]) * dt;
 			var currentSteer = this.input.steer * 0.55;
 			if(this.playerMesh.wheels.length >= 4) {
 				this.playerMesh.wheels[0].setRotation(0,0,currentSteer);
@@ -840,10 +842,10 @@ Main.prototype = $extend(hxd_App.prototype,{
 				this.playerMesh.wheels[1].rotate(this.wheelSpinAngle,0,0);
 				this.playerMesh.wheels[2].setRotation(0,0,0);
 				this.playerMesh.wheels[2].rotate(0,1.5707963,0);
-				this.playerMesh.wheels[2].rotate(this.wheelSpinAngle,0,0);
+				this.playerMesh.wheels[2].rotate(this.rearWheelSpinAngle,0,0);
 				this.playerMesh.wheels[3].setRotation(0,0,0);
 				this.playerMesh.wheels[3].rotate(0,1.5707963,0);
-				this.playerMesh.wheels[3].rotate(this.wheelSpinAngle,0,0);
+				this.playerMesh.wheels[3].rotate(this.rearWheelSpinAngle,0,0);
 			}
 			this.chaseCam.update(dt,this.carPhysics,this.input.boost);
 			this.speedText.set_text(kmh + " KM/H [" + (this.carPhysics.currentGear == -1 ? "R" : this.carPhysics.currentGear == 0 ? "N" : "G" + this.carPhysics.currentGear) + "] (" + Math.round(this.carPhysics.engineRPM) + " RPM)" + (this.carPhysics.isDrifting ? " [DRIFTING]" : "") + (this.input.boost ? " [NITRO]" : ""));
@@ -51471,7 +51473,7 @@ var physics_CarConfig = function() { };
 $hxClasses["physics.CarConfig"] = physics_CarConfig;
 physics_CarConfig.__name__ = "physics.CarConfig";
 physics_CarConfig.getDefault = function() {
-	return { name : "Apex GT-R Prototype", mass : 1350.0, yawInertia : 1750.0, pitchInertia : 1350.0, rollInertia : 620.0, baseTopSpeed : 68.0, boostTopSpeed : 88.0, baseAcceleration : 28.0, boostAcceleration : 48.0, brakeDecel : 38.0, reverseTopSpeed : 18.0, suspension : { restLength : 0.45, springRate : 32000.0, damping : 2600.0, antiRollStiffness : 9500.0, minTravel : 0.08, maxTravel : 0.52}, tires : { peakSlipAngle : 0.16, baseLateralStiffness : 34.0, longitudinalGrip : 1.15, rollingResistance : 2.0}, drift : { lateralStiffnessScale : 0.35, counterSteerTorque : 3.4, forwardBiasRate : 3.8, minDriftSpeed : 12.0, driftYawRate : 2.8, driftExitSpeed : 8.0}, drivetrain : { gearRatios : [3.40,2.20,1.55,1.18,0.92,0.76], reverseRatio : -3.10, finalDrive : 3.73, idleRPM : 1000.0, redlineRPM : 8000.0, shiftUpRPM : 7200.0, shiftDownRPM : 3400.0, shiftDelay : 0.20, lsdLockRatio : 0.72, maxEngineTorque : 540.0}, aero : { dragCoeff : 0.0032, downforceCoeff : 0.0045}};
+	return { name : "Apex GT-R Prototype", mass : 1350.0, yawInertia : 1750.0, pitchInertia : 1350.0, rollInertia : 620.0, baseTopSpeed : 68.0, boostTopSpeed : 88.0, baseAcceleration : 28.0, boostAcceleration : 48.0, brakeDecel : 38.0, reverseTopSpeed : 18.0, suspension : { restLength : 0.45, springRate : 32000.0, damping : 2600.0, antiRollStiffness : 9500.0, minTravel : 0.08, maxTravel : 0.52, bodyRollScale : 1.0}, tires : { peakSlipAngle : 0.16, baseLateralStiffness : 34.0, longitudinalGrip : 1.15, rollingResistance : 2.0, tireSlipBias : -0.45, groundFriction : 1.0, wheelspinAmount : 1.2}, drift : { lateralStiffnessScale : 0.35, counterSteerTorque : 3.4, forwardBiasRate : 3.8, minDriftSpeed : 12.0, driftYawRate : 2.8, driftExitSpeed : 8.0, driftTriggerAngle : 0.22}, drivetrain : { gearRatios : [3.40,2.20,1.55,1.18,0.92,0.76], reverseRatio : -3.10, finalDrive : 3.73, idleRPM : 1000.0, redlineRPM : 8000.0, shiftUpRPM : 7200.0, shiftDownRPM : 3400.0, shiftDelay : 0.20, lsdLockRatio : 0.72, maxEngineTorque : 540.0}, aero : { dragCoeff : 0.0032, downforceCoeff : 0.0045}};
 };
 var physics_CarPhysics = function(startX,startY,startZ,initialConfig) {
 	if(startZ == null) {
@@ -51634,7 +51636,7 @@ physics_CarPhysics.prototype = {
 			_this1.x = x1;
 			_this1.y = y1;
 			_this1.z = z1;
-			var currentLen = attachZ - groundZ;
+			var currentLen = attachZ - groundZ + offset.x * Math.sin(this.roll) * this.config.suspension.bodyRollScale;
 			this.prevSuspLength[i] = this.suspLength[i];
 			if(currentLen <= restLen) {
 				this.wheelOnGround[i] = true;
@@ -51706,20 +51708,29 @@ physics_CarPhysics.prototype = {
 		this.wheelSpinVelocity[3] += (rearAvgSpin - this.wheelSpinVelocity[3]) * lsdLock * Math.min(1.0,15.0 * dt);
 	}
 	,updateLongitudinal: function(dt,input) {
+		var mu = this.config.tires.groundFriction;
+		var accelRate = (input.boost ? this.config.boostAcceleration : this.config.baseAcceleration) * mu;
 		var throttleEff = this.isShifting ? input.throttle * 0.25 : input.throttle;
+		var speedAbs = Math.abs(this.forwardSpeed);
+		if(speedAbs < 8.0 && throttleEff > 0.75) {
+			var burnoutRatio = (1.0 - speedAbs / 8.0) * throttleEff * this.config.tires.wheelspinAmount;
+			this.wheelSpinVelocity[2] += burnoutRatio * 140.0 * dt;
+			this.wheelSpinVelocity[3] += burnoutRatio * 140.0 * dt;
+			accelRate *= Math.max(0.65,1.0 - burnoutRatio * 0.35);
+		}
 		if(throttleEff > 0.0) {
 			if(this.forwardSpeed < (input.boost ? this.config.boostTopSpeed : this.config.baseTopSpeed)) {
-				this.forwardSpeed += (input.boost ? this.config.boostAcceleration : this.config.baseAcceleration) * throttleEff * dt;
+				this.forwardSpeed += accelRate * throttleEff * dt;
 			}
 		} else if(input.brake > 0.0) {
 			if(this.forwardSpeed > 0.5) {
-				this.forwardSpeed = Math.max(0.0,this.forwardSpeed - this.config.brakeDecel * input.brake * dt);
+				this.forwardSpeed = Math.max(0.0,this.forwardSpeed - this.config.brakeDecel * mu * input.brake * dt);
 			} else {
-				this.forwardSpeed = Math.max(-this.config.reverseTopSpeed,this.forwardSpeed - this.config.baseAcceleration * 0.5 * input.brake * dt);
+				this.forwardSpeed = Math.max(-this.config.reverseTopSpeed,this.forwardSpeed - this.config.baseAcceleration * 0.5 * mu * input.brake * dt);
 			}
 		} else {
 			var sign = this.forwardSpeed > 0 ? 1.0 : -1.0;
-			var decel = (this.config.tires.rollingResistance + this.forwardSpeed * this.forwardSpeed * this.config.aero.dragCoeff) * dt;
+			var decel = (this.config.tires.rollingResistance * mu + this.forwardSpeed * this.forwardSpeed * this.config.aero.dragCoeff) * dt;
 			if(Math.abs(this.forwardSpeed) <= decel) {
 				this.forwardSpeed = 0.0;
 			} else {
@@ -51729,35 +51740,63 @@ physics_CarPhysics.prototype = {
 	}
 	,updateLateralAndDrift: function(dt,input,fwdX,fwdY,rightX,rightY) {
 		var driftCfg = this.config.drift;
+		var tireCfg = this.config.tires;
 		var speedAbs = Math.abs(this.forwardSpeed);
 		var speedRatio = Math.min(1.0,speedAbs / this.config.baseTopSpeed);
-		if(!this.isDrifting && ((input.handbrake || input.brake > 0.2 && input.throttle > 0.1) && Math.abs(input.steer) > 0.22) && this.forwardSpeed > driftCfg.minDriftSpeed) {
+		var bias = tireCfg.tireSlipBias;
+		var frontGripMult = (1.0 - bias * 0.40) * tireCfg.groundFriction;
+		if(input.handbrake) {
+			if(speedAbs > 0.5) {
+				var hbDecel = 14.0 * tireCfg.groundFriction * dt;
+				if(this.forwardSpeed > 0) {
+					this.forwardSpeed = Math.max(0.0,this.forwardSpeed - hbDecel);
+				} else {
+					this.forwardSpeed = Math.min(0.0,this.forwardSpeed + hbDecel);
+				}
+			}
+			if(speedAbs > 2.0) {
+				var yawSteer = input.steer != 0.0 ? input.steer : this.lateralVelocity < 0 ? -0.8 : 0.8;
+				this.yaw += yawSteer * 3.2 * dt;
+				this.lateralVelocity += yawSteer * 20.0 * dt;
+			}
+		}
+		if(Math.abs(input.steer) > 0.25 && input.throttle > 0.75 && speedAbs > 4.0) {
+			var spinKick = input.throttle * tireCfg.wheelspinAmount;
+			this.wheelSpinVelocity[2] += spinKick * 60.0 * dt;
+			this.wheelSpinVelocity[3] += spinKick * 60.0 * dt;
+			this.yaw += input.steer * 1.8 * tireCfg.wheelspinAmount * dt;
+		}
+		var carSlipAngle = Math.atan2(Math.abs(this.lateralVelocity),Math.max(1.0,speedAbs));
+		var triggerAngle = driftCfg.driftTriggerAngle;
+		if(!this.isDrifting && (input.handbrake && Math.abs(input.steer) > 0.15 || carSlipAngle >= triggerAngle && Math.abs(input.steer) > 0.18 || input.brake > 0.2 && input.throttle > 0.1 && Math.abs(input.steer) > 0.22) && speedAbs > driftCfg.minDriftSpeed) {
 			this.isDrifting = true;
-			this.driftDirection = input.steer < 0 ? -1.0 : 1.0;
+			this.driftDirection = this.lateralVelocity != 0.0 ? this.lateralVelocity < 0.0 ? -1.0 : 1.0 : input.steer < 0.0 ? -1.0 : 1.0;
 		}
 		if(this.isDrifting) {
-			if(this.forwardSpeed < driftCfg.driftExitSpeed || (this.driftDirection > 0 && input.steer < -0.65 || this.driftDirection < 0 && input.steer > 0.65)) {
+			if(speedAbs < driftCfg.driftExitSpeed || (this.driftDirection > 0 && input.steer < -0.70 || this.driftDirection < 0 && input.steer > 0.70) || carSlipAngle < triggerAngle * 0.35 && !input.handbrake && Math.abs(input.steer) < 0.10) {
 				this.isDrifting = false;
 			}
 		}
 		if(this.isDrifting) {
 			this.driftAngle += (this.driftDirection * 0.65 - this.driftAngle) * 5.5 * dt;
-			this.yaw += (this.driftDirection * driftCfg.driftYawRate + input.steer * (input.steer * this.driftDirection < 0 ? driftCfg.counterSteerTorque : 1.4)) * dt;
-			this.lateralVelocity = (this.lateralVelocity += this.driftDirection * 15.0 * dt) * Math.pow(0.88,dt * 60.0);
+			this.yaw += (this.driftDirection * driftCfg.driftYawRate + input.steer * (input.steer * this.driftDirection < 0 ? driftCfg.counterSteerTorque : 1.5)) * dt;
+			this.lateralVelocity = (this.lateralVelocity += this.driftDirection * (16.0 * (1.0 - bias * 0.25)) * dt) * Math.pow(0.88,dt * 60.0);
 			this.lateralVelocity *= 1.0 - Math.min(1.0,driftCfg.forwardBiasRate * dt) * 0.45;
 		} else {
 			this.driftAngle += (0.0 - this.driftAngle) * 10.0 * dt;
-			this.lateralVelocity *= Math.pow(0.50,dt * 60.0);
+			this.lateralVelocity *= Math.pow(Math.max(0.1,0.50 / frontGripMult),dt * 60.0);
 			if(speedAbs > 0.2) {
-				this.yaw += input.steer * (2.2 * Math.min(1.0,speedRatio + 0.35)) * (this.forwardSpeed >= 0 ? 1.0 : -1.0) * dt;
+				this.yaw += input.steer * (2.2 * Math.min(1.0,speedRatio + 0.35) * frontGripMult) * (this.forwardSpeed >= 0 ? 1.0 : -1.0) * dt;
 			}
 		}
 	}
 	,updateChassisAttitude: function(dt,input) {
-		var targetRoll = -input.steer * Math.min(1.0,Math.abs(this.forwardSpeed) / this.config.baseTopSpeed) * 0.12;
+		var targetRoll = -input.steer * Math.min(1.0,Math.abs(this.forwardSpeed) / this.config.baseTopSpeed) * 0.14 * this.config.suspension.bodyRollScale;
 		if(this.isDrifting) {
-			targetRoll *= 1.8;
+			targetRoll *= 1.7;
 		}
+		var maxRoll = 0.25 * Math.min(1.5,Math.max(0.5,this.config.suspension.bodyRollScale));
+		targetRoll = Math.max(-maxRoll,Math.min(maxRoll,targetRoll));
 		this.roll += (targetRoll - this.roll) * 8.0 * dt;
 		this.pitch += ((input.throttle - input.brake) * 0.06 - this.pitch) * 8.0 * dt;
 	}
@@ -51858,19 +51897,19 @@ save_SaveSystem.load = function() {
 			}
 			if(data.version == null || data.version < 3 || isLegacy) {
 				data.version = 3;
-				data.buildNumber = 3;
+				data.buildNumber = 4;
 				save_SaveSystem.save(data);
 			}
 			return data;
 		}
 	} catch( _g ) {
 	}
-	return { version : 3, buildNumber : 3, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, graphics : save_SaveSystem.getDefaultGraphics()};
+	return { version : 3, buildNumber : 4, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, graphics : save_SaveSystem.getDefaultGraphics()};
 };
 save_SaveSystem.save = function(data) {
 	try {
 		data.version = 3;
-		data.buildNumber = 3;
+		data.buildNumber = 4;
 		var raw = JSON.stringify(data);
 		var storage = js_Browser.getLocalStorage();
 		storage.setItem("mob_motors_on_boost_save_v3",raw);
@@ -52881,55 +52920,117 @@ ui_components_MenuItemRow.prototype = $extend(h2d_Object.prototype,{
 	,__class__: ui_components_MenuItemRow
 });
 var ui_components_TouchControlsHUD = function(input,parent) {
+	this.nativeTouchesActive = new haxe_ds_IntMap();
 	this.scratchEvent = new hxd_Event(hxd_EventKind.ECheck,0,0);
 	this.scratchPoint = new h2d_col_PointImpl(0.,0.);
-	this.activeTouches = new haxe_ds_IntMap();
+	this.stickPointerId = null;
+	this.activeRoles = new haxe_ds_IntMap();
+	this.pauseH = 44.0;
+	this.pauseW = 48.0;
+	this.pauseY = 24.0;
+	this.pauseX = 1390.0;
+	this.driftRadius = 38.0;
+	this.driftY = 490.0;
+	this.driftX = 1260.0;
+	this.brakeRadius = 36.0;
+	this.brakeY = 610.0;
+	this.brakeX = 1200.0;
+	this.gasRadius = 44.0;
+	this.gasY = 610.0;
+	this.gasX = 1320.0;
+	this.nitroRadius = 36.0;
+	this.nitroY = 465.0;
+	this.nitroX = 130.0;
+	this.stickKnobY = 590.0;
+	this.stickKnobX = 130.0;
+	this.stickMaxTravel = 50.0;
+	this.stickKnobRadius = 30.0;
+	this.stickBaseRadius = 65.0;
+	this.stickBaseY = 590.0;
+	this.stickBaseX = 130.0;
 	this.isPausePressed = false;
 	this.isHandbrakePressed = false;
 	this.isBoostPressed = false;
 	this.isBrakePressed = false;
 	this.isGasPressed = false;
-	this.isRightPressed = false;
-	this.isLeftPressed = false;
 	var _gthis = this;
 	h2d_Object.call(this,parent);
 	this.inputRef = input;
 	this.canvas = new h2d_Graphics(this);
-	this.steerLeftInter = new h2d_Interactive(84.0,84.0,this);
-	this.steerLeftText = new h2d_Text(ui_FontManager.titleFont,this);
-	this.steerLeftText.set_text("<");
-	this.steerLeftText.set_textColor(58879);
-	this.steerRightInter = new h2d_Interactive(84.0,84.0,this);
-	this.steerRightText = new h2d_Text(ui_FontManager.titleFont,this);
-	this.steerRightText.set_text(">");
-	this.steerRightText.set_textColor(58879);
-	this.gasInter = new h2d_Interactive(72.0,72.0,this);
+	this.nitroText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.nitroText.set_text("NITRO");
+	this.nitroText.set_textColor(58879);
 	this.gasText = new h2d_Text(ui_FontManager.regularFont,this);
 	this.gasText.set_text("GAS");
 	this.gasText.set_textColor(10011513);
-	this.brakeInter = new h2d_Interactive(72.0,72.0,this);
 	this.brakeText = new h2d_Text(ui_FontManager.regularFont,this);
 	this.brakeText.set_text("BRAKE");
 	this.brakeText.set_textColor(14707829);
-	this.boostInter = new h2d_Interactive(72.0,72.0,this);
-	this.boostText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.boostText.set_text("NITRO");
-	this.boostText.set_textColor(58879);
-	this.handbrakeInter = new h2d_Interactive(72.0,72.0,this);
-	this.handbrakeText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.handbrakeText.set_text("DRIFT");
-	this.handbrakeText.set_textColor(16772608);
-	this.pauseInter = new h2d_Interactive(52.0,52.0,this);
+	this.driftText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.driftText.set_text("DRIFT");
+	this.driftText.set_textColor(16772608);
 	this.pauseText = new h2d_Text(ui_FontManager.titleFont,this);
 	this.pauseText.set_text("||");
 	this.pauseText.set_textColor(12767712);
 	this.windowEventTarget = $bind(this,this.onWindowEvent);
 	hxd_Window.getInstance().addEventTarget(this.windowEventTarget);
 	try {
-		this.touchCancelHandler = function(_) {
-			_gthis.resetTouchStates();
-		};
-		window.addEventListener("touchcancel",this.touchCancelHandler,{ passive : true});
+		this.nativeCanvas = window.document.getElementById("webgl");
+		if(this.nativeCanvas != null) {
+			this.nativeTouchStartHandler = function(e) {
+				if(!_gthis.visible || !_gthis.inputRef.isTouchActive) {
+					_gthis.inputRef.isTouchActive = true;
+					_gthis.set_visible(true);
+				}
+				e.preventDefault();
+				var _g = 0;
+				var _g1 = e.changedTouches;
+				while(_g < _g1.length) {
+					var t = _g1[_g];
+					++_g;
+					_gthis.nativeTouchesActive.h[t.identifier] = true;
+					var p = _gthis.clientToHUD(t.clientX,t.clientY);
+					_gthis.handlePointerDown(t.identifier,p.x,p.y);
+				}
+			};
+			this.nativeTouchMoveHandler = function(e) {
+				e.preventDefault();
+				var _g = 0;
+				var _g1 = e.changedTouches;
+				while(_g < _g1.length) {
+					var t = _g1[_g];
+					++_g;
+					var p = _gthis.clientToHUD(t.clientX,t.clientY);
+					_gthis.handlePointerMove(t.identifier,p.x,p.y);
+				}
+			};
+			this.nativeTouchEndHandler = function(e) {
+				e.preventDefault();
+				var _g = 0;
+				var _g1 = e.changedTouches;
+				while(_g < _g1.length) {
+					var t = _g1[_g];
+					++_g;
+					_gthis.nativeTouchesActive.remove(t.identifier);
+					_gthis.handlePointerUp(t.identifier);
+				}
+			};
+			this.nativeTouchCancelHandler = function(e) {
+				e.preventDefault();
+				var _g = 0;
+				var _g1 = e.changedTouches;
+				while(_g < _g1.length) {
+					var t = _g1[_g];
+					++_g;
+					_gthis.nativeTouchesActive.remove(t.identifier);
+					_gthis.handlePointerCancel(t.identifier);
+				}
+			};
+			this.nativeCanvas.addEventListener("touchstart",this.nativeTouchStartHandler,{ passive : false});
+			this.nativeCanvas.addEventListener("touchmove",this.nativeTouchMoveHandler,{ passive : false});
+			this.nativeCanvas.addEventListener("touchend",this.nativeTouchEndHandler,{ passive : false});
+			this.nativeCanvas.addEventListener("touchcancel",this.nativeTouchCancelHandler,{ passive : false});
+		}
 	} catch( _g ) {
 	}
 };
@@ -52937,7 +53038,24 @@ $hxClasses["ui.components.TouchControlsHUD"] = ui_components_TouchControlsHUD;
 ui_components_TouchControlsHUD.__name__ = "ui.components.TouchControlsHUD";
 ui_components_TouchControlsHUD.__super__ = h2d_Object;
 ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
-	getLocalCoords: function(screenX,screenY,out) {
+	clientToHUD: function(clientX,clientY) {
+		if(this.nativeCanvas != null) {
+			var rect = this.nativeCanvas.getBoundingClientRect();
+			var s2d = this.getScene();
+			if(s2d != null && rect.width > 0 && rect.height > 0) {
+				var normX = (clientX - rect.left) / rect.width;
+				var normY = (clientY - rect.top) / rect.height;
+				this.scratchPoint.x = normX * s2d.width;
+				this.scratchPoint.y = normY * s2d.height;
+				this.globalToLocal(this.scratchPoint);
+				return this.scratchPoint;
+			}
+		}
+		this.scratchPoint.x = clientX;
+		this.scratchPoint.y = clientY;
+		return this.scratchPoint;
+	}
+	,getLocalCoords: function(screenX,screenY,out) {
 		var s2d = this.getScene();
 		if(s2d == null) {
 			out.x = screenX;
@@ -52957,61 +53075,157 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		}
 		this.globalToLocal(out);
 	}
-	,hitTestAll: function(px,py) {
-		if(px >= this.pauseInter.x - 18.0 && px <= this.pauseInter.x + this.pauseInter.width + 18.0 && py >= this.pauseInter.y - 18.0 && py <= this.pauseInter.y + this.pauseInter.height + 18.0) {
-			return "pause";
+	,updateStickDeflection: function(px,py) {
+		var dx = px - this.stickBaseX;
+		var dy = py - this.stickBaseY;
+		var d = Math.sqrt(dx * dx + dy * dy);
+		if(d > this.stickMaxTravel) {
+			var scale = this.stickMaxTravel / d;
+			dx *= scale;
+			dy *= scale;
 		}
-		if(py >= this.steerLeftInter.y - 24.0 && py <= this.steerLeftInter.y + this.steerLeftInter.height + 24.0) {
-			var steerMidX = (this.steerLeftInter.x + this.steerLeftInter.width + this.steerRightInter.x) * 0.5;
-			if(px >= this.steerLeftInter.x - 24.0 && px < steerMidX) {
-				return "left";
-			} else if(px >= steerMidX && px <= this.steerRightInter.x + this.steerRightInter.width + 24.0) {
-				return "right";
+		this.stickKnobX = this.stickBaseX + dx;
+		this.stickKnobY = this.stickBaseY + dy;
+		this.inputRef.touchSteer = Math.max(-1.0,Math.min(1.0,dx / this.stickMaxTravel));
+	}
+	,handlePointerDown: function(tid,px,py) {
+		var s2d = this.getScene();
+		var sw = s2d != null ? s2d.width : 1280.0;
+		if(px >= this.pauseX - 14.0 && px <= this.pauseX + this.pauseW + 14.0 && py >= this.pauseY - 14.0 && py <= this.pauseY + this.pauseH + 14.0) {
+			this.activeRoles.h[tid] = "pause";
+			this.recomputeStates();
+			return;
+		}
+		var dx = px - this.nitroX;
+		var dy = py - this.nitroY;
+		if(dx * dx + dy * dy <= (this.nitroRadius + 22.0) * (this.nitroRadius + 22.0)) {
+			this.activeRoles.h[tid] = "nitro";
+			this.recomputeStates();
+			return;
+		}
+		var dx = px - this.driftX;
+		var dy = py - this.driftY;
+		if(dx * dx + dy * dy <= (this.driftRadius + 24.0) * (this.driftRadius + 24.0)) {
+			this.activeRoles.h[tid] = "drift";
+			this.recomputeStates();
+			return;
+		}
+		var dx = px - this.gasX;
+		var dy = py - this.gasY;
+		if(dx * dx + dy * dy <= (this.gasRadius + 28.0) * (this.gasRadius + 28.0)) {
+			this.activeRoles.h[tid] = "gas";
+			this.recomputeStates();
+			return;
+		}
+		var dx = px - this.brakeX;
+		var dy = py - this.brakeY;
+		if(dx * dx + dy * dy <= (this.brakeRadius + 24.0) * (this.brakeRadius + 24.0)) {
+			this.activeRoles.h[tid] = "brake";
+			this.recomputeStates();
+			return;
+		}
+		var dx = px - this.stickBaseX;
+		var dy = py - this.stickBaseY;
+		if(dx * dx + dy * dy <= (this.stickBaseRadius + 45.0) * (this.stickBaseRadius + 45.0) || px < sw * 0.44 && py > this.nitroY - 40.0) {
+			this.stickPointerId = tid;
+			this.activeRoles.h[tid] = "stick";
+			this.updateStickDeflection(px,py);
+			this.recomputeStates();
+			return;
+		}
+	}
+	,handlePointerMove: function(tid,px,py) {
+		if(tid == this.stickPointerId) {
+			this.updateStickDeflection(px,py);
+			this.renderHUD();
+			return;
+		}
+		if(this.activeRoles.h.hasOwnProperty(tid)) {
+			var currentRole = this.activeRoles.h[tid];
+			if(currentRole == "gas") {
+				var dx = px - this.gasX;
+				var dy = py - this.gasY;
+				if(dx * dx + dy * dy > (this.gasRadius + 50.0) * (this.gasRadius + 50.0)) {
+					var dx = px - this.brakeX;
+					var dy = py - this.brakeY;
+					if(dx * dx + dy * dy <= (this.brakeRadius + 24.0) * (this.brakeRadius + 24.0)) {
+						this.activeRoles.h[tid] = "brake";
+						this.recomputeStates();
+					} else {
+						var dx = px - this.driftX;
+						var dy = py - this.driftY;
+						if(dx * dx + dy * dy <= (this.driftRadius + 24.0) * (this.driftRadius + 24.0)) {
+							this.activeRoles.h[tid] = "drift";
+							this.recomputeStates();
+						}
+					}
+				}
+			} else if(currentRole == "brake") {
+				var dx = px - this.brakeX;
+				var dy = py - this.brakeY;
+				if(dx * dx + dy * dy > (this.brakeRadius + 50.0) * (this.brakeRadius + 50.0)) {
+					var dx = px - this.gasX;
+					var dy = py - this.gasY;
+					if(dx * dx + dy * dy <= (this.gasRadius + 28.0) * (this.gasRadius + 28.0)) {
+						this.activeRoles.h[tid] = "gas";
+						this.recomputeStates();
+					} else {
+						var dx = px - this.driftX;
+						var dy = py - this.driftY;
+						if(dx * dx + dy * dy <= (this.driftRadius + 24.0) * (this.driftRadius + 24.0)) {
+							this.activeRoles.h[tid] = "drift";
+							this.recomputeStates();
+						}
+					}
+				}
+			} else if(currentRole == "drift") {
+				var dx = px - this.driftX;
+				var dy = py - this.driftY;
+				if(dx * dx + dy * dy > (this.driftRadius + 50.0) * (this.driftRadius + 50.0)) {
+					var dx = px - this.gasX;
+					var dy = py - this.gasY;
+					if(dx * dx + dy * dy <= (this.gasRadius + 28.0) * (this.gasRadius + 28.0)) {
+						this.activeRoles.h[tid] = "gas";
+						this.recomputeStates();
+					} else {
+						var dx = px - this.brakeX;
+						var dy = py - this.brakeY;
+						if(dx * dx + dy * dy <= (this.brakeRadius + 24.0) * (this.brakeRadius + 24.0)) {
+							this.activeRoles.h[tid] = "brake";
+							this.recomputeStates();
+						}
+					}
+				}
 			}
 		}
-		var bestBtn = null;
-		var bestDistSq = 2916.;
-		var dx = px - (this.gasInter.x + this.gasInter.width * 0.5);
-		var dy = py - (this.gasInter.y + this.gasInter.height * 0.5);
-		var dGas = dx * dx + dy * dy;
-		if(dGas <= 2916.) {
-			bestDistSq = dGas;
-			bestBtn = "gas";
-		}
-		var dx = px - (this.brakeInter.x + this.brakeInter.width * 0.5);
-		var dy = py - (this.brakeInter.y + this.brakeInter.height * 0.5);
-		var dBrake = dx * dx + dy * dy;
-		if(dBrake <= bestDistSq) {
-			bestDistSq = dBrake;
-			bestBtn = "brake";
-		}
-		var dx = px - (this.boostInter.x + this.boostInter.width * 0.5);
-		var dy = py - (this.boostInter.y + this.boostInter.height * 0.5);
-		var dBoost = dx * dx + dy * dy;
-		if(dBoost <= bestDistSq) {
-			bestDistSq = dBoost;
-			bestBtn = "boost";
-		}
-		var dx = px - (this.handbrakeInter.x + this.handbrakeInter.width * 0.5);
-		var dy = py - (this.handbrakeInter.y + this.handbrakeInter.height * 0.5);
-		if(dx * dx + dy * dy <= bestDistSq) {
-			bestBtn = "drift";
-		}
-		return bestBtn;
 	}
-	,recomputeActiveStates: function() {
-		var newLeft = false;
-		var newRight = false;
+	,handlePointerUp: function(tid) {
+		if(tid == this.stickPointerId) {
+			this.stickPointerId = null;
+			this.stickKnobX = this.stickBaseX;
+			this.stickKnobY = this.stickBaseY;
+			this.inputRef.touchSteer = 0.0;
+		}
+		if(this.activeRoles.h.hasOwnProperty(tid)) {
+			var role = this.activeRoles.h[tid];
+			this.activeRoles.remove(tid);
+			this.recomputeStates();
+			if(role == "pause" && this.onPauseTriggered != null) {
+				this.onPauseTriggered();
+			}
+		}
+	}
+	,handlePointerCancel: function(tid) {
+		this.handlePointerUp(tid);
+	}
+	,recomputeStates: function() {
 		var newGas = false;
 		var newBrake = false;
 		var newBoost = false;
 		var newDrift = false;
 		var newPause = false;
-		var btn = this.activeTouches.iterator();
-		while(btn.hasNext()) switch(btn.next()) {
-		case "boost":
-			newBoost = true;
-			break;
+		var role = this.activeRoles.iterator();
+		while(role.hasNext()) switch(role.next()) {
 		case "brake":
 			newBrake = true;
 			break;
@@ -53021,18 +53235,13 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		case "gas":
 			newGas = true;
 			break;
-		case "left":
-			newLeft = true;
+		case "nitro":
+			newBoost = true;
 			break;
 		case "pause":
 			newPause = true;
 			break;
-		case "right":
-			newRight = true;
-			break;
 		}
-		this.isLeftPressed = newLeft;
-		this.isRightPressed = newRight;
 		this.isGasPressed = newGas;
 		this.isBrakePressed = newBrake;
 		this.isBoostPressed = newBoost;
@@ -53042,11 +53251,7 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		this.inputRef.touchBrake = this.isBrakePressed ? 1.0 : 0.0;
 		this.inputRef.touchBoost = this.isBoostPressed;
 		this.inputRef.touchHandbrake = this.isHandbrakePressed;
-		if(this.isLeftPressed && !this.isRightPressed) {
-			this.inputRef.touchSteer = -1.0;
-		} else if(this.isRightPressed && !this.isLeftPressed) {
-			this.inputRef.touchSteer = 1.0;
-		} else {
+		if(this.stickPointerId == null) {
 			this.inputRef.touchSteer = 0.0;
 		}
 		this.renderHUD();
@@ -53058,6 +53263,9 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		var isTouchKind = e.touchId != null && e.touchId >= 0;
 		if(isTouchKind && !this.inputRef.isTouchActive) {
 			this.inputRef.isTouchActive = true;
+		}
+		if(isTouchKind && this.nativeTouchesActive.h.hasOwnProperty(e.touchId)) {
+			return;
 		}
 		if(!this.visible) {
 			if(this.inputRef.isTouchActive && this.parent.visible) {
@@ -53079,63 +53287,58 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 			if(tid == -1 && e.button != 0) {
 				return;
 			}
-			var btn = this.hitTestAll(px,py);
-			if(btn != null) {
-				this.activeTouches.h[tid] = btn;
-				this.recomputeActiveStates();
-			}
+			this.handlePointerDown(tid,px,py);
 			break;
 		case 2:
-			if(this.activeTouches.h.hasOwnProperty(tid)) {
-				var prevBtn = this.activeTouches.h[tid];
-				var newBtn = this.hitTestAll(px,py);
-				if(newBtn != prevBtn) {
-					if(newBtn != null) {
-						this.activeTouches.h[tid] = newBtn;
-					} else {
-						this.activeTouches.remove(tid);
-					}
-					this.recomputeActiveStates();
-				}
-			} else if(isTouchKind) {
-				var newBtn = this.hitTestAll(px,py);
-				if(newBtn != null) {
-					this.activeTouches.h[tid] = newBtn;
-					this.recomputeActiveStates();
-				}
-			}
+			this.handlePointerMove(tid,px,py);
 			break;
 		case 1:case 10:
-			if(this.activeTouches.h.hasOwnProperty(tid)) {
-				var btn = this.activeTouches.h[tid];
-				this.activeTouches.remove(tid);
-				this.recomputeActiveStates();
-				if(btn == "pause" && this.onPauseTriggered != null) {
-					this.onPauseTriggered();
-				}
-			}
+			this.handlePointerUp(tid);
 			break;
 		default:
 		}
 	}
 	,onRemove: function() {
 		h2d_Object.prototype.onRemove.call(this);
+		this.dispose();
+	}
+	,dispose: function() {
+		this.resetTouchStates();
 		if(this.windowEventTarget != null) {
 			hxd_Window.getInstance().removeEventTarget(this.windowEventTarget);
 			this.windowEventTarget = null;
 		}
-		if(this.touchCancelHandler != null) {
-			try {
-				window.removeEventListener("touchcancel",this.touchCancelHandler);
-				this.touchCancelHandler = null;
-			} catch( _g ) {
+		try {
+			if(this.nativeCanvas != null) {
+				if(this.nativeTouchStartHandler != null) {
+					this.nativeCanvas.removeEventListener("touchstart",this.nativeTouchStartHandler);
+				}
+				if(this.nativeTouchMoveHandler != null) {
+					this.nativeCanvas.removeEventListener("touchmove",this.nativeTouchMoveHandler);
+				}
+				if(this.nativeTouchEndHandler != null) {
+					this.nativeCanvas.removeEventListener("touchend",this.nativeTouchEndHandler);
+				}
+				if(this.nativeTouchCancelHandler != null) {
+					this.nativeCanvas.removeEventListener("touchcancel",this.nativeTouchCancelHandler);
+				}
+				this.nativeTouchStartHandler = null;
+				this.nativeTouchMoveHandler = null;
+				this.nativeTouchEndHandler = null;
+				this.nativeTouchCancelHandler = null;
+				this.nativeCanvas = null;
 			}
+		} catch( _g ) {
+		}
+		if(this.canvas != null) {
+			this.canvas.clear();
 		}
 	}
 	,resetTouchStates: function() {
-		this.activeTouches.h = { };
-		this.isLeftPressed = false;
-		this.isRightPressed = false;
+		this.activeRoles.h = { };
+		this.stickPointerId = null;
+		this.stickKnobX = this.stickBaseX;
+		this.stickKnobY = this.stickBaseY;
 		this.isGasPressed = false;
 		this.isBrakePressed = false;
 		this.isBoostPressed = false;
@@ -53153,174 +53356,143 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		if(!this.visible) {
 			return;
 		}
-		var bx = this.steerLeftInter.x;
-		var by = this.steerLeftInter.y;
-		var bw = this.steerLeftInter.width;
-		var bh = this.steerLeftInter.height;
-		var isPressed = this.isLeftPressed;
-		this.canvas.beginFill(58879,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.0,58879,isPressed ? 0.95 : 0.65);
-		this.canvas.drawRoundedRect(bx,by,bw,bh,12.0);
-		this.canvas.endFill();
-		var bx = this.steerRightInter.x;
-		var by = this.steerRightInter.y;
-		var bw = this.steerRightInter.width;
-		var bh = this.steerRightInter.height;
-		var isPressed = this.isRightPressed;
-		this.canvas.beginFill(58879,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.0,58879,isPressed ? 0.95 : 0.65);
-		this.canvas.drawRoundedRect(bx,by,bw,bh,12.0);
-		this.canvas.endFill();
-		var bx = this.gasInter.x;
-		var by = this.gasInter.y;
-		var bw = this.gasInter.width;
-		var bh = this.gasInter.height;
-		var isPressed = this.isGasPressed;
-		var radius = this.gasInter.width * 0.5;
-		this.canvas.beginFill(10011513,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.0,10011513,isPressed ? 0.95 : 0.65);
-		this.canvas.drawRoundedRect(bx,by,bw,bh,radius);
-		this.canvas.endFill();
-		var bx = this.brakeInter.x;
-		var by = this.brakeInter.y;
-		var bw = this.brakeInter.width;
-		var bh = this.brakeInter.height;
-		var isPressed = this.isBrakePressed;
-		var radius = this.brakeInter.width * 0.5;
-		this.canvas.beginFill(14707829,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.0,14707829,isPressed ? 0.95 : 0.65);
-		this.canvas.drawRoundedRect(bx,by,bw,bh,radius);
-		this.canvas.endFill();
-		var bx = this.boostInter.x;
-		var by = this.boostInter.y;
-		var bw = this.boostInter.width;
-		var bh = this.boostInter.height;
+		this.drawAnalogStick();
+		var cx = this.nitroX;
+		var cy = this.nitroY;
+		var radius = this.nitroRadius;
 		var isPressed = this.isBoostPressed;
-		var radius = this.boostInter.width * 0.5;
 		this.canvas.beginFill(58879,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.0,58879,isPressed ? 0.95 : 0.65);
-		this.canvas.drawRoundedRect(bx,by,bw,bh,radius);
+		this.canvas.lineStyle(2.5,58879,isPressed ? 0.95 : 0.65);
+		this.canvas.drawCircle(cx,cy,radius);
 		this.canvas.endFill();
-		var bx = this.handbrakeInter.x;
-		var by = this.handbrakeInter.y;
-		var bw = this.handbrakeInter.width;
-		var bh = this.handbrakeInter.height;
+		var cx = this.gasX;
+		var cy = this.gasY;
+		var radius = this.gasRadius;
+		var isPressed = this.isGasPressed;
+		this.canvas.beginFill(10011513,isPressed ? 0.72 : 0.28);
+		this.canvas.lineStyle(2.5,10011513,isPressed ? 0.95 : 0.65);
+		this.canvas.drawCircle(cx,cy,radius);
+		this.canvas.endFill();
+		var cx = this.brakeX;
+		var cy = this.brakeY;
+		var radius = this.brakeRadius;
+		var isPressed = this.isBrakePressed;
+		this.canvas.beginFill(14707829,isPressed ? 0.72 : 0.28);
+		this.canvas.lineStyle(2.5,14707829,isPressed ? 0.95 : 0.65);
+		this.canvas.drawCircle(cx,cy,radius);
+		this.canvas.endFill();
+		var cx = this.driftX;
+		var cy = this.driftY;
+		var radius = this.driftRadius;
 		var isPressed = this.isHandbrakePressed;
-		var radius = this.handbrakeInter.width * 0.5;
 		this.canvas.beginFill(16772608,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.0,16772608,isPressed ? 0.95 : 0.65);
-		this.canvas.drawRoundedRect(bx,by,bw,bh,radius);
+		this.canvas.lineStyle(2.5,16772608,isPressed ? 0.95 : 0.65);
+		this.canvas.drawCircle(cx,cy,radius);
 		this.canvas.endFill();
-		var bx = this.pauseInter.x;
-		var by = this.pauseInter.y;
-		var bw = this.pauseInter.width;
-		var bh = this.pauseInter.height;
-		var isPressed = this.isPausePressed;
-		this.canvas.beginFill(12767712,isPressed ? 0.72 : 0.28);
-		this.canvas.lineStyle(2.0,12767712,isPressed ? 0.95 : 0.65);
-		this.canvas.drawRoundedRect(bx,by,bw,bh,8.0);
+		var borderAlpha = this.isPausePressed ? 0.95 : 0.65;
+		this.canvas.beginFill(12767712,this.isPausePressed ? 0.72 : 0.28);
+		this.canvas.lineStyle(2.0,12767712,borderAlpha);
+		this.canvas.drawRoundedRect(this.pauseX,this.pauseY,this.pauseW,this.pauseH,8.0);
+		this.canvas.endFill();
+	}
+	,drawAnalogStick: function() {
+		var isGrabbed = this.stickPointerId != null;
+		var borderAlpha = isGrabbed ? 0.85 : 0.45;
+		this.canvas.beginFill(58879,isGrabbed ? 0.38 : 0.22);
+		this.canvas.lineStyle(2.0,58879,borderAlpha);
+		this.canvas.drawCircle(this.stickBaseX,this.stickBaseY,this.stickBaseRadius);
+		this.canvas.endFill();
+		this.canvas.lineStyle(1.5,58879,borderAlpha * 0.6);
+		var _this = this.canvas;
+		var x = this.stickBaseX - this.stickBaseRadius + 8.0;
+		var y = this.stickBaseY;
+		_this.flush();
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+		var _this = this.canvas;
+		var x = this.stickBaseX - this.stickBaseRadius + 20.0;
+		var y = this.stickBaseY;
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+		var _this = this.canvas;
+		var x = this.stickBaseX + this.stickBaseRadius - 20.0;
+		var y = this.stickBaseY;
+		_this.flush();
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+		var _this = this.canvas;
+		var x = this.stickBaseX + this.stickBaseRadius - 8.0;
+		var y = this.stickBaseY;
+		_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+		this.canvas.beginFill(58879,0.45);
+		this.canvas.drawCircle(this.stickBaseX,this.stickBaseY,4.0);
+		this.canvas.endFill();
+		this.canvas.beginFill(58879,isGrabbed ? 0.72 : 0.28);
+		this.canvas.lineStyle(2.5,58879,isGrabbed ? 0.95 : 0.65);
+		this.canvas.drawCircle(this.stickKnobX,this.stickKnobY,this.stickKnobRadius);
 		this.canvas.endFill();
 	}
 	,layout: function(sw,sh) {
-		var steerY = sh - 84.0 - 28.0;
-		var _this = this.steerLeftInter;
-		_this.posChanged = true;
-		_this.x = 28.0;
-		var _this = this.steerLeftInter;
-		_this.posChanged = true;
-		_this.y = steerY;
-		var _this = this.steerLeftText;
-		var v = this.steerLeftInter.x + (84.0 - this.steerLeftText.get_textWidth()) * 0.5;
-		_this.posChanged = true;
-		_this.x = v;
-		var _this = this.steerLeftText;
-		var v = this.steerLeftInter.y + (84.0 - this.steerLeftText.get_textHeight()) * 0.5;
-		_this.posChanged = true;
-		_this.y = v;
-		var _this = this.steerRightInter;
-		_this.posChanged = true;
-		_this.x = 128.;
-		var _this = this.steerRightInter;
-		_this.posChanged = true;
-		_this.y = steerY;
-		var _this = this.steerRightText;
-		var v = this.steerRightInter.x + (84.0 - this.steerRightText.get_textWidth()) * 0.5;
+		this.stickBaseRadius = 65.0;
+		this.stickKnobRadius = 30.0;
+		this.stickMaxTravel = 50.0;
+		this.stickBaseX = 28.0 + this.stickBaseRadius + 16.0;
+		this.stickBaseY = sh - 28.0 - this.stickBaseRadius - 16.0;
+		if(this.stickPointerId == null) {
+			this.stickKnobX = this.stickBaseX;
+			this.stickKnobY = this.stickBaseY;
+		}
+		this.nitroRadius = 36.0;
+		this.nitroX = this.stickBaseX;
+		this.nitroY = this.stickBaseY - this.stickBaseRadius - this.nitroRadius - 28.0;
+		var _this = this.nitroText;
+		var v = this.nitroX - this.nitroText.get_textWidth() * 0.5;
 		_this.posChanged = true;
 		_this.x = v;
-		var _this = this.steerRightText;
-		var v = this.steerRightInter.y + (84.0 - this.steerRightText.get_textHeight()) * 0.5;
+		var _this = this.nitroText;
+		var v = this.nitroY - this.nitroText.get_textHeight() * 0.5;
 		_this.posChanged = true;
 		_this.y = v;
-		var farRightX = sw - 72.0 - 28.0;
-		var _this = this.gasInter;
-		_this.posChanged = true;
-		_this.x = farRightX;
-		var _this = this.gasInter;
-		_this.posChanged = true;
-		_this.y = sh - 144. - 28.0 - 16.0;
+		this.gasRadius = 44.0;
+		this.gasX = sw - 28.0 - this.gasRadius - 16.0;
+		this.gasY = sh - 28.0 - this.gasRadius - 16.0;
 		var _this = this.gasText;
-		var v = this.gasInter.x + (72.0 - this.gasText.get_textWidth()) * 0.5;
+		var v = this.gasX - this.gasText.get_textWidth() * 0.5;
 		_this.posChanged = true;
 		_this.x = v;
 		var _this = this.gasText;
-		var v = this.gasInter.y + (72.0 - this.gasText.get_textHeight()) * 0.5;
+		var v = this.gasY - this.gasText.get_textHeight() * 0.5;
 		_this.posChanged = true;
 		_this.y = v;
-		var _this = this.brakeInter;
-		_this.posChanged = true;
-		_this.x = farRightX;
-		var _this = this.brakeInter;
-		_this.posChanged = true;
-		_this.y = sh - 72.0 - 28.0;
+		this.brakeRadius = 36.0;
+		this.brakeX = this.gasX - this.gasRadius - this.brakeRadius - 32.0;
+		this.brakeY = this.gasY;
 		var _this = this.brakeText;
-		var v = this.brakeInter.x + (72.0 - this.brakeText.get_textWidth()) * 0.5;
+		var v = this.brakeX - this.brakeText.get_textWidth() * 0.5;
 		_this.posChanged = true;
 		_this.x = v;
 		var _this = this.brakeText;
-		var v = this.brakeInter.y + (72.0 - this.brakeText.get_textHeight()) * 0.5;
+		var v = this.brakeY - this.brakeText.get_textHeight() * 0.5;
 		_this.posChanged = true;
 		_this.y = v;
-		var innerActionX = farRightX - 72.0 - 16.0;
-		var _this = this.boostInter;
-		_this.posChanged = true;
-		_this.x = innerActionX;
-		var _this = this.boostInter;
-		_this.posChanged = true;
-		_this.y = this.gasInter.y;
-		var _this = this.boostText;
-		var v = this.boostInter.x + (72.0 - this.boostText.get_textWidth()) * 0.5;
+		this.driftRadius = 38.0;
+		this.driftX = (this.gasX + this.brakeX) * 0.5;
+		this.driftY = this.gasY - this.gasRadius - this.driftRadius - 24.0;
+		var _this = this.driftText;
+		var v = this.driftX - this.driftText.get_textWidth() * 0.5;
 		_this.posChanged = true;
 		_this.x = v;
-		var _this = this.boostText;
-		var v = this.boostInter.y + (72.0 - this.boostText.get_textHeight()) * 0.5;
+		var _this = this.driftText;
+		var v = this.driftY - this.driftText.get_textHeight() * 0.5;
 		_this.posChanged = true;
 		_this.y = v;
-		var _this = this.handbrakeInter;
-		_this.posChanged = true;
-		_this.x = innerActionX;
-		var _this = this.handbrakeInter;
-		_this.posChanged = true;
-		_this.y = this.brakeInter.y;
-		var _this = this.handbrakeText;
-		var v = this.handbrakeInter.x + (72.0 - this.handbrakeText.get_textWidth()) * 0.5;
-		_this.posChanged = true;
-		_this.x = v;
-		var _this = this.handbrakeText;
-		var v = this.handbrakeInter.y + (72.0 - this.handbrakeText.get_textHeight()) * 0.5;
-		_this.posChanged = true;
-		_this.y = v;
-		var _this = this.pauseInter;
-		_this.posChanged = true;
-		_this.x = sw - 52.0 - 28.0;
-		var _this = this.pauseInter;
-		_this.posChanged = true;
-		_this.y = 28.0;
+		this.pauseW = 48.0;
+		this.pauseH = 44.0;
+		this.pauseX = sw - this.pauseW - 28.0;
+		this.pauseY = 28.0;
 		var _this = this.pauseText;
-		var v = this.pauseInter.x + (52.0 - this.pauseText.get_textWidth()) * 0.5;
+		var v = this.pauseX + (this.pauseW - this.pauseText.get_textWidth()) * 0.5;
 		_this.posChanged = true;
 		_this.x = v;
 		var _this = this.pauseText;
-		var v = this.pauseInter.y + (52.0 - this.pauseText.get_textHeight()) * 0.5;
+		var v = this.pauseY + (this.pauseH - this.pauseText.get_textHeight()) * 0.5;
 		_this.posChanged = true;
 		_this.y = v;
 		this.renderHUD();
@@ -53385,7 +53557,7 @@ var ui_views_credits_CreditsView = function(parent) {
 	this.techDetailsText.set_textColor(10531526);
 	this.techDetailsText.set_text("Built with Haxe, Heaps.io (Hardware-Accelerated WebGL) & Modern Shaders\n" + "Typography: Stack Sans Headline & Material Symbols Sharp\n" + "Homage & Inspiration: Need for Speed: Most Wanted (2005) & Burnout Revenge (2005)\n\n" + "Thank you for playing!");
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
+	this.versionText.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
 	this.versionText.set_textColor(15057019);
 	this.versionText.set_textAlign(h2d_Align.Center);
 	this.backBtnText = new h2d_Text(ui_FontManager.titleFont,this);
@@ -53524,7 +53696,7 @@ var ui_views_mainmenu_MainMenuView = function(parent) {
 	this.titleText.set_text("MAIN MENU");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
+	this.versionText.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
 	this.versionText.set_textColor(9413043);
 	var labels = ["START NEW RACE","RESUME SAVED RACE","OPTIONS","CREDITS","EXIT TO SPLASH"];
 	var iconTypes = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Settings,ui_IconType.Credits,ui_IconType.Exit];
@@ -54201,7 +54373,7 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.titleText.set_text("CONFIGURATION & HARDWARE");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
+	this.versionText.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
 	this.versionText.set_textColor(9413043);
 	var tabNames = ["GRAPHICS","AUDIO","KEYBOARD","GAMEPAD"];
 	var tabIconTypes = [ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Keyboard,ui_IconType.Gamepad];
@@ -54510,7 +54682,7 @@ var ui_views_splash_SplashView = function(parent) {
 	this.promptText.set_text("PRESS ANY BUTTON OR CLICK TO ENTER");
 	this.promptText.set_textColor(16777215);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.0" + " (Build " + 3 + ")");
+	this.versionText.set_text("v" + "0.2.1" + " (Build " + 4 + ")");
 	this.versionText.set_textColor(9413043);
 	this.screenHit = new h2d_Interactive(3000,3000,this);
 	this.screenHit.onClick = function(_) {

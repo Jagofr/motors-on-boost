@@ -141,6 +141,10 @@ G:.
 |               
 +---changelogs
 |       2026-10-06-v0.1.0-initial.md
+|       2026-10-06-v0.1.1-branding-persistence.md
+|       2026-10-09-v0.1.4-ui-touch-resolution-versioning.md
+|       2026-10-09-v0.2.0-arcade-vehicle-dynamics.md
+|       2026-10-09-v0.2.1-touch-joystick-physics-tuning.md
 |       
 +---docs
 |       DOCS.md

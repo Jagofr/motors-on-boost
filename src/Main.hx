@@ -113,6 +113,7 @@ class Main extends hxd.App {
     var skybox:Skybox;
     var postRenderer:PostProcessRenderer;
     var wheelSpinAngle:Float = 0.0;
+    var rearWheelSpinAngle:Float = 0.0;
 
     var showcaseAngle:Float = 0.0;
 
@@ -706,6 +707,7 @@ class Main extends hxd.App {
 
                 // Four-wheel steering and longitudinal spin animation
                 wheelSpinAngle += (carPhysics.forwardSpeed * dt) / 0.36;
+                rearWheelSpinAngle += ((carPhysics.forwardSpeed / 0.36) + carPhysics.wheelSpinVelocity[2]) * dt;
                 var maxSteerAngle = 0.55;
                 var currentSteer = input.steer * maxSteerAngle;
                 if (playerMesh.wheels.length >= 4) {
@@ -719,15 +721,15 @@ class Main extends hxd.App {
                     playerMesh.wheels[1].rotate(0, 1.5707963, 0);
                     playerMesh.wheels[1].rotate(wheelSpinAngle, 0, 0);
 
-                    // Rear-Left (2): Roll
+                    // Rear-Left (2): Roll with burnout spin
                     playerMesh.wheels[2].setRotation(0, 0, 0);
                     playerMesh.wheels[2].rotate(0, 1.5707963, 0);
-                    playerMesh.wheels[2].rotate(wheelSpinAngle, 0, 0);
+                    playerMesh.wheels[2].rotate(rearWheelSpinAngle, 0, 0);
 
-                    // Rear-Right (3): Roll
+                    // Rear-Right (3): Roll with burnout spin
                     playerMesh.wheels[3].setRotation(0, 0, 0);
                     playerMesh.wheels[3].rotate(0, 1.5707963, 0);
-                    playerMesh.wheels[3].rotate(wheelSpinAngle, 0, 0);
+                    playerMesh.wheels[3].rotate(rearWheelSpinAngle, 0, 0);
                 }
 
                 chaseCam.update(dt, carPhysics, input.boost);

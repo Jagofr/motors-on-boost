@@ -152,6 +152,15 @@ class UITheme {
     /** Touch pause button size in pixels. */
     public static inline var TOUCH_PAUSE_BTN_SIZE:Float = 52.0;
 
+    /** Touch virtual analog joystick base outer radius in pixels. */
+    public static inline var TOUCH_STICK_BASE_RADIUS:Float = 65.0;
+
+    /** Touch virtual analog joystick movable thumb knob radius in pixels. */
+    public static inline var TOUCH_STICK_KNOB_RADIUS:Float = 30.0;
+
+    /** Touch virtual analog joystick maximum travel deflection distance in pixels. */
+    public static inline var TOUCH_STICK_MAX_TRAVEL:Float = 50.0;
+
     /** Inactive touch control capsule fill alpha. */
     public static inline var ALPHA_TOUCH_IDLE:Float = 0.28;
 
