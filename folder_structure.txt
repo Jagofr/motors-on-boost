@@ -86,6 +86,12 @@ G:.
 |   |       stack_sans.ttf
 |   |       symbols.ttf
 |   |       
+|   +---icons
+|   |       brake.png
+|   |       burn.png
+|   |       gas-pedal.png
+|   |       hand-brake.png
+|   |       
 |   \---intro
 |       |   heaps-haxe-splash.webp
 |       |   jagofr-rvl-splash.webp
@@ -112,6 +118,10 @@ G:.
 |   |   web.config
 |   |   
 |   +---icons
+|   |       brake.png
+|   |       burn.png
+|   |       gas-pedal.png
+|   |       hand-brake.png
 |   |       icon-192.png
 |   |       icon-512.png
 |   |       

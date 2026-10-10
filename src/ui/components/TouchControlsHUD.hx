@@ -2,32 +2,32 @@ package ui.components;
 
 import h2d.Object;
 import h2d.Graphics;
-import h2d.Text;
+import h2d.Bitmap;
+import h2d.Tile;
 import input.InputController;
-import ui.FontManager;
 import ui.components.UITheme;
 
 /**
  * On-screen virtual touch driving controls HUD overlay.
- * Features an ergonomic virtual analog steering joystick on the left (thumb),
- * nitro boost button on the upper left (fingers), gas thumbpad on the lower right,
- * and brake + drift buttons on the right (fingers).
+ * Features an ergonomic virtual analog steering joystick on the lower left (thumb),
+ * nitro boost button on the left below the minimap, and an ergonomic right-hand cluster:
+ * upper-right brake disc, mid-right handbrake lever, and lower-right gas pedal.
+ * Uses custom 512x512 vector icons loaded from `res/icons` with frosted glass plate styling.
  * Fully independent multi-touch concurrency supporting simultaneous chords
- * (Gas + Steer, Gas + Nitro, Gas + Drift, Drift + Nitro, Brake + Nitro).
+ * (Gas + Steer, Gas + Nitro, Gas + Drift, Drift + Nitro, Brake + Nitro, etc.).
  */
 class TouchControlsHUD extends Object {
     /** Reference to active input controller. */
     public var inputRef:InputController;
 
-    /** Vector graphics context for virtual button capsules and indicators. */
+    /** Vector graphics context for virtual button plates and indicators. */
     public var canvas:Graphics;
 
-    // Text labels for buttons
-    var nitroText:Text;
-    var gasText:Text;
-    var brakeText:Text;
-    var driftText:Text;
-    var pauseText:Text;
+    // Custom Icon Bitmaps loaded from res/icons
+    var nitroIconBmp:Bitmap;
+    var gasIconBmp:Bitmap;
+    var brakeIconBmp:Bitmap;
+    var driftIconBmp:Bitmap;
 
     // Momentary pressed flags for dynamic visual rendering
     public var isGasPressed:Bool = false;
@@ -43,39 +43,40 @@ class TouchControlsHUD extends Object {
     // GEOMETRIC METRICS & BUTTON POSITIONING
     // =========================================================================
 
-    /** Left hand: Virtual analog joystick geometry. */
-    public var stickBaseX:Float = 130.0;
+    /** Left hand: Virtual analog joystick geometry (lower-left thumb zone). */
+    public var stickBaseX:Float = 96.0;
     public var stickBaseY:Float = 590.0;
-    public var stickBaseRadius:Float = 65.0;
-    public var stickKnobRadius:Float = 30.0;
-    public var stickMaxTravel:Float = 50.0;
-    public var stickKnobX:Float = 130.0;
+    public var stickBaseRadius:Float = 64.0;
+    public var stickKnobRadius:Float = 34.0;
+    public var stickMaxTravel:Float = 48.0;
+    public var stickKnobX:Float = 96.0;
     public var stickKnobY:Float = 590.0;
 
-    /** Left hand: Nitrous Boost button geometry (positioned above analog stick). */
-    public var nitroX:Float = 130.0;
-    public var nitroY:Float = 465.0;
-    public var nitroRadius:Float = 36.0;
+    /** Left hand: Nitrous Boost button geometry (left edge, situated below minimap). */
+    public var nitroX:Float = 78.0;
+    public var nitroY:Float = 220.0;
+    public var nitroRadius:Float = 46.0;
 
-    /** Right hand: Gas / Throttle button geometry (right thumb rest zone). */
-    public var gasX:Float = 1320.0;
-    public var gasY:Float = 610.0;
-    public var gasRadius:Float = 44.0;
+    /** Right hand: Gas / Throttle button geometry (lower-right thumb rest zone). */
+    public var gasX:Float = 1140.0;
+    public var gasY:Float = 640.0;
+    public var gasRadius:Float = 48.0;
 
-    /** Right hand: Brake / Reverse button geometry. */
-    public var brakeX:Float = 1200.0;
-    public var brakeY:Float = 610.0;
-    public var brakeRadius:Float = 36.0;
+    /** Right hand: Brake / Reverse button geometry (upper-right quadrant). */
+    public var brakeX:Float = 1050.0;
+    public var brakeY:Float = 108.0;
+    public var brakeRadius:Float = 46.0;
 
-    /** Right hand: Handbrake Drift button geometry (arched above Gas and Brake). */
-    public var driftX:Float = 1260.0;
-    public var driftY:Float = 490.0;
-    public var driftRadius:Float = 38.0;
+    /** Right hand: Handbrake Drift button geometry (mid-right edge). */
+    public var driftX:Float = 1210.0;
+    public var driftY:Float = 260.0;
+    public var driftRadius:Float = 46.0;
 
-    /** Top Right: Dedicated Pause button geometry. */
-    public var pauseX:Float = 1390.0;
-    public var pauseY:Float = 24.0;
-    public var pauseW:Float = 48.0;
+    /** Top Right: Dedicated circular Pause button geometry. */
+    public var pauseX:Float = 1234.0;
+    public var pauseY:Float = 46.0;
+    public var pauseRadius:Float = 22.0;
+    public var pauseW:Float = 44.0;
     public var pauseH:Float = 44.0;
 
     // =========================================================================
@@ -118,30 +119,42 @@ class TouchControlsHUD extends Object {
 
         canvas = new Graphics(this);
 
-        // 1. Nitrous Boost Label (NITRO)
-        nitroText = new Text(FontManager.regularFont, this);
-        nitroText.text = "NITRO";
-        nitroText.textColor = UITheme.COLOR_ACCENT_CYAN;
+        // Load custom PNG icons from res/icons (512x512 source)
+        try {
+            var burnTile = hxd.Res.load("icons/burn.png").toTile();
+            burnTile.setCenterRatio(0.5, 0.5);
+            nitroIconBmp = new Bitmap(burnTile, this);
+            nitroIconBmp.smooth = true;
+        } catch (e:haxe.Exception) {
+            trace("[TouchControlsHUD] Failed to load icons/burn.png: " + e.message);
+        }
 
-        // 2. Throttle Label (GAS)
-        gasText = new Text(FontManager.regularFont, this);
-        gasText.text = "GAS";
-        gasText.textColor = UITheme.COLOR_GREEN_SUCCESS;
+        try {
+            var gasTile = hxd.Res.load("icons/gas-pedal.png").toTile();
+            gasTile.setCenterRatio(0.5, 0.5);
+            gasIconBmp = new Bitmap(gasTile, this);
+            gasIconBmp.smooth = true;
+        } catch (e:haxe.Exception) {
+            trace("[TouchControlsHUD] Failed to load icons/gas-pedal.png: " + e.message);
+        }
 
-        // 3. Brake Label (BRAKE)
-        brakeText = new Text(FontManager.regularFont, this);
-        brakeText.text = "BRAKE";
-        brakeText.textColor = UITheme.COLOR_RED_ALERT;
+        try {
+            var brakeTile = hxd.Res.load("icons/brake.png").toTile();
+            brakeTile.setCenterRatio(0.5, 0.5);
+            brakeIconBmp = new Bitmap(brakeTile, this);
+            brakeIconBmp.smooth = true;
+        } catch (e:haxe.Exception) {
+            trace("[TouchControlsHUD] Failed to load icons/brake.png: " + e.message);
+        }
 
-        // 4. Handbrake Drift Label (DRIFT)
-        driftText = new Text(FontManager.regularFont, this);
-        driftText.text = "DRIFT";
-        driftText.textColor = UITheme.COLOR_ACCENT_GOLD;
-
-        // 5. Pause Button Label
-        pauseText = new Text(FontManager.titleFont, this);
-        pauseText.text = "||";
-        pauseText.textColor = UITheme.COLOR_TEXT_NORMAL;
+        try {
+            var handbrakeTile = hxd.Res.load("icons/hand-brake.png").toTile();
+            handbrakeTile.setCenterRatio(0.5, 0.5);
+            driftIconBmp = new Bitmap(handbrakeTile, this);
+            driftIconBmp.smooth = true;
+        } catch (e:haxe.Exception) {
+            trace("[TouchControlsHUD] Failed to load icons/hand-brake.png: " + e.message);
+        }
 
         // Register window event target for Heaps / desktop / test dispatching
         windowEventTarget = onWindowEvent;
@@ -287,41 +300,24 @@ class TouchControlsHUD extends Object {
         var sh = s2d != null ? s2d.height : 720.0;
 
         // 1. Pause Button (Top-Right)
-        if (px >= pauseX - 14.0 && px <= pauseX + pauseW + 14.0 &&
-            py >= pauseY - 14.0 && py <= pauseY + pauseH + 14.0) {
+        var dPause = distSq(px, py, pauseX, pauseY);
+        var hitPauseRadiusSq = (pauseRadius + 18.0) * (pauseRadius + 18.0);
+        if (dPause <= hitPauseRadiusSq) {
             activeRoles.set(tid, "pause");
             recomputeStates();
             return;
         }
 
-        // 2. Nitro Boost (Left hand, upper-left above stick)
+        // 2. Nitro Boost (Left hand, below minimap)
         var dNitro = distSq(px, py, nitroX, nitroY);
-        var hitNitroRadiusSq = (nitroRadius + 22.0) * (nitroRadius + 22.0);
+        var hitNitroRadiusSq = (nitroRadius + 24.0) * (nitroRadius + 24.0);
         if (dNitro <= hitNitroRadiusSq) {
             activeRoles.set(tid, "nitro");
             recomputeStates();
             return;
         }
 
-        // 3. Drift / Handbrake (Right hand, upper-right above gas/brake)
-        var dDrift = distSq(px, py, driftX, driftY);
-        var hitDriftRadiusSq = (driftRadius + 24.0) * (driftRadius + 24.0);
-        if (dDrift <= hitDriftRadiusSq) {
-            activeRoles.set(tid, "drift");
-            recomputeStates();
-            return;
-        }
-
-        // 4. Gas / Throttle (Right hand, bottom-right corner)
-        var dGas = distSq(px, py, gasX, gasY);
-        var hitGasRadiusSq = (gasRadius + 28.0) * (gasRadius + 28.0);
-        if (dGas <= hitGasRadiusSq) {
-            activeRoles.set(tid, "gas");
-            recomputeStates();
-            return;
-        }
-
-        // 5. Brake / Reverse (Right hand, bottom-right inner)
+        // 3. Brake / Reverse (Right hand, upper-right quadrant)
         var dBrake = distSq(px, py, brakeX, brakeY);
         var hitBrakeRadiusSq = (brakeRadius + 24.0) * (brakeRadius + 24.0);
         if (dBrake <= hitBrakeRadiusSq) {
@@ -330,12 +326,30 @@ class TouchControlsHUD extends Object {
             return;
         }
 
-        // 6. Virtual Analog Steering Joystick (Left thumb, bottom-left zone)
+        // 4. Drift / Handbrake (Right hand, mid-right edge)
+        var dDrift = distSq(px, py, driftX, driftY);
+        var hitDriftRadiusSq = (driftRadius + 24.0) * (driftRadius + 24.0);
+        if (dDrift <= hitDriftRadiusSq) {
+            activeRoles.set(tid, "drift");
+            recomputeStates();
+            return;
+        }
+
+        // 5. Gas / Throttle (Right hand, lower-right corner)
+        var dGas = distSq(px, py, gasX, gasY);
+        var hitGasRadiusSq = (gasRadius + 28.0) * (gasRadius + 28.0);
+        if (dGas <= hitGasRadiusSq) {
+            activeRoles.set(tid, "gas");
+            recomputeStates();
+            return;
+        }
+
+        // 6. Virtual Analog Steering Joystick (Left thumb, lower-left zone)
         var dStick = distSq(px, py, stickBaseX, stickBaseY);
         var hitStickRadiusSq = (stickBaseRadius + 45.0) * (stickBaseRadius + 45.0);
-        var isLeftQuadrant = (px < sw * 0.44 && py > (nitroY - 40.0));
+        var isLeftLowerQuadrant = (px < sw * 0.38 && py > sh * 0.48);
 
-        if (dStick <= hitStickRadiusSq || isLeftQuadrant) {
+        if (dStick <= hitStickRadiusSq || isLeftLowerQuadrant) {
             stickPointerId = tid;
             activeRoles.set(tid, "stick");
             updateStickDeflection(px, py);
@@ -387,6 +401,11 @@ class TouchControlsHUD extends Object {
                         activeRoles.set(tid, "brake");
                         recomputeStates();
                     }
+                }
+            } else if (currentRole == "nitro") {
+                if (distSq(px, py, nitroX, nitroY) > (nitroRadius + 50.0) * (nitroRadius + 50.0)) {
+                    activeRoles.remove(tid);
+                    recomputeStates();
                 }
             }
         }
@@ -451,22 +470,25 @@ class TouchControlsHUD extends Object {
         inputRef.touchBoost = isBoostPressed;
         inputRef.touchHandbrake = isHandbrakePressed;
 
-        if (stickPointerId == null) {
-            inputRef.touchSteer = 0.0;
-        }
-
         renderHUD();
     }
 
     /**
-     * Low-level window event handler tracking independent touch pointers concurrently.
+     * Dispatches window pointer events for desktop / simulator debugging.
      */
     function onWindowEvent(e:hxd.Event) {
-        if (parent == null) return;
+        var isTouchKind = switch (e.kind) {
+            case EPush, ERelease, EMove, EReleaseOutside:
+                (e.touchId != null && e.touchId >= 0);
+            default:
+                false;
+        };
 
-        var isTouchKind = (e.touchId != null && e.touchId >= 0);
         if (isTouchKind && !inputRef.isTouchActive) {
             inputRef.isTouchActive = true;
+            visible = true;
+            var s2d = getScene();
+            if (s2d != null) layout(s2d.width, s2d.height);
         }
 
         #if js
@@ -475,7 +497,7 @@ class TouchControlsHUD extends Object {
         #end
 
         if (!visible) {
-            if (inputRef.isTouchActive && parent.visible) {
+            if (inputRef.isTouchActive && parent != null && parent.visible) {
                 visible = true;
                 var s2d = getScene();
                 if (s2d != null) layout(s2d.width, s2d.height);
@@ -511,7 +533,7 @@ class TouchControlsHUD extends Object {
     }
 
     /**
-     * Explicit disposal method removing all window event bindings and graphics memory.
+     * Explicit disposal method removing all window event bindings, bitmaps, and graphics memory.
      */
     public function dispose():Void {
         resetTouchStates();
@@ -534,6 +556,10 @@ class TouchControlsHUD extends Object {
             }
         } catch (e:haxe.Exception) {}
         #end
+        if (nitroIconBmp != null) { nitroIconBmp.remove(); nitroIconBmp = null; }
+        if (gasIconBmp != null) { gasIconBmp.remove(); gasIconBmp = null; }
+        if (brakeIconBmp != null) { brakeIconBmp.remove(); brakeIconBmp = null; }
+        if (driftIconBmp != null) { driftIconBmp.remove(); driftIconBmp = null; }
         if (canvas != null) {
             canvas.clear();
         }
@@ -564,32 +590,43 @@ class TouchControlsHUD extends Object {
     }
 
     /**
-     * Renders virtual touch control button capsules, analog joystick, and border highlights.
+     * Renders virtual touch control button plates, analog joystick, and border highlights.
      */
     public function renderHUD() {
         canvas.clear();
-        if (!visible) return;
+        if (!visible) {
+            if (nitroIconBmp != null) nitroIconBmp.visible = false;
+            if (gasIconBmp != null) gasIconBmp.visible = false;
+            if (brakeIconBmp != null) brakeIconBmp.visible = false;
+            if (driftIconBmp != null) driftIconBmp.visible = false;
+            return;
+        }
+
+        if (nitroIconBmp != null) nitroIconBmp.visible = true;
+        if (gasIconBmp != null) gasIconBmp.visible = true;
+        if (brakeIconBmp != null) brakeIconBmp.visible = true;
+        if (driftIconBmp != null) driftIconBmp.visible = true;
 
         // 1. Virtual Analog Steering Joystick (Left Hand)
         drawAnalogStick();
 
-        // 2. Nitro Boost Button (Left Hand, above joystick)
-        drawCircularButton(nitroX, nitroY, nitroRadius, UITheme.COLOR_ACCENT_CYAN, isBoostPressed);
-        drawFlameGraphic(nitroX, nitroY - 6.0, nitroRadius * 0.42, isBoostPressed);
+        // 2. Nitro Boost Button (Left Hand, situated below minimap)
+        drawFrostedButton(nitroX, nitroY, nitroRadius, isBoostPressed);
+        updateIconAppearance(nitroIconBmp, isBoostPressed, 0.0, 0.85, 1.0);
 
-        // 3. Gas / Throttle Pad (Right Hand, bottom-right)
-        drawCircularButton(gasX, gasY, gasRadius, UITheme.COLOR_GREEN_SUCCESS, isGasPressed);
-        drawPedalGraphic(gasX, gasY - 6.0, gasRadius * 0.55, gasRadius * 0.68, isGasPressed);
+        // 3. Gas / Throttle Pad (Right Hand, lower-right)
+        drawFrostedButton(gasX, gasY, gasRadius, isGasPressed);
+        updateIconAppearance(gasIconBmp, isGasPressed, 0.20, 0.90, 0.35);
 
-        // 4. Brake / Reverse Pad (Right Hand, bottom-right inner)
-        drawCircularButton(brakeX, brakeY, brakeRadius, UITheme.COLOR_RED_ALERT, isBrakePressed);
-        drawBrakeDiscGraphic(brakeX, brakeY - 5.0, brakeRadius, isBrakePressed);
+        // 4. Brake / Reverse Pad (Right Hand, upper-right quadrant)
+        drawFrostedButton(brakeX, brakeY, brakeRadius, isBrakePressed);
+        updateIconAppearance(brakeIconBmp, isBrakePressed, 0.95, 0.20, 0.20);
 
-        // 5. Drift / Handbrake Pad (Right Hand, arched above Gas & Brake)
-        drawCircularButton(driftX, driftY, driftRadius, UITheme.COLOR_ACCENT_GOLD, isHandbrakePressed);
-        drawHandbrakeGraphic(driftX, driftY - 5.0, driftRadius * 0.65, isHandbrakePressed);
+        // 5. Drift / Handbrake Pad (Right Hand, mid-right edge)
+        drawFrostedButton(driftX, driftY, driftRadius, isHandbrakePressed);
+        updateIconAppearance(driftIconBmp, isHandbrakePressed, 0.95, 0.65, 0.10);
 
-        // 6. Pause Button (Top-Right)
+        // 6. Circular Pause Button (Top-Right)
         drawPauseButton();
     }
 
@@ -598,224 +635,149 @@ class TouchControlsHUD extends Object {
      */
     function drawAnalogStick() {
         var isGrabbed = (stickPointerId != null);
-        var baseAlpha = isGrabbed ? 0.45 : 0.28;
-        var borderAlpha = isGrabbed ? 0.90 : 0.50;
+        var baseAlpha = isGrabbed ? 0.48 : 0.32;
+        var borderAlpha = isGrabbed ? 0.85 : 0.45;
 
         // Base circular zone
-        canvas.beginFill(0x060E18, baseAlpha);
-        canvas.lineStyle(2.0, UITheme.COLOR_ACCENT_CYAN, borderAlpha);
+        canvas.beginFill(0x0A0F16, baseAlpha);
+        canvas.lineStyle(2.0, 0xFFFFFF, borderAlpha);
         canvas.drawCircle(stickBaseX, stickBaseY, stickBaseRadius);
         canvas.endFill();
 
-        // Outer cyber tick ring
-        canvas.lineStyle(1.0, UITheme.COLOR_ACCENT_CYAN, borderAlpha * 0.4);
-        canvas.drawCircle(stickBaseX, stickBaseY, stickBaseRadius - 6.0);
+        // Outer subtle tick ring
+        canvas.lineStyle(1.0, 0xFFFFFF, borderAlpha * 0.35);
+        canvas.drawCircle(stickBaseX, stickBaseY, stickBaseRadius - 5.0);
 
-        // Directional crosshair ticks
-        canvas.lineStyle(1.5, UITheme.COLOR_ACCENT_CYAN, borderAlpha * 0.7);
-        canvas.moveTo(stickBaseX - stickBaseRadius + 6.0, stickBaseY);
-        canvas.lineTo(stickBaseX - stickBaseRadius + 16.0, stickBaseY);
-        canvas.moveTo(stickBaseX + stickBaseRadius - 16.0, stickBaseY);
-        canvas.lineTo(stickBaseX + stickBaseRadius - 6.0, stickBaseY);
-
-        // Center neutral reference dot
-        canvas.beginFill(UITheme.COLOR_ACCENT_CYAN, 0.45);
-        canvas.drawCircle(stickBaseX, stickBaseY, 4.0);
-        canvas.endFill();
-
-        // Movable thumb knob
-        var knobAlpha = isGrabbed ? UITheme.ALPHA_TOUCH_PRESSED : UITheme.ALPHA_TOUCH_IDLE;
-        var knobBorderAlpha = isGrabbed ? 0.98 : UITheme.ALPHA_TOUCH_BORDER;
-        canvas.beginFill(UITheme.COLOR_ACCENT_CYAN, knobAlpha);
-        canvas.lineStyle(2.5, UITheme.COLOR_ACCENT_CYAN, knobBorderAlpha);
+        // Movable thumb knob puck
+        var knobAlpha = isGrabbed ? 0.80 : 0.52;
+        var knobBorderAlpha = isGrabbed ? 0.98 : 0.60;
+        canvas.beginFill(0x18202C, knobAlpha);
+        canvas.lineStyle(2.0, 0xFFFFFF, knobBorderAlpha);
         canvas.drawCircle(stickKnobX, stickKnobY, stickKnobRadius);
         canvas.endFill();
 
-        // Inner knob accent dot
-        canvas.beginFill(0xFFFFFF, isGrabbed ? 0.95 : 0.60);
-        canvas.drawCircle(stickKnobX, stickKnobY, 5.0);
-        canvas.endFill();
+        // Inner knob accent ring
+        canvas.lineStyle(1.0, 0xFFFFFF, isGrabbed ? 0.40 : 0.18);
+        canvas.drawCircle(stickKnobX, stickKnobY, stickKnobRadius - 3.5);
     }
 
     /**
-     * Draws an individual circular action button with radial fill and glowing perimeter.
+     * Draws an individual circular action button with frosted glass fill and glowing perimeter.
      */
-    inline function drawCircularButton(cx:Float, cy:Float, radius:Float, color:Int, isPressed:Bool) {
-        var fillAlpha = isPressed ? 0.88 : 0.55;
-        var borderAlpha = isPressed ? 1.0 : 0.70;
+    inline function drawFrostedButton(cx:Float, cy:Float, radius:Float, isPressed:Bool) {
+        var fillAlpha = isPressed ? 0.70 : 0.40;
+        var borderAlpha = isPressed ? 0.95 : 0.45;
 
         // Frosted dark glass circular plate
-        canvas.beginFill(0x060E18, fillAlpha);
-        canvas.lineStyle(2.5, color, borderAlpha);
+        canvas.beginFill(0x0A0F16, fillAlpha);
+        canvas.lineStyle(2.0, 0xFFFFFF, borderAlpha);
         canvas.drawCircle(cx, cy, radius);
         canvas.endFill();
 
         // Inner specular ring highlight
         canvas.lineStyle(1.0, 0xFFFFFF, isPressed ? 0.35 : 0.12);
-        canvas.drawCircle(cx, cy, radius - 4.0);
+        canvas.drawCircle(cx, cy, radius - 3.5);
     }
 
     /**
-     * Draws procedural flame icon inside Nitro boost button.
+     * Updates icon bitmap tint, alpha, and glow based on momentary press state.
      */
-    function drawFlameGraphic(cx:Float, cy:Float, size:Float, isPressed:Bool) {
-        var flameColor = isPressed ? 0xFF8800 : UITheme.COLOR_ACCENT_CYAN;
-        var coreColor = isPressed ? 0xFFFF66 : 0xFFFFFF;
-
-        canvas.beginFill(flameColor, 0.90);
-        canvas.moveTo(cx, cy - size);
-        canvas.curveTo(cx + size * 0.6, cy - size * 0.2, cx + size * 0.6, cy + size * 0.4);
-        canvas.curveTo(cx + size * 0.6, cy + size, cx, cy + size);
-        canvas.curveTo(cx - size * 0.6, cy + size, cx - size * 0.6, cy + size * 0.4);
-        canvas.curveTo(cx - size * 0.6, cy - size * 0.2, cx, cy - size);
-        canvas.endFill();
-
-        canvas.beginFill(coreColor, 0.95);
-        canvas.moveTo(cx, cy - size * 0.2);
-        canvas.curveTo(cx + size * 0.3, cy + size * 0.2, cx + size * 0.3, cy + size * 0.6);
-        canvas.curveTo(cx + size * 0.3, cy + size * 0.8, cx, cy + size * 0.8);
-        canvas.curveTo(cx - size * 0.3, cy + size * 0.8, cx - size * 0.3, cy + size * 0.6);
-        canvas.curveTo(cx - size * 0.3, cy + size * 0.2, cx, cy - size * 0.2);
-        canvas.endFill();
+    inline function updateIconAppearance(bmp:Bitmap, isPressed:Bool, r:Float, g:Float, b:Float) {
+        if (bmp == null) return;
+        bmp.alpha = isPressed ? 0.95 : 0.60;
+        bmp.colorAdd = isPressed ? new h3d.Vector(r, g, b) : new h3d.Vector(0.18, 0.18, 0.20);
     }
 
     /**
-     * Draws accelerator throttle pedal icon inside Gas button.
-     */
-    function drawPedalGraphic(cx:Float, cy:Float, w:Float, h:Float, isPressed:Bool) {
-        var pedalColor = isPressed ? 0x00FF88 : UITheme.COLOR_GREEN_SUCCESS;
-
-        canvas.beginFill(0x182430, 0.90);
-        canvas.lineStyle(1.5, pedalColor, 0.90);
-        canvas.drawRoundedRect(cx - (w * 0.5), cy - (h * 0.5), w, h, 4.0);
-        canvas.endFill();
-
-        // Rubber grip ridges
-        canvas.lineStyle(1.5, pedalColor, 0.70);
-        canvas.moveTo(cx - (w * 0.32), cy - (h * 0.24));
-        canvas.lineTo(cx + (w * 0.32), cy - (h * 0.24));
-        canvas.moveTo(cx - (w * 0.32), cy);
-        canvas.lineTo(cx + (w * 0.32), cy);
-        canvas.moveTo(cx - (w * 0.32), cy + (h * 0.24));
-        canvas.lineTo(cx + (w * 0.32), cy + (h * 0.24));
-    }
-
-    /**
-     * Draws disc brake rotor with red caliper inside Brake button.
-     */
-    function drawBrakeDiscGraphic(cx:Float, cy:Float, radius:Float, isPressed:Bool) {
-        // Metallic brake rotor disc
-        canvas.lineStyle(2.0, 0x8898A8, 0.75);
-        canvas.drawCircle(cx, cy, radius * 0.60);
-        canvas.drawCircle(cx, cy, radius * 0.28);
-
-        // Perforated cross-drilled cooling vent holes
-        canvas.beginFill(0x060E18, 0.95);
-        for (i in 0...6) {
-            var ang = i * (Math.PI / 3.0);
-            var hx = cx + Math.cos(ang) * (radius * 0.44);
-            var hy = cy + Math.sin(ang) * (radius * 0.44);
-            canvas.drawCircle(hx, hy, 1.8);
-        }
-        canvas.endFill();
-
-        // Red brake caliper on side
-        canvas.beginFill(isPressed ? 0xFF0033 : UITheme.COLOR_RED_ALERT, 0.95);
-        canvas.lineStyle(1.5, 0xFF6677, 0.95);
-        canvas.drawRoundedRect(cx + (radius * 0.20), cy - (radius * 0.55), radius * 0.44, radius * 0.55, 3.0);
-        canvas.endFill();
-    }
-
-    /**
-     * Draws handbrake drift icon inside Drift button.
-     */
-    function drawHandbrakeGraphic(cx:Float, cy:Float, size:Float, isPressed:Bool) {
-        var driftColor = isPressed ? 0xFFEE00 : UITheme.COLOR_ACCENT_GOLD;
-
-        // Twin skid mark drift arcs
-        canvas.lineStyle(2.0, driftColor, 0.85);
-        canvas.moveTo(cx - (size * 0.55), cy + (size * 0.35));
-        canvas.curveTo(cx - (size * 0.15), cy - (size * 0.25), cx + (size * 0.35), cy - (size * 0.35));
-
-        canvas.moveTo(cx - (size * 0.35), cy + (size * 0.55));
-        canvas.curveTo(cx, cy - (size * 0.05), cx + (size * 0.55), cy - (size * 0.15));
-
-        // Center lever accent
-        canvas.beginFill(driftColor, 0.95);
-        canvas.drawCircle(cx - (size * 0.10), cy + (size * 0.10), 2.5);
-        canvas.endFill();
-    }
-
-    /**
-     * Draws the dedicated top-right pause button capsule.
+     * Draws the circular top-right pause button matching reference aesthetic.
      */
     inline function drawPauseButton() {
-        var fillAlpha = isPausePressed ? UITheme.ALPHA_TOUCH_PRESSED : UITheme.ALPHA_TOUCH_IDLE;
-        var borderAlpha = isPausePressed ? 0.95 : UITheme.ALPHA_TOUCH_BORDER;
+        var fillAlpha = isPausePressed ? 0.70 : 0.40;
+        var borderAlpha = isPausePressed ? 0.95 : 0.45;
 
-        canvas.beginFill(UITheme.COLOR_TEXT_NORMAL, fillAlpha);
-        canvas.lineStyle(2.0, UITheme.COLOR_TEXT_NORMAL, borderAlpha);
-        canvas.drawRoundedRect(pauseX, pauseY, pauseW, pauseH, 8.0);
+        canvas.beginFill(0x0A0F16, fillAlpha);
+        canvas.lineStyle(1.8, 0xFFFFFF, borderAlpha);
+        canvas.drawCircle(pauseX, pauseY, pauseRadius);
+        canvas.endFill();
+
+        // Two vertical pause bars centered in button
+        canvas.beginFill(0xFFFFFF, isPausePressed ? 0.95 : 0.65);
+        canvas.drawRect(pauseX - 5.0, pauseY - 7.0, 3.5, 14.0);
+        canvas.drawRect(pauseX + 1.5, pauseY - 7.0, 3.5, 14.0);
         canvas.endFill();
     }
 
     /**
-     * Positions virtual touch buttons and text relative to viewport boundaries.
+     * Positions virtual touch buttons and icons relative to viewport boundaries.
+     * Preserves exact ergonomically separated positions across all display aspect ratios.
      *
      * @param sw Screen width in pixels.
      * @param sh Screen height in pixels.
      */
     public function layout(sw:Float, sh:Float) {
-        var margin = 28.0;
+        // 1. Left Hand: Virtual Analog Steering Joystick (Lower-Left Corner)
+        stickBaseRadius = 64.0;
+        stickKnobRadius = 34.0;
+        stickMaxTravel = 48.0;
 
-        // 1. Left Hand: Virtual Analog Joystick (Left thumb)
-        stickBaseRadius = UITheme.TOUCH_STICK_BASE_RADIUS;
-        stickKnobRadius = UITheme.TOUCH_STICK_KNOB_RADIUS;
-        stickMaxTravel = UITheme.TOUCH_STICK_MAX_TRAVEL;
-
-        stickBaseX = margin + stickBaseRadius + 16.0;
-        stickBaseY = sh - margin - stickBaseRadius - 16.0;
+        stickBaseX = Math.max(85.0, Math.min(130.0, sw * 0.088));
+        stickBaseY = sh - Math.max(90.0, Math.min(130.0, sh * 0.165));
 
         if (stickPointerId == null) {
             stickKnobX = stickBaseX;
             stickKnobY = stickBaseY;
         }
 
-        // 2. Left Hand: Nitro Boost (Left fingers, above joystick)
-        nitroRadius = 36.0;
-        nitroX = stickBaseX;
-        nitroY = stickBaseY - stickBaseRadius - nitroRadius - 28.0;
-        nitroText.x = nitroX - (nitroText.textWidth * 0.5);
-        nitroText.y = nitroY + 6.0;
+        // 2. Left Hand: Nitro Boost Button (burn.png, situated below minimap on left edge)
+        nitroRadius = 46.0;
+        nitroX = Math.max(74.0, Math.min(110.0, sw * 0.076));
+        nitroY = Math.max(190.0, Math.min(240.0, sh * 0.31));
 
-        // 3. Right Hand: Gas / Throttle Pad (Right thumb)
-        gasRadius = 44.0;
-        gasX = sw - margin - gasRadius - 16.0;
-        gasY = sh - margin - gasRadius - 16.0;
-        gasText.x = gasX - (gasText.textWidth * 0.5);
-        gasText.y = gasY + 9.0;
+        if (nitroIconBmp != null) {
+            nitroIconBmp.setScale(56.0 / 512.0);
+            nitroIconBmp.x = nitroX;
+            nitroIconBmp.y = nitroY;
+        }
 
-        // 4. Right Hand: Brake / Reverse Pad (Right thumb / fingers)
-        brakeRadius = 36.0;
-        brakeX = gasX - gasRadius - brakeRadius - 32.0;
-        brakeY = gasY;
-        brakeText.x = brakeX - (brakeText.textWidth * 0.5);
-        brakeText.y = brakeY + 7.0;
+        // 3. Right Hand: Gas Pedal (gas-pedal.png, lower-right thumb rest zone)
+        gasRadius = 48.0;
+        gasX = sw - Math.max(120.0, Math.min(160.0, sw * 0.125));
+        gasY = sh - Math.max(85.0, Math.min(125.0, sh * 0.165));
 
-        // 5. Right Hand: Handbrake Drift Pad (Right index finger, arched above Gas & Brake)
-        driftRadius = 38.0;
-        driftX = (gasX + brakeX) * 0.5;
-        driftY = gasY - gasRadius - driftRadius - 24.0;
-        driftText.x = driftX - (driftText.textWidth * 0.5);
-        driftText.y = driftY + 8.0;
+        if (gasIconBmp != null) {
+            gasIconBmp.setScale(58.0 / 512.0);
+            gasIconBmp.x = gasX;
+            gasIconBmp.y = gasY;
+        }
 
-        // 6. Top Right: Pause Button
-        pauseW = 48.0;
+        // 4. Right Hand: Handbrake Lever (hand-brake.png, mid-right edge)
+        driftRadius = 46.0;
+        driftX = sw - Math.max(68.0, Math.min(95.0, sw * 0.075));
+        driftY = Math.max(210.0, Math.min(270.0, sh * 0.35));
+
+        if (driftIconBmp != null) {
+            driftIconBmp.setScale(56.0 / 512.0);
+            driftIconBmp.x = driftX;
+            driftIconBmp.y = driftY;
+        }
+
+        // 5. Right Hand: Brake Disc (brake.png, upper-right quadrant)
+        brakeRadius = 46.0;
+        brakeX = sw - Math.max(180.0, Math.min(240.0, sw * 0.185));
+        brakeY = Math.max(68.0, Math.min(115.0, sh * 0.15));
+
+        if (brakeIconBmp != null) {
+            brakeIconBmp.setScale(56.0 / 512.0);
+            brakeIconBmp.x = brakeX;
+            brakeIconBmp.y = brakeY;
+        }
+
+        // 6. Top-Right: Dedicated Circular Pause Button
+        pauseRadius = 22.0;
+        pauseW = 44.0;
         pauseH = 44.0;
-        pauseX = sw - pauseW - margin;
-        pauseY = margin;
-        pauseText.x = pauseX + (pauseW - pauseText.textWidth) * 0.5;
-        pauseText.y = pauseY + (pauseH - pauseText.textHeight) * 0.5;
+        pauseX = sw - Math.max(38.0, Math.min(50.0, sw * 0.038));
+        pauseY = Math.max(34.0, Math.min(50.0, sh * 0.065));
 
         renderHUD();
     }

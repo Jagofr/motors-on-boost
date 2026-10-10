@@ -29,9 +29,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Fixed OptionsView Back button hitzone overlap (`BACK_BUTTON_WIDTH = 100.0`), preventing collision with Tab 0 ("GRAPHICS").
   - Added vertical scrolling (`scrollOffset`, `maxVisibleRows`) with navigation arrows and mouse wheel support in `GraphicsOptionsPanel.hx`.
   - Dynamic responsive card backplate sizing in `CardBackplate.hx` preventing lower-resolution overflow.
-- **Frosted Glass Touch Controls Aesthetic (`TouchControlsHUD.hx`)**:
-  - Circular frosted glass buttons with procedural vector icons: flame icon for Nitro, accelerator pedal for Gas, disc brake with red caliper for Brake, and drift arc for Handbrake.
-  - True multi-touch concurrency across all simultaneous chords.
+- **Frosted Glass Touch Controls & Custom Icons (`TouchControlsHUD.hx`)**:
+  - Integrated custom 512x512 vector icons from `res/icons/`: `burn.png` for Nitro, `gas-pedal.png` for Gas, `brake.png` for Brake, and `hand-brake.png` for Handbrake.
+  - Aligned button positions with reference layout: lower-left virtual steering joystick, mid-left Nitro button below minimap, upper-right Brake button, mid-right Handbrake lever, lower-right Gas pedal, and top-right circular pause button.
+  - Multi-touch concurrency across all simultaneous finger chords.
 
 *For detailed notes, see [`changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md`](./changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md).*
 
