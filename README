@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-0.2.2--Alpha%20(Build%205)-00E5FF?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.3.0--Alpha%20(Build%200005)-00E5FF?style=for-the-badge)
 ![Haxe](https://img.shields.io/badge/Haxe-4.3%2B-FA7E0A?style=for-the-badge&logo=haxe&logoColor=white)
 ![Heaps.io](https://img.shields.io/badge/Engine-Heaps.io-00E5FF?style=for-the-badge&logo=opengl&logoColor=white)
 ![Platform](https://img.shields.io/badge/Platform-Web%20%2F%20PWA-111418?style=for-the-badge&logo=pwa&logoColor=00E5FF)
@@ -43,18 +43,18 @@ This project represents the primary WebGL foundation of the *M.O.B.* racing line
 * **Responsive Options UI & Viewport Scrolling (`OptionsView.hx` & `GraphicsOptionsPanel.hx`)**: Scrolling menu viewport with navigation hints, adaptive card backplates, and fixed Back button hitzone avoiding tab collisions.
 * **Arcade Raycast Vehicle Dynamics (`CarPhysics.hx`)**: Four-wheel independent spring-damper suspension integration along road surface normals, anti-roll bar torque distribution across wheel pairs, slip-angle cornering grip clamped via normalized Pacejka-like curves, front vs rear tire slip bias (`tireSlipBias: [-1.0 .. 1.0]`), dedicated handbrake breakaway, automatic drift engagement at threshold slip angles (`driftTriggerAngle: 0.22 rad`), dynamic body roll scaling (`bodyRollScale: 1.0`), ground friction scaling (`groundFriction: 1.0`), and burnout wheelspin simulation (`wheelspinAmount: 1.2`).
 * **Powertrain & Transmission Simulation**: Dynamic engine RPM flywheel calculation, progressive 6-speed gear ratios, automatic transmission up/down-shift logic, and simulated limited-slip differential (LSD).
-* **Runtime Vehicle Configuration (`CarConfig.hx`)**: Strongly typed JSON configuration schema for mass, moments of inertia, suspension rates, gear ratios, and drift assist multipliers—fully tunable at runtime without recompiling.
-* **Spring-Damped Chase Camera (`ChaseCamera.hx`)**: Spring-damped target lag with acceleration pull-back, speed-dependent dynamic FOV stretching (65° base to 85° at top speed), and softened, punchy collision trauma dampening with rapid exponential decay (`3.8 * dt`).
+* **Dynamic Speed Chase Camera (`ChaseCamera.hx`)**: Spring-damped target follow with controlled acceleration pull-back (+0.55m max), velocity feedforward anchoring (0.65), speed-dependent dynamic FOV (65.0° base smoothly scaling to 77.0° cruising at top speed with +3.5° boost, bounded to prevent fisheye distortion), and toned-down collision trauma dampening with rapid exponential decay (`3.8 * dt`).
+* **Dual-Tier Automated Testing Infrastructure**: Headless unit test suite (`tests/`) powered by `utest` across 12 fixtures (200/200 assertions passed in under 0.06s) and automated browser testing suite (`web/test-suite.html` & `tests/run-browser-tests.js`) driven via Microsoft Edge and Chrome DevTools Protocol (CDP).
 * **High-Speed Radial Motion Blur (`RadialBlurShader.hx`)**: Custom HxSL screen post-processing shader with runtime `blurOrigin` and `blurIntensity` scaled dynamically with forward vehicle velocity via `PostProcessRenderer.hx`.
 * **Procedural Gradient Blue Skybox (`Skybox.hx`)**: Geodesic celestial dome with custom HxSL shader blending deep azure zenith blue (`#1052B8`), bright atmospheric horizon cyan (`#7AC2F2`), and dusk nadir tones.
 * **Apex Summit Solar Lighting**: Scene directional sunlight positioned at the highest south-east elevation of the circuit map (`X: +350, Y: -250, Z: 140`) providing crisp directional illumination.
 * **Autonomous Highway Traffic AI**: Multi-lane procedural obstacle vehicles traversing route waypoints with dynamic spatial proximity checks, lane-following, and collision boundaries.
 * **Cinematic 3-Stage Boot Sequence**: Studio, Engine, and locked Legal Disclaimer preload sequence transitioning via a 1.2-second smooth cross-fade curtain into the interactive 3D showcase.
-* **Procedural Vector Iconography (`UIIcons.hx`)**: Resolution-independent vector UI symbols drawn on the fly via `h2d.Graphics` and cached into `h2d.Tile` textures.
+* **Procedural Vector Iconography & PNG Asset Integration (`TouchControlsHUD.hx`, `UIIcons.hx`)**: Native loading of PNG button icons from `res/icons/` with immediate automatic fallback to resolution-independent procedural vector graphics.
 * **Bumper-Navigated Glassmorphic UI**: High-contrast UI featuring edge-triggered bumper/tab navigation (`LB`/`RB` or `Q`/`E`), discrete block audio volume gauges (`■` / `□`), and real-time graphics adjustments.
 * **Dual-Scheme Hardware Diagrams**: Procedural vector controller diagrams (PXN P50L / standard Xbox layouts) and keyboard diagrams with in-game button remapping and device isolation modes (`Both`, `Keyboard Only`, `Gamepad Only`).
 * **Web Audio Synthesis Engine**: Custom square, sawtooth, and noise tone generators producing procedural engine RPM frequency modulation, tire screeches, and UI chime sound effects without external audio files.
-* **Frosted Glass Multi-Touch Driving HUD (`TouchControlsHUD.hx`)**: Proportional virtual analog steering joystick for left thumb, left-hand Nitro button with flame vector icon, high-capacity Gas pad with pedal vector icon, disc brake pad with red caliper, and arched Drift button with native DOM TouchEvent integration and true multi-touch concurrency across all simultaneous chords.
+* **Frosted Glass Multi-Touch Driving HUD (`TouchControlsHUD.hx`)**: Proportional virtual analog steering joystick for left thumb, left-hand Nitro button with flame icon, high-capacity Gas pad with pedal icon, disc brake pad with red caliper, and arched Drift button with native DOM TouchEvent integration and true multi-touch concurrency across all simultaneous chords.
 * **State Persistence & Version Migration (`SaveSystem.hx`)**: Browser `LocalStorage` v4 schema caching for hardware graphics levels, audio channels, steering sensitivity, and mid-run race checkpoints with automated forward migration.
 
 ---

@@ -325,7 +325,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.discBody.set_lineSpacing(5.0);
 		this.discBody.set_text("M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" + "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" + "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" + "are the intellectual property of their respective creators. All rights reserved.\n\n" + "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" + "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" + "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" + "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" + "Please play in a well-lit environment and take a 15-minute break for every hour of play.");
 		this.discVersion = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
-		this.discVersion.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
+		this.discVersion.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
 		this.discVersion.set_textColor(5927822);
 		this.discVersion.set_textAlign(h2d_Align.Center);
 		this.logoRow = new h2d_Object(this.screenDisclaimer);
@@ -53994,7 +53994,7 @@ var ui_views_credits_CreditsView = function(parent) {
 	this.techDetailsText.set_textColor(10531526);
 	this.techDetailsText.set_text("Built with Haxe, Heaps.io (Hardware-Accelerated WebGL) & Modern Shaders\n" + "Typography: Stack Sans Headline & Material Symbols Sharp\n" + "Homage & Inspiration: Need for Speed: Most Wanted (2005) & Burnout Revenge (2005)\n\n" + "Thank you for playing!");
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
+	this.versionText.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
 	this.versionText.set_textColor(15057019);
 	this.versionText.set_textAlign(h2d_Align.Center);
 	this.backBtnText = new h2d_Text(ui_FontManager.titleFont,this);
@@ -54491,7 +54491,7 @@ var ui_views_mainmenu_MainMenuView = function(parent) {
 	this.titleText.set_text("MAIN MENU");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
+	this.versionText.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
 	this.versionText.set_textColor(9413043);
 	var labels = ["START NEW RACE","RESUME SAVED RACE","OPTIONS","CREDITS","EXIT TO SPLASH"];
 	var iconTypes = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Settings,ui_IconType.Credits,ui_IconType.Exit];
@@ -55583,7 +55583,7 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.titleText.set_text("CONFIGURATION & HARDWARE");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
+	this.versionText.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
 	this.versionText.set_textColor(9413043);
 	var tabNames = ["GRAPHICS","AUDIO","KEYBOARD","GAMEPAD","TOUCH"];
 	var tabIconTypes = [ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Touch];
@@ -55897,7 +55897,7 @@ var ui_views_splash_SplashView = function(parent) {
 	this.promptText.set_text("PRESS ANY BUTTON OR CLICK TO ENTER");
 	this.promptText.set_textColor(16777215);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
+	this.versionText.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
 	this.versionText.set_textColor(9413043);
 	this.screenHit = new h2d_Interactive(3000,3000,this);
 	this.screenHit.onClick = function(_) {

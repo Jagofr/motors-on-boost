@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.3.0] - 2026-10-11
+### Added
+- **Dynamic Speed Chase Camera (`ChaseCamera.hx`)**:
+  - Replaced extreme physical camera pull-back with a subtle, controlled lagging back (+0.85m at max speed) anchored with velocity feedforward (`0.65`) and adaptive spring stiffness (`15.0 + speedRatio * 4.0`).
+  - Dynamic non-linear FOV expansion curve (`pow(speedRatio, 1.25)`), smoothly scaling between 65.0° and 77.0° (+3.5° under nitrous boost) to eliminate fisheye warping distortion.
+  - Tighter base chassis framing (`BASE_DISTANCE = 7.5m`, `BASE_HEIGHT = 2.8m`, `LOOK_AHEAD_DIST = 6.2m`).
+  - Zero runtime heap allocations in update loops; added zero-allocation public getters `getPos()` and `getTarget()`.
+- **Touch Controls Icon Assets Integration & HUD Alignment (`TouchControlsHUD.hx`, `res/icons/`)**:
+  - Embedded native PNG asset loader for touch icons (`icons/burn.png`, `icons/gas-pedal.png`, `icons/brake.png`, `icons/hand-brake.png`) with automatic fallback to high-contrast procedural vector graphics.
+  - Re-anchored controls into two-handed driving layout: left-thumb analog steering stick with left-index nitro button, right-thumb throttle pedal with upper-right brake and drift pads.
+  - Multi-touch concurrency across all simultaneous chords.
+- **Dual-Tier Automated Testing Infrastructure (`tests/` & `web/test-suite.html`)**:
+  - Headless unit test suite with `utest` 1.13.2 across 12 fixtures with 200/200 assertions passing in under 0.06s.
+  - Modular argument filter runner in `TestMain.hx` (`node tests/node-runner.js [module|class]`).
+  - Automated browser visual/programmatic testing suite (`tests/run-browser-tests.js`) driven headlessly via Microsoft Edge and CDP with 15/15 scenarios passing.
+- **Graphics Options Hierarchy & Dependency Locking (`GraphicsOptionsPanel.hx`)**:
+  - Automatically disables, grays out, labels `[DISABLED]`, and blocks value cycling for dependent settings when parent options are disabled.
+  - Added vertical scrolling (`scrollOffset`, `maxVisibleRows`) and adaptive card backplates.
+- **Steering Sensitivity Across All Tabs (`ControlsOptionsPanel.hx`)**:
+  - Permanent steering sensitivity slider across Keyboard, Gamepad, and Touch tabs (0% to 100% in 2% steps), synced to `InputController.steerSensitivity`.
+- **Dedicated Touch Controls Options Tab (`ControlsOptionsPanel.hx`, `SaveSystem.hx`)**:
+  - Added dedicated 5th Options tab supporting Default vector layout schematic and Custom offset/scale adjustment with 1-click Reset to Defaults.
+- **Decoupled 3D Render Scale from 2D UI Resolution (`PostProcessRenderer.hx`, `GraphicsManager.hx`)**:
+  - Independent 3D offscreen render target scaling with matching `Depth24Stencil8` depth buffer allocation, keeping 2D UI canvas and text at native 1:1 window resolution.
+- **Milestone Versioning & Build Tallies**:
+  - Incremented semantic version to `0.3.0` (`0.+1.-5` milestone transition).
+  - Tallied build compilation number from 0 to `0005` in `0000` format (`v0.3.0 (Build 0005)`).
+  - Updated PWA service worker cache to `mob-motors-on-boost-v3-0`.
+
+*For detailed notes, see [`changelogs/2026-10-11-v0.3.0-speed-camera-refinements-and-qa-milestone.md`](./changelogs/2026-10-11-v0.3.0-speed-camera-refinements-and-qa-milestone.md).*
+
+---
+
 ## [0.2.2] - 2026-10-10
 ### Added
 - **In-Game HUD Overhaul (`InGameHUDView.hx`)**:

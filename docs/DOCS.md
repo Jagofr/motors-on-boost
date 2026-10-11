@@ -75,11 +75,14 @@ This ledger records active tuning variables across physics, input, track geometr
 
 | Parameter | Current Value | Description / Impact |
 |---|---|---|
-| `BASE_FOV` | `65.0°` | Base vertical field of view angle when cruising. |
-| `MAX_SPEED_FOV` | `85.0°` | Smoothly dilated FOV angle at terminal velocity (+5° under nitrous). |
+| `BASE_DISTANCE` | `7.5` m | Follow distance behind vehicle at zero speed. |
+| `BASE_HEIGHT` | `2.8` m | Vertical elevation above vehicle chassis at zero speed. |
+| `BASE_FOV` | `65.0°` | Base vertical field of view angle when cruising or stationary. |
+| `MAX_SPEED_FOV` | `77.0°` | Smoothly dilated FOV angle at terminal velocity (+3.5° under nitrous boost). |
+| `accelPullBack` | Dynamic (`0.0 - 0.55m`) | Spring-damped camera pull-back during forward acceleration (+0.35m boost). |
+| `velocityFeedforward` | `0.65` | Forward velocity feedforward anchoring camera tightly behind chassis at 200+ km/h. |
 | `MAX_TRAUMA_CEILING` | `0.55` | Clamped maximum trauma ceiling preventing violent screen disorientation. |
 | `TRAUMA_DECAY_RATE` | `3.8` | Rapid exponential decay settling trauma crisp and punchy. |
-| `accelPullBack` | Dynamic (`0.0 - 2.5m`) | Spring-damped camera pull-back during forward acceleration surges. |
 
 ---
 
@@ -103,10 +106,10 @@ This ledger records active tuning variables across physics, input, track geometr
 | `UI Resolution` | `720p (HD), 1080p (FHD), 1440p (2K), 2160p (4K), Native / Match Window` | In-Game & Menu | 2D scene coordinate scale and layout projection. |
 
 ### PWA Storage Spec (`localStorage`):
-- Version: `4` (Application Release: `v0.2.2`, Build: `5`)
+- Version: `4` (Application Release: `v0.3.0`, Build: `0005`)
 - Primary Key: `mob_motors_on_boost_save_v4`
 - Backwards-Compatible Fallback Keys: `mob_motors_on_boost_save_v3`, `mob_motors_on_boost_save_v2`, `mob_motors_on_boost_save_v1`, `burnout_overdrive_save_v1`
-- Forward Migration: Older save records are loaded, schema-migrated to version 4 with `steerSensitivity` (1.0) and `touchSettings` (`mode: "Default"`, custom offsets and scale), stamped with `buildNumber: 5`, and committed back to `mob_motors_on_boost_save_v4`.
+- Forward Migration: Older save records are loaded, schema-migrated to version 4 with `steerSensitivity` (1.0) and `touchSettings` (`mode: "Default"`, custom offsets and scale), stamped with `buildNumber: 5` (`0005`), and committed back to `mob_motors_on_boost_save_v4`.
 - Preserves: `version`, `buildNumber`, `hasActiveRun`, `posX`, `posY`, `posZ`, `yaw`, `forwardSpeed`, `masterVol`, `musicVol`, `sfxVol`, `steerSensitivity`, `touchSettings`, and `graphics` profile.
 
 ### Graphics Options Dependency Hierarchy (`GraphicsOptionsPanel.hx`):
@@ -143,7 +146,7 @@ This ledger records active tuning variables across physics, input, track geometr
 - Powered by `utest` (1.13.2) and `vshaxe.haxe-test-adapter`.
 - Statically builds via `haxe test.hxml` and runs headlessly in Node.js via `tests/node-runner.js`.
 - Shims DOM and local storage environments cleanly for Heaps.
-- 12 comprehensive test fixtures with 197 assertions passing in under 0.10s.
+- 12 comprehensive test fixtures with 200 assertions passing in under 0.06s.
 
 ### 2. Browser Visual / UI Automation Suite (`web/test-suite.html` & `tests/run-browser-tests.js`)
 - Runs Microsoft Edge headlessly with an isolated profile and dynamic CDP debugging port.
