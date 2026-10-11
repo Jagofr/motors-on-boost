@@ -1462,34 +1462,40 @@ camera_ChaseCamera.prototype = {
 		var clampedDt = Math.min(dt,0.05);
 		var speedAbs = Math.abs(carPhysics.forwardSpeed);
 		var speedRatio = Math.min(1.0,speedAbs / 68.0);
-		var targetFov = 65.0 + speedRatio * 20.;
-		if(isNitroActive) {
-			targetFov += 5.0;
+		var targetFov = 65.0 + Math.pow(speedRatio,1.25) * 12.;
+		if(isNitroActive && speedAbs > 10.0) {
+			targetFov += 3.5 * Math.min(1.0,speedAbs / 25.0);
 		}
-		this.cam.fovY += (targetFov - this.cam.fovY) * Math.min(1.0,7.5 * clampedDt);
+		this.cam.fovY += (targetFov - this.cam.fovY) * Math.min(1.0,7.0 * clampedDt);
 		var currentAccel = (carPhysics.forwardSpeed - this.prevSpeed) / clampedDt;
 		this.prevSpeed = carPhysics.forwardSpeed;
 		var targetPullBack = 0.0;
-		if(currentAccel > 2.0) {
-			targetPullBack = Math.min(2.5,currentAccel * 0.06);
+		if(currentAccel > 1.5) {
+			targetPullBack = Math.min(0.55,currentAccel * 0.02);
 		}
-		if(isNitroActive && speedAbs > 15.0) {
-			targetPullBack += 1.2;
+		if(isNitroActive && speedAbs > 10.0) {
+			targetPullBack += 0.35;
 		}
 		this.accelPullBack += (targetPullBack - this.accelPullBack) * Math.min(1.0,5.0 * clampedDt);
-		var effectiveYaw = carPhysics.yaw + carPhysics.driftAngle * 0.40;
+		var effectiveYaw = carPhysics.yaw + carPhysics.driftAngle * 0.35;
 		var fwdX = -Math.sin(effectiveYaw);
 		var fwdY = Math.cos(effectiveYaw);
-		var dist = 8.8 + speedRatio * 1.5 + this.accelPullBack;
-		var targetLookX = carPhysics.pos.x + fwdX * 6.5;
-		var targetLookY = carPhysics.pos.y + fwdY * 6.5;
+		var dist = 7.5 + speedRatio * 0.85 + this.accelPullBack;
+		var targetCamX = carPhysics.pos.x - fwdX * dist;
+		var targetCamY = carPhysics.pos.y - fwdY * dist;
+		var targetLookX = carPhysics.pos.x + fwdX * 6.2;
+		var targetLookY = carPhysics.pos.y + fwdY * 6.2;
 		var targetLookZ = carPhysics.pos.z + 1.0;
-		this.currentPos.x += (carPhysics.pos.x - fwdX * dist - this.currentPos.x) * Math.min(1.0,8.5 * clampedDt);
-		this.currentPos.y += (carPhysics.pos.y - fwdY * dist - this.currentPos.y) * Math.min(1.0,8.5 * clampedDt);
-		this.currentPos.z += (carPhysics.pos.z + (3.2 + speedRatio * 0.35) - this.currentPos.z) * Math.min(1.0,8.5 * clampedDt);
-		this.currentTarget.x += (targetLookX - this.currentTarget.x) * Math.min(1.0,12.0 * clampedDt);
-		this.currentTarget.y += (targetLookY - this.currentTarget.y) * Math.min(1.0,12.0 * clampedDt);
-		this.currentTarget.z += (targetLookZ - this.currentTarget.z) * Math.min(1.0,12.0 * clampedDt);
+		var fwdVelY = Math.cos(carPhysics.yaw) * carPhysics.forwardSpeed;
+		this.currentPos.x += -Math.sin(carPhysics.yaw) * carPhysics.forwardSpeed * clampedDt * 0.65;
+		this.currentPos.y += fwdVelY * clampedDt * 0.65;
+		var posStiffness = 15.0 + speedRatio * 4.0;
+		this.currentPos.x += (targetCamX - this.currentPos.x) * Math.min(1.0,posStiffness * clampedDt);
+		this.currentPos.y += (targetCamY - this.currentPos.y) * Math.min(1.0,posStiffness * clampedDt);
+		this.currentPos.z += (carPhysics.pos.z + (2.8 + speedRatio * 0.20) - this.currentPos.z) * Math.min(1.0,posStiffness * clampedDt);
+		this.currentTarget.x += (targetLookX - this.currentTarget.x) * Math.min(1.0,14.0 * clampedDt);
+		this.currentTarget.y += (targetLookY - this.currentTarget.y) * Math.min(1.0,14.0 * clampedDt);
+		this.currentTarget.z += (targetLookZ - this.currentTarget.z) * Math.min(1.0,14.0 * clampedDt);
 		var shakeX = 0.0;
 		var shakeY = 0.0;
 		var shakeZ = 0.0;

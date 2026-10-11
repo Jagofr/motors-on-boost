@@ -36,6 +36,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Automatically disables, grays out, labels `[DISABLED]`, and blocks value cycling for dependent settings when parent options are disabled (`shadowLevel == "Off"` -> `shadowRes`; `mipmapping == false` -> `anisotropic`; `aaType == "None"` -> `aaLevel`; `modelReflections == false` -> `reflectionLevel`).
 - **Dedicated Touch Controls Options Tab (`ControlsOptionsPanel.hx`, `TouchControlsHUD.hx`, `SaveSystem.hx`)**:
   - Added dedicated 5th tab to Options menu supporting Default layout vector schematic and Custom layout position adjustment with fine-grained offsets, scale, and 1-click Reset to Defaults.
+- **Dynamic Speed Camera & Controlled Lag Refinements (`ChaseCamera.hx`)**:
+  - Replaced extreme physical camera pull-back with a subtle, controlled lagging back (+0.85m at max speed) anchored with velocity feedforward (`0.65`) and adaptive spring stiffness.
+  - Dynamically scaled FOV based on speed using a smooth non-linear curve (`pow(speedRatio, 1.25)`), bounded between 65.0° and 77.0° (+3.5° under nitro boost) to prevent fisheye warping at high velocities.
+  - Zero per-frame object allocations in camera update loops.
 
 *For detailed notes, see [`changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md`](./changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md) and [`changelogs/2026-10-11-v0.2.2-automated-test-suite-and-options-overhaul.md`](./changelogs/2026-10-11-v0.2.2-automated-test-suite-and-options-overhaul.md).*
 

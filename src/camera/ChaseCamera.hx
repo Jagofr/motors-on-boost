@@ -5,8 +5,9 @@ import h3d.Vector;
 import physics.CarPhysics;
 
 /**
- * Third-person spring-damped chase camera with acceleration pull-back,
- * velocity-dependent FOV dilation, and toned-down, punchy collision trauma dampening.
+ * Third-person spring-damped chase camera with subtle acceleration pull-back lag,
+ * dynamic speed-based FOV expansion (bounded to prevent extreme distortion), and
+ * toned-down, punchy collision trauma dampening.
  * Designed with zero runtime allocations in update loops.
  */
 class ChaseCamera {
@@ -20,31 +21,31 @@ class ChaseCamera {
     var currentTarget:Vector = new Vector();
 
     /** Base follow distance in meters behind the vehicle chassis at zero speed. */
-    static inline var BASE_DISTANCE:Float = 8.8;
+    public static inline var BASE_DISTANCE:Float = 7.5;
 
     /** Base vertical elevation in meters above the vehicle chassis at zero speed. */
-    static inline var BASE_HEIGHT:Float = 3.2;
+    public static inline var BASE_HEIGHT:Float = 2.8;
 
     /** Distance in meters ahead of the vehicle along heading vector to position the focal target. */
-    static inline var LOOK_AHEAD_DIST:Float = 6.5;
+    public static inline var LOOK_AHEAD_DIST:Float = 6.2;
 
     /** Vertical offset in meters above vehicle center point for the look-ahead focal point. */
-    static inline var LOOK_AHEAD_HEIGHT:Float = 1.0;
+    public static inline var LOOK_AHEAD_HEIGHT:Float = 1.0;
 
-    /** Base vertical field of view angle in degrees when cruising at low speed. */
-    static inline var BASE_FOV:Float = 65.0;
+    /** Base vertical field of view angle in degrees when stationary or cruising at low speed. */
+    public static inline var BASE_FOV:Float = 65.0;
 
-    /** Target vertical field of view angle in degrees at top speed. */
-    static inline var MAX_SPEED_FOV:Float = 85.0;
+    /** Target vertical field of view angle in degrees at top speed without boost (bounded to avoid extreme distortion). */
+    public static inline var MAX_SPEED_FOV:Float = 77.0;
 
-    /** Maximum additional FOV expansion under nitrous oxide boost. */
-    static inline var BOOST_FOV_EXTRA:Float = 5.0;
+    /** Maximum additional FOV expansion in degrees under nitrous oxide boost. */
+    public static inline var BOOST_FOV_EXTRA:Float = 3.5;
 
     /** Maximum trauma ceiling preventing disorienting or violent screen shake. */
-    static inline var MAX_TRAUMA_CEILING:Float = 0.55;
+    public static inline var MAX_TRAUMA_CEILING:Float = 0.55;
 
     /** Rapid exponential decay rate per second settling trauma quickly. */
-    static inline var TRAUMA_DECAY_RATE:Float = 3.8;
+    public static inline var TRAUMA_DECAY_RATE:Float = 3.8;
 
     /** Current screen trauma intensity scalar in range [0.0, MAX_TRAUMA_CEILING]. */
     public var trauma:Float = 0.0;
@@ -74,6 +75,16 @@ class ChaseCamera {
     }
 
     /**
+     * Returns current camera eye position vector in world space.
+     */
+    public inline function getPos():Vector return currentPos;
+
+    /**
+     * Returns current focal target vector in world space.
+     */
+    public inline function getTarget():Vector return currentTarget;
+
+    /**
      * Adds an impulse of impact or drift trauma to trigger rotational/translational screen shake.
      * Softened and clamped to a toned-down ceiling to avoid disorienting the player.
      *
@@ -86,7 +97,7 @@ class ChaseCamera {
     }
 
     /**
-     * Updates spring-arm position, acceleration pull-back lag, look-ahead target vector,
+     * Updates spring-arm position, controlled acceleration pull-back lag, look-ahead target vector,
      * speed-dependent dynamic FOV, and toned-down camera shake offsets.
      *
      * @param dt Delta time elapsed since last frame in seconds.
@@ -97,37 +108,41 @@ class ChaseCamera {
         if (dt <= 0.0) return;
         var clampedDt = Math.min(dt, 0.05);
 
-        // 1. Dynamic FOV Scaling (65° base smoothly scaling up to 85° at top speed)
+        // 1. Dynamic FOV Scaling (smooth non-linear expansion bounded to avoid extreme distortion)
         var speedAbs = Math.abs(carPhysics.forwardSpeed);
         var speedRatio = Math.min(1.0, speedAbs / CarPhysics.TOP_SPEED);
-        var targetFov = BASE_FOV + (speedRatio * (MAX_SPEED_FOV - BASE_FOV));
-        if (isNitroActive) targetFov += BOOST_FOV_EXTRA;
+        var fovProgress = Math.pow(speedRatio, 1.25);
+        var targetFov = BASE_FOV + (fovProgress * (MAX_SPEED_FOV - BASE_FOV));
+        if (isNitroActive && speedAbs > 10.0) {
+            targetFov += BOOST_FOV_EXTRA * Math.min(1.0, speedAbs / 25.0);
+        }
 
         // Smooth spring interpolation for FOV transition
-        var fovStiffness = 7.5;
+        var fovStiffness = 7.0;
         cam.fovY += (targetFov - cam.fovY) * Math.min(1.0, fovStiffness * clampedDt);
 
-        // 2. Acceleration Pull-Back Lag
+        // 2. Controlled Acceleration & Punch Pull-Back Lag
         var currentAccel = (carPhysics.forwardSpeed - prevSpeed) / clampedDt;
         prevSpeed = carPhysics.forwardSpeed;
 
         var targetPullBack = 0.0;
-        if (currentAccel > 2.0) {
-            targetPullBack = Math.min(2.5, currentAccel * 0.06);
+        if (currentAccel > 1.5) {
+            targetPullBack = Math.min(0.55, currentAccel * 0.02);
         }
-        if (isNitroActive && speedAbs > 15.0) {
-            targetPullBack += 1.2;
+        if (isNitroActive && speedAbs > 10.0) {
+            targetPullBack += 0.35;
         }
         accelPullBack += (targetPullBack - accelPullBack) * Math.min(1.0, 5.0 * clampedDt);
 
         // 3. Spring-Damped Follow Distance & Dynamic Camera Orientation
-        var effectiveYaw = carPhysics.yaw + (carPhysics.driftAngle * 0.40);
+        // Blend effective yaw with drift angle for natural slide framing
+        var effectiveYaw = carPhysics.yaw + (carPhysics.driftAngle * 0.35);
         var fwdX = -Math.sin(effectiveYaw);
         var fwdY =  Math.cos(effectiveYaw);
 
-        // Expand follow distance with forward speed and acceleration pull-back
-        var dist = BASE_DISTANCE + (speedRatio * 1.5) + accelPullBack;
-        var height = BASE_HEIGHT + (speedRatio * 0.35);
+        // Slight physical lagging back: base distance plus only +0.85m at maximum speed
+        var dist = BASE_DISTANCE + (speedRatio * 0.85) + accelPullBack;
+        var height = BASE_HEIGHT + (speedRatio * 0.20);
 
         // Target eye and look-at positions in world space
         var targetCamX = carPhysics.pos.x - (fwdX * dist);
@@ -138,9 +153,16 @@ class ChaseCamera {
         var targetLookY = carPhysics.pos.y + (fwdY * LOOK_AHEAD_DIST);
         var targetLookZ = carPhysics.pos.z + LOOK_AHEAD_HEIGHT;
 
+        // Velocity feedforward prevents the camera from physically lagging too far back at high speeds (200+ km/h)
+        // while preserving natural spring feel during turns and direction changes
+        var fwdVelX = -Math.sin(carPhysics.yaw) * carPhysics.forwardSpeed;
+        var fwdVelY =  Math.cos(carPhysics.yaw) * carPhysics.forwardSpeed;
+        currentPos.x += fwdVelX * clampedDt * 0.65;
+        currentPos.y += fwdVelY * clampedDt * 0.65;
+
         // Spring-damped target follow stiffness: camPos.lerp(targetPos, dt * stiffness)
-        var posStiffness = 8.5;
-        var lookStiffness = 12.0;
+        var posStiffness = 15.0 + (speedRatio * 4.0);
+        var lookStiffness = 14.0;
 
         currentPos.x += (targetCamX - currentPos.x) * Math.min(1.0, posStiffness * clampedDt);
         currentPos.y += (targetCamY - currentPos.y) * Math.min(1.0, posStiffness * clampedDt);
