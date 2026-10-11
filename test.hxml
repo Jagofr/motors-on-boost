@@ -8,4 +8,5 @@
 -js bin/test.js
 -D js-es=6
 -D resourcesPath=res
+-w -WDeprecatedEnumAbstract
 --cmd node tests/node-runner.js

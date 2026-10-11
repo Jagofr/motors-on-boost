@@ -16,6 +16,7 @@ import audio.AudioManager;
  * Composite hardware configuration and options modal container view.
  * Integrates tab navigation across Graphics, Audio, Keyboard, and Gamepad subpanels.
  */
+@:keep
 class OptionsView extends Object {
     /** Title banner display. */
     public var titleText:Text;
@@ -31,6 +32,7 @@ class OptionsView extends Object {
     /** Currently active configuration tab. */
     public var currentTab:OptionsTab = Graphics;
     public static var TAB_ORDER:Array<OptionsTab> = [Graphics, Audio, Keyboard, Gamepad, Touch];
+    public var tabs:Array<OptionsTab> = TAB_ORDER;
 
     /** Subpanel views. */
     public var gfxPanel:GraphicsOptionsPanel;

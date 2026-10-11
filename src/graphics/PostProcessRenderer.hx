@@ -30,8 +30,16 @@ class PostProcessRenderer extends Renderer {
     override function render() {
         var needsOffscreen = (Math.abs(renderScale - 1.0) > 0.001) || (blurShader != null && blurShader.blurIntensity > 0.001);
         if (needsOffscreen) {
-            // Allocate offscreen render target matching current engine viewport scaled by renderScale
-            var target = allocTarget("scene3dBuffer", true, renderScale);
+            // Allocate offscreen render target matching current engine viewport scaled by renderScale.
+            // If renderScale is not 1.0, allocate a matching depth target rather than using defaultDepthBuffer
+            // which retains native screen backbuffer dimensions.
+            var target:h3d.mat.Texture;
+            if (Math.abs(renderScale - 1.0) <= 0.001) {
+                target = allocTarget("scene3dBuffer", true, 1.0);
+            } else {
+                target = allocTarget("scene3dBuffer", false, renderScale);
+                target.depthBuffer = ctx.textures.allocTarget("scene3dDepth", target.width, target.height, false, hxd.PixelFormat.Depth24Stencil8);
+            }
             setTarget(target);
             clear(ctx.engine.backgroundColor, 1);
 

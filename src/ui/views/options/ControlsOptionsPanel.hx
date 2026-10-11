@@ -19,10 +19,16 @@ import save.SaveSystem.TouchSettings;
  * and custom action / button remapping subpanel.
  * Features an independent persistent steering sensitivity slider active across all control modes.
  */
+@:keep
 class ControlsOptionsPanel extends Object {
-    // =========================================================================
-    // GENERAL STEERING SENSITIVITY SLIDER (ALWAYS ACTIVE ACROSS ALL TABS)
-    // =========================================================================
+    /** Alias for persistent sensitivity row container. */
+    public var sensitivityRow:Object;
+
+    /** Convenience alias returning the touch layout diagram viewer. */
+    public var touchDiagram:Object;
+
+    /** Convenience alias returning the custom touch adjustment list container. */
+    public var customTouchList:Object;
 
     /** Container holding persistent sensitivity slider elements. */
     public var sensContainer:Object;
@@ -183,6 +189,10 @@ class ControlsOptionsPanel extends Object {
         remapStatusNotice.textColor = UITheme.COLOR_ACCENT_GOLD;
         remapStatusNotice.visible = false;
 
+        sensitivityRow = sensContainer;
+        touchDiagram = diagramViewer;
+        customTouchList = remapContainer;
+
         updateSensitivityDisplay();
     }
 
@@ -201,11 +211,12 @@ class ControlsOptionsPanel extends Object {
     }
 
     /**
-     * Increments or decrements steering sensitivity by fractional delta (typically 0.02 = 2%).
+     * Increments or decrements steering sensitivity by fractional delta or integer steps (typically 0.02 = 2%).
      *
-     * @param delta Change amount (-0.02 or +0.02).
+     * @param stepsOrDelta Change amount (-0.02, +0.02, -1, or +1).
      */
-    public function adjustSensitivity(delta:Float) {
+    public function adjustSensitivity(stepsOrDelta:Float) {
+        var delta = (Math.abs(stepsOrDelta) >= 1.0) ? (stepsOrDelta * 0.02) : stepsOrDelta;
         var sens = Math.round((inputRef.steerSensitivity + delta) * 50) / 50.0;
         sens = Math.max(0.0, Math.min(1.0, sens));
         inputRef.steerSensitivity = sens;
@@ -215,6 +226,9 @@ class ControlsOptionsPanel extends Object {
         var d = SaveSystem.load();
         d.steerSensitivity = sens;
         SaveSystem.save(d);
+        #if js
+        if (untyped js.Browser.window.app != null) untyped js.Browser.window.app.saveData = d;
+        #end
     }
 
     /**
@@ -298,6 +312,9 @@ class ControlsOptionsPanel extends Object {
                 d.touchSettings = SaveSystem.getDefaultTouchSettings();
                 d.touchSettings.mode = "Custom";
                 SaveSystem.save(d);
+                #if js
+                if (untyped js.Browser.window.app != null) untyped js.Browser.window.app.saveData = d;
+                #end
                 if (onTouchSettingsChanged != null) onTouchSettingsChanged();
                 updateRemapStyles();
                 return;
@@ -335,7 +352,7 @@ class ControlsOptionsPanel extends Object {
         var d = SaveSystem.load();
         var ts = d.touchSettings != null ? d.touchSettings : SaveSystem.getDefaultTouchSettings();
         ts.mode = "Custom";
-        var delta = dir * 5.0;
+        var delta = dir * 10.0;
 
         switch (remapIndex) {
             case 0: ts.stickOffsetX = Math.max(-100.0, Math.min(100.0, ts.stickOffsetX + delta));
@@ -358,9 +375,46 @@ class ControlsOptionsPanel extends Object {
 
         d.touchSettings = ts;
         SaveSystem.save(d);
+        #if js
+        if (untyped js.Browser.window.app != null) untyped js.Browser.window.app.saveData = d;
+        #end
         AudioManager.inst.playMenuBeep(450 + remapIndex * 20, 0.04);
         if (onTouchSettingsChanged != null) onTouchSettingsChanged();
         updateRemapStyles();
+    }
+
+
+    /**
+     * Toggles between Default layout diagram and Custom layout adjustment list.
+     */
+    public function toggleCustomMode() {
+        controlViewMode = (controlViewMode == "Diagram") ? "Custom" : "Diagram";
+        var d = SaveSystem.load();
+        d.touchSettings.mode = (controlViewMode == "Diagram") ? "Default" : "Custom";
+        SaveSystem.save(d);
+        #if js
+        if (untyped js.Browser.window.app != null) untyped js.Browser.window.app.saveData = d;
+        #end
+        updateControlViewMode();
+        if (onTouchSettingsChanged != null) onTouchSettingsChanged();
+    }
+
+    /**
+     * Adjusts a specific touch custom option row by index and direction.
+     *
+     * @param row Option row index (0-11).
+     * @param dir Increment or decrement direction (-1 or +1).
+     */
+    public function cycleCustomTouchRow(row:Int, dir:Int) {
+        remapIndex = row;
+        adjustCurrentCustomOption(dir);
+    }
+
+    /**
+     * Resets touch controls configuration to baseline defaults.
+     */
+    public function resetTouchDefaults() {
+        triggerRemapEntry(11);
     }
 
     /**

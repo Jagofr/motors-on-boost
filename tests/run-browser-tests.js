@@ -52,8 +52,8 @@ server.listen(PORT, '127.0.0.1', async () => {
     
     // 2. Launch Microsoft Edge in Headless Mode with Isolated User Profile and Unique Port
     const edgeArgs = [
-        '--headless',
-        '--disable-gpu',
+        '--headless=new',
+        '--use-gl=angle',
         `--user-data-dir=${tmpUserDataDir}`,
         `--remote-debugging-port=${DEBUG_PORT}`,
         '--no-first-run',
@@ -124,6 +124,14 @@ server.listen(PORT, '127.0.0.1', async () => {
 
     ws.onmessage = (event) => {
         const msg = JSON.parse(event.data);
+        if (msg.method === 'Runtime.consoleAPICalled') {
+            const text = (msg.params.args || []).map(a => a.value !== undefined ? a.value : (a.description || '')).join(' ');
+            console.log(`[PageConsole] ${text}`);
+        }
+        if (msg.method === 'Runtime.exceptionThrown') {
+            const desc = msg.params.exceptionDetails ? (msg.params.exceptionDetails.text + (msg.params.exceptionDetails.exception ? ' ' + JSON.stringify(msg.params.exceptionDetails.exception) : '')) : 'Unknown Exception';
+            console.error(`[PageException] ${desc}`);
+        }
         if (msg.id && pending.has(msg.id)) {
             const { resolve, reject } = pending.get(msg.id);
             pending.delete(msg.id);
@@ -176,6 +184,20 @@ server.listen(PORT, '127.0.0.1', async () => {
         checkInterval = setInterval(async () => {
             if (Date.now() - startTime > maxWaitMs) {
                 console.error('[BrowserRunner] Test execution timed out after 30 seconds.');
+                try {
+                    const logRes = await sendCommand('Runtime.evaluate', {
+                        expression: 'document.getElementById("logConsole") ? document.getElementById("logConsole").textContent : ""',
+                        returnByValue: true
+                    });
+                    const resJson = await sendCommand('Runtime.evaluate', {
+                        expression: 'JSON.stringify(window.__TEST_RESULTS__ || null)',
+                        returnByValue: true
+                    });
+                    console.log('\n--- LOG CONSOLE AT TIMEOUT ---');
+                    console.log(logRes ? logRes.result.value : '');
+                    console.log('TEST RESULTS AT TIMEOUT:', resJson ? resJson.result.value : '');
+                    console.log('------------------------------\n');
+                } catch (e) {}
                 cleanup(1);
                 return;
             }
@@ -198,6 +220,18 @@ server.listen(PORT, '127.0.0.1', async () => {
                         console.log('\n--- BROWSER TEST CONSOLE OUTPUT ---');
                         console.log(logRes ? logRes.result.value : '');
                         console.log('-----------------------------------\n');
+
+                        const itemsRes = await sendCommand('Runtime.evaluate', {
+                            expression: 'Array.from(document.querySelectorAll(".test-item")).map(i => ({ id: i.id, icon: i.querySelector(".test-icon") ? i.querySelector(".test-icon").textContent : "", desc: i.querySelector(".test-desc") ? i.querySelector(".test-desc").textContent : "", detail: i.querySelector(".test-detail") ? i.querySelector(".test-detail").textContent : "" }))',
+                            returnByValue: true
+                        });
+                        if (itemsRes && itemsRes.result && itemsRes.result.value) {
+                            console.log('--- INDIVIDUAL ITEM RESULTS ---');
+                            for (const it of itemsRes.result.value) {
+                                console.log(`${it.icon} [${it.id}] ${it.desc}: ${it.detail}`);
+                            }
+                            console.log('-------------------------------\n');
+                        }
 
                         console.log(`[BrowserRunner] SUMMARY: Total: ${results.total}, Passed: ${results.passed}, Failed: ${results.failed}`);
                         cleanup(results.failed > 0 ? 1 : 0);

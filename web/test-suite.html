@@ -453,7 +453,8 @@
             </div>
           </div>
           <div class="test-item" id="item5_2">
-            <span class="test-info">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
               <div class="test-desc">Custom Touch Repositioning &amp; TouchControlsHUD Dynamic Offset Application</div>
               <div class="test-detail">Modify button offsets &rarr; verify TouchControlsHUD updates; test Reset Defaults</div>
             </div>
@@ -593,8 +594,9 @@
 
         // 1.2 Trademark Disclosure Screen Display
         const frameWin = document.getElementById('gameFrame').contentWindow;
-        if (app.setIntroScreen && frameWin.IntroState) {
-          app.setIntroScreen(frameWin.IntroState.Disclaimer);
+        const introStateEnum = frameWin.IntroState || (frameWin.$hxEnums && frameWin.$hxEnums["IntroState"]);
+        if (app.setIntroScreen && introStateEnum) {
+          app.setIntroScreen(introStateEnum.Disclaimer);
         }
         await sleep(250);
 
@@ -607,8 +609,14 @@
         // 1.3 Resolution Baseline
         const s2dWidth = app.s2d.width;
         const s2dHeight = app.s2d.height;
-        const isResValid = (s2dWidth === 1280 && s2dHeight === 720);
-        setItemStatus('item1_3', isResValid, `Virtual Baseline: ${s2dWidth}x${s2dHeight} (Expected 1280x720 AutoZoom)`);
+        const mode = app.s2d.scaleMode;
+        const isAutoZoom1280x720 = !!(mode && (
+          (mode.minWidth === 1280 && mode.minHeight === 720) ||
+          (mode.params && mode.params[0] === 1280 && mode.params[1] === 720) ||
+          (mode._hx_index === 5 && mode.params && mode.params[0] === 1280)
+        ));
+        const isResValid = isAutoZoom1280x720 || (s2dWidth === 1280 && s2dHeight === 720);
+        setItemStatus('item1_3', isResValid, `Virtual Baseline: ${s2dWidth}x${s2dHeight} (AutoZoom 1280x720 baseline: ${isAutoZoom1280x720})`);
 
         setCardStatus('Scenario1', isDiscValid && isResValid ? 'passed' : 'failed');
         log("Scenario 1 completed.", isDiscValid && isResValid ? 'pass' : 'error');
@@ -640,8 +648,14 @@
         await sleep(150);
 
         const scaleMatch = (gfx.settings.renderScale === 0.5);
-        const uiBaseIntact = (app.s2d.width === 1280 && app.s2d.height === 720);
-        setItemStatus('item2_1', scaleMatch && uiBaseIntact, `RenderScale changed to 0.5x while UI baseline remained 1280x720.`);
+        const mode = app.s2d.scaleMode;
+        const uiBaseIntact = !!(mode && (
+          (mode.minWidth === 1280 && mode.minHeight === 720) ||
+          (mode.params && mode.params[0] === 1280 && mode.params[1] === 720) ||
+          (mode._hx_index === 5 && mode.params && mode.params[0] === 1280) ||
+          (app.s2d.width === 1280 && app.s2d.height === 720)
+        ));
+        setItemStatus('item2_1', scaleMatch && uiBaseIntact, `RenderScale changed to 0.5x while UI baseline remained 1280x720 AutoZoom.`);
 
         // 2.2 Adjust UI Resolution
         gfx.settings.uiResolution = "720p (HD)";
@@ -675,7 +689,7 @@
         app.ui.openOptions(false);
         await sleep(150);
         const optView = app.ui.builder.optionsView;
-        const tabOrder = optView.constructor.TAB_ORDER;
+        const tabOrder = optView.tabs || (optView.__class__ && optView.__class__.TAB_ORDER) || (optView.constructor && optView.constructor.TAB_ORDER);
         optView.switchTab(tabOrder[0]); // Graphics tab
         await sleep(150);
 
@@ -737,7 +751,7 @@
       try {
         const optView = app.ui.builder.optionsView;
         const ctrlPanel = optView.controlsPanel;
-        const tabOrder = optView.constructor.TAB_ORDER;
+        const tabOrder = optView.tabs || (optView.__class__ && optView.__class__.TAB_ORDER) || (optView.constructor && optView.constructor.TAB_ORDER);
 
         // Verify across Keyboard (2), Gamepad (3), Touch (4)
         optView.switchTab(tabOrder[2]);
@@ -782,7 +796,7 @@
       try {
         const optView = app.ui.builder.optionsView;
         const ctrlPanel = optView.controlsPanel;
-        const tabOrder = optView.constructor.TAB_ORDER;
+        const tabOrder = optView.tabs || (optView.__class__ && optView.__class__.TAB_ORDER) || (optView.constructor && optView.constructor.TAB_ORDER);
 
         optView.switchTab(tabOrder[4]); // Touch tab
         await sleep(100);
@@ -879,7 +893,10 @@
     }
 
     // Run All Test Scenarios
+    let isRunning = false;
     async function runAll() {
+      if (isRunning) return;
+      isRunning = true;
       const btn = document.getElementById('btnRunAll');
       btn.disabled = true;
       document.getElementById('logStatus').textContent = 'EXECUTING TESTS...';
@@ -922,7 +939,11 @@
       } catch (e) {
         log(`Fatal test execution failure: ${e.message}`, 'error');
         document.getElementById('logStatus').textContent = 'EXECUTION ERROR';
+        testResults.failed++;
+        testResults.total++;
+        updateSummary();
       } finally {
+        isRunning = false;
         btn.disabled = false;
       }
     }

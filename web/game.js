@@ -276,6 +276,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.buildIntroScreens();
 		this.setIntroScreen(IntroState.Studio);
 		window.app = this;
+		window.IntroState = IntroState;
 	}
 	,loadWebpTile: function(path,onLoaded) {
 		var img = new Image();
@@ -295,7 +296,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 			onLoaded(tile);
 		};
 		img.onerror = function(err) {
-			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 186, className : "Main", methodName : "loadWebpTile"});
+			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 187, className : "Main", methodName : "loadWebpTile"});
 		};
 		img.src = path;
 	}
@@ -395,6 +396,9 @@ Main.prototype = $extend(hxd_App.prototype,{
 		}
 	}
 	,finishIntroSequence: function() {
+		if(!this.isLoadingStarted) {
+			this.startBackgroundLoading();
+		}
 		this.introState = IntroState.Complete;
 		this.appState = AppState.InGameUI;
 		var _this = this.introContainer;
@@ -755,6 +759,9 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.input.update(dt);
 		if(this.appState == AppState.IntroSequence) {
 			this.updateIntro(dt);
+			return;
+		}
+		if(this.ui == null) {
 			return;
 		}
 		if(this.isShowcaseFadingIn) {
@@ -5474,11 +5481,17 @@ graphics_PostProcessRenderer.__super__ = h3d_scene_fwd_Renderer;
 graphics_PostProcessRenderer.prototype = $extend(h3d_scene_fwd_Renderer.prototype,{
 	render: function() {
 		if(Math.abs(this.renderScale - 1.0) > 0.001 || this.blurShader != null && this.blurShader.blurIntensity__ > 0.001) {
-			var size = this.renderScale;
-			if(size == null) {
-				size = 1.;
+			var target;
+			if(Math.abs(this.renderScale - 1.0) <= 0.001) {
+				target = this.ctx.textures.allocTarget("scene3dBuffer",Math.round(this.ctx.engine.width * 1.0),Math.round(this.ctx.engine.height * 1.0),true,null);
+			} else {
+				var size = this.renderScale;
+				if(size == null) {
+					size = 1.;
+				}
+				target = this.ctx.textures.allocTarget("scene3dBuffer",Math.round(this.ctx.engine.width * size),Math.round(this.ctx.engine.height * size),false,null);
+				target.depthBuffer = this.ctx.textures.allocTarget("scene3dDepth",target.width,target.height,false,hxd_PixelFormat.Depth24Stencil8);
 			}
-			var target = this.ctx.textures.allocTarget("scene3dBuffer",Math.round(this.ctx.engine.width * size),Math.round(this.ctx.engine.height * size),true,null);
 			this.setTarget(target);
 			this.ctx.engine.clear(this.ctx.engine.backgroundColor,1,null);
 			h3d_scene_fwd_Renderer.prototype.render.call(this);
@@ -54819,6 +54832,9 @@ var ui_views_options_ControlsOptionsPanel = function(input,parent) {
 	this.remapStatusNotice = new h2d_Text(ui_FontManager.regularFont,this);
 	this.remapStatusNotice.set_textColor(16772608);
 	this.remapStatusNotice.set_visible(false);
+	this.sensitivityRow = this.sensContainer;
+	this.touchDiagram = this.diagramViewer;
+	this.customTouchList = this.remapContainer;
 	this.updateSensitivityDisplay();
 };
 $hxClasses["ui.views.options.ControlsOptionsPanel"] = ui_views_options_ControlsOptionsPanel;
@@ -54837,7 +54853,8 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		}
 		this.updateControlHeaderButtons();
 	}
-	,adjustSensitivity: function(delta) {
+	,adjustSensitivity: function(stepsOrDelta) {
+		var delta = Math.abs(stepsOrDelta) >= 1.0 ? stepsOrDelta * 0.02 : stepsOrDelta;
 		var sens = Math.round((this.inputRef.steerSensitivity + delta) * 50) / 50.0;
 		sens = Math.max(0.0,Math.min(1.0,sens));
 		this.inputRef.steerSensitivity = sens;
@@ -54846,6 +54863,9 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		var d = save_SaveSystem.load();
 		d.steerSensitivity = sens;
 		save_SaveSystem.save(d);
+		if(window.app != null) {
+			window.app.saveData = d;
+		}
 	}
 	,updateSensitivityDisplay: function() {
 		var barLen = Math.round(this.inputRef.steerSensitivity * 20);
@@ -54922,11 +54942,15 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	,triggerRemapEntry: function(idx) {
 		if(this.currentTab == ui_components_OptionsTab.Touch) {
 			var d = save_SaveSystem.load();
+			var ts = d.touchSettings != null ? d.touchSettings : save_SaveSystem.getDefaultTouchSettings();
 			if(idx == 11) {
 				audio_AudioManager.inst.playMenuBeep(320,0.08);
 				d.touchSettings = save_SaveSystem.getDefaultTouchSettings();
 				d.touchSettings.mode = "Custom";
 				save_SaveSystem.save(d);
+				if(window.app != null) {
+					window.app.saveData = d;
+				}
 				if(this.onTouchSettingsChanged != null) {
 					this.onTouchSettingsChanged();
 				}
@@ -54947,10 +54971,11 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			return;
 		}
 		var isGamepad = this.currentTab == ui_components_OptionsTab.Gamepad;
+		var actList = [input_InputAction.Throttle,input_InputAction.Brake,input_InputAction.SteerLeft,input_InputAction.SteerRight,input_InputAction.Handbrake,input_InputAction.Boost];
 		audio_AudioManager.inst.playMenuBeep(640,0.1);
 		this.remapStatusNotice.set_text("PRESS ANY " + (isGamepad ? "BUTTON" : "KEY") + "...");
 		this.remapStatusNotice.set_visible(true);
-		this.inputRef.startListening([input_InputAction.Throttle,input_InputAction.Brake,input_InputAction.SteerLeft,input_InputAction.SteerRight,input_InputAction.Handbrake,input_InputAction.Boost][idx],isGamepad);
+		this.inputRef.startListening(actList[idx],isGamepad);
 	}
 	,adjustCurrentCustomOption: function(dir) {
 		if(this.currentTab != ui_components_OptionsTab.Touch) {
@@ -54959,7 +54984,7 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		var d = save_SaveSystem.load();
 		var ts = d.touchSettings != null ? d.touchSettings : save_SaveSystem.getDefaultTouchSettings();
 		ts.mode = "Custom";
-		var delta = dir * 5.0;
+		var delta = dir * 10.0;
 		switch(this.remapIndex) {
 		case 0:
 			ts.stickOffsetX = Math.max(-100.0,Math.min(100.0,ts.stickOffsetX + delta));
@@ -54992,18 +55017,42 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			ts.driftOffsetY = Math.max(-100.0,Math.min(100.0,ts.driftOffsetY + delta));
 			break;
 		case 10:
-			ts.scale = Math.max(0.5,Math.min(1.5,Math.round((ts.scale + dir * 0.05) * 100) / 100.0));
+			var s = Math.round((ts.scale + dir * 0.05) * 100) / 100.0;
+			ts.scale = Math.max(0.5,Math.min(1.5,s));
 			break;
 		case 11:
 			return;
 		}
 		d.touchSettings = ts;
 		save_SaveSystem.save(d);
+		if(window.app != null) {
+			window.app.saveData = d;
+		}
 		audio_AudioManager.inst.playMenuBeep(450 + this.remapIndex * 20,0.04);
 		if(this.onTouchSettingsChanged != null) {
 			this.onTouchSettingsChanged();
 		}
 		this.updateRemapStyles();
+	}
+	,toggleCustomMode: function() {
+		this.controlViewMode = this.controlViewMode == "Diagram" ? "Custom" : "Diagram";
+		var d = save_SaveSystem.load();
+		d.touchSettings.mode = this.controlViewMode == "Diagram" ? "Default" : "Custom";
+		save_SaveSystem.save(d);
+		if(window.app != null) {
+			window.app.saveData = d;
+		}
+		this.updateControlViewMode();
+		if(this.onTouchSettingsChanged != null) {
+			this.onTouchSettingsChanged();
+		}
+	}
+	,cycleCustomTouchRow: function(row,dir) {
+		this.remapIndex = row;
+		this.adjustCurrentCustomOption(dir);
+	}
+	,resetTouchDefaults: function() {
+		this.triggerRemapEntry(11);
 	}
 	,navigate: function(dir) {
 		var count = this.getMaxRemapCount();
@@ -55517,6 +55566,7 @@ ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 });
 var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.isOpenedFromPause = false;
+	this.tabs = ui_views_options_OptionsView.TAB_ORDER;
 	this.currentTab = ui_components_OptionsTab.Graphics;
 	this.tabInteractives = [];
 	this.tabIcons = [];
@@ -57258,8 +57308,14 @@ hxsl_SharedShader.SHADER_RESOLVE = new haxe_ds_StringMap();
 physics_CarPhysics.WHEEL_OFFSETS = [{ x : -0.98, y : 1.35},{ x : 0.98, y : 1.35},{ x : -0.98, y : -1.35},{ x : 0.98, y : -1.35}];
 ui_UIIcons.cache = new haxe_ds_StringMap();
 ui_views_mainmenu_MainMenuView.ACTIONS = [ui_components_MenuAction.StartGame,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
+ui_views_options_ControlsOptionsPanel.REMAP_ROW_WIDTH = 540.0;
+ui_views_options_ControlsOptionsPanel.REMAP_ROW_HEIGHT = 26.0;
+ui_views_options_ControlsOptionsPanel.REMAP_ROW_STRIDE = 27.0;
+ui_views_options_ControlsOptionsPanel.MAX_REMAP_ITEMS = 12;
 ui_views_options_GraphicsOptionsPanel.NAMES = ["Textures","Shadow Level","Shadow Res","Lighting","Lighting Res","Mipmapping","Anisotropy","Anti-Aliasing","AA Level","Model Geometry","Reflections","Reflection Level","Render Scale","UI Resolution"];
 ui_views_options_OptionsView.TAB_ORDER = [ui_components_OptionsTab.Graphics,ui_components_OptionsTab.Audio,ui_components_OptionsTab.Keyboard,ui_components_OptionsTab.Gamepad,ui_components_OptionsTab.Touch];
+ui_views_options_OptionsView.TAB_BUTTON_WIDTH = 130.0;
+ui_views_options_OptionsView.TAB_BUTTON_HEIGHT = 42.0;
 world_SkyGradientShader.SRC = "HXSMF3dvcmxkLlNreUdyYWRpZW50U2hhZGVyBgEIdG9wQ29sb3IFCwIAAAIMaG9yaXpvbkNvbG9yBQsCAAADC2dyb3VuZENvbG9yBQsCAAAECnBpeGVsQ29sb3IFDAQAAAUTdHJhbnNmb3JtZWRQb3NpdGlvbgULBAAABghmcmFnbWVudA4GAAABAQYAAAUFCAcDZGlyBQsEAAAJAyAOAQIFBQsFCwAICAFoAwQAAAoCBwULCAADAAgJA2NvbAULBAAAAAALBgcCCAMBAwAAAAAAAAAAAwIFAggKAXQDBAAACQMIDgICCAMBA5qZmZmZmeE/AwMABgQCCQULCQMYDgMCAgULAgEFCwIKAwULBQsABQIICwF0AwQAAAkDFw4DBgEHAwIIAwMBAwAAAAAAABBAAwMBAwAAAAAAAAAAAwEDAAAAAAAA8D8DAwAGBAIJBQsJAxgOAwICBQsCAwULAgsDBQsFCwAABgQCBAUMCQMrDgICCQULAQMAAAAAAADwPwMFDAUMAA";
 world_SkyGradientShader._MODULE = "world.Skybox";
 {

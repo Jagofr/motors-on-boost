@@ -144,6 +144,7 @@ class Main extends hxd.App {
 
         #if js
         untyped js.Browser.window.app = this;
+        untyped js.Browser.window.IntroState = IntroState;
         #end
     }
 
@@ -339,6 +340,9 @@ class Main extends hxd.App {
     }
 
     public function finishIntroSequence() {
+        if (!isLoadingStarted) {
+            startBackgroundLoading();
+        }
         introState = Complete;
         appState = InGameUI;
         introContainer.remove();
@@ -632,6 +636,8 @@ class Main extends hxd.App {
             updateIntro(dt);
             return;
         }
+
+        if (ui == null) return;
 
         // Post-intro smooth fade-in management
         if (isShowcaseFadingIn) {
