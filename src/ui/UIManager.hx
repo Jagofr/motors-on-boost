@@ -72,6 +72,9 @@ class UIManager extends Object {
             layout();
         };
         builder.creditsView.onBack = function() showMainMenu();
+        builder.optionsView.controlsPanel.onTouchSettingsChanged = function() {
+            builder.touchControlsHUD.refreshSettings();
+        };
         builder.touchControlsHUD.onPauseTriggered = function() {
             if (currentState == InGameHUD) {
                 showPause();
@@ -297,10 +300,8 @@ class UIManager extends Object {
                 if (opt.controlsPanel.controlViewMode == "Custom") {
                     if (uiUp) opt.controlsPanel.navigate(-1);
                     else if (uiDown) opt.controlsPanel.navigate(1);
-                    if (opt.controlsPanel.remapIndex == 0) {
-                        if (uiLeft) opt.controlsPanel.adjustSensitivity(-0.02);
-                        if (uiRight) opt.controlsPanel.adjustSensitivity(0.02);
-                    }
+                    if (uiLeft) opt.controlsPanel.adjustCurrentCustomOption(-1);
+                    if (uiRight) opt.controlsPanel.adjustCurrentCustomOption(1);
                     if (uiConfirm) opt.controlsPanel.triggerRemapEntry(opt.controlsPanel.remapIndex);
                 } else {
                     if (uiLeft) opt.controlsPanel.adjustSensitivity(-0.02);

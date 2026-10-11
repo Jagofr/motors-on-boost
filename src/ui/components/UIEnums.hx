@@ -58,5 +58,8 @@ enum OptionsTab {
 
     /** Gamepad controller bindings and schematic diagram. */
     Gamepad;
+
+    /** Mobile virtual touch controls layout and on-screen button positioning. */
+    Touch;
 }
 

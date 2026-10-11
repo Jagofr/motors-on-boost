@@ -51973,6 +51973,9 @@ save_SaveSystem.__name__ = "save.SaveSystem";
 save_SaveSystem.getDefaultGraphics = function() {
 	return { textures : "High", shadowLevel : "Normal", shadowRes : 1024, lightingLevel : "Medium", lightingRes : 1024, mipmapping : true, anisotropic : 4, aaType : "FXAA", aaLevel : 2, modelGeometry : "Medium", modelReflections : true, reflectionLevel : "Medium", renderScale : 1.0, uiResolution : "720p (HD)"};
 };
+save_SaveSystem.getDefaultTouchSettings = function() {
+	return { mode : "Default", scale : 1.0, stickOffsetX : 0.0, stickOffsetY : 0.0, nitroOffsetX : 0.0, nitroOffsetY : 0.0, gasOffsetX : 0.0, gasOffsetY : 0.0, brakeOffsetX : 0.0, brakeOffsetY : 0.0, driftOffsetX : 0.0, driftOffsetY : 0.0};
+};
 save_SaveSystem.load = function() {
 	try {
 		var storage = js_Browser.getLocalStorage();
@@ -52010,6 +52013,9 @@ save_SaveSystem.load = function() {
 			if(data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
 				data.steerSensitivity = 1.0;
 			}
+			if(data.touchSettings == null) {
+				data.touchSettings = save_SaveSystem.getDefaultTouchSettings();
+			}
 			if(data.version == null || data.version < 4 || isLegacy) {
 				data.version = 4;
 				data.buildNumber = 5;
@@ -52019,7 +52025,7 @@ save_SaveSystem.load = function() {
 		}
 	} catch( _g ) {
 	}
-	return { version : 4, buildNumber : 5, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, steerSensitivity : 1.0, graphics : save_SaveSystem.getDefaultGraphics()};
+	return { version : 4, buildNumber : 5, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, steerSensitivity : 1.0, graphics : save_SaveSystem.getDefaultGraphics(), touchSettings : save_SaveSystem.getDefaultTouchSettings()};
 };
 save_SaveSystem.save = function(data) {
 	try {
@@ -52027,6 +52033,9 @@ save_SaveSystem.save = function(data) {
 		data.buildNumber = 5;
 		if(data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
 			data.steerSensitivity = 1.0;
+		}
+		if(data.touchSettings == null) {
+			data.touchSettings = save_SaveSystem.getDefaultTouchSettings();
 		}
 		var raw = JSON.stringify(data);
 		var storage = js_Browser.getLocalStorage();
@@ -52299,6 +52308,85 @@ ui_ControlDiagrams.prototype = $extend(h2d_Object.prototype,{
 			t.y = c.y2 - 8;
 		}
 	}
+	,drawTouchLayout: function() {
+		this.g.clear();
+		this.labelsContainer.removeChildren();
+		this.g.beginFill(1579808,0.85);
+		this.g.lineStyle(2.5,58879,0.95);
+		this.g.drawRoundedRect(-240.,-110.,480,220,16);
+		this.g.endFill();
+		this.g.lineStyle(1.0,3359829,0.6);
+		this.g.drawRoundedRect(-228.,-98.,456,196,10);
+		this.g.beginFill(659222,0.7);
+		this.g.lineStyle(2.0,58879,0.9);
+		this.g.drawCircle(-170.,42.,32);
+		this.g.endFill();
+		this.g.beginFill(58879,0.35);
+		this.g.lineStyle(1.5,58879,0.95);
+		this.g.drawCircle(-170.,42.,16);
+		this.g.endFill();
+		this.g.beginFill(3807240,0.7);
+		this.g.lineStyle(2.0,16737792,0.9);
+		this.g.drawCircle(-170.,-42.,22);
+		this.g.endFill();
+		this.g.beginFill(536094,0.7);
+		this.g.lineStyle(2.0,65416,0.9);
+		this.g.drawCircle(175.,45.,24);
+		this.g.endFill();
+		this.g.beginFill(3022856,0.7);
+		this.g.lineStyle(2.0,16763904,0.9);
+		this.g.drawCircle(195.,-20.,20);
+		this.g.endFill();
+		this.g.beginFill(3018002,0.7);
+		this.g.lineStyle(2.0,16724804,0.9);
+		this.g.drawCircle(140.,-54.,20);
+		this.g.endFill();
+		this.g.beginFill(659222,0.6);
+		this.g.lineStyle(1.5,16777215,0.8);
+		this.g.drawCircle(210.,-80.,11);
+		this.g.endFill();
+		var callouts = [{ x1 : -170., y1 : 76., x2 : -170., y2 : 122., text : "LEFT THUMB: Analog Steering Joystick"},{ x1 : -170., y1 : -66., x2 : -170., y2 : -122., text : "LEFT FINGER: Nitro Boost"},{ x1 : 175., y1 : 71., x2 : 175., y2 : 122., text : "RIGHT THUMB: Gas / Throttle"},{ x1 : 217., y1 : -20., x2 : 265., y2 : -20., text : "HANDBRAKE (DRIFT)"},{ x1 : 140., y1 : -76., x2 : 140., y2 : -122., text : "BRAKE / REVERSE"},{ x1 : 210., y1 : -93., x2 : 230., y2 : -110., text : "PAUSE"}];
+		this.g.lineStyle(1.5,58879,0.8);
+		var _g = 0;
+		while(_g < callouts.length) {
+			var c = callouts[_g];
+			++_g;
+			var _this = this.g;
+			var x = c.x1;
+			var y = c.y1;
+			_this.flush();
+			_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+			var _this1 = this.g;
+			var x1 = c.x2;
+			var y1 = c.y2;
+			_this1.addVertex(x1,y1,_this1.curR,_this1.curG,_this1.curB,_this1.curA,x1 * _this1.ma + y1 * _this1.mc + _this1.mx,x1 * _this1.mb + y1 * _this1.md + _this1.my);
+			var t = new h2d_Text(ui_FontManager.regularFont,this.labelsContainer);
+			t.set_text(c.text);
+			t.set_textColor(16777215);
+			t.posChanged = true;
+			t.scaleX = 0.85;
+			t.posChanged = true;
+			t.scaleY = 0.85;
+			if(c.x2 >= 200.) {
+				t.posChanged = true;
+				t.x = c.x2 + 6;
+				t.posChanged = true;
+				t.y = c.y2 - 8;
+			} else if(c.y2 > 0.0) {
+				var v = c.x2 - t.get_textWidth() * 0.85 * 0.5;
+				t.posChanged = true;
+				t.x = v;
+				t.posChanged = true;
+				t.y = c.y2 + 4;
+			} else {
+				var v1 = c.x2 - t.get_textWidth() * 0.85 * 0.5;
+				t.posChanged = true;
+				t.x = v1;
+				t.posChanged = true;
+				t.y = c.y2 - 20;
+			}
+		}
+	}
 	,__class__: ui_ControlDiagrams
 });
 var ui_FontManager = function() { };
@@ -52319,11 +52407,22 @@ ui_FontManager.init = function() {
 	}
 };
 ui_FontManager.fallbackToDefault = function() {
-	ui_FontManager.regularFont = hxd_res_DefaultFont.get();
-	ui_FontManager.titleFont = hxd_res_DefaultFont.get();
-	ui_FontManager.heroFont = hxd_res_DefaultFont.get();
-	ui_FontManager.iconFont = hxd_res_DefaultFont.get();
-	ui_FontManager.largeIconFont = hxd_res_DefaultFont.get();
+	try {
+		ui_FontManager.regularFont = hxd_res_DefaultFont.get();
+		ui_FontManager.titleFont = hxd_res_DefaultFont.get();
+		ui_FontManager.heroFont = hxd_res_DefaultFont.get();
+		ui_FontManager.iconFont = hxd_res_DefaultFont.get();
+		ui_FontManager.largeIconFont = hxd_res_DefaultFont.get();
+	} catch( _g ) {
+		var mockFont = new h2d_Font("default",16);
+		mockFont.baseLine = 16;
+		mockFont.lineHeight = 16;
+		ui_FontManager.regularFont = mockFont;
+		ui_FontManager.titleFont = mockFont;
+		ui_FontManager.heroFont = mockFont;
+		ui_FontManager.iconFont = mockFont;
+		ui_FontManager.largeIconFont = mockFont;
+	}
 	ui_FontManager.sanitizeAllFonts();
 };
 ui_FontManager.sanitizeAllFonts = function() {
@@ -52442,10 +52541,11 @@ var ui_IconType = $hxEnums["ui.IconType"] = { __ename__:true,__constructs__:null
 	,Keyboard: {_hx_name:"Keyboard",_hx_index:9,__enum__:"ui.IconType",toString:$estr}
 	,Gamepad: {_hx_name:"Gamepad",_hx_index:10,__enum__:"ui.IconType",toString:$estr}
 	,Credits: {_hx_name:"Credits",_hx_index:11,__enum__:"ui.IconType",toString:$estr}
-	,Exit: {_hx_name:"Exit",_hx_index:12,__enum__:"ui.IconType",toString:$estr}
+	,Touch: {_hx_name:"Touch",_hx_index:12,__enum__:"ui.IconType",toString:$estr}
+	,Exit: {_hx_name:"Exit",_hx_index:13,__enum__:"ui.IconType",toString:$estr}
 };
-ui_IconType.__constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Exit];
-ui_IconType.__empty_constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Exit];
+ui_IconType.__constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Exit];
+ui_IconType.__empty_constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Exit];
 var ui_UIIcons = function() { };
 $hxClasses["ui.UIIcons"] = ui_UIIcons;
 ui_UIIcons.__name__ = "ui.UIIcons";
@@ -52657,6 +52757,13 @@ ui_UIIcons.get = function(type,size,color) {
 		break;
 	case 12:
 		g.endFill();
+		g.drawRoundedRect(pad + w * 0.15,pad,w * 0.7,w,4);
+		g.beginFill(color,1.0);
+		g.drawCircle(s * 0.5,pad + w * 0.86,w * 0.05);
+		g.drawCircle(s * 0.5,pad + w * 0.45,w * 0.10);
+		break;
+	case 13:
+		g.endFill();
 		g.drawRect(pad,pad,w * 0.55,w);
 		g.lineStyle(2.0,color,1.0);
 		var x = pad + w * 0.35;
@@ -52732,6 +52839,9 @@ var ui_UIManager = function(input,initialGfx,hasSave,parent) {
 	};
 	this.builder.creditsView.onBack = function() {
 		_gthis.showMainMenu();
+	};
+	this.builder.optionsView.controlsPanel.onTouchSettingsChanged = function() {
+		_gthis.builder.touchControlsHUD.refreshSettings();
 	};
 	this.builder.touchControlsHUD.onPauseTriggered = function() {
 		if(_gthis.currentState == ui_components_UIState.InGameHUD) {
@@ -52934,13 +53044,11 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 				} else if(uiDown) {
 					opt.controlsPanel.navigate(1);
 				}
-				if(opt.controlsPanel.remapIndex == 0) {
-					if(uiLeft) {
-						opt.controlsPanel.adjustSensitivity(-0.02);
-					}
-					if(uiRight) {
-						opt.controlsPanel.adjustSensitivity(0.02);
-					}
+				if(uiLeft) {
+					opt.controlsPanel.adjustCurrentCustomOption(-1);
+				}
+				if(uiRight) {
+					opt.controlsPanel.adjustCurrentCustomOption(1);
 				}
 				if(uiConfirm) {
 					opt.controlsPanel.triggerRemapEntry(opt.controlsPanel.remapIndex);
@@ -53103,6 +53211,7 @@ var ui_components_TouchControlsHUD = function(input,parent) {
 	this.isBoostPressed = false;
 	this.isBrakePressed = false;
 	this.isGasPressed = false;
+	this.touchSettings = null;
 	var _gthis = this;
 	h2d_Object.call(this,parent);
 	this.inputRef = input;
@@ -53114,7 +53223,7 @@ var ui_components_TouchControlsHUD = function(input,parent) {
 		this.nitroIconBmp = new h2d_Bitmap(burnTile,this);
 		this.nitroIconBmp.smooth = true;
 	} catch( _g ) {
-		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/burn.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 129, className : "ui.components.TouchControlsHUD", methodName : "new"});
+		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/burn.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 134, className : "ui.components.TouchControlsHUD", methodName : "new"});
 	}
 	try {
 		var gasTile = hxd_Res.load("icons/gas-pedal.png").toTile();
@@ -53123,7 +53232,7 @@ var ui_components_TouchControlsHUD = function(input,parent) {
 		this.gasIconBmp = new h2d_Bitmap(gasTile,this);
 		this.gasIconBmp.smooth = true;
 	} catch( _g ) {
-		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/gas-pedal.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 138, className : "ui.components.TouchControlsHUD", methodName : "new"});
+		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/gas-pedal.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 143, className : "ui.components.TouchControlsHUD", methodName : "new"});
 	}
 	try {
 		var brakeTile = hxd_Res.load("icons/brake.png").toTile();
@@ -53132,7 +53241,7 @@ var ui_components_TouchControlsHUD = function(input,parent) {
 		this.brakeIconBmp = new h2d_Bitmap(brakeTile,this);
 		this.brakeIconBmp.smooth = true;
 	} catch( _g ) {
-		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/brake.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 147, className : "ui.components.TouchControlsHUD", methodName : "new"});
+		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/brake.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 152, className : "ui.components.TouchControlsHUD", methodName : "new"});
 	}
 	try {
 		var handbrakeTile = hxd_Res.load("icons/hand-brake.png").toTile();
@@ -53141,7 +53250,7 @@ var ui_components_TouchControlsHUD = function(input,parent) {
 		this.driftIconBmp = new h2d_Bitmap(handbrakeTile,this);
 		this.driftIconBmp.smooth = true;
 	} catch( _g ) {
-		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/hand-brake.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 156, className : "ui.components.TouchControlsHUD", methodName : "new"});
+		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/hand-brake.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 161, className : "ui.components.TouchControlsHUD", methodName : "new"});
 	}
 	this.windowEventTarget = $bind(this,this.onWindowEvent);
 	hxd_Window.getInstance().addEventTarget(this.windowEventTarget);
@@ -53686,25 +53795,60 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		this.canvas.lineStyle(1.0,16777215,isGrabbed ? 0.40 : 0.18);
 		this.canvas.drawCircle(this.stickKnobX,this.stickKnobY,this.stickKnobRadius - 3.5);
 	}
+	,refreshSettings: function() {
+		this.touchSettings = save_SaveSystem.load().touchSettings;
+		var s2d = this.getScene();
+		if(s2d != null) {
+			this.layout(s2d.width,s2d.height);
+		}
+	}
 	,layout: function(sw,sh) {
-		this.stickBaseRadius = 64.0;
-		this.stickKnobRadius = 34.0;
-		this.stickMaxTravel = 48.0;
-		this.stickBaseX = Math.max(85.0,Math.min(130.0,sw * 0.088));
-		this.stickBaseY = sh - Math.max(90.0,Math.min(130.0,sh * 0.165));
+		if(this.touchSettings == null) {
+			this.touchSettings = save_SaveSystem.load().touchSettings;
+		}
+		var s = 1.0;
+		var oxStick = 0.0;
+		var oyStick = 0.0;
+		var oxNitro = 0.0;
+		var oyNitro = 0.0;
+		var oxGas = 0.0;
+		var oyGas = 0.0;
+		var oxBrake = 0.0;
+		var oyBrake = 0.0;
+		var oxDrift = 0.0;
+		var oyDrift = 0.0;
+		if(this.touchSettings != null && this.touchSettings.mode == "Custom") {
+			s = Math.max(0.5,Math.min(1.5,this.touchSettings.scale));
+			oxStick = this.touchSettings.stickOffsetX;
+			oyStick = this.touchSettings.stickOffsetY;
+			oxNitro = this.touchSettings.nitroOffsetX;
+			oyNitro = this.touchSettings.nitroOffsetY;
+			oxGas = this.touchSettings.gasOffsetX;
+			oyGas = this.touchSettings.gasOffsetY;
+			oxBrake = this.touchSettings.brakeOffsetX;
+			oyBrake = this.touchSettings.brakeOffsetY;
+			oxDrift = this.touchSettings.driftOffsetX;
+			oyDrift = this.touchSettings.driftOffsetY;
+		}
+		this.stickBaseRadius = 64.0 * s;
+		this.stickKnobRadius = 34.0 * s;
+		this.stickMaxTravel = 48.0 * s;
+		this.stickBaseX = Math.max(85.0,Math.min(130.0,sw * 0.088)) + oxStick;
+		this.stickBaseY = sh - Math.max(90.0,Math.min(130.0,sh * 0.165)) + oyStick;
 		if(this.stickPointerId == null) {
 			this.stickKnobX = this.stickBaseX;
 			this.stickKnobY = this.stickBaseY;
 		}
-		this.nitroRadius = 46.0;
-		this.nitroX = Math.max(74.0,Math.min(110.0,sw * 0.076));
-		this.nitroY = Math.max(190.0,Math.min(240.0,sh * 0.31));
+		this.nitroRadius = 46.0 * s;
+		this.nitroX = Math.max(74.0,Math.min(110.0,sw * 0.076)) + oxNitro;
+		this.nitroY = Math.max(190.0,Math.min(240.0,sh * 0.31)) + oyNitro;
 		if(this.nitroIconBmp != null) {
 			var _this = this.nitroIconBmp;
+			var v = 56.0 * s / 512.0;
 			_this.posChanged = true;
-			_this.scaleX = 0.109375;
+			_this.scaleX = v;
 			_this.posChanged = true;
-			_this.scaleY = 0.109375;
+			_this.scaleY = v;
 			var _this = this.nitroIconBmp;
 			_this.posChanged = true;
 			_this.x = this.nitroX;
@@ -53712,15 +53856,16 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 			_this.posChanged = true;
 			_this.y = this.nitroY;
 		}
-		this.gasRadius = 48.0;
-		this.gasX = sw - Math.max(120.0,Math.min(160.0,sw * 0.125));
-		this.gasY = sh - Math.max(85.0,Math.min(125.0,sh * 0.165));
+		this.gasRadius = 48.0 * s;
+		this.gasX = sw - Math.max(120.0,Math.min(160.0,sw * 0.125)) + oxGas;
+		this.gasY = sh - Math.max(85.0,Math.min(125.0,sh * 0.165)) + oyGas;
 		if(this.gasIconBmp != null) {
 			var _this = this.gasIconBmp;
+			var v = 58.0 * s / 512.0;
 			_this.posChanged = true;
-			_this.scaleX = 0.11328125;
+			_this.scaleX = v;
 			_this.posChanged = true;
-			_this.scaleY = 0.11328125;
+			_this.scaleY = v;
 			var _this = this.gasIconBmp;
 			_this.posChanged = true;
 			_this.x = this.gasX;
@@ -53728,15 +53873,16 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 			_this.posChanged = true;
 			_this.y = this.gasY;
 		}
-		this.driftRadius = 46.0;
-		this.driftX = sw - Math.max(68.0,Math.min(95.0,sw * 0.075));
-		this.driftY = Math.max(210.0,Math.min(270.0,sh * 0.35));
+		this.driftRadius = 46.0 * s;
+		this.driftX = sw - Math.max(68.0,Math.min(95.0,sw * 0.075)) + oxDrift;
+		this.driftY = Math.max(210.0,Math.min(270.0,sh * 0.35)) + oyDrift;
 		if(this.driftIconBmp != null) {
 			var _this = this.driftIconBmp;
+			var v = 56.0 * s / 512.0;
 			_this.posChanged = true;
-			_this.scaleX = 0.109375;
+			_this.scaleX = v;
 			_this.posChanged = true;
-			_this.scaleY = 0.109375;
+			_this.scaleY = v;
 			var _this = this.driftIconBmp;
 			_this.posChanged = true;
 			_this.x = this.driftX;
@@ -53744,15 +53890,16 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 			_this.posChanged = true;
 			_this.y = this.driftY;
 		}
-		this.brakeRadius = 46.0;
-		this.brakeX = sw - Math.max(180.0,Math.min(240.0,sw * 0.185));
-		this.brakeY = Math.max(68.0,Math.min(115.0,sh * 0.15));
+		this.brakeRadius = 46.0 * s;
+		this.brakeX = sw - Math.max(180.0,Math.min(240.0,sw * 0.185)) + oxBrake;
+		this.brakeY = Math.max(68.0,Math.min(115.0,sh * 0.15)) + oyBrake;
 		if(this.brakeIconBmp != null) {
 			var _this = this.brakeIconBmp;
+			var v = 56.0 * s / 512.0;
 			_this.posChanged = true;
-			_this.scaleX = 0.109375;
+			_this.scaleX = v;
 			_this.posChanged = true;
-			_this.scaleY = 0.109375;
+			_this.scaleY = v;
 			var _this = this.brakeIconBmp;
 			_this.posChanged = true;
 			_this.x = this.brakeX;
@@ -53760,9 +53907,9 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 			_this.posChanged = true;
 			_this.y = this.brakeY;
 		}
-		this.pauseRadius = 22.0;
-		this.pauseW = 44.0;
-		this.pauseH = 44.0;
+		this.pauseRadius = 22.0 * s;
+		this.pauseW = 44.0 * s;
+		this.pauseH = 44.0 * s;
 		this.pauseX = sw - Math.max(38.0,Math.min(50.0,sw * 0.038));
 		this.pauseY = Math.max(34.0,Math.min(50.0,sh * 0.065));
 		this.renderHUD();
@@ -53793,9 +53940,10 @@ var ui_components_OptionsTab = $hxEnums["ui.components.OptionsTab"] = { __ename_
 	,Audio: {_hx_name:"Audio",_hx_index:1,__enum__:"ui.components.OptionsTab",toString:$estr}
 	,Keyboard: {_hx_name:"Keyboard",_hx_index:2,__enum__:"ui.components.OptionsTab",toString:$estr}
 	,Gamepad: {_hx_name:"Gamepad",_hx_index:3,__enum__:"ui.components.OptionsTab",toString:$estr}
+	,Touch: {_hx_name:"Touch",_hx_index:4,__enum__:"ui.components.OptionsTab",toString:$estr}
 };
-ui_components_OptionsTab.__constructs__ = [ui_components_OptionsTab.Graphics,ui_components_OptionsTab.Audio,ui_components_OptionsTab.Keyboard,ui_components_OptionsTab.Gamepad];
-ui_components_OptionsTab.__empty_constructs__ = [ui_components_OptionsTab.Graphics,ui_components_OptionsTab.Audio,ui_components_OptionsTab.Keyboard,ui_components_OptionsTab.Gamepad];
+ui_components_OptionsTab.__constructs__ = [ui_components_OptionsTab.Graphics,ui_components_OptionsTab.Audio,ui_components_OptionsTab.Keyboard,ui_components_OptionsTab.Gamepad,ui_components_OptionsTab.Touch];
+ui_components_OptionsTab.__empty_constructs__ = [ui_components_OptionsTab.Graphics,ui_components_OptionsTab.Audio,ui_components_OptionsTab.Keyboard,ui_components_OptionsTab.Gamepad,ui_components_OptionsTab.Touch];
 var ui_views_credits_CreditsView = function(parent) {
 	var _gthis = this;
 	h2d_Object.call(this,parent);
@@ -54600,25 +54748,57 @@ var ui_views_options_ControlsOptionsPanel = function(input,parent) {
 	var _gthis = this;
 	h2d_Object.call(this,parent);
 	this.inputRef = input;
+	this.sensContainer = new h2d_Object(this);
+	this.sensDecrBtn = new h2d_Text(ui_FontManager.regularFont,this.sensContainer);
+	this.sensDecrBtn.set_text("[ < -2% ]");
+	this.sensDecrBtn.set_textColor(58879);
+	this.sensDecrInter = new h2d_Interactive(80,28,this.sensContainer);
+	this.sensDecrInter.onClick = function(_) {
+		_gthis.adjustSensitivity(-0.02);
+	};
+	this.sensLabel = new h2d_Text(ui_FontManager.regularFont,this.sensContainer);
+	this.sensLabel.set_textColor(12767712);
+	this.sensRowInter = new h2d_Interactive(320,28,this.sensContainer);
+	this.sensRowInter.onClick = function(_) {
+		_gthis.adjustSensitivity(_gthis.inputRef.steerSensitivity >= 0.99 ? -1.0 : 0.02);
+	};
+	this.sensIncrBtn = new h2d_Text(ui_FontManager.regularFont,this.sensContainer);
+	this.sensIncrBtn.set_text("[ +2% > ]");
+	this.sensIncrBtn.set_textColor(58879);
+	this.sensIncrInter = new h2d_Interactive(80,28,this.sensContainer);
+	this.sensIncrInter.onClick = function(_) {
+		_gthis.adjustSensitivity(0.02);
+	};
 	this.toggleExclusiveBtn = new h2d_Text(ui_FontManager.regularFont,this);
-	this.toggleExclusiveInter = new h2d_Interactive(300,34,this);
+	this.toggleExclusiveInter = new h2d_Interactive(300,32,this);
 	this.toggleExclusiveInter.onClick = function(_) {
 		_gthis.toggleExclusiveDevice();
 	};
 	this.toggleViewModeBtn = new h2d_Text(ui_FontManager.regularFont,this);
-	this.toggleViewModeInter = new h2d_Interactive(300,34,this);
+	this.toggleViewModeInter = new h2d_Interactive(300,32,this);
 	this.toggleViewModeInter.onClick = function(_) {
 		_gthis.controlViewMode = _gthis.controlViewMode == "Diagram" ? "Custom" : "Diagram";
+		if(_gthis.currentTab == ui_components_OptionsTab.Touch) {
+			var d = save_SaveSystem.load();
+			if(d.touchSettings == null) {
+				d.touchSettings = save_SaveSystem.getDefaultTouchSettings();
+			}
+			d.touchSettings.mode = _gthis.controlViewMode == "Diagram" ? "Default" : "Custom";
+			save_SaveSystem.save(d);
+			if(_gthis.onTouchSettingsChanged != null) {
+				_gthis.onTouchSettingsChanged();
+			}
+		}
 		_gthis.updateControlViewMode();
 	};
 	this.diagramViewer = new ui_ControlDiagrams(this);
 	this.remapContainer = new h2d_Object(this);
 	var _g = 0;
-	while(_g < 8) {
+	while(_g < 12) {
 		var i = [_g++];
 		var txt = new h2d_Text(ui_FontManager.regularFont,this.remapContainer);
 		this.remapItems.push(txt);
-		var inter = new h2d_Interactive(500.0,36.0,this.remapContainer);
+		var inter = new h2d_Interactive(540.0,26.0,this.remapContainer);
 		inter.onOver = (function(i) {
 			return function(_) {
 				if(_gthis.visible && _gthis.controlViewMode == "Custom") {
@@ -54639,12 +54819,16 @@ var ui_views_options_ControlsOptionsPanel = function(input,parent) {
 	this.remapStatusNotice = new h2d_Text(ui_FontManager.regularFont,this);
 	this.remapStatusNotice.set_textColor(16772608);
 	this.remapStatusNotice.set_visible(false);
+	this.updateSensitivityDisplay();
 };
 $hxClasses["ui.views.options.ControlsOptionsPanel"] = ui_views_options_ControlsOptionsPanel;
 ui_views_options_ControlsOptionsPanel.__name__ = "ui.views.options.ControlsOptionsPanel";
 ui_views_options_ControlsOptionsPanel.__super__ = h2d_Object;
 ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	toggleExclusiveDevice: function() {
+		if(this.currentTab == ui_components_OptionsTab.Touch) {
+			return;
+		}
 		audio_AudioManager.inst.playMenuBeep(480,0.06);
 		if(this.currentTab == ui_components_OptionsTab.Keyboard) {
 			this.inputRef.exclusiveDevice = this.inputRef.exclusiveDevice == input_ExclusiveDevice.KeyboardOnly ? input_ExclusiveDevice.Both : input_ExclusiveDevice.KeyboardOnly;
@@ -54653,7 +54837,51 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		}
 		this.updateControlHeaderButtons();
 	}
+	,adjustSensitivity: function(delta) {
+		var sens = Math.round((this.inputRef.steerSensitivity + delta) * 50) / 50.0;
+		sens = Math.max(0.0,Math.min(1.0,sens));
+		this.inputRef.steerSensitivity = sens;
+		audio_AudioManager.inst.playMenuBeep(420 + sens * 240,0.04);
+		this.updateSensitivityDisplay();
+		var d = save_SaveSystem.load();
+		d.steerSensitivity = sens;
+		save_SaveSystem.save(d);
+	}
+	,updateSensitivityDisplay: function() {
+		var barLen = Math.round(this.inputRef.steerSensitivity * 20);
+		var barStr = "";
+		barStr = "" + (0 < barLen ? "■" : "□");
+		barStr += 1 < barLen ? "■" : "□";
+		barStr += 2 < barLen ? "■" : "□";
+		barStr += 3 < barLen ? "■" : "□";
+		barStr += 4 < barLen ? "■" : "□";
+		barStr += 5 < barLen ? "■" : "□";
+		barStr += 6 < barLen ? "■" : "□";
+		barStr += 7 < barLen ? "■" : "□";
+		barStr += 8 < barLen ? "■" : "□";
+		barStr += 9 < barLen ? "■" : "□";
+		barStr += 10 < barLen ? "■" : "□";
+		barStr += 11 < barLen ? "■" : "□";
+		barStr += 12 < barLen ? "■" : "□";
+		barStr += 13 < barLen ? "■" : "□";
+		barStr += 14 < barLen ? "■" : "□";
+		barStr += 15 < barLen ? "■" : "□";
+		barStr += 16 < barLen ? "■" : "□";
+		barStr += 17 < barLen ? "■" : "□";
+		barStr += 18 < barLen ? "■" : "□";
+		barStr += 19 < barLen ? "■" : "□";
+		this.sensLabel.set_text("Steering Sensitivity: [" + barStr + "] " + Math.round(this.inputRef.steerSensitivity * 100) + "%");
+	}
 	,updateControlHeaderButtons: function() {
+		if(this.currentTab == ui_components_OptionsTab.Touch) {
+			this.toggleExclusiveBtn.set_text("[INTERFACE: MULTI-TOUCH ACTIVE]");
+			this.toggleExclusiveBtn.set_textColor(10011513);
+			this.toggleExclusiveInter.set_visible(false);
+			this.toggleViewModeBtn.set_text("[MODE: " + (this.controlViewMode == "Diagram" ? "DEFAULT LAYOUT" : "CUSTOM LAYOUT") + "]");
+			this.toggleViewModeBtn.set_textColor(58879);
+			return;
+		}
+		this.toggleExclusiveInter.set_visible(true);
 		var isKbd = this.currentTab == ui_components_OptionsTab.Keyboard;
 		var active = this.inputRef.exclusiveDevice;
 		var status = "BOTH ACTIVE";
@@ -54673,20 +54901,42 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		if(this.controlViewMode == "Diagram") {
 			if(this.currentTab == ui_components_OptionsTab.Keyboard) {
 				this.diagramViewer.drawKeyboardLayout();
-			} else {
+			} else if(this.currentTab == ui_components_OptionsTab.Gamepad) {
 				this.diagramViewer.drawGamepadLayout();
+			} else if(this.currentTab == ui_components_OptionsTab.Touch) {
+				this.diagramViewer.drawTouchLayout();
 			}
 		} else {
 			this.updateRemapStyles();
 		}
 		this.updateControlHeaderButtons();
+		this.updateSensitivityDisplay();
+	}
+	,getMaxRemapCount: function() {
+		if(this.currentTab == ui_components_OptionsTab.Touch) {
+			return 12;
+		} else {
+			return 7;
+		}
 	}
 	,triggerRemapEntry: function(idx) {
-		if(idx == 0) {
-			this.adjustSensitivity(this.inputRef.steerSensitivity >= 0.99 ? -1.0 : 0.02);
+		if(this.currentTab == ui_components_OptionsTab.Touch) {
+			var d = save_SaveSystem.load();
+			if(idx == 11) {
+				audio_AudioManager.inst.playMenuBeep(320,0.08);
+				d.touchSettings = save_SaveSystem.getDefaultTouchSettings();
+				d.touchSettings.mode = "Custom";
+				save_SaveSystem.save(d);
+				if(this.onTouchSettingsChanged != null) {
+					this.onTouchSettingsChanged();
+				}
+				this.updateRemapStyles();
+				return;
+			}
+			this.adjustCurrentCustomOption(1);
 			return;
 		}
-		if(idx == 7) {
+		if(idx == 6) {
 			audio_AudioManager.inst.playMenuBeep(320,0.08);
 			if(this.currentTab == ui_components_OptionsTab.Keyboard) {
 				this.inputRef.bindings.resetKeyboardDefaults();
@@ -54700,38 +54950,116 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		audio_AudioManager.inst.playMenuBeep(640,0.1);
 		this.remapStatusNotice.set_text("PRESS ANY " + (isGamepad ? "BUTTON" : "KEY") + "...");
 		this.remapStatusNotice.set_visible(true);
-		this.inputRef.startListening([input_InputAction.Throttle,input_InputAction.Brake,input_InputAction.SteerLeft,input_InputAction.SteerRight,input_InputAction.Handbrake,input_InputAction.Boost][idx - 1],isGamepad);
+		this.inputRef.startListening([input_InputAction.Throttle,input_InputAction.Brake,input_InputAction.SteerLeft,input_InputAction.SteerRight,input_InputAction.Handbrake,input_InputAction.Boost][idx],isGamepad);
 	}
-	,adjustSensitivity: function(delta) {
-		var sens = Math.round((this.inputRef.steerSensitivity + delta) * 50) / 50.0;
-		sens = Math.max(0.0,Math.min(1.0,sens));
-		this.inputRef.steerSensitivity = sens;
-		audio_AudioManager.inst.playMenuBeep(420 + sens * 240,0.04);
-		this.updateRemapStyles();
+	,adjustCurrentCustomOption: function(dir) {
+		if(this.currentTab != ui_components_OptionsTab.Touch) {
+			return;
+		}
 		var d = save_SaveSystem.load();
-		d.steerSensitivity = sens;
+		var ts = d.touchSettings != null ? d.touchSettings : save_SaveSystem.getDefaultTouchSettings();
+		ts.mode = "Custom";
+		var delta = dir * 5.0;
+		switch(this.remapIndex) {
+		case 0:
+			ts.stickOffsetX = Math.max(-100.0,Math.min(100.0,ts.stickOffsetX + delta));
+			break;
+		case 1:
+			ts.stickOffsetY = Math.max(-100.0,Math.min(100.0,ts.stickOffsetY + delta));
+			break;
+		case 2:
+			ts.nitroOffsetX = Math.max(-100.0,Math.min(100.0,ts.nitroOffsetX + delta));
+			break;
+		case 3:
+			ts.nitroOffsetY = Math.max(-100.0,Math.min(100.0,ts.nitroOffsetY + delta));
+			break;
+		case 4:
+			ts.gasOffsetX = Math.max(-100.0,Math.min(100.0,ts.gasOffsetX + delta));
+			break;
+		case 5:
+			ts.gasOffsetY = Math.max(-100.0,Math.min(100.0,ts.gasOffsetY + delta));
+			break;
+		case 6:
+			ts.brakeOffsetX = Math.max(-100.0,Math.min(100.0,ts.brakeOffsetX + delta));
+			break;
+		case 7:
+			ts.brakeOffsetY = Math.max(-100.0,Math.min(100.0,ts.brakeOffsetY + delta));
+			break;
+		case 8:
+			ts.driftOffsetX = Math.max(-100.0,Math.min(100.0,ts.driftOffsetX + delta));
+			break;
+		case 9:
+			ts.driftOffsetY = Math.max(-100.0,Math.min(100.0,ts.driftOffsetY + delta));
+			break;
+		case 10:
+			ts.scale = Math.max(0.5,Math.min(1.5,Math.round((ts.scale + dir * 0.05) * 100) / 100.0));
+			break;
+		case 11:
+			return;
+		}
+		d.touchSettings = ts;
 		save_SaveSystem.save(d);
+		audio_AudioManager.inst.playMenuBeep(450 + this.remapIndex * 20,0.04);
+		if(this.onTouchSettingsChanged != null) {
+			this.onTouchSettingsChanged();
+		}
+		this.updateRemapStyles();
 	}
 	,navigate: function(dir) {
-		this.remapIndex = (this.remapIndex + dir + this.remapItems.length) % this.remapItems.length;
+		var count = this.getMaxRemapCount();
+		this.remapIndex = (this.remapIndex + dir + count) % count;
 		audio_AudioManager.inst.playMenuBeep(380,0.04);
 		this.updateRemapStyles();
 	}
 	,updateRemapStyles: function() {
+		var count = this.getMaxRemapCount();
+		if(this.currentTab == ui_components_OptionsTab.Touch) {
+			var d = save_SaveSystem.load();
+			var ts = d.touchSettings != null ? d.touchSettings : save_SaveSystem.getDefaultTouchSettings();
+			var labels = ["Analog Joystick Offset X:  " + Math.round(ts.stickOffsetX) + " px  [ < / > ]","Analog Joystick Offset Y:  " + Math.round(ts.stickOffsetY) + " px  [ < / > ]","Nitro Button Offset X:     " + Math.round(ts.nitroOffsetX) + " px  [ < / > ]","Nitro Button Offset Y:     " + Math.round(ts.nitroOffsetY) + " px  [ < / > ]","Gas Pedal Offset X:        " + Math.round(ts.gasOffsetX) + " px  [ < / > ]","Gas Pedal Offset Y:        " + Math.round(ts.gasOffsetY) + " px  [ < / > ]","Brake Disc Offset X:       " + Math.round(ts.brakeOffsetX) + " px  [ < / > ]","Brake Disc Offset Y:       " + Math.round(ts.brakeOffsetY) + " px  [ < / > ]","Handbrake Offset X:        " + Math.round(ts.driftOffsetX) + " px  [ < / > ]","Handbrake Offset Y:        " + Math.round(ts.driftOffsetY) + " px  [ < / > ]","Touch Controls Scale:      " + Math.round(ts.scale * 100) + "%  [ < / > ]","[RESET TOUCH LAYOUT TO DEFAULTS]"];
+			var _g = 0;
+			while(_g < 12) {
+				var i = _g++;
+				var item = this.remapItems[i];
+				var inter = this.remapInteractives[i];
+				if(i < count) {
+					item.set_visible(true);
+					inter.set_visible(true);
+					if(i == this.remapIndex) {
+						item.set_textColor(58879);
+						item.set_text("> " + labels[i] + " <");
+					} else {
+						item.set_textColor(i == 11 ? 15057019 : 12767712);
+						item.set_text("  " + labels[i] + "  ");
+					}
+				} else {
+					item.set_visible(false);
+					inter.set_visible(false);
+				}
+			}
+			return;
+		}
 		var isGamepad = this.currentTab == ui_components_OptionsTab.Gamepad;
 		var b = this.inputRef.bindings;
-		var labels = ["Steering Sensitivity: " + Math.round(this.inputRef.steerSensitivity * 100) + "%  [ < / > ]","Throttle (Gas):       " + (isGamepad ? input_InputController.getGamepadBtnName(b.padGas) : input_InputController.getKeyName(b.keyGas)),"Brake / Reverse:      " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBrake) : input_InputController.getKeyName(b.keyBrake)),"Steer Left:           " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyLeft)),"Steer Right:          " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyRight)),"Handbrake (Drift):    " + (isGamepad ? input_InputController.getGamepadBtnName(b.padHandbrake) : input_InputController.getKeyName(b.keyHandbrake)),"Nitro Boost:          " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBoost) : input_InputController.getKeyName(b.keyBoost)),"[RESET TO DEFAULTS]"];
+		var labels = ["Throttle (Gas):       " + (isGamepad ? input_InputController.getGamepadBtnName(b.padGas) : input_InputController.getKeyName(b.keyGas)),"Brake / Reverse:      " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBrake) : input_InputController.getKeyName(b.keyBrake)),"Steer Left:           " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyLeft)),"Steer Right:          " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyRight)),"Handbrake (Drift):    " + (isGamepad ? input_InputController.getGamepadBtnName(b.padHandbrake) : input_InputController.getKeyName(b.keyHandbrake)),"Nitro Boost:          " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBoost) : input_InputController.getKeyName(b.keyBoost)),"[RESET TO DEFAULTS]"];
 		var _g = 0;
-		var _g1 = this.remapItems.length;
-		while(_g < _g1) {
+		while(_g < 12) {
 			var i = _g++;
 			var item = this.remapItems[i];
-			if(i == this.remapIndex) {
-				item.set_textColor(58879);
-				item.set_text("> " + labels[i] + " <");
+			var inter = this.remapInteractives[i];
+			if(i < count) {
+				item.set_visible(true);
+				inter.set_visible(true);
+				if(i == this.remapIndex) {
+					item.set_textColor(58879);
+					item.set_text("> " + labels[i] + " <");
+				} else {
+					item.set_textColor(i == 6 ? 15057019 : 12767712);
+					item.set_text("  " + labels[i] + "  ");
+				}
 			} else {
-				item.set_textColor(i == 7 ? 15057019 : 12767712);
-				item.set_text("  " + labels[i] + "  ");
+				item.set_visible(false);
+				inter.set_visible(false);
 			}
 		}
 	}
@@ -54751,7 +55079,55 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		var effectiveCardX = cardW > 0 ? cardX : (sw - 920.0) * 0.5;
 		var effectiveCardY = cardH > 0 ? cardY : sh * 0.16;
 		var effectiveCardW = cardW > 0 ? cardW : 920.0;
-		var headerY = effectiveCardY + 70.0;
+		var sensY = effectiveCardY + 54.0;
+		if(this.sensLabel != null) {
+			var _this = this.sensLabel;
+			var v = (sw - this.sensLabel.get_textWidth()) * 0.5;
+			_this.posChanged = true;
+			_this.x = v;
+			var _this = this.sensLabel;
+			_this.posChanged = true;
+			_this.y = sensY;
+			var _this = this.sensRowInter;
+			_this.posChanged = true;
+			_this.x = this.sensLabel.x;
+			var _this = this.sensRowInter;
+			_this.posChanged = true;
+			_this.y = sensY;
+			this.sensRowInter.width = this.sensLabel.get_textWidth();
+			this.sensRowInter.height = 24.0;
+			var _this = this.sensDecrBtn;
+			var v = this.sensLabel.x - this.sensDecrBtn.get_textWidth() - 14.0;
+			_this.posChanged = true;
+			_this.x = v;
+			var _this = this.sensDecrBtn;
+			_this.posChanged = true;
+			_this.y = sensY;
+			var _this = this.sensDecrInter;
+			_this.posChanged = true;
+			_this.x = this.sensDecrBtn.x;
+			var _this = this.sensDecrInter;
+			_this.posChanged = true;
+			_this.y = sensY;
+			this.sensDecrInter.width = this.sensDecrBtn.get_textWidth();
+			this.sensDecrInter.height = 24.0;
+			var _this = this.sensIncrBtn;
+			var v = this.sensLabel.x + this.sensLabel.get_textWidth() + 14.0;
+			_this.posChanged = true;
+			_this.x = v;
+			var _this = this.sensIncrBtn;
+			_this.posChanged = true;
+			_this.y = sensY;
+			var _this = this.sensIncrInter;
+			_this.posChanged = true;
+			_this.x = this.sensIncrBtn.x;
+			var _this = this.sensIncrInter;
+			_this.posChanged = true;
+			_this.y = sensY;
+			this.sensIncrInter.width = this.sensIncrBtn.get_textWidth();
+			this.sensIncrInter.height = 24.0;
+		}
+		var headerY = sensY + 34.0;
 		if(this.toggleExclusiveBtn != null) {
 			var _this = this.toggleExclusiveBtn;
 			_this.posChanged = true;
@@ -54786,14 +55162,14 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			_this.x = effectiveCardX + effectiveCardW * 0.5;
 			var _this = this.diagramViewer;
 			_this.posChanged = true;
-			_this.y = effectiveCardY + 310.0;
+			_this.y = effectiveCardY + 320.0;
 			var _this = this.diagramViewer;
 			_this.posChanged = true;
 			_this.scaleX = 0.92;
 			_this.posChanged = true;
 			_this.scaleY = 0.92;
 		}
-		var remapStartY = headerY + 48.0;
+		var remapStartY = headerY + 42.0;
 		if(this.remapStatusNotice != null) {
 			var _this = this.remapStatusNotice;
 			var v = (sw - this.remapStatusNotice.get_textWidth()) * 0.5;
@@ -54803,10 +55179,9 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			_this.posChanged = true;
 			_this.y = remapStartY;
 		}
-		var itemsStartY = remapStartY + 26.0;
+		var itemsStartY = remapStartY + 24.0;
 		var _g = 0;
-		var _g1 = this.remapItems.length;
-		while(_g < _g1) {
+		while(_g < 12) {
 			var i = _g++;
 			var item = this.remapItems[i];
 			var inter = this.remapInteractives[i];
@@ -54814,13 +55189,13 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			item.posChanged = true;
 			item.x = v;
 			item.posChanged = true;
-			item.y = itemsStartY + i * 38.0;
+			item.y = itemsStartY + i * 27.0;
 			inter.posChanged = true;
-			inter.x = effectiveCardX + (effectiveCardW - 500.0) * 0.5;
+			inter.x = effectiveCardX + (effectiveCardW - 540.0) * 0.5;
 			inter.posChanged = true;
 			inter.y = item.y;
-			inter.width = 500.0;
-			inter.height = 36.0;
+			inter.width = 540.0;
+			inter.height = 26.0;
 		}
 	}
 	,__class__: ui_views_options_ControlsOptionsPanel
@@ -54889,7 +55264,25 @@ $hxClasses["ui.views.options.GraphicsOptionsPanel"] = ui_views_options_GraphicsO
 ui_views_options_GraphicsOptionsPanel.__name__ = "ui.views.options.GraphicsOptionsPanel";
 ui_views_options_GraphicsOptionsPanel.__super__ = h2d_Object;
 ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
-	cycleOption: function(idx,dir) {
+	isOptionDisabled: function(idx) {
+		switch(idx) {
+		case 2:
+			return this.settings.shadowLevel == "Off";
+		case 6:
+			return !this.settings.mipmapping;
+		case 8:
+			return this.settings.aaType == "None";
+		case 11:
+			return !this.settings.modelReflections;
+		default:
+			return false;
+		}
+	}
+	,cycleOption: function(idx,dir) {
+		if(this.isOptionDisabled(idx)) {
+			audio_AudioManager.inst.playMenuBeep(220.0,0.05);
+			return;
+		}
 		audio_AudioManager.inst.playMenuBeep(480.0,0.05);
 		var s = this.settings;
 		switch(idx) {
@@ -54901,18 +55294,24 @@ ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			break;
 		case 1:
 			s.shadowLevel = this.cycleArray(["Off","Normal","High","Ultra","Dynamic"],s.shadowLevel,dir);
-			graphics_GraphicsManager.inst.applyShadows();
+			if(graphics_GraphicsManager.inst != null) {
+				graphics_GraphicsManager.inst.applyShadows();
+			}
 			break;
 		case 2:
 			s.shadowRes = this.cycleArray([512,1024,2048,4096],s.shadowRes,dir);
-			graphics_GraphicsManager.inst.applyShadows();
+			if(graphics_GraphicsManager.inst != null) {
+				graphics_GraphicsManager.inst.applyShadows();
+			}
 			break;
 		case 3:
 			if(this.isOpenedFromPause) {
 				return;
 			}
 			s.lightingLevel = this.cycleArray(["Low","Medium","High","Ultra (RTX/Path)"],s.lightingLevel,dir);
-			graphics_GraphicsManager.inst.applyLighting();
+			if(graphics_GraphicsManager.inst != null) {
+				graphics_GraphicsManager.inst.applyLighting();
+			}
 			break;
 		case 4:
 			s.lightingRes = this.cycleArray([512,1024,2048],s.lightingRes,dir);
@@ -54949,11 +55348,15 @@ ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			break;
 		case 12:
 			s.renderScale = this.cycleArray([0.25,0.334,0.5,0.75,1.0,2.0,3.0,4.0],s.renderScale,dir);
-			graphics_GraphicsManager.inst.applyRenderScale();
+			if(graphics_GraphicsManager.inst != null) {
+				graphics_GraphicsManager.inst.applyRenderScale();
+			}
 			break;
 		case 13:
 			s.uiResolution = this.cycleArray(["720p (HD)","1080p (FHD)","1440p (2K)","2160p (4K)","Native / Match Window"],s.uiResolution,dir);
-			graphics_GraphicsManager.inst.applyUIResolution();
+			if(graphics_GraphicsManager.inst != null) {
+				graphics_GraphicsManager.inst.applyUIResolution();
+			}
 			if(this.onUIResolutionChanged != null) {
 				this.onUIResolutionChanged();
 			}
@@ -54993,7 +55396,17 @@ ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	,updateStyles: function() {
 		var s = this.settings;
 		var inGameLocked = this.isOpenedFromPause;
-		var vals = [s.textures + (inGameLocked ? " [LOCKED IN-RUN]" : ""),s.shadowLevel,s.shadowRes + "p",s.lightingLevel + (inGameLocked ? " [LOCKED IN-RUN]" : ""),s.lightingRes + "p",(s.mipmapping ? "Enabled" : "Disabled") + (inGameLocked ? " [LOCKED IN-RUN]" : ""),s.anisotropic + "x" + (inGameLocked ? " [LOCKED IN-RUN]" : ""),s.aaType,s.aaLevel + "x",s.modelGeometry + (inGameLocked ? " [LOCKED IN-RUN]" : ""),s.modelReflections ? "Active" : "Disabled",s.reflectionLevel,s.renderScale + "x (" + Math.round(s.renderScale * 100) + "%)",s.uiResolution];
+		var shadowResStr = this.isOptionDisabled(2) ? "[DISABLED]" : s.shadowRes + "p";
+		var anisoStr = this.isOptionDisabled(6) ? "[DISABLED]" : s.anisotropic + "x";
+		var aaLevelStr = this.isOptionDisabled(8) ? "[DISABLED]" : s.aaLevel + "x";
+		var reflLevelStr = this.isOptionDisabled(11) ? "[DISABLED]" : s.reflectionLevel;
+		var vals = s.textures + (inGameLocked ? " [LOCKED IN-RUN]" : "");
+		var s1 = s.shadowLevel;
+		var vals1 = s.lightingLevel + (inGameLocked ? " [LOCKED IN-RUN]" : "");
+		var vals2 = s.lightingRes + "p";
+		var vals3 = s.mipmapping ? "Enabled" : "Disabled";
+		var vals4 = inGameLocked && !this.isOptionDisabled(6);
+		var vals5 = [vals,s1,shadowResStr,vals1,vals2,vals3 + (inGameLocked ? " [LOCKED IN-RUN]" : ""),anisoStr + (vals4 ? " [LOCKED IN-RUN]" : ""),s.aaType,aaLevelStr,s.modelGeometry + (inGameLocked ? " [LOCKED IN-RUN]" : ""),s.modelReflections ? "Active" : "Disabled",reflLevelStr,s.renderScale + "x (" + Math.round(s.renderScale * 100) + "%)",s.uiResolution];
 		var titles = ["Texture Fidelity:    ","Shadow Quality:      ","Shadow Buffer:       ","Lighting Pipeline:   ","Light Buffer:        ","Mipmapping Filters:  ","Anisotropy Sampling: ","Anti-Aliasing Pass:  ","AA Multiplier:       ","Model Geometry LOD:  ","Screen Reflections:  ","Reflection Updates:  ","3D Render Resolution:","UI Interface Target: "];
 		var _g = 0;
 		var _g1 = this.items.length;
@@ -55001,12 +55414,25 @@ ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			var i = _g++;
 			var item = this.items[i];
 			var isLocked = inGameLocked && (i == 0 || i == 3 || i == 5 || i == 6 || i == 9);
+			var isDisabled = this.isOptionDisabled(i);
 			if(i == this.selectedIndex) {
-				item.set_textColor(isLocked ? 9413043 : 58879);
-				item.set_text("> " + titles[i] + vals[i] + " <");
+				if(isDisabled) {
+					item.set_textColor(5595246);
+				} else if(isLocked) {
+					item.set_textColor(9413043);
+				} else {
+					item.set_textColor(58879);
+				}
+				item.set_text("> " + titles[i] + vals5[i] + " <");
 			} else {
-				item.set_textColor(isLocked ? 5595246 : 12767712);
-				item.set_text("  " + titles[i] + vals[i] + "  ");
+				if(isDisabled) {
+					item.set_textColor(5595246);
+				} else if(isLocked) {
+					item.set_textColor(9413043);
+				} else {
+					item.set_textColor(12767712);
+				}
+				item.set_text("  " + titles[i] + vals5[i] + "  ");
 			}
 		}
 	}
@@ -55103,8 +55529,8 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
 	this.versionText.set_text("v" + "0.2.2" + " (Build " + 5 + ")");
 	this.versionText.set_textColor(9413043);
-	var tabNames = ["GRAPHICS","AUDIO","KEYBOARD","GAMEPAD"];
-	var tabIconTypes = [ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Keyboard,ui_IconType.Gamepad];
+	var tabNames = ["GRAPHICS","AUDIO","KEYBOARD","GAMEPAD","TOUCH"];
+	var tabIconTypes = [ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Touch];
 	var _g = 0;
 	var _g1 = tabNames.length;
 	while(_g < _g1) {
@@ -55114,7 +55540,7 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 		var tTxt = new h2d_Text(ui_FontManager.regularFont,this);
 		tTxt.set_text(tabNames[i[0]]);
 		this.tabLabels.push(tTxt);
-		var tabInter = new h2d_Interactive(150.0,42.0,this);
+		var tabInter = new h2d_Interactive(130.0,42.0,this);
 		tabInter.onClick = (function(i) {
 			return function(_) {
 				_gthis.switchTab(ui_views_options_OptionsView.TAB_ORDER[i[0]]);
@@ -55161,9 +55587,9 @@ ui_views_options_OptionsView.prototype = $extend(h2d_Object.prototype,{
 		audio_AudioManager.inst.playMenuBeep(420,0.05);
 		this.gfxPanel.set_visible(this.currentTab == ui_components_OptionsTab.Graphics);
 		this.audioPanel.set_visible(this.currentTab == ui_components_OptionsTab.Audio);
-		this.controlsPanel.set_visible(this.currentTab == ui_components_OptionsTab.Keyboard || this.currentTab == ui_components_OptionsTab.Gamepad);
+		this.controlsPanel.set_visible(this.currentTab == ui_components_OptionsTab.Keyboard || this.currentTab == ui_components_OptionsTab.Gamepad || this.currentTab == ui_components_OptionsTab.Touch);
 		this.controlsPanel.currentTab = this.currentTab;
-		if(this.currentTab == ui_components_OptionsTab.Keyboard || this.currentTab == ui_components_OptionsTab.Gamepad) {
+		if(this.currentTab == ui_components_OptionsTab.Keyboard || this.currentTab == ui_components_OptionsTab.Gamepad || this.currentTab == ui_components_OptionsTab.Touch) {
 			this.controlsPanel.updateControlViewMode();
 		} else if(this.currentTab == ui_components_OptionsTab.Graphics) {
 			this.gfxPanel.updateStyles();
@@ -55217,7 +55643,7 @@ ui_views_options_OptionsView.prototype = $extend(h2d_Object.prototype,{
 		var tabSpacing = Math.min(170.0,(cardW - 140.0) / ui_views_options_OptionsView.TAB_ORDER.length);
 		var tabStartX = (sw - ui_views_options_OptionsView.TAB_ORDER.length * tabSpacing) * 0.5;
 		var tabY = cardY + 12.0;
-		var tabBtnW = Math.min(150.0,tabSpacing - 8.0);
+		var tabBtnW = Math.min(130.0,tabSpacing - 8.0);
 		var _g = 0;
 		var _g1 = ui_views_options_OptionsView.TAB_ORDER.length;
 		while(_g < _g1) {
@@ -56833,7 +57259,7 @@ physics_CarPhysics.WHEEL_OFFSETS = [{ x : -0.98, y : 1.35},{ x : 0.98, y : 1.35}
 ui_UIIcons.cache = new haxe_ds_StringMap();
 ui_views_mainmenu_MainMenuView.ACTIONS = [ui_components_MenuAction.StartGame,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
 ui_views_options_GraphicsOptionsPanel.NAMES = ["Textures","Shadow Level","Shadow Res","Lighting","Lighting Res","Mipmapping","Anisotropy","Anti-Aliasing","AA Level","Model Geometry","Reflections","Reflection Level","Render Scale","UI Resolution"];
-ui_views_options_OptionsView.TAB_ORDER = [ui_components_OptionsTab.Graphics,ui_components_OptionsTab.Audio,ui_components_OptionsTab.Keyboard,ui_components_OptionsTab.Gamepad];
+ui_views_options_OptionsView.TAB_ORDER = [ui_components_OptionsTab.Graphics,ui_components_OptionsTab.Audio,ui_components_OptionsTab.Keyboard,ui_components_OptionsTab.Gamepad,ui_components_OptionsTab.Touch];
 world_SkyGradientShader.SRC = "HXSMF3dvcmxkLlNreUdyYWRpZW50U2hhZGVyBgEIdG9wQ29sb3IFCwIAAAIMaG9yaXpvbkNvbG9yBQsCAAADC2dyb3VuZENvbG9yBQsCAAAECnBpeGVsQ29sb3IFDAQAAAUTdHJhbnNmb3JtZWRQb3NpdGlvbgULBAAABghmcmFnbWVudA4GAAABAQYAAAUFCAcDZGlyBQsEAAAJAyAOAQIFBQsFCwAICAFoAwQAAAoCBwULCAADAAgJA2NvbAULBAAAAAALBgcCCAMBAwAAAAAAAAAAAwIFAggKAXQDBAAACQMIDgICCAMBA5qZmZmZmeE/AwMABgQCCQULCQMYDgMCAgULAgEFCwIKAwULBQsABQIICwF0AwQAAAkDFw4DBgEHAwIIAwMBAwAAAAAAABBAAwMBAwAAAAAAAAAAAwEDAAAAAAAA8D8DAwAGBAIJBQsJAxgOAwICBQsCAwULAgsDBQsFCwAABgQCBAUMCQMrDgICCQULAQMAAAAAAADwPwMFDAUMAA";
 world_SkyGradientShader._MODULE = "world.Skybox";
 {

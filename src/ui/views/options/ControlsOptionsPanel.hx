@@ -12,11 +12,43 @@ import input.InputController.InputAction;
 import input.InputController.ExclusiveDevice;
 import audio.AudioManager;
 import save.SaveSystem;
+import save.SaveSystem.TouchSettings;
 
 /**
- * Controller and keyboard configuration, schematic diagrams, and custom action remapping subpanel.
+ * Controller, keyboard, and touch screen configuration, schematic diagrams,
+ * and custom action / button remapping subpanel.
+ * Features an independent persistent steering sensitivity slider active across all control modes.
  */
 class ControlsOptionsPanel extends Object {
+    // =========================================================================
+    // GENERAL STEERING SENSITIVITY SLIDER (ALWAYS ACTIVE ACROSS ALL TABS)
+    // =========================================================================
+
+    /** Container holding persistent sensitivity slider elements. */
+    public var sensContainer:Object;
+
+    /** Steering sensitivity text label display. */
+    public var sensLabel:Text;
+
+    /** Decrement sensitivity button text label. */
+    public var sensDecrBtn:Text;
+
+    /** Interactive hitzone for decrementing sensitivity. */
+    public var sensDecrInter:Interactive;
+
+    /** Increment sensitivity button text label. */
+    public var sensIncrBtn:Text;
+
+    /** Interactive hitzone for incrementing sensitivity. */
+    public var sensIncrInter:Interactive;
+
+    /** Interactive hitzone covering the entire sensitivity row for easy clicking. */
+    public var sensRowInter:Interactive;
+
+    // =========================================================================
+    // HEADER CONTROLS (EXCLUSIVE HARDWARE & VIEW MODE)
+    // =========================================================================
+
     /** Toggle exclusive hardware device button. */
     public var toggleExclusiveBtn:Text;
     public var toggleExclusiveInter:Interactive;
@@ -24,6 +56,10 @@ class ControlsOptionsPanel extends Object {
     /** Toggle schematic diagram vs custom remapping button. */
     public var toggleViewModeBtn:Text;
     public var toggleViewModeInter:Interactive;
+
+    // =========================================================================
+    // CONTENT CONTAINERS
+    // =========================================================================
 
     /** Vector schematic diagram canvas. */
     public var diagramViewer:ControlDiagrams;
@@ -52,14 +88,20 @@ class ControlsOptionsPanel extends Object {
     /** Currently selected options tab. */
     public var currentTab:OptionsTab = Keyboard;
 
+    /** Callback invoked whenever touch control settings are modified. */
+    public var onTouchSettingsChanged:Void->Void;
+
     /** Interactive remapping row hitzone width in pixels. */
-    public static inline var REMAP_ROW_WIDTH:Float = 500.0;
+    public static inline var REMAP_ROW_WIDTH:Float = 540.0;
 
     /** Interactive remapping row hitzone height in pixels. */
-    public static inline var REMAP_ROW_HEIGHT:Float = 36.0;
+    public static inline var REMAP_ROW_HEIGHT:Float = 26.0;
 
     /** Vertical spacing between successive remapping list rows in pixels. */
-    public static inline var REMAP_ROW_STRIDE:Float = 38.0;
+    public static inline var REMAP_ROW_STRIDE:Float = 27.0;
+
+    /** Maximum customizable items (supports up to 12 touch configuration rows). */
+    public static inline var MAX_REMAP_ITEMS:Int = 12;
 
     /**
      * Instantiates the controls and hardware options subpanel.
@@ -71,22 +113,56 @@ class ControlsOptionsPanel extends Object {
         super(parent);
         this.inputRef = input;
 
+        // 1. General Steering Sensitivity Row
+        sensContainer = new Object(this);
+
+        sensDecrBtn = new Text(FontManager.regularFont, sensContainer);
+        sensDecrBtn.text = "[ < -2% ]";
+        sensDecrBtn.textColor = UITheme.COLOR_ACCENT_CYAN;
+        sensDecrInter = new Interactive(80, 28, sensContainer);
+        sensDecrInter.onClick = function(_) adjustSensitivity(-0.02);
+
+        sensLabel = new Text(FontManager.regularFont, sensContainer);
+        sensLabel.textColor = UITheme.COLOR_TEXT_NORMAL;
+
+        sensRowInter = new Interactive(320, 28, sensContainer);
+        sensRowInter.onClick = function(_) {
+            // Cycle sensitivity by +2% or wrap around
+            var next = inputRef.steerSensitivity >= 0.99 ? -1.0 : 0.02;
+            adjustSensitivity(next);
+        };
+
+        sensIncrBtn = new Text(FontManager.regularFont, sensContainer);
+        sensIncrBtn.text = "[ +2% > ]";
+        sensIncrBtn.textColor = UITheme.COLOR_ACCENT_CYAN;
+        sensIncrInter = new Interactive(80, 28, sensContainer);
+        sensIncrInter.onClick = function(_) adjustSensitivity(0.02);
+
+        // 2. Header Status & Mode Buttons
         toggleExclusiveBtn = new Text(FontManager.regularFont, this);
-        toggleExclusiveInter = new Interactive(300, 34, this);
+        toggleExclusiveInter = new Interactive(300, 32, this);
         toggleExclusiveInter.onClick = function(_) toggleExclusiveDevice();
 
         toggleViewModeBtn = new Text(FontManager.regularFont, this);
-        toggleViewModeInter = new Interactive(300, 34, this);
+        toggleViewModeInter = new Interactive(300, 32, this);
         toggleViewModeInter.onClick = function(_) {
             controlViewMode = (controlViewMode == "Diagram") ? "Custom" : "Diagram";
+            if (currentTab == Touch) {
+                var d = SaveSystem.load();
+                if (d.touchSettings == null) d.touchSettings = SaveSystem.getDefaultTouchSettings();
+                d.touchSettings.mode = (controlViewMode == "Diagram") ? "Default" : "Custom";
+                SaveSystem.save(d);
+                if (onTouchSettingsChanged != null) onTouchSettingsChanged();
+            }
             updateControlViewMode();
         };
 
+        // 3. Diagram Viewer
         diagramViewer = new ControlDiagrams(this);
 
+        // 4. Remapping List Container
         remapContainer = new Object(this);
-        var actions = ["Steering Sensitivity", "Throttle (Gas)", "Brake / Reverse", "Steer Left", "Steer Right", "Handbrake", "Nitro Boost", "Reset All to Defaults"];
-        for (i in 0...actions.length) {
+        for (i in 0...MAX_REMAP_ITEMS) {
             var txt = new Text(FontManager.regularFont, remapContainer);
             remapItems.push(txt);
 
@@ -106,12 +182,15 @@ class ControlsOptionsPanel extends Object {
         remapStatusNotice = new Text(FontManager.regularFont, this);
         remapStatusNotice.textColor = UITheme.COLOR_ACCENT_GOLD;
         remapStatusNotice.visible = false;
+
+        updateSensitivityDisplay();
     }
 
     /**
-     * Toggles exclusive hardware device mode.
+     * Toggles exclusive hardware device mode for keyboard / gamepad.
      */
     public function toggleExclusiveDevice() {
+        if (currentTab == Touch) return;
         AudioManager.inst.playMenuBeep(480, 0.06);
         if (currentTab == Keyboard) {
             inputRef.exclusiveDevice = (inputRef.exclusiveDevice == KeyboardOnly) ? Both : KeyboardOnly;
@@ -122,9 +201,48 @@ class ControlsOptionsPanel extends Object {
     }
 
     /**
+     * Increments or decrements steering sensitivity by fractional delta (typically 0.02 = 2%).
+     *
+     * @param delta Change amount (-0.02 or +0.02).
+     */
+    public function adjustSensitivity(delta:Float) {
+        var sens = Math.round((inputRef.steerSensitivity + delta) * 50) / 50.0;
+        sens = Math.max(0.0, Math.min(1.0, sens));
+        inputRef.steerSensitivity = sens;
+        AudioManager.inst.playMenuBeep(420 + sens * 240, 0.04);
+        updateSensitivityDisplay();
+
+        var d = SaveSystem.load();
+        d.steerSensitivity = sens;
+        SaveSystem.save(d);
+    }
+
+    /**
+     * Refreshes text display of current steering sensitivity level.
+     */
+    public function updateSensitivityDisplay() {
+        var sensPct = Math.round(inputRef.steerSensitivity * 100);
+        var barLen = Math.round(inputRef.steerSensitivity * 20);
+        var barStr = "";
+        for (i in 0...20) barStr += (i < barLen) ? "■" : "□";
+
+        sensLabel.text = "Steering Sensitivity: [" + barStr + "] " + sensPct + "%";
+    }
+
+    /**
      * Updates header status labels for exclusive device and view mode.
      */
     public function updateControlHeaderButtons() {
+        if (currentTab == Touch) {
+            toggleExclusiveBtn.text = "[INTERFACE: MULTI-TOUCH ACTIVE]";
+            toggleExclusiveBtn.textColor = UITheme.COLOR_GREEN_SUCCESS;
+            toggleExclusiveInter.visible = false;
+            toggleViewModeBtn.text = "[MODE: " + (controlViewMode == "Diagram" ? "DEFAULT LAYOUT" : "CUSTOM LAYOUT") + "]";
+            toggleViewModeBtn.textColor = UITheme.COLOR_ACCENT_CYAN;
+            return;
+        }
+
+        toggleExclusiveInter.visible = true;
         var isKbd = (currentTab == Keyboard);
         var active = inputRef.exclusiveDevice;
         var status = "BOTH ACTIVE";
@@ -143,29 +261,54 @@ class ControlsOptionsPanel extends Object {
     public function updateControlViewMode() {
         diagramViewer.visible = (controlViewMode == "Diagram");
         remapContainer.visible = (controlViewMode == "Custom");
+
         if (controlViewMode == "Diagram") {
             if (currentTab == Keyboard) diagramViewer.drawKeyboardLayout();
-            else diagramViewer.drawGamepadLayout();
+            else if (currentTab == Gamepad) diagramViewer.drawGamepadLayout();
+            else if (currentTab == Touch) diagramViewer.drawTouchLayout();
         } else {
             updateRemapStyles();
         }
+
         updateControlHeaderButtons();
+        updateSensitivityDisplay();
     }
 
     /**
-     * Initiates remapping capture for an action.
+     * Gets the number of valid items in the current custom mode list.
+     *
+     * @return 12 for touch tab, 7 for keyboard/gamepad tabs.
+     */
+    public function getMaxRemapCount():Int {
+        return (currentTab == Touch) ? 12 : 7;
+    }
+
+    /**
+     * Initiates remapping capture or activates an option entry.
      *
      * @param idx Action row index.
      */
     public function triggerRemapEntry(idx:Int) {
-        if (idx == 0) {
-            // Cycle sensitivity by +2% or wrap around
-            var next = inputRef.steerSensitivity >= 0.99 ? -1.0 : 0.02;
-            adjustSensitivity(next);
+        if (currentTab == Touch) {
+            var d = SaveSystem.load();
+            var ts = d.touchSettings != null ? d.touchSettings : SaveSystem.getDefaultTouchSettings();
+            if (idx == 11) {
+                // Reset to default touch layout
+                AudioManager.inst.playMenuBeep(320, 0.08);
+                d.touchSettings = SaveSystem.getDefaultTouchSettings();
+                d.touchSettings.mode = "Custom";
+                SaveSystem.save(d);
+                if (onTouchSettingsChanged != null) onTouchSettingsChanged();
+                updateRemapStyles();
+                return;
+            }
+
+            // Click cycles value forward
+            adjustCurrentCustomOption(1);
             return;
         }
 
-        if (idx == 7) {
+        if (idx == 6) {
             AudioManager.inst.playMenuBeep(320, 0.08);
             if (currentTab == Keyboard) inputRef.bindings.resetKeyboardDefaults();
             else inputRef.bindings.resetGamepadDefaults();
@@ -178,24 +321,46 @@ class ControlsOptionsPanel extends Object {
         AudioManager.inst.playMenuBeep(640, 0.1);
         remapStatusNotice.text = "PRESS ANY " + (isGamepad ? "BUTTON" : "KEY") + "...";
         remapStatusNotice.visible = true;
-        inputRef.startListening(actList[idx - 1], isGamepad);
+        inputRef.startListening(actList[idx], isGamepad);
     }
 
     /**
-     * Increments or decrements steering sensitivity by fractional delta (typically 0.02 = 2%).
+     * Adjusts the currently selected custom setting left (-1) or right (+1).
      *
-     * @param delta Change amount (-0.02 or +0.02).
+     * @param dir Navigation direction multiplier (-1 or +1).
      */
-    public function adjustSensitivity(delta:Float) {
-        var sens = Math.round((inputRef.steerSensitivity + delta) * 50) / 50.0;
-        sens = Math.max(0.0, Math.min(1.0, sens));
-        inputRef.steerSensitivity = sens;
-        AudioManager.inst.playMenuBeep(420 + sens * 240, 0.04);
-        updateRemapStyles();
+    public function adjustCurrentCustomOption(dir:Int) {
+        if (currentTab != Touch) return;
 
         var d = SaveSystem.load();
-        d.steerSensitivity = sens;
+        var ts = d.touchSettings != null ? d.touchSettings : SaveSystem.getDefaultTouchSettings();
+        ts.mode = "Custom";
+        var delta = dir * 5.0;
+
+        switch (remapIndex) {
+            case 0: ts.stickOffsetX = Math.max(-100.0, Math.min(100.0, ts.stickOffsetX + delta));
+            case 1: ts.stickOffsetY = Math.max(-100.0, Math.min(100.0, ts.stickOffsetY + delta));
+            case 2: ts.nitroOffsetX = Math.max(-100.0, Math.min(100.0, ts.nitroOffsetX + delta));
+            case 3: ts.nitroOffsetY = Math.max(-100.0, Math.min(100.0, ts.nitroOffsetY + delta));
+            case 4: ts.gasOffsetX = Math.max(-100.0, Math.min(100.0, ts.gasOffsetX + delta));
+            case 5: ts.gasOffsetY = Math.max(-100.0, Math.min(100.0, ts.gasOffsetY + delta));
+            case 6: ts.brakeOffsetX = Math.max(-100.0, Math.min(100.0, ts.brakeOffsetX + delta));
+            case 7: ts.brakeOffsetY = Math.max(-100.0, Math.min(100.0, ts.brakeOffsetY + delta));
+            case 8: ts.driftOffsetX = Math.max(-100.0, Math.min(100.0, ts.driftOffsetX + delta));
+            case 9: ts.driftOffsetY = Math.max(-100.0, Math.min(100.0, ts.driftOffsetY + delta));
+            case 10:
+                var s = Math.round((ts.scale + dir * 0.05) * 100) / 100.0;
+                ts.scale = Math.max(0.5, Math.min(1.5, s));
+            case 11:
+                // No adjustment for reset row
+                return;
+        }
+
+        d.touchSettings = ts;
         SaveSystem.save(d);
+        AudioManager.inst.playMenuBeep(450 + remapIndex * 20, 0.04);
+        if (onTouchSettingsChanged != null) onTouchSettingsChanged();
+        updateRemapStyles();
     }
 
     /**
@@ -204,20 +369,60 @@ class ControlsOptionsPanel extends Object {
      * @param dir Navigation offset (-1 or +1).
      */
     public function navigate(dir:Int) {
-        remapIndex = (remapIndex + dir + remapItems.length) % remapItems.length;
+        var count = getMaxRemapCount();
+        remapIndex = (remapIndex + dir + count) % count;
         AudioManager.inst.playMenuBeep(380, 0.04);
         updateRemapStyles();
     }
 
     /**
-     * Refreshes keycap and gamepad button name representations in remapping list.
+     * Refreshes text and highlights in remapping / custom list.
      */
     public function updateRemapStyles() {
+        var count = getMaxRemapCount();
+
+        if (currentTab == Touch) {
+            var d = SaveSystem.load();
+            var ts = d.touchSettings != null ? d.touchSettings : SaveSystem.getDefaultTouchSettings();
+            var labels = [
+                "Analog Joystick Offset X:  " + Math.round(ts.stickOffsetX) + " px  [ < / > ]",
+                "Analog Joystick Offset Y:  " + Math.round(ts.stickOffsetY) + " px  [ < / > ]",
+                "Nitro Button Offset X:     " + Math.round(ts.nitroOffsetX) + " px  [ < / > ]",
+                "Nitro Button Offset Y:     " + Math.round(ts.nitroOffsetY) + " px  [ < / > ]",
+                "Gas Pedal Offset X:        " + Math.round(ts.gasOffsetX) + " px  [ < / > ]",
+                "Gas Pedal Offset Y:        " + Math.round(ts.gasOffsetY) + " px  [ < / > ]",
+                "Brake Disc Offset X:       " + Math.round(ts.brakeOffsetX) + " px  [ < / > ]",
+                "Brake Disc Offset Y:       " + Math.round(ts.brakeOffsetY) + " px  [ < / > ]",
+                "Handbrake Offset X:        " + Math.round(ts.driftOffsetX) + " px  [ < / > ]",
+                "Handbrake Offset Y:        " + Math.round(ts.driftOffsetY) + " px  [ < / > ]",
+                "Touch Controls Scale:      " + Math.round(ts.scale * 100) + "%  [ < / > ]",
+                "[RESET TOUCH LAYOUT TO DEFAULTS]"
+            ];
+
+            for (i in 0...MAX_REMAP_ITEMS) {
+                var item = remapItems[i];
+                var inter = remapInteractives[i];
+                if (i < count) {
+                    item.visible = true;
+                    inter.visible = true;
+                    if (i == remapIndex) {
+                        item.textColor = UITheme.COLOR_ACCENT_CYAN;
+                        item.text = "> " + labels[i] + " <";
+                    } else {
+                        item.textColor = (i == 11) ? 0xE5C07B : UITheme.COLOR_TEXT_NORMAL;
+                        item.text = "  " + labels[i] + "  ";
+                    }
+                } else {
+                    item.visible = false;
+                    inter.visible = false;
+                }
+            }
+            return;
+        }
+
         var isGamepad = (currentTab == Gamepad);
         var b = inputRef.bindings;
-        var sensPct = Math.round(inputRef.steerSensitivity * 100);
         var labels = [
-            "Steering Sensitivity: " + sensPct + "%  [ < / > ]",
             "Throttle (Gas):       " + (isGamepad ? InputController.getGamepadBtnName(b.padGas) : InputController.getKeyName(b.keyGas)),
             "Brake / Reverse:      " + (isGamepad ? InputController.getGamepadBtnName(b.padBrake) : InputController.getKeyName(b.keyBrake)),
             "Steer Left:           " + (isGamepad ? "Left Analog / D-Pad" : InputController.getKeyName(b.keyLeft)),
@@ -227,20 +432,28 @@ class ControlsOptionsPanel extends Object {
             "[RESET TO DEFAULTS]"
         ];
 
-        for (i in 0...remapItems.length) {
+        for (i in 0...MAX_REMAP_ITEMS) {
             var item = remapItems[i];
-            if (i == remapIndex) {
-                item.textColor = UITheme.COLOR_ACCENT_CYAN;
-                item.text = "> " + labels[i] + " <";
+            var inter = remapInteractives[i];
+            if (i < count) {
+                item.visible = true;
+                inter.visible = true;
+                if (i == remapIndex) {
+                    item.textColor = UITheme.COLOR_ACCENT_CYAN;
+                    item.text = "> " + labels[i] + " <";
+                } else {
+                    item.textColor = (i == 6) ? 0xE5C07B : UITheme.COLOR_TEXT_NORMAL;
+                    item.text = "  " + labels[i] + "  ";
+                }
             } else {
-                item.textColor = (i == 7) ? 0xE5C07B : UITheme.COLOR_TEXT_NORMAL;
-                item.text = "  " + labels[i] + "  ";
+                item.visible = false;
+                inter.visible = false;
             }
         }
     }
 
     /**
-     * Positions diagram viewer, header toggle buttons, and remapping items relative to modal card bounds.
+     * Positions diagram viewer, sensitivity controls, header buttons, and remapping items.
      *
      * @param sw Screen width in pixels.
      * @param sh Screen height in pixels.
@@ -255,7 +468,33 @@ class ControlsOptionsPanel extends Object {
         var effectiveCardW = (cardW > 0) ? cardW : UITheme.OPTIONS_CARD_WIDTH;
         var effectiveCardH = (cardH > 0) ? cardH : UITheme.OPTIONS_CARD_HEIGHT;
 
-        var headerY = effectiveCardY + 70.0;
+        // 1. Steering Sensitivity Slider at top
+        var sensY = effectiveCardY + 54.0;
+        if (sensLabel != null) {
+            sensLabel.x = (sw - sensLabel.textWidth) * 0.5;
+            sensLabel.y = sensY;
+            sensRowInter.x = sensLabel.x;
+            sensRowInter.y = sensY;
+            sensRowInter.width = sensLabel.textWidth;
+            sensRowInter.height = 24.0;
+
+            sensDecrBtn.x = sensLabel.x - sensDecrBtn.textWidth - 14.0;
+            sensDecrBtn.y = sensY;
+            sensDecrInter.x = sensDecrBtn.x;
+            sensDecrInter.y = sensY;
+            sensDecrInter.width = sensDecrBtn.textWidth;
+            sensDecrInter.height = 24.0;
+
+            sensIncrBtn.x = sensLabel.x + sensLabel.textWidth + 14.0;
+            sensIncrBtn.y = sensY;
+            sensIncrInter.x = sensIncrBtn.x;
+            sensIncrInter.y = sensY;
+            sensIncrInter.width = sensIncrBtn.textWidth;
+            sensIncrInter.height = 24.0;
+        }
+
+        // 2. Mode and Device Header Buttons
+        var headerY = sensY + 34.0;
         if (toggleExclusiveBtn != null) {
             toggleExclusiveBtn.x = effectiveCardX + 50.0;
             toggleExclusiveBtn.y = headerY;
@@ -269,20 +508,22 @@ class ControlsOptionsPanel extends Object {
             toggleViewModeInter.y = toggleViewModeBtn.y;
         }
 
+        // 3. Diagram Viewer
         if (diagramViewer != null) {
             diagramViewer.x = effectiveCardX + (effectiveCardW * 0.5);
-            diagramViewer.y = effectiveCardY + 310.0;
+            diagramViewer.y = effectiveCardY + 320.0;
             diagramViewer.setScale(0.92);
         }
 
-        var remapStartY = headerY + 48.0;
+        // 4. Remapping List
+        var remapStartY = headerY + 42.0;
         if (remapStatusNotice != null) {
             remapStatusNotice.x = (sw - remapStatusNotice.textWidth) * 0.5;
             remapStatusNotice.y = remapStartY;
         }
 
-        var itemsStartY = remapStartY + 26.0;
-        for (i in 0...remapItems.length) {
+        var itemsStartY = remapStartY + 24.0;
+        for (i in 0...MAX_REMAP_ITEMS) {
             var item = remapItems[i];
             var inter = remapInteractives[i];
             item.x = (sw - item.textWidth) * 0.5;

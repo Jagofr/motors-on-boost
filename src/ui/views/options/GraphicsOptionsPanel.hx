@@ -110,12 +110,33 @@ class GraphicsOptionsPanel extends Object {
     }
 
     /**
+     * Checks if a graphics setting is currently disabled due to its parent option setting.
+     *
+     * @param idx Option index.
+     * @return True if the option should be grayed out and non-interactive.
+     */
+    public function isOptionDisabled(idx:Int):Bool {
+        switch (idx) {
+            case 2: return settings.shadowLevel == "Off";
+            case 6: return !settings.mipmapping;
+            case 8: return settings.aaType == "None";
+            case 11: return !settings.modelReflections;
+            default: return false;
+        }
+    }
+
+    /**
      * Cycles an option setting in forward (+1) or backward (-1) direction.
      *
      * @param idx Option index.
      * @param dir Direction multiplier.
      */
     public function cycleOption(idx:Int, dir:Int) {
+        if (isOptionDisabled(idx)) {
+            AudioManager.inst.playMenuBeep(220.0, 0.05);
+            return;
+        }
+
         AudioManager.inst.playMenuBeep(AUDIO_CYCLE_FREQ, 0.05);
         var s = settings;
 
@@ -127,16 +148,16 @@ class GraphicsOptionsPanel extends Object {
             case 1:
                 var list = ["Off", "Normal", "High", "Ultra", "Dynamic"];
                 s.shadowLevel = cycleArray(list, s.shadowLevel, dir);
-                GraphicsManager.inst.applyShadows();
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyShadows();
             case 2:
                 var list = [512, 1024, 2048, 4096];
                 s.shadowRes = cycleArray(list, s.shadowRes, dir);
-                GraphicsManager.inst.applyShadows();
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyShadows();
             case 3:
                 if (isOpenedFromPause) return;
                 var list = ["Low", "Medium", "High", "Ultra (RTX/Path)"];
                 s.lightingLevel = cycleArray(list, s.lightingLevel, dir);
-                GraphicsManager.inst.applyLighting();
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyLighting();
             case 4:
                 var list = [512, 1024, 2048];
                 s.lightingRes = cycleArray(list, s.lightingRes, dir);
@@ -165,11 +186,11 @@ class GraphicsOptionsPanel extends Object {
             case 12:
                 var list = [0.25, 0.334, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0];
                 s.renderScale = cycleArray(list, s.renderScale, dir);
-                GraphicsManager.inst.applyRenderScale();
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyRenderScale();
             case 13:
                 var list = ["720p (HD)", "1080p (FHD)", "1440p (2K)", "2160p (4K)", "Native / Match Window"];
                 s.uiResolution = cycleArray(list, s.uiResolution, dir);
-                GraphicsManager.inst.applyUIResolution();
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyUIResolution();
                 if (onUIResolutionChanged != null) onUIResolutionChanged();
         }
 
@@ -230,19 +251,24 @@ class GraphicsOptionsPanel extends Object {
         var s = settings;
         var inGameLocked = isOpenedFromPause;
 
+        var shadowResStr = isOptionDisabled(2) ? "[DISABLED]" : (s.shadowRes + "p");
+        var anisoStr = isOptionDisabled(6) ? "[DISABLED]" : (s.anisotropic + "x");
+        var aaLevelStr = isOptionDisabled(8) ? "[DISABLED]" : (s.aaLevel + "x");
+        var reflLevelStr = isOptionDisabled(11) ? "[DISABLED]" : s.reflectionLevel;
+
         var vals = [
             s.textures + (inGameLocked ? " [LOCKED IN-RUN]" : ""),
             s.shadowLevel,
-            s.shadowRes + "p",
+            shadowResStr,
             s.lightingLevel + (inGameLocked ? " [LOCKED IN-RUN]" : ""),
             s.lightingRes + "p",
             (s.mipmapping ? "Enabled" : "Disabled") + (inGameLocked ? " [LOCKED IN-RUN]" : ""),
-            s.anisotropic + "x" + (inGameLocked ? " [LOCKED IN-RUN]" : ""),
+            anisoStr + (inGameLocked && !isOptionDisabled(6) ? " [LOCKED IN-RUN]" : ""),
             s.aaType,
-            s.aaLevel + "x",
+            aaLevelStr,
             s.modelGeometry + (inGameLocked ? " [LOCKED IN-RUN]" : ""),
             s.modelReflections ? "Active" : "Disabled",
-            s.reflectionLevel,
+            reflLevelStr,
             s.renderScale + "x (" + Math.round(s.renderScale * 100) + "%)",
             s.uiResolution
         ];
@@ -256,12 +282,25 @@ class GraphicsOptionsPanel extends Object {
         for (i in 0...items.length) {
             var item = items[i];
             var isLocked = inGameLocked && (i == 0 || i == 3 || i == 5 || i == 6 || i == 9);
+            var isDisabled = isOptionDisabled(i);
 
             if (i == selectedIndex) {
-                item.textColor = isLocked ? UITheme.COLOR_TEXT_MUTED : UITheme.COLOR_ACCENT_CYAN;
+                if (isDisabled) {
+                    item.textColor = UITheme.COLOR_TEXT_DISABLED;
+                } else if (isLocked) {
+                    item.textColor = UITheme.COLOR_TEXT_MUTED;
+                } else {
+                    item.textColor = UITheme.COLOR_ACCENT_CYAN;
+                }
                 item.text = "> " + titles[i] + vals[i] + " <";
             } else {
-                item.textColor = isLocked ? UITheme.COLOR_TEXT_DISABLED : UITheme.COLOR_TEXT_NORMAL;
+                if (isDisabled) {
+                    item.textColor = UITheme.COLOR_TEXT_DISABLED;
+                } else if (isLocked) {
+                    item.textColor = UITheme.COLOR_TEXT_MUTED;
+                } else {
+                    item.textColor = UITheme.COLOR_TEXT_NORMAL;
+                }
                 item.text = "  " + titles[i] + vals[i] + "  ";
             }
         }

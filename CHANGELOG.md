@@ -29,12 +29,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Fixed OptionsView Back button hitzone overlap (`BACK_BUTTON_WIDTH = 100.0`), preventing collision with Tab 0 ("GRAPHICS").
   - Added vertical scrolling (`scrollOffset`, `maxVisibleRows`) with navigation arrows and mouse wheel support in `GraphicsOptionsPanel.hx`.
   - Dynamic responsive card backplate sizing in `CardBackplate.hx` preventing lower-resolution overflow.
-- **Frosted Glass Touch Controls & Custom Icons (`TouchControlsHUD.hx`)**:
-  - Integrated custom 512x512 vector icons from `res/icons/`: `burn.png` for Nitro, `gas-pedal.png` for Gas, `brake.png` for Brake, and `hand-brake.png` for Handbrake.
-  - Aligned button positions with reference layout: lower-left virtual steering joystick, mid-left Nitro button below minimap, upper-right Brake button, mid-right Handbrake lever, lower-right Gas pedal, and top-right circular pause button.
-  - Multi-touch concurrency across all simultaneous finger chords.
+- **Comprehensive Dual-Tier Automated Testing Infrastructure (`tests/` & `web/test-suite.html`)**:
+  - Headless Unit Test Suite with `utest` (1.13.2) compatible with VSCode `Haxe Test Explorer`, testing 12 fixtures (Audio, Camera, Core Version, Entities, Input, Physics, SplineMath, Save, Graphics Options, Touch Controls, Track) with 197 assertions passing in under 0.10s.
+  - Automated Browser Visual/Programmatic Testing Suite (`web/test-suite.html`) driven headlessly via Microsoft Edge and CDP (`tests/run-browser-tests.js`), verifying trademark boot resolution, independent UI vs 3D render scaling, graphics dependency locking, global sensitivity slider persistence, and simulated in-game track driving with nitrous consumption and recharge.
+- **Graphics Options Hierarchy & Dependency Graying Out (`GraphicsOptionsPanel.hx`)**:
+  - Automatically disables, grays out, labels `[DISABLED]`, and blocks value cycling for dependent settings when parent options are disabled (`shadowLevel == "Off"` -> `shadowRes`; `mipmapping == false` -> `anisotropic`; `aaType == "None"` -> `aaLevel`; `modelReflections == false` -> `reflectionLevel`).
+- **Dedicated Touch Controls Options Tab (`ControlsOptionsPanel.hx`, `TouchControlsHUD.hx`, `SaveSystem.hx`)**:
+  - Added dedicated 5th tab to Options menu supporting Default layout vector schematic and Custom layout position adjustment with fine-grained offsets, scale, and 1-click Reset to Defaults.
 
-*For detailed notes, see [`changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md`](./changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md).*
+*For detailed notes, see [`changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md`](./changelogs/2026-10-10-v0.2.2-hud-overhaul-controls-qol.md) and [`changelogs/2026-10-11-v0.2.2-automated-test-suite-and-options-overhaul.md`](./changelogs/2026-10-11-v0.2.2-automated-test-suite-and-options-overhaul.md).*
 
 ---
 

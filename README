@@ -115,26 +115,30 @@ This project represents the primary WebGL foundation of the *M.O.B.* racing line
 │       └── symbols.ttf
 ├── src/
 │   ├── Main.hx                    # Entry point & intro sequence controller
-│   ├── core/
-│   │   ├── AudioManager.hx        # Sound synthesis and gain staging
-│   │   ├── ChaseCamera.hx         # Spring-arm chase camera with trauma shake
-│   │   ├── ControlDiagrams.hx     # Procedural controller & keyboard visualizer
-│   │   ├── FontManager.hx         # Font loading and typography registry
-│   │   ├── GraphicsManager.hx     # Render scale, shadow, and lighting pipeline
-│   │   ├── SaveSystem.hx          # LocalStorage persistence for settings & state
-│   │   ├── UIIcons.hx             # Vector UI icon renderer & tile cache
-│   │   └── UIManager.hx           # UI views, bumper tabs, sliders, and HUD
-│   ├── entities/
-│   │   ├── CarMesh.hx             # Procedural player vehicle geometry & wheels
-│   │   └── TrafficSystem.hx       # Highway traffic spawning & waypoint AI
-│   ├── input/
-│   │   └── InputController.hx     # Gamepad/keyboard polling & edge detection
-│   ├── physics/
-│   │   └── CarPhysics.hx          # Vehicle handling, friction & drift physics
-│   └── world/
-│       └── Track.hx               # Procedural highway geometry & lift constants
+│   ├── core/                      # Architecture and boot packages
+│   ├── entities/                  # Vehicle meshes and traffic simulation
+│   ├── input/                     # Gamepad, keyboard, and touch controller
+│   ├── physics/                   # Vehicle dynamics, raycast suspension, drift
+│   ├── ui/                        # High-density HUD, options panels, and controls
+│   └── world/                     # Highway circuit geometry & boundaries
+├── tests/                         # Dual-tier automated testing infrastructure
+│   ├── TestMain.hx                # Headless unit test runner (utest)
+│   ├── node-runner.js             # Node.js DOM/storage shims for Heaps JS
+│   ├── run-browser-tests.js       # Headless Edge CDP automation runner
+│   ├── audio/                     # Audio manager test cases
+│   ├── camera/                    # Chase camera FOV & trauma test cases
+│   ├── core/                      # Version and core system test cases
+│   ├── entities/                  # Traffic AI and vehicle mesh test cases
+│   ├── input/                     # Sensitivity & input controller test cases
+│   ├── physics/                   # Raycast suspension & drift test cases
+│   ├── save/                      # Save schema migration & touch settings tests
+│   ├── ui/                        # Graphics options & touch HUD test cases
+│   └── world/                     # Track spline & waypoint test cases
+├── compile.hxml                   # Production JS compilation configuration
+├── test.hxml                      # Headless unit testing compilation configuration
 └── web/                           # Production web root & PWA distribution bundle
     ├── index.html                 # App shell with noscript fallback & canvas
+    ├── test-suite.html            # Interactive browser test suite & visual verification
     ├── manifest.json              # Web App Manifest (standalone landscape)
     ├── sw.js                      # Cache-first Service Worker
     ├── game.js                    # Compiled JavaScript bundle (generated)
@@ -191,7 +195,23 @@ haxe compile.hxml
 ```
 The output file `web/game.js` will be created or updated automatically.
 
-### 2. Running Locally
+### 2. Running Automated Tests
+
+#### Headless Unit Test Suite (`utest`)
+```bash
+haxe test.hxml
+```
+Executes 197 assertions across 12 test fixtures (Audio, Camera, Version, Entities, Input, Physics, SplineMath, Save, Graphics, Touch, Track) in under 0.10s via Node.js. Fully compatible with the VSCode `Haxe Test Explorer` plugin (`test-adapter`).
+
+#### Browser Visual & UI Automation Suite
+```bash
+node tests/run-browser-tests.js
+```
+Launches Microsoft Edge in headless mode with an isolated profile and runs automated scenarios via Chrome DevTools Protocol (CDP) testing startup resolution, decoupled UI vs 3D render scaling, graphics dependency locking, global sensitivity slider persistence, touch layout customization, and simulated in-game track driving with nitrous depletion/recharge.
+
+You can also open `web/test-suite.html` directly in any web browser to view the interactive test dashboard and embedded live game execution.
+
+### 3. Running Locally
 Because WebGL, Web Audio, Service Workers, and Canvas WebP decoding require a valid HTTP origin, serve the `web/` directory using any local development server:
 
 #### Using Python 3:

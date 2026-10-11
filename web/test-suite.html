@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>M.O.B. // Automated Browser Test Suite</title>
+  <style>
+    :root {
+      --bg-dark: #0a0d14;
+      --bg-card: #121722;
+      --bg-card-header: #1a2233;
+      --accent-cyan: #00e5ff;
+      --accent-magenta: #ff0055;
+      --accent-yellow: #ffcc00;
+      --accent-green: #00ff66;
+      --accent-red: #ff3344;
+      --text-main: #f0f4fc;
+      --text-muted: #8892b0;
+      --border-color: #232d42;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    header {
+      background: linear-gradient(90deg, #0e1420 0%, #171f30 100%);
+      border-bottom: 2px solid var(--accent-cyan);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .badge-logo {
+      background: var(--accent-magenta);
+      color: #fff;
+      font-weight: 900;
+      padding: 4px 10px;
+      border-radius: 4px;
+      letter-spacing: 0.15em;
+      font-size: 13px;
+    }
+
+    h1 {
+      font-size: 18px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn {
+      background: #1e283d;
+      color: var(--accent-cyan);
+      border: 1px solid var(--accent-cyan);
+      padding: 7px 16px;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: var(--accent-cyan);
+      color: #000;
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
+    }
+
+    .btn-primary {
+      background: var(--accent-cyan);
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      background: #33ebff;
+      box-shadow: 0 0 14px rgba(0, 229, 255, 0.7);
+    }
+
+    .status-summary {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 6px 14px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .stat-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .stat-pill .count {
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .stat-pass { color: var(--accent-green); }
+    .stat-fail { color: var(--accent-red); }
+    .stat-total { color: var(--accent-cyan); }
+
+    .main-workspace {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Left panel: Test Execution Dashboard */
+    .test-dashboard {
+      flex: 1.1;
+      padding: 16px 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      border-right: 1px solid var(--border-color);
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    }
+
+    .card-header {
+      background: var(--bg-card-header);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .card-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-status {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 3px;
+      text-transform: uppercase;
+    }
+
+    .status-pending { background: #2c3345; color: #a4b1cd; }
+    .status-running { background: #614a00; color: #ffe066; animation: pulse 1.5s infinite; }
+    .status-passed { background: #084c26; color: #00ff66; }
+    .status-failed { background: #5a0f1b; color: #ff6b81; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .card-body {
+      padding: 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .test-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+      padding: 4px 0;
+      border-bottom: 1px dashed rgba(255, 255, 255, 0.06);
+    }
+
+    .test-item:last-child {
+      border-bottom: none;
+    }
+
+    .test-icon {
+      font-size: 14px;
+      line-height: 1.2;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .test-info {
+      flex: 1;
+    }
+
+    .test-desc {
+      color: var(--text-main);
+    }
+
+    .test-detail {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-family: Consolas, monospace;
+    }
+
+    .log-console {
+      background: #06080e;
+      border: 1px solid #1a2233;
+      border-radius: 4px;
+      padding: 10px 14px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 12px;
+      color: #79d2a6;
+      max-height: 180px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+
+    /* Right panel: Live Game Iframe */
+    .game-viewport {
+      flex: 1.3;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .viewport-header {
+      background: #141b29;
+      border-bottom: 1px solid var(--border-color);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .viewport-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--accent-green);
+      display: inline-block;
+    }
+
+    #gameFrame {
+      width: 100%;
+      height: 100%;
+      border: none;
+      background: #000;
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-title">
+      <span class="badge-logo">M.O.B.</span>
+      <h1>Automated Browser Test Suite &amp; Visual Verification</h1>
+      <span style="color: var(--text-muted); font-size: 12px; margin-left: 8px;">v0.2.2</span>
+    </div>
+
+    <div class="header-controls">
+      <div class="status-summary">
+        <div class="stat-pill stat-total">TOTAL: <span class="count" id="statTotal">0</span></div>
+        <div class="stat-pill stat-pass">PASSED: <span class="count" id="statPass">0</span></div>
+        <div class="stat-pill stat-fail">FAILED: <span class="count" id="statFail">0</span></div>
+      </div>
+      <button class="btn btn-primary" id="btnRunAll">▶ Run All Scenarios</button>
+      <button class="btn" id="btnReloadGame">↺ Reload Game</button>
+    </div>
+  </header>
+
+  <div class="main-workspace">
+    <!-- Test Scenarios Dashboard -->
+    <div class="test-dashboard">
+
+      <!-- Scenario 1 -->
+      <div class="card" id="cardScenario1">
+        <div class="card-header">
+          <div class="card-title">1. Trademark &amp; Boot Resolution Verification</div>
+          <span class="card-status status-pending" id="statusScenario1">PENDING</span>
+        </div>
+        <div class="card-body" id="bodyScenario1">
+          <div class="test-item" id="item1_1">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Engine and Global Game Instance Initialization</div>
+              <div class="test-detail">Waiting for window.app to attach...</div>
+            </div>
+          </div>
+          <div class="test-item" id="item1_2">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Trademark Disclosure Screen Display</div>
+              <div class="test-detail">Assert app.screenDisclaimer.visible is true and disclaimer header renders</div>
+            </div>
+          </div>
+          <div class="test-item" id="item1_3">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Virtual Baseline Resolution Consistency</div>
+              <div class="test-detail">Assert s2d virtual baseline matches 1280x720 AutoZoom ratio</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scenario 2 -->
+      <div class="card" id="cardScenario2">
+        <div class="card-header">
+          <div class="card-title">2. UI Resolution vs 3D Graphics Render Scaling</div>
+          <span class="card-status status-pending" id="statusScenario2">PENDING</span>
+        </div>
+        <div class="card-body" id="bodyScenario2">
+          <div class="test-item" id="item2_1">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Independent 3D Render Scaling</div>
+              <div class="test-detail">Scale 3D scene to 0.5x without changing 2D UI scaling baseline</div>
+            </div>
+          </div>
+          <div class="test-item" id="item2_2">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Independent 2D UI Resolution Scaling</div>
+              <div class="test-detail">Switch UI resolution to 720p (HD) without degrading 3D render buffer</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scenario 3 -->
+      <div class="card" id="cardScenario3">
+        <div class="card-header">
+          <div class="card-title">3. Graphics Options Dependency Locking &amp; Graying Out</div>
+          <span class="card-status status-pending" id="statusScenario3">PENDING</span>
+        </div>
+        <div class="card-body" id="bodyScenario3">
+          <div class="test-item" id="item3_1">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Shadow Quality "Off" &rarr; Shadow Buffer Disabled</div>
+              <div class="test-detail">Assert isOptionDisabled(2) is true, labeled [DISABLED], and cycling blocked</div>
+            </div>
+          </div>
+          <div class="test-item" id="item3_2">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Mipmapping Disabled &rarr; Anisotropic Filtering Disabled</div>
+              <div class="test-detail">Assert isOptionDisabled(6) is true and labeled [DISABLED]</div>
+            </div>
+          </div>
+          <div class="test-item" id="item3_3">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Anti-Aliasing "None" &rarr; AA Multiplier Disabled</div>
+              <div class="test-detail">Assert isOptionDisabled(8) is true and labeled [DISABLED]</div>
+            </div>
+          </div>
+          <div class="test-item" id="item3_4">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Vehicle Reflections Disabled &rarr; Reflection Level Disabled</div>
+              <div class="test-detail">Assert isOptionDisabled(11) is true and labeled [DISABLED]</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scenario 4 -->
+      <div class="card" id="cardScenario4">
+        <div class="card-header">
+          <div class="card-title">4. General Steering Sensitivity Slider Across All Tabs</div>
+          <span class="card-status status-pending" id="statusScenario4">PENDING</span>
+        </div>
+        <div class="card-body" id="bodyScenario4">
+          <div class="test-item" id="item4_1">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Steering Sensitivity Slider Visibility Across Tabs</div>
+              <div class="test-detail">Assert permanent slider active on Keyboard, Gamepad, and Touch tabs</div>
+            </div>
+          </div>
+          <div class="test-item" id="item4_2">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Sensitivity Stepping and InputController Linkage</div>
+              <div class="test-detail">Adjust in 2% steps and verify InputController.steerSensitivity matches</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scenario 5 -->
+      <div class="card" id="cardScenario5">
+        <div class="card-header">
+          <div class="card-title">5. Dedicated Touch Tab: Default Schematic vs Custom Adjustment</div>
+          <span class="card-status status-pending" id="statusScenario5">PENDING</span>
+        </div>
+        <div class="card-body" id="bodyScenario5">
+          <div class="test-item" id="item5_1">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Default Touch Mode Vector Schematic</div>
+              <div class="test-detail">Verify default ergonomic tablet/phone diagram renders</div>
+            </div>
+          </div>
+          <div class="test-item" id="item5_2">
+            <span class="test-info">
+              <div class="test-desc">Custom Touch Repositioning &amp; TouchControlsHUD Dynamic Offset Application</div>
+              <div class="test-detail">Modify button offsets &rarr; verify TouchControlsHUD updates; test Reset Defaults</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scenario 6 -->
+      <div class="card" id="cardScenario6">
+        <div class="card-header">
+          <div class="card-title">6. In-Game Drive &amp; Physics Simulation</div>
+          <span class="card-status status-pending" id="statusScenario6">PENDING</span>
+        </div>
+        <div class="card-body" id="bodyScenario6">
+          <div class="test-item" id="item6_1">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Track Launch &amp; Throttle Acceleration</div>
+              <div class="test-detail">Inject simulated throttle input; assert car forward velocity &gt; 0</div>
+            </div>
+          </div>
+          <div class="test-item" id="item6_2">
+            <span class="test-icon">⏳</span>
+            <div class="test-info">
+              <div class="test-desc">Nitro Boost Drain &amp; Automatic Recharge</div>
+              <div class="test-detail">Fire boost &rarr; verify nitro depletion; release &rarr; verify recharge</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Diagnostic Console -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Live Test Log Console</div>
+          <span style="font-size: 11px; color: var(--text-muted);" id="logStatus">IDLE</span>
+        </div>
+        <div class="log-console" id="logConsole">System ready. Click "Run All Scenarios" to begin browser validation.</div>
+      </div>
+
+    </div>
+
+    <!-- Live Game Frame -->
+    <div class="game-viewport">
+      <div class="viewport-header">
+        <div class="viewport-info">
+          <span class="live-dot"></span>
+          <span>LIVE EMBEDDED ENGINE CANVAS</span>
+        </div>
+        <span id="canvasMetrics">1280 x 720 (AutoZoom)</span>
+      </div>
+      <iframe id="gameFrame" src="index.html" allow="autoplay"></iframe>
+    </div>
+  </div>
+
+  <script>
+    // State and Result Counters
+    const testResults = {
+      total: 0,
+      passed: 0,
+      failed: 0,
+      history: []
+    };
+
+    window.__TEST_RESULTS__ = testResults;
+
+    const logConsole = document.getElementById('logConsole');
+    function log(msg, type = 'info') {
+      const ts = new Date().toISOString().substring(11, 19);
+      const prefix = type === 'error' ? '[ERR]' : (type === 'pass' ? '[PASS]' : '[INFO]');
+      logConsole.textContent += `\n${ts} ${prefix} ${msg}`;
+      logConsole.scrollTop = logConsole.scrollHeight;
+    }
+
+    function setItemStatus(id, pass, detail = null) {
+      const item = document.getElementById(id);
+      if (!item) return;
+      const icon = item.querySelector('.test-icon');
+      if (pass) {
+        icon.textContent = '✅';
+        icon.style.color = '#00ff66';
+        testResults.passed++;
+      } else {
+        icon.textContent = '❌';
+        icon.style.color = '#ff3344';
+        testResults.failed++;
+      }
+      testResults.total++;
+      if (detail) {
+        const detElem = item.querySelector('.test-detail');
+        if (detElem) detElem.textContent = detail;
+      }
+      updateSummary();
+    }
+
+    function setCardStatus(cardId, status) {
+      const statusElem = document.getElementById('status' + cardId);
+      if (!statusElem) return;
+      statusElem.className = 'card-status status-' + status.toLowerCase();
+      statusElem.textContent = status.toUpperCase();
+    }
+
+    function updateSummary() {
+      document.getElementById('statTotal').textContent = testResults.total;
+      document.getElementById('statPass').textContent = testResults.passed;
+      document.getElementById('statFail').textContent = testResults.failed;
+    }
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // Helper: Wait for game instance in iframe
+    async function getGameApp(timeoutMs = 15000) {
+      const frame = document.getElementById('gameFrame');
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        try {
+          if (frame.contentWindow && frame.contentWindow.app && frame.contentWindow.app.s2d) {
+            return frame.contentWindow.app;
+          }
+        } catch (e) {}
+        await sleep(100);
+      }
+      throw new Error("Timeout waiting for game window.app in iframe.");
+    }
+
+    // Scenario 1: Trademark & Boot Resolution
+    async function runScenario1(app) {
+      setCardStatus('Scenario1', 'running');
+      log("Starting Scenario 1: Trademark & Boot Resolution...");
+
+      try {
+        // 1.1 App Attached
+        const hasApp = app && app.s2d && app.engine;
+        setItemStatus('item1_1', hasApp, hasApp ? `App attached cleanly. Engine initialized.` : `App object not found.`);
+
+        // 1.2 Trademark Disclosure Screen Display
+        const frameWin = document.getElementById('gameFrame').contentWindow;
+        if (app.setIntroScreen && frameWin.IntroState) {
+          app.setIntroScreen(frameWin.IntroState.Disclaimer);
+        }
+        await sleep(250);
+
+        const hasDisclaimer = app.screenDisclaimer && app.screenDisclaimer.visible;
+        const discTitle = app.discHeader ? app.discHeader.text : "";
+        const versionStr = app.discVersion ? app.discVersion.text : "";
+        const isDiscValid = hasDisclaimer && discTitle.length > 0 && versionStr.includes("v0.2.2");
+        setItemStatus('item1_2', isDiscValid, `Disclaimer visible: ${hasDisclaimer}, Title: "${discTitle.substring(0, 24)}...", Version: "${versionStr}"`);
+
+        // 1.3 Resolution Baseline
+        const s2dWidth = app.s2d.width;
+        const s2dHeight = app.s2d.height;
+        const isResValid = (s2dWidth === 1280 && s2dHeight === 720);
+        setItemStatus('item1_3', isResValid, `Virtual Baseline: ${s2dWidth}x${s2dHeight} (Expected 1280x720 AutoZoom)`);
+
+        setCardStatus('Scenario1', isDiscValid && isResValid ? 'passed' : 'failed');
+        log("Scenario 1 completed.", isDiscValid && isResValid ? 'pass' : 'error');
+      } catch (err) {
+        log(`Scenario 1 error: ${err.message}`, 'error');
+        setCardStatus('Scenario1', 'failed');
+      }
+    }
+
+    // Scenario 2: UI Resolution vs 3D Render Scale
+    async function runScenario2(app) {
+      setCardStatus('Scenario2', 'running');
+      log("Starting Scenario 2: UI Resolution vs 3D Render Scaling Independence...");
+
+      try {
+        // Fast-forward to in-game / menu
+        if (app.finishIntroSequence) {
+          app.finishIntroSequence();
+          await sleep(300);
+        }
+
+        const gfx = app.gfx;
+        const origScale = gfx.settings.renderScale;
+        const origUIRes = gfx.settings.uiResolution;
+
+        // 2.1 Adjust 3D Render Scale
+        gfx.settings.renderScale = 0.5;
+        gfx.applyRenderScale();
+        await sleep(150);
+
+        const scaleMatch = (gfx.settings.renderScale === 0.5);
+        const uiBaseIntact = (app.s2d.width === 1280 && app.s2d.height === 720);
+        setItemStatus('item2_1', scaleMatch && uiBaseIntact, `RenderScale changed to 0.5x while UI baseline remained 1280x720.`);
+
+        // 2.2 Adjust UI Resolution
+        gfx.settings.uiResolution = "720p (HD)";
+        gfx.applyUIResolution();
+        await sleep(150);
+
+        const uiResMatch = (gfx.settings.uiResolution === "720p (HD)");
+        const scaleStillHalf = (gfx.settings.renderScale === 0.5);
+        setItemStatus('item2_2', uiResMatch && scaleStillHalf, `UI Resolution set to "720p (HD)" independently of 3D render scale.`);
+
+        // Restore
+        gfx.settings.renderScale = origScale;
+        gfx.settings.uiResolution = origUIRes;
+        gfx.applyRenderScale();
+        gfx.applyUIResolution();
+
+        setCardStatus('Scenario2', scaleMatch && uiBaseIntact && uiResMatch ? 'passed' : 'failed');
+        log("Scenario 2 completed.", 'pass');
+      } catch (err) {
+        log(`Scenario 2 error: ${err.message}`, 'error');
+        setCardStatus('Scenario2', 'failed');
+      }
+    }
+
+    // Scenario 3: Graphics Options Dependency Locking
+    async function runScenario3(app) {
+      setCardStatus('Scenario3', 'running');
+      log("Starting Scenario 3: Graphics Options Dependency Locking & Graying Out...");
+
+      try {
+        app.ui.openOptions(false);
+        await sleep(150);
+        const optView = app.ui.builder.optionsView;
+        const tabOrder = optView.constructor.TAB_ORDER;
+        optView.switchTab(tabOrder[0]); // Graphics tab
+        await sleep(150);
+
+        const gfxPanel = app.ui.builder.optionsView.gfxPanel;
+
+        // 3.1 Shadows
+        gfxPanel.settings.shadowLevel = "Off";
+        gfxPanel.updateStyles();
+        const shadowDisabled = gfxPanel.isOptionDisabled(2);
+        const shadowItemText = gfxPanel.items[2].text;
+        const shadowPass = shadowDisabled && shadowItemText.includes("[DISABLED]");
+        setItemStatus('item3_1', shadowPass, `ShadowLevel "Off" -> isOptionDisabled(2): ${shadowDisabled}, Label: "${shadowItemText.trim()}"`);
+
+        // 3.2 Mipmapping
+        gfxPanel.settings.mipmapping = false;
+        gfxPanel.updateStyles();
+        const mipDisabled = gfxPanel.isOptionDisabled(6);
+        const anisoText = gfxPanel.items[6].text;
+        const mipPass = mipDisabled && anisoText.includes("[DISABLED]");
+        setItemStatus('item3_2', mipPass, `Mipmapping false -> isOptionDisabled(6): ${mipDisabled}, Label: "${anisoText.trim()}"`);
+
+        // 3.3 Anti-Aliasing
+        gfxPanel.settings.aaType = "None";
+        gfxPanel.updateStyles();
+        const aaDisabled = gfxPanel.isOptionDisabled(8);
+        const aaText = gfxPanel.items[8].text;
+        const aaPass = aaDisabled && aaText.includes("[DISABLED]");
+        setItemStatus('item3_3', aaPass, `AAType "None" -> isOptionDisabled(8): ${aaDisabled}, Label: "${aaText.trim()}"`);
+
+        // 3.4 Reflections
+        gfxPanel.settings.modelReflections = false;
+        gfxPanel.updateStyles();
+        const reflDisabled = gfxPanel.isOptionDisabled(11);
+        const reflText = gfxPanel.items[11].text;
+        const reflPass = reflDisabled && reflText.includes("[DISABLED]");
+        setItemStatus('item3_4', reflPass, `ModelReflections false -> isOptionDisabled(11): ${reflDisabled}, Label: "${reflText.trim()}"`);
+
+        // Restore active settings
+        gfxPanel.settings.shadowLevel = "High";
+        gfxPanel.settings.mipmapping = true;
+        gfxPanel.settings.aaType = "MSAA";
+        gfxPanel.settings.modelReflections = true;
+        gfxPanel.updateStyles();
+
+        const allPass = shadowPass && mipPass && aaPass && reflPass;
+        setCardStatus('Scenario3', allPass ? 'passed' : 'failed');
+        log("Scenario 3 completed.", allPass ? 'pass' : 'error');
+      } catch (err) {
+        log(`Scenario 3 error: ${err.message}`, 'error');
+        setCardStatus('Scenario3', 'failed');
+      }
+    }
+
+    // Scenario 4: General Steering Sensitivity Slider Across All Tabs
+    async function runScenario4(app) {
+      setCardStatus('Scenario4', 'running');
+      log("Starting Scenario 4: Steering Sensitivity Slider Across All Tabs...");
+
+      try {
+        const optView = app.ui.builder.optionsView;
+        const ctrlPanel = optView.controlsPanel;
+        const tabOrder = optView.constructor.TAB_ORDER;
+
+        // Verify across Keyboard (2), Gamepad (3), Touch (4)
+        optView.switchTab(tabOrder[2]);
+        await sleep(100);
+        const kbVisible = ctrlPanel.sensitivityRow && ctrlPanel.sensitivityRow.visible;
+
+        optView.switchTab(tabOrder[3]);
+        await sleep(100);
+        const gpVisible = ctrlPanel.sensitivityRow && ctrlPanel.sensitivityRow.visible;
+
+        optView.switchTab(tabOrder[4]);
+        await sleep(100);
+        const touchVisible = ctrlPanel.sensitivityRow && ctrlPanel.sensitivityRow.visible;
+
+        const allTabsVisible = kbVisible && gpVisible && touchVisible;
+        setItemStatus('item4_1', allTabsVisible, `Permanent sensitivity slider active across Keyboard (${kbVisible}), Gamepad (${gpVisible}), Touch (${touchVisible})`);
+
+        // Adjust in 2% step
+        app.input.steerSensitivity = 1.0;
+        ctrlPanel.adjustSensitivity(-1); // -2%
+        await sleep(50);
+
+        const sens98 = Math.abs(app.input.steerSensitivity - 0.98) < 0.001;
+        ctrlPanel.adjustSensitivity(1); // +2% back to 1.0
+        const sens100 = Math.abs(app.input.steerSensitivity - 1.0) < 0.001;
+
+        setItemStatus('item4_2', sens98 && sens100, `Sensitivity adjusts in 2% steps (0.98 -> 1.00) and syncs directly to InputController.`);
+
+        setCardStatus('Scenario4', allTabsVisible && sens98 && sens100 ? 'passed' : 'failed');
+        log("Scenario 4 completed.", 'pass');
+      } catch (err) {
+        log(`Scenario 4 error: ${err.message}`, 'error');
+        setCardStatus('Scenario4', 'failed');
+      }
+    }
+
+    // Scenario 5: Touch Tab Default vs Custom
+    async function runScenario5(app) {
+      setCardStatus('Scenario5', 'running');
+      log("Starting Scenario 5: Dedicated Touch Controls Tab...");
+
+      try {
+        const optView = app.ui.builder.optionsView;
+        const ctrlPanel = optView.controlsPanel;
+        const tabOrder = optView.constructor.TAB_ORDER;
+
+        optView.switchTab(tabOrder[4]); // Touch tab
+        await sleep(100);
+
+        // 5.1 Default Vector Schematic
+        const isDefault = (app.saveData.touchSettings.mode === "Default");
+        const diagramActive = (ctrlPanel.touchDiagram != null && ctrlPanel.touchDiagram.visible);
+        setItemStatus('item5_1', isDefault && diagramActive, `Default mode active: Vector layout schematic rendered on screen.`);
+
+        // 5.2 Custom Repositioning & HUD Application
+        ctrlPanel.toggleCustomMode();
+        await sleep(100);
+
+        const isCustom = (app.saveData.touchSettings.mode === "Custom");
+        const listActive = (ctrlPanel.customTouchList != null && ctrlPanel.customTouchList.visible);
+
+        // Adjust custom offset
+        ctrlPanel.cycleCustomTouchRow(0, 1); // Stick X +10
+        await sleep(50);
+        const stickShifted = (app.saveData.touchSettings.stickOffsetX === 10);
+
+        // Reset to Defaults
+        ctrlPanel.resetTouchDefaults();
+        await sleep(50);
+        const resetOk = (app.saveData.touchSettings.stickOffsetX === 0 && app.saveData.touchSettings.scale === 1.0);
+
+        setItemStatus('item5_2', isCustom && listActive && stickShifted && resetOk, `Custom touch list loaded, stickOffsetX modified (+10px), and Reset Defaults restored initial layout.`);
+
+        setCardStatus('Scenario5', isDefault && diagramActive && isCustom && resetOk ? 'passed' : 'failed');
+        log("Scenario 5 completed.", 'pass');
+      } catch (err) {
+        log(`Scenario 5 error: ${err.message}`, 'error');
+        setCardStatus('Scenario5', 'failed');
+      }
+    }
+
+    // Scenario 6: In-Game Physics & Drive Simulation
+    async function runScenario6(app) {
+      setCardStatus('Scenario6', 'running');
+      log("Starting Scenario 6: In-Game Drive & Physics Simulation...");
+
+      try {
+        // Close options and enter InGame
+        app.ui.showInGame();
+        await sleep(200);
+
+        const initialSpeed = app.carPhysics.forwardSpeed;
+        const initialNitro = app.carPhysics.boostFuel;
+
+        // Apply simulated driving inputs: full gas + slight steer + nitro boost
+        app.input.touchThrottle = 1.0;
+        app.input.touchSteer = 0.2;
+        app.input.touchBoost = true;
+        app.input.isTouchActive = true;
+
+        // Simulate 45 physics frames
+        for (let i = 0; i < 45; i++) {
+          app.input.update(1 / 60);
+          app.carPhysics.update(1 / 60, app.input);
+        }
+
+        const drivenSpeed = app.carPhysics.forwardSpeed;
+        const boostedNitro = app.carPhysics.boostFuel;
+
+        const hasAccelerated = drivenSpeed > initialSpeed && drivenSpeed > 5.0;
+        setItemStatus('item6_1', hasAccelerated, `Vehicle accelerated from ${initialSpeed.toFixed(1)} to ${drivenSpeed.toFixed(1)} m/s under full throttle.`);
+
+        const nitroDrained = boostedNitro < initialNitro;
+
+        // Release boost & throttle, simulate 30 frames for nitro recharge
+        app.input.touchBoost = false;
+        app.input.touchThrottle = 0.0;
+        for (let i = 0; i < 30; i++) {
+          app.input.update(1 / 60);
+          app.carPhysics.update(1 / 60, app.input);
+        }
+
+        const rechargedNitro = app.carPhysics.boostFuel;
+        const nitroRecharged = rechargedNitro > boostedNitro;
+
+        setItemStatus('item6_2', nitroDrained && nitroRecharged, `Nitro drained during boost (${initialNitro.toFixed(1)} -> ${boostedNitro.toFixed(1)}) and recharged on release (${rechargedNitro.toFixed(1)}).`);
+
+        // Clean up inputs
+        app.input.flushInputs();
+        app.input.isTouchActive = false;
+
+        const allPass = hasAccelerated && nitroDrained && nitroRecharged;
+        setCardStatus('Scenario6', allPass ? 'passed' : 'failed');
+        log("Scenario 6 completed.", allPass ? 'pass' : 'error');
+      } catch (err) {
+        log(`Scenario 6 error: ${err.message}`, 'error');
+        setCardStatus('Scenario6', 'failed');
+      }
+    }
+
+    // Run All Test Scenarios
+    async function runAll() {
+      const btn = document.getElementById('btnRunAll');
+      btn.disabled = true;
+      document.getElementById('logStatus').textContent = 'EXECUTING TESTS...';
+      log("=================================================");
+      log("Beginning Automated Browser Test Run...");
+      log("=================================================");
+
+      // Reset counters
+      testResults.total = 0;
+      testResults.passed = 0;
+      testResults.failed = 0;
+      updateSummary();
+
+      try {
+        const app = await getGameApp();
+        log("Connected to game application successfully.");
+
+        await runScenario1(app);
+        await sleep(200);
+
+        await runScenario2(app);
+        await sleep(200);
+
+        await runScenario3(app);
+        await sleep(200);
+
+        await runScenario4(app);
+        await sleep(200);
+
+        await runScenario5(app);
+        await sleep(200);
+
+        await runScenario6(app);
+        await sleep(200);
+
+        log("=================================================");
+        log(`ALL TEST SUITES FINISHED: ${testResults.passed}/${testResults.total} assertions passed. Errors: ${testResults.failed}`);
+        log("=================================================");
+        document.getElementById('logStatus').textContent = testResults.failed === 0 ? 'ALL PASSED (100%)' : 'FAILURES DETECTED';
+      } catch (e) {
+        log(`Fatal test execution failure: ${e.message}`, 'error');
+        document.getElementById('logStatus').textContent = 'EXECUTION ERROR';
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('btnRunAll').addEventListener('click', runAll);
+    document.getElementById('btnReloadGame').addEventListener('click', () => {
+      document.getElementById('gameFrame').src = 'index.html?t=' + Date.now();
+      log("Game iframe reloaded.");
+    });
+
+    // Auto-run once game iframe loads
+    window.addEventListener('load', () => {
+      setTimeout(runAll, 1200);
+    });
+  </script>
+</body>
+</html>

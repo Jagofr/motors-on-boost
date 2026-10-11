@@ -289,4 +289,110 @@ class ControlDiagrams extends Object {
             t.y = c.y2 - 8;
         }
     }
+
+    /**
+     * Renders a vector schematic layout of the mobile touch driving interface.
+     * Illustrates the left-hand virtual analog joystick and nitro button,
+     * and the right-hand brake disc, handbrake drift, and gas pedal buttons.
+     */
+    public function drawTouchLayout() {
+        g.clear();
+        labelsContainer.removeChildren();
+
+        var cx = 0.0;
+        var cy = 0.0;
+
+        // 1. Tablet/Phone Bezel Silhouette
+        g.beginFill(0x181B20, 0.85);
+        g.lineStyle(2.5, 0x00E5FF, 0.95);
+        g.drawRoundedRect(cx - 240, cy - 110, 480, 220, 16);
+        g.endFill();
+
+        // Screen Inner Border
+        g.lineStyle(1.0, 0x334455, 0.6);
+        g.drawRoundedRect(cx - 228, cy - 98, 456, 196, 10);
+
+        // 2. Left Side: Virtual Analog Joystick (Steering)
+        var stickX = cx - 170;
+        var stickY = cy + 42;
+        g.beginFill(0x0A0F16, 0.7);
+        g.lineStyle(2.0, 0x00E5FF, 0.9);
+        g.drawCircle(stickX, stickY, 32);
+        g.endFill();
+        g.beginFill(0x00E5FF, 0.35);
+        g.lineStyle(1.5, 0x00E5FF, 0.95);
+        g.drawCircle(stickX, stickY, 16);
+        g.endFill();
+
+        // 3. Left Side: Nitro Boost Button
+        var nitroX = cx - 170;
+        var nitroY = cy - 42;
+        g.beginFill(0x3A1808, 0.7);
+        g.lineStyle(2.0, 0xFF6600, 0.9);
+        g.drawCircle(nitroX, nitroY, 22);
+        g.endFill();
+
+        // 4. Right Side: Gas / Throttle Pedal (Lower-Right)
+        var gasX = cx + 175;
+        var gasY = cy + 45;
+        g.beginFill(0x082E1E, 0.7);
+        g.lineStyle(2.0, 0x00FF88, 0.9);
+        g.drawCircle(gasX, gasY, 24);
+        g.endFill();
+
+        // 5. Right Side: Handbrake Drift Lever (Mid-Right)
+        var driftX = cx + 195;
+        var driftY = cy - 20;
+        g.beginFill(0x2E2008, 0.7);
+        g.lineStyle(2.0, 0xFFCC00, 0.9);
+        g.drawCircle(driftX, driftY, 20);
+        g.endFill();
+
+        // 6. Right Side: Brake / Reverse Disc (Upper-Right)
+        var brakeX = cx + 140;
+        var brakeY = cy - 54;
+        g.beginFill(0x2E0D12, 0.7);
+        g.lineStyle(2.0, 0xFF3344, 0.9);
+        g.drawCircle(brakeX, brakeY, 20);
+        g.endFill();
+
+        // 7. Top-Right: Pause Button
+        var pauseX = cx + 210;
+        var pauseY = cy - 80;
+        g.beginFill(0x0A0F16, 0.6);
+        g.lineStyle(1.5, 0xFFFFFF, 0.8);
+        g.drawCircle(pauseX, pauseY, 11);
+        g.endFill();
+
+        // Callouts
+        var callouts = [
+            { x1: stickX, y1: stickY + 34, x2: stickX, y2: cy + 122, text: "LEFT THUMB: Analog Steering Joystick" },
+            { x1: nitroX, y1: nitroY - 24, x2: nitroX, y2: cy - 122, text: "LEFT FINGER: Nitro Boost" },
+            { x1: gasX, y1: gasY + 26, x2: gasX, y2: cy + 122, text: "RIGHT THUMB: Gas / Throttle" },
+            { x1: driftX + 22, y1: driftY, x2: cx + 265, y2: driftY, text: "HANDBRAKE (DRIFT)" },
+            { x1: brakeX, y1: brakeY - 22, x2: brakeX, y2: cy - 122, text: "BRAKE / REVERSE" },
+            { x1: pauseX, y1: pauseY - 13, x2: cx + 230, y2: cy - 110, text: "PAUSE" }
+        ];
+
+        g.lineStyle(1.5, 0x00E5FF, 0.8);
+        for (c in callouts) {
+            g.moveTo(c.x1, c.y1);
+            g.lineTo(c.x2, c.y2);
+
+            var t = new Text(FontManager.regularFont, labelsContainer);
+            t.text = c.text;
+            t.textColor = 0xFFFFFF;
+            t.setScale(0.85);
+            if (c.x2 >= cx + 200) {
+                t.x = c.x2 + 6;
+                t.y = c.y2 - 8;
+            } else if (c.y2 > cy) {
+                t.x = c.x2 - (t.textWidth * 0.85 * 0.5);
+                t.y = c.y2 + 4;
+            } else {
+                t.x = c.x2 - (t.textWidth * 0.85 * 0.5);
+                t.y = c.y2 - 20;
+            }
+        }
+    }
 }

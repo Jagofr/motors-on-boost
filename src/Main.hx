@@ -61,18 +61,18 @@ enum AppState {
  * car physics updates, third-person spring-arm camera tracking, and UI lifecycle.
  */
 class Main extends hxd.App {
-    var appState:AppState = IntroSequence;
-    var introState:IntroState = Studio;
+    public var appState:AppState = IntroSequence;
+    public var introState:IntroState = Studio;
 
     // Intro Phase Timers & Transitions
     var introTimer:Float = 0.0;
     var introAlpha:Float = 0.0;
     var isFadingOut:Bool = false;
-    var introContainer:Object;
+    public var introContainer:Object;
     var introBg:Bitmap;
-    var screenStudio:Object;
-    var screenEngine:Object;
-    var screenDisclaimer:Object;
+    public var screenStudio:Object;
+    public var screenEngine:Object;
+    public var screenDisclaimer:Object;
 
     // Post-Intro Showcase Fade-in Transition
     var showcaseFadeTimer:Float = 0.0;
@@ -83,9 +83,9 @@ class Main extends hxd.App {
     // Splash Bitmaps loaded via WebP decoder
     var studioSplashBmp:Bitmap;
     var engineSplashBmp:Bitmap;
-    var discHeader:Text;
-    var discBody:Text;
-    var discVersion:Text;
+    public var discHeader:Text;
+    public var discBody:Text;
+    public var discVersion:Text;
     var logoRow:Object;
     var discLogos:Array<Bitmap> = [];
 
@@ -97,18 +97,18 @@ class Main extends hxd.App {
     // Game Core Systems & Singletons
     var fpsText:Text;
     var speedText:Text;
-    var ui:UIManager;
-    var audio:AudioManager;
-    var gfx:GraphicsManager;
-    var saveData:GameSaveData;
+    public var ui:UIManager;
+    public var audio:AudioManager;
+    public var gfx:GraphicsManager;
+    public var saveData:GameSaveData;
 
-    var track:Track;
-    var traffic:TrafficSystem;
-    var playerMesh:CarMesh;
-    var carPhysics:CarPhysics;
+    public var track:Track;
+    public var traffic:TrafficSystem;
+    public var playerMesh:CarMesh;
+    public var carPhysics:CarPhysics;
     var terrainGround:Mesh;
-    var input:InputController;
-    var chaseCam:ChaseCamera;
+    public var input:InputController;
+    public var chaseCam:ChaseCamera;
     var dirLight:DirLight;
     var skybox:Skybox;
     var postRenderer:PostProcessRenderer;
@@ -262,7 +262,7 @@ class Main extends hxd.App {
         layoutIntro();
     }
 
-    function setIntroScreen(target:IntroState) {
+    public function setIntroScreen(target:IntroState) {
         introState = target;
         introTimer = 0.0;
         introAlpha = 0.0;
@@ -338,7 +338,7 @@ class Main extends hxd.App {
         }
     }
 
-    function finishIntroSequence() {
+    public function finishIntroSequence() {
         introState = Complete;
         appState = InGameUI;
         introContainer.remove();
@@ -742,6 +742,15 @@ class Main extends hxd.App {
                 ui.inGameHUD.updateTelemetry(dt, carPhysics, kmh, carPhysics.isBoosting, raceTimer, currentLap, totalLaps);
         }
     }
+
+    /** Returns the 2D UI scene instance. */
+    public function getS2d():h2d.Scene { return s2d; }
+
+    /** Returns the 3D world scene instance. */
+    public function getS3d():h3d.scene.Scene { return s3d; }
+
+    /** Returns the low-level rendering hardware engine. */
+    public function getEngine():h3d.Engine { return engine; }
 
     static function main() {
         #if js

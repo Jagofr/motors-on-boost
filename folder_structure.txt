@@ -9,121 +9,123 @@ G:.
 |   CONTRIBUTING
 |   SECURITY.md
 |   folder_structure.txt
+|   test.hxml
 |   
 +---src
 |   |   Main.hx
 |   |   Version.hx
 |   |   
-|   +---audio
-|   |       AudioManager.hx
-|   |       
-|   +---camera
-|   |       ChaseCamera.hx
-|   |       
-|   +---entities
-|   |       CarMesh.hx
-|   |       TrafficCarMesh.hx
-|   |       TrafficSystem.hx
-|   |       
-|   +---graphics
-|   |       GraphicsManager.hx
-|   |       PostProcessRenderer.hx
-|   |       RadialBlurShader.hx
-|   |       
 |   +---input
 |   |       InputController.hx
 |   |       
 |   +---physics
-|   |       CarConfig.hx
 |   |       CarPhysics.hx
 |   |       SplineMath.hx
+|   |       CarConfig.hx
+|   |       
+|   +---entities
+|   |       CarMesh.hx
+|   |       TrafficSystem.hx
+|   |       TrafficCarMesh.hx
+|   |       
+|   +---world
+|   |       Track.hx
+|   |       Skybox.hx
+|   |       
+|   +---camera
+|   |       ChaseCamera.hx
+|   |       
+|   +---audio
+|   |       AudioManager.hx
+|   |       
+|   +---graphics
+|   |       GraphicsManager.hx
+|   |       RadialBlurShader.hx
+|   |       PostProcessRenderer.hx
 |   |       
 |   +---save
 |   |       SaveSystem.hx
 |   |       
-|   +---ui
-|   |   |   ControlDiagrams.hx
-|   |   |   FontManager.hx
-|   |   |   UIBuilder.hx
-|   |   |   UIIcons.hx
-|   |   |   UIManager.hx
-|   |   |   
-|   |   +---components
-|   |   |       CardBackplate.hx
-|   |   |       MenuItemRow.hx
-|   |   |       TouchControlsHUD.hx
-|   |   |       UIEnums.hx
-|   |   |       UITheme.hx
-|   |   |       
-|   |   \---views
-|   |       +---credits
-|   |       |       CreditsView.hx
-|   |       |       
-|   |       +---mainmenu
-|   |       |       MainMenuView.hx
-|   |       |       
-|   |       +---options
-|   |       |       AudioOptionsPanel.hx
-|   |       |       ControlsOptionsPanel.hx
-|   |       |       GraphicsOptionsPanel.hx
-|   |       |       OptionsView.hx
-|   |       |       
-|   |       +---pause
-|   |       |       PauseMenuView.hx
-|   |       |       
-|   |       +---hud
-|   |       |       InGameHUDView.hx
-|   |       |       
-|   |       \---splash
-|   |               SplashView.hx
-|   |               
-|   \---world
-|           Skybox.hx
-|           Track.hx
-|           
+|   \---ui
+|       |   UIManager.hx
+|       |   ControlDiagrams.hx
+|       |   FontManager.hx
+|       |   UIIcons.hx
+|       |   UIBuilder.hx
+|       |   
+|       +---components
+|       |       UIEnums.hx
+|       |       MenuItemRow.hx
+|       |       CardBackplate.hx
+|       |       UITheme.hx
+|       |       TouchControlsHUD.hx
+|       |       
+|       \---views
+|           +---splash
+|           |       SplashView.hx
+|           |       
+|           +---mainmenu
+|           |       MainMenuView.hx
+|           |       
+|           +---pause
+|           |       PauseMenuView.hx
+|           |       
+|           +---options
+|           |       GraphicsOptionsPanel.hx
+|           |       AudioOptionsPanel.hx
+|           |       ControlsOptionsPanel.hx
+|           |       OptionsView.hx
+|           |       
+|           +---credits
+|           |       CreditsView.hx
+|           |       
+|           \---hud
+|                   InGameHUDView.hx
+|                   
 +---res
 |   +---fonts
 |   |       stack_sans.ttf
 |   |       symbols.ttf
 |   |       
-|   +---icons
-|   |       brake.png
-|   |       burn.png
-|   |       gas-pedal.png
-|   |       hand-brake.png
-|   |       
-|   \---intro
-|       |   heaps-haxe-splash.webp
-|       |   jagofr-rvl-splash.webp
-|       |   
-|       +---unoptimized
-|       |   |   jagofr-rvl-spash.jpg
-|       |   |   heaps-haxe-splash.jpg
-|       |   |   
-|       |   \---icons
-|       |           logo_heaps.png
-|       |           logo_haxe.png
-|       |           logo_webgl.png
-|       |           
-|       \---icons
-|               logo_webgl.webp
-|               logo_haxe.webp
-|               logo_heaps.webp
-|               
+|   +---intro
+|   |   |   heaps-haxe-splash.webp
+|   |   |   jagofr-rvl-splash.webp
+|   |   |   
+|   |   +---unoptimized
+|   |   |   |   jagofr-rvl-spash.jpg
+|   |   |   |   heaps-haxe-splash.jpg
+|   |   |   |   
+|   |   |   \---icons
+|   |   |           logo_heaps.png
+|   |   |           logo_haxe.png
+|   |   |           logo_webgl.png
+|   |   |           
+|   |   \---icons
+|   |           logo_webgl.webp
+|   |           logo_haxe.webp
+|   |           logo_heaps.webp
+|   |           
+|   \---icons
+|           gas-pedal.png
+|           brake.png
+|           hand-brake.png
+|           burn.png
+|           
 +---web
 |   |   index.html
 |   |   manifest.json
 |   |   sw.js
 |   |   game.js
 |   |   web.config
+|   |   test-suite.html
 |   |   
 |   +---icons
+|   |       icon-192.png
+|   |       icon-512.png
 |   |       brake.png
 |   |       burn.png
 |   |       gas-pedal.png
 |   |       hand-brake.png
-|   |       icon-192.png
-|   |       icon-512.png
 |   |       
 |   \---intro
 |       |   heaps-haxe-splash.webp
@@ -154,14 +156,54 @@ G:.
 |               
 +---changelogs
 |       2026-10-06-v0.1.0-initial.md
-|       2026-10-06-v0.1.1-branding-persistence.md
-|       2026-10-09-v0.1.4-ui-touch-resolution-versioning.md
-|       2026-10-09-v0.2.0-arcade-vehicle-dynamics.md
 |       2026-10-09-v0.2.1-touch-joystick-physics-tuning.md
+|       2026-10-09-v0.2.0-arcade-vehicle-dynamics.md
+|       2026-10-09-v0.1.4-ui-touch-resolution-versioning.md
+|       2026-10-06-v0.1.1-branding-persistence.md
+|       2026-10-10-v0.2.2-hud-overhaul-controls-qol.md
+|       2026-10-11-v0.2.2-automated-test-suite-and-options-overhaul.md
 |       
 +---docs
 |       DOCS.md
 |       
-\---.vscode
-        tasks.json
++---.vscode
+|       tasks.json
+|       
++---tests
+|   |   TestMain.hx
+|   |   node-runner.js
+|   |   run-browser-tests.js
+|   |   
+|   +---core
+|   |       TestVersion.hx
+|   |       
+|   +---physics
+|   |       TestSplineMath.hx
+|   |       TestCarConfig.hx
+|   |       TestCarPhysics.hx
+|   |       
+|   +---save
+|   |       TestSaveSystem.hx
+|   |       
+|   +---input
+|   |       TestInputController.hx
+|   |       
+|   +---world
+|   |       TestTrack.hx
+|   |       
+|   +---camera
+|   |       TestChaseCamera.hx
+|   |       
+|   +---entities
+|   |       TestTrafficSystem.hx
+|   |       
+|   +---ui
+|   |       TestGraphicsOptions.hx
+|   |       TestTouchControls.hx
+|   |       
+|   \---audio
+|           TestAudioManager.hx
+|           
+\---bin
+        test.js
         

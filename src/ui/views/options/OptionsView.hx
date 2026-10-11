@@ -30,7 +30,7 @@ class OptionsView extends Object {
 
     /** Currently active configuration tab. */
     public var currentTab:OptionsTab = Graphics;
-    public static var TAB_ORDER:Array<OptionsTab> = [Graphics, Audio, Keyboard, Gamepad];
+    public static var TAB_ORDER:Array<OptionsTab> = [Graphics, Audio, Keyboard, Gamepad, Touch];
 
     /** Subpanel views. */
     public var gfxPanel:GraphicsOptionsPanel;
@@ -48,7 +48,7 @@ class OptionsView extends Object {
     public var isOpenedFromPause:Bool = false;
 
     /** Tab interactive hitzone width in pixels. */
-    public static inline var TAB_BUTTON_WIDTH:Float = 150.0;
+    public static inline var TAB_BUTTON_WIDTH:Float = 130.0;
 
     /** Tab interactive hitzone height in pixels. */
     public static inline var TAB_BUTTON_HEIGHT:Float = 42.0;
@@ -71,12 +71,13 @@ class OptionsView extends Object {
         versionText.text = Version.DISPLAY;
         versionText.textColor = UITheme.COLOR_TEXT_MUTED;
 
-        var tabNames = ["GRAPHICS", "AUDIO", "KEYBOARD", "GAMEPAD"];
+        var tabNames = ["GRAPHICS", "AUDIO", "KEYBOARD", "GAMEPAD", "TOUCH"];
         var tabIconTypes = [
             UIIcons.IconType.Graphics,
             UIIcons.IconType.Volume,
             UIIcons.IconType.Keyboard,
-            UIIcons.IconType.Gamepad
+            UIIcons.IconType.Gamepad,
+            UIIcons.IconType.Touch
         ];
 
         for (i in 0...tabNames.length) {
@@ -139,10 +140,10 @@ class OptionsView extends Object {
 
         gfxPanel.visible = (currentTab == Graphics);
         audioPanel.visible = (currentTab == Audio);
-        controlsPanel.visible = (currentTab == Keyboard || currentTab == Gamepad);
+        controlsPanel.visible = (currentTab == Keyboard || currentTab == Gamepad || currentTab == Touch);
         controlsPanel.currentTab = currentTab;
 
-        if (currentTab == Keyboard || currentTab == Gamepad) {
+        if (currentTab == Keyboard || currentTab == Gamepad || currentTab == Touch) {
             controlsPanel.updateControlViewMode();
         } else if (currentTab == Graphics) {
             gfxPanel.updateStyles();

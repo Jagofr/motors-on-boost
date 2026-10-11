@@ -6,6 +6,8 @@ import h2d.Bitmap;
 import h2d.Tile;
 import input.InputController;
 import ui.components.UITheme;
+import save.SaveSystem;
+import save.SaveSystem.TouchSettings;
 
 /**
  * On-screen virtual touch driving controls HUD overlay.
@@ -19,6 +21,9 @@ import ui.components.UITheme;
 class TouchControlsHUD extends Object {
     /** Reference to active input controller. */
     public var inputRef:InputController;
+
+    /** Mobile touch layout configuration profile. */
+    public var touchSettings:TouchSettings = null;
 
     /** Vector graphics context for virtual button plates and indicators. */
     public var canvas:Graphics;
@@ -708,20 +713,62 @@ class TouchControlsHUD extends Object {
     }
 
     /**
+     * Re-reads touch configuration profile from storage and updates button positions.
+     */
+    public function refreshSettings() {
+        touchSettings = SaveSystem.load().touchSettings;
+        var s2d = getScene();
+        if (s2d != null) {
+            layout(s2d.width, s2d.height);
+        }
+    }
+
+    /**
      * Positions virtual touch buttons and icons relative to viewport boundaries.
-     * Preserves exact ergonomically separated positions across all display aspect ratios.
+     * Preserves exact ergonomically separated positions across all display aspect ratios
+     * while applying custom offsets and scales when in Custom mode.
      *
      * @param sw Screen width in pixels.
      * @param sh Screen height in pixels.
      */
     public function layout(sw:Float, sh:Float) {
-        // 1. Left Hand: Virtual Analog Steering Joystick (Lower-Left Corner)
-        stickBaseRadius = 64.0;
-        stickKnobRadius = 34.0;
-        stickMaxTravel = 48.0;
+        if (touchSettings == null) {
+            touchSettings = SaveSystem.load().touchSettings;
+        }
 
-        stickBaseX = Math.max(85.0, Math.min(130.0, sw * 0.088));
-        stickBaseY = sh - Math.max(90.0, Math.min(130.0, sh * 0.165));
+        var s:Float = 1.0;
+        var oxStick:Float = 0.0;
+        var oyStick:Float = 0.0;
+        var oxNitro:Float = 0.0;
+        var oyNitro:Float = 0.0;
+        var oxGas:Float = 0.0;
+        var oyGas:Float = 0.0;
+        var oxBrake:Float = 0.0;
+        var oyBrake:Float = 0.0;
+        var oxDrift:Float = 0.0;
+        var oyDrift:Float = 0.0;
+
+        if (touchSettings != null && touchSettings.mode == "Custom") {
+            s = Math.max(0.5, Math.min(1.5, touchSettings.scale));
+            oxStick = touchSettings.stickOffsetX;
+            oyStick = touchSettings.stickOffsetY;
+            oxNitro = touchSettings.nitroOffsetX;
+            oyNitro = touchSettings.nitroOffsetY;
+            oxGas = touchSettings.gasOffsetX;
+            oyGas = touchSettings.gasOffsetY;
+            oxBrake = touchSettings.brakeOffsetX;
+            oyBrake = touchSettings.brakeOffsetY;
+            oxDrift = touchSettings.driftOffsetX;
+            oyDrift = touchSettings.driftOffsetY;
+        }
+
+        // 1. Left Hand: Virtual Analog Steering Joystick (Lower-Left Corner)
+        stickBaseRadius = 64.0 * s;
+        stickKnobRadius = 34.0 * s;
+        stickMaxTravel = 48.0 * s;
+
+        stickBaseX = Math.max(85.0, Math.min(130.0, sw * 0.088)) + oxStick;
+        stickBaseY = sh - Math.max(90.0, Math.min(130.0, sh * 0.165)) + oyStick;
 
         if (stickPointerId == null) {
             stickKnobX = stickBaseX;
@@ -729,53 +776,53 @@ class TouchControlsHUD extends Object {
         }
 
         // 2. Left Hand: Nitro Boost Button (burn.png, situated below minimap on left edge)
-        nitroRadius = 46.0;
-        nitroX = Math.max(74.0, Math.min(110.0, sw * 0.076));
-        nitroY = Math.max(190.0, Math.min(240.0, sh * 0.31));
+        nitroRadius = 46.0 * s;
+        nitroX = Math.max(74.0, Math.min(110.0, sw * 0.076)) + oxNitro;
+        nitroY = Math.max(190.0, Math.min(240.0, sh * 0.31)) + oyNitro;
 
         if (nitroIconBmp != null) {
-            nitroIconBmp.setScale(56.0 / 512.0);
+            nitroIconBmp.setScale((56.0 * s) / 512.0);
             nitroIconBmp.x = nitroX;
             nitroIconBmp.y = nitroY;
         }
 
         // 3. Right Hand: Gas Pedal (gas-pedal.png, lower-right thumb rest zone)
-        gasRadius = 48.0;
-        gasX = sw - Math.max(120.0, Math.min(160.0, sw * 0.125));
-        gasY = sh - Math.max(85.0, Math.min(125.0, sh * 0.165));
+        gasRadius = 48.0 * s;
+        gasX = sw - Math.max(120.0, Math.min(160.0, sw * 0.125)) + oxGas;
+        gasY = sh - Math.max(85.0, Math.min(125.0, sh * 0.165)) + oyGas;
 
         if (gasIconBmp != null) {
-            gasIconBmp.setScale(58.0 / 512.0);
+            gasIconBmp.setScale((58.0 * s) / 512.0);
             gasIconBmp.x = gasX;
             gasIconBmp.y = gasY;
         }
 
         // 4. Right Hand: Handbrake Lever (hand-brake.png, mid-right edge)
-        driftRadius = 46.0;
-        driftX = sw - Math.max(68.0, Math.min(95.0, sw * 0.075));
-        driftY = Math.max(210.0, Math.min(270.0, sh * 0.35));
+        driftRadius = 46.0 * s;
+        driftX = sw - Math.max(68.0, Math.min(95.0, sw * 0.075)) + oxDrift;
+        driftY = Math.max(210.0, Math.min(270.0, sh * 0.35)) + oyDrift;
 
         if (driftIconBmp != null) {
-            driftIconBmp.setScale(56.0 / 512.0);
+            driftIconBmp.setScale((56.0 * s) / 512.0);
             driftIconBmp.x = driftX;
             driftIconBmp.y = driftY;
         }
 
         // 5. Right Hand: Brake Disc (brake.png, upper-right quadrant)
-        brakeRadius = 46.0;
-        brakeX = sw - Math.max(180.0, Math.min(240.0, sw * 0.185));
-        brakeY = Math.max(68.0, Math.min(115.0, sh * 0.15));
+        brakeRadius = 46.0 * s;
+        brakeX = sw - Math.max(180.0, Math.min(240.0, sw * 0.185)) + oxBrake;
+        brakeY = Math.max(68.0, Math.min(115.0, sh * 0.15)) + oyBrake;
 
         if (brakeIconBmp != null) {
-            brakeIconBmp.setScale(56.0 / 512.0);
+            brakeIconBmp.setScale((56.0 * s) / 512.0);
             brakeIconBmp.x = brakeX;
             brakeIconBmp.y = brakeY;
         }
 
         // 6. Top-Right: Dedicated Circular Pause Button
-        pauseRadius = 22.0;
-        pauseW = 44.0;
-        pauseH = 44.0;
+        pauseRadius = 22.0 * s;
+        pauseW = 44.0 * s;
+        pauseH = 44.0 * s;
         pauseX = sw - Math.max(38.0, Math.min(50.0, sw * 0.038));
         pauseY = Math.max(34.0, Math.min(50.0, sh * 0.065));
 

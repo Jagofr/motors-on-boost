@@ -128,12 +128,24 @@ class FontManager {
     /**
      * Fallback strategy assigning Heaps built-in default bitmap font when custom TTFs fail.
      */
+    @:access(h2d.Font)
     static function fallbackToDefault() {
-        regularFont = DefaultFont.get();
-        titleFont = DefaultFont.get();
-        heroFont = DefaultFont.get();
-        iconFont = DefaultFont.get();
-        largeIconFont = DefaultFont.get();
+        try {
+            regularFont = DefaultFont.get();
+            titleFont = DefaultFont.get();
+            heroFont = DefaultFont.get();
+            iconFont = DefaultFont.get();
+            largeIconFont = DefaultFont.get();
+        } catch (e:haxe.Exception) {
+            var mockFont = @:privateAccess new h2d.Font("default", 16);
+            mockFont.baseLine = 16;
+            mockFont.lineHeight = 16;
+            regularFont = mockFont;
+            titleFont = mockFont;
+            heroFont = mockFont;
+            iconFont = mockFont;
+            largeIconFont = mockFont;
+        }
         sanitizeAllFonts();
     }
 

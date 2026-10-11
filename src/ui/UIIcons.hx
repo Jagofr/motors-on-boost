@@ -43,6 +43,9 @@ enum IconType {
     /** Information shield badge representing credits and disclosures. */
     Credits;
 
+    /** Mobile touch screen silhouette representing touch controls. */
+    Touch;
+
     /** Exit doorway with directional arrow representing exit to title. */
     Exit;
 }
@@ -184,6 +187,14 @@ class UIIcons {
                 g.beginFill(color, 1.0);
                 g.drawCircle(s * 0.5, pad + w * 0.25, w * 0.07);
                 g.drawRect(s * 0.5 - w * 0.05, pad + w * 0.45, w * 0.1, w * 0.32);
+
+            case Touch:
+                // Mobile smartphone screen outline with touch target indicator
+                g.endFill();
+                g.drawRoundedRect(pad + w * 0.15, pad, w * 0.7, w, 4);
+                g.beginFill(color, 1.0);
+                g.drawCircle(s * 0.5, pad + w * 0.86, w * 0.05);
+                g.drawCircle(s * 0.5, pad + w * 0.45, w * 0.10);
 
             case Exit:
                 // Open doorway frame with outbound directional arrow

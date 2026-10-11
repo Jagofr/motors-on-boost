@@ -100,6 +100,50 @@ typedef GameSaveData = {
 
     /** Steering sensitivity multiplier in range [0.0, 1.0] (default 1.0). */
     var ?steerSensitivity:Float;
+
+    /** Mobile touch controls positioning, offsets, and scale profile. */
+    var ?touchSettings:TouchSettings;
+}
+
+/**
+ * Touch control button offsets, scaling, and layout configuration.
+ */
+typedef TouchSettings = {
+    /** Layout mode: "Default" or "Custom". */
+    var mode:String;
+
+    /** Global UI scale factor for touch buttons (0.5 to 1.5). */
+    var scale:Float;
+
+    /** Virtual analog stick center X offset in pixels relative to bottom-left anchor. */
+    var stickOffsetX:Float;
+
+    /** Virtual analog stick center Y offset in pixels relative to bottom-left anchor. */
+    var stickOffsetY:Float;
+
+    /** Nitro button center X offset in pixels relative to bottom-left anchor. */
+    var nitroOffsetX:Float;
+
+    /** Nitro button center Y offset in pixels relative to bottom-left anchor. */
+    var nitroOffsetY:Float;
+
+    /** Gas / Throttle button center X offset in pixels relative to bottom-right anchor. */
+    var gasOffsetX:Float;
+
+    /** Gas / Throttle button center Y offset in pixels relative to bottom-right anchor. */
+    var gasOffsetY:Float;
+
+    /** Brake / Reverse button center X offset in pixels relative to bottom-right anchor. */
+    var brakeOffsetX:Float;
+
+    /** Brake / Reverse button center Y offset in pixels relative to bottom-right anchor. */
+    var brakeOffsetY:Float;
+
+    /** Drift / Handbrake button center X offset in pixels relative to bottom-right anchor. */
+    var driftOffsetX:Float;
+
+    /** Drift / Handbrake button center Y offset in pixels relative to bottom-right anchor. */
+    var driftOffsetY:Float;
 }
 
 /**
@@ -146,6 +190,28 @@ class SaveSystem {
             reflectionLevel: "Medium",
             renderScale: 1.0,
             uiResolution: "720p (HD)"
+        };
+    }
+
+    /**
+     * Creates and returns default touch control button offset and scale settings.
+     *
+     * @return Neutral default touch configuration profile.
+     */
+    public static function getDefaultTouchSettings():TouchSettings {
+        return {
+            mode: "Default",
+            scale: 1.0,
+            stickOffsetX: 0.0,
+            stickOffsetY: 0.0,
+            nitroOffsetX: 0.0,
+            nitroOffsetY: 0.0,
+            gasOffsetX: 0.0,
+            gasOffsetY: 0.0,
+            brakeOffsetX: 0.0,
+            brakeOffsetY: 0.0,
+            driftOffsetX: 0.0,
+            driftOffsetY: 0.0
         };
     }
 
@@ -199,7 +265,12 @@ class SaveSystem {
                     data.steerSensitivity = 1.0;
                 }
 
-                // Step 7: Schema version migration to v4
+                // Step 7: Forward migration: ensure touchSettings default
+                if (data.touchSettings == null) {
+                    data.touchSettings = getDefaultTouchSettings();
+                }
+
+                // Step 8: Schema version migration to v4
                 if (data.version == null || data.version < SAVE_VERSION || isLegacy) {
                     data.version = SAVE_VERSION;
                     data.buildNumber = Version.BUILD;
@@ -220,7 +291,8 @@ class SaveSystem {
             musicVol: 0.7,
             sfxVol: 0.9,
             steerSensitivity: 1.0,
-            graphics: getDefaultGraphics()
+            graphics: getDefaultGraphics(),
+            touchSettings: getDefaultTouchSettings()
         };
     }
 
@@ -236,6 +308,9 @@ class SaveSystem {
             data.buildNumber = Version.BUILD;
             if (data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
                 data.steerSensitivity = 1.0;
+            }
+            if (data.touchSettings == null) {
+                data.touchSettings = getDefaultTouchSettings();
             }
 
             var raw = Json.stringify(data);

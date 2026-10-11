@@ -103,11 +103,17 @@ This ledger records active tuning variables across physics, input, track geometr
 | `UI Resolution` | `720p (HD), 1080p (FHD), 1440p (2K), 2160p (4K), Native / Match Window` | In-Game & Menu | 2D scene coordinate scale and layout projection. |
 
 ### PWA Storage Spec (`localStorage`):
-- Version: `3` (Application Release: `v0.2.0`, Build: `3`)
-- Primary Key: `mob_motors_on_boost_save_v3`
-- Backwards-Compatible Fallback Keys: `mob_motors_on_boost_save_v2`, `mob_motors_on_boost_save_v1`, `burnout_overdrive_save_v1`
-- Forward Migration: Older save records are loaded, schema-migrated to version 3 with default `uiResolution`, stamped with `buildNumber: 3`, and committed back to `mob_motors_on_boost_save_v3`.
-- Preserves: `version`, `buildNumber`, `hasActiveRun`, `posX`, `posY`, `posZ`, `yaw`, `forwardSpeed`, `masterVol`, `musicVol`, `sfxVol`, and `graphics` profile.
+- Version: `4` (Application Release: `v0.2.2`, Build: `5`)
+- Primary Key: `mob_motors_on_boost_save_v4`
+- Backwards-Compatible Fallback Keys: `mob_motors_on_boost_save_v3`, `mob_motors_on_boost_save_v2`, `mob_motors_on_boost_save_v1`, `burnout_overdrive_save_v1`
+- Forward Migration: Older save records are loaded, schema-migrated to version 4 with `steerSensitivity` (1.0) and `touchSettings` (`mode: "Default"`, custom offsets and scale), stamped with `buildNumber: 5`, and committed back to `mob_motors_on_boost_save_v4`.
+- Preserves: `version`, `buildNumber`, `hasActiveRun`, `posX`, `posY`, `posZ`, `yaw`, `forwardSpeed`, `masterVol`, `musicVol`, `sfxVol`, `steerSensitivity`, `touchSettings`, and `graphics` profile.
+
+### Graphics Options Dependency Hierarchy (`GraphicsOptionsPanel.hx`):
+- `Shadow Buffer Size (shadowRes)` is automatically disabled and marked `[DISABLED]` if `shadowLevel == "Off"`.
+- `Anisotropic Filtering (anisotropic)` is automatically disabled and marked `[DISABLED]` if `mipmapping == false`.
+- `Anti-Aliasing Multiplier (aaLevel)` is automatically disabled and marked `[DISABLED]` if `aaType == "None"`.
+- `Reflection Level (reflectionLevel)` is automatically disabled and marked `[DISABLED]` if `modelReflections == false`.
 
 ---
 
@@ -115,12 +121,11 @@ This ledger records active tuning variables across physics, input, track geometr
 
 | Component | Dimensions / Bounds | Screen Placement | Geometry Model / Detection |
 |---|---|---|---|
-| `Steer Left` (`<`) | `84 x 84` px | Bottom-Left (`x = 28.0`, `y = sh - 112.0`) | Rectangular bounding partition with `24px` margin |
-| `Steer Right` (`>`) | `84 x 84` px | Bottom-Left (`x = 128.0`, `y = sh - 112.0`) | Rectangular bounding partition with `24px` margin |
-| `Gas (Throttle)` | `72 x 72` px | Bottom-Right Outer (`x = sw - 100.0`, `y = sh - 188.0`) | Euclidean distance-to-center (`radius = 54px`, min dist) |
-| `Brake / Reverse` | `72 x 72` px | Bottom-Right Outer (`x = sw - 100.0`, `y = sh - 100.0`) | Euclidean distance-to-center (`radius = 54px`, min dist) |
-| `Nitro Boost` | `72 x 72` px | Bottom-Right Inner (`x = sw - 188.0`, `y = sh - 188.0`) | Euclidean distance-to-center (`radius = 54px`, min dist) |
-| `Handbrake Drift` | `72 x 72` px | Bottom-Right Inner (`x = sw - 188.0`, `y = sh - 100.0`) | Euclidean distance-to-center (`radius = 54px`, min dist) |
+| `Virtual Analog Joystick` | `140 x 140` px base, `54px` thumbstick | Bottom-Left (`x = 110.0 + stickOffsetX`, `y = sh - 110.0 + stickOffsetY`) | Continuous proportional deflection with spring return |
+| `Nitro Boost` (Flame Icon) | `74 x 74` px | Mid-Left (`x = 75.0 + nitroOffsetX`, `y = sh - 225.0 + nitroOffsetY`) | Bounding radius hitzone with multi-touch hold |
+| `Gas (Throttle)` (Pedal Icon) | `88 x 88` px | Bottom-Right Outer (`x = sw - 92.0 + gasOffsetX`, `y = sh - 95.0 + gasOffsetY`) | High-capacity prime right-thumb rest zone |
+| `Brake / Reverse` (Disc Icon) | `74 x 74` px | Upper-Right (`x = sw - 182.0 + brakeOffsetX`, `y = sh - 215.0 + brakeOffsetY`) | Independent braking zone |
+| `Handbrake Drift` (Lever Icon)| `78 x 78` px | Mid-Right (`x = sw - 192.0 + driftOffsetX`, `y = sh - 115.0 + driftOffsetY`) | Curved drift breakaway actuator |
 | `Pause Toggle` (`\|\|`) | `52 x 52` px | Top-Right (`x = sw - 80.0`, `y = 28.0`) | Rectangular bounding box with `18px` padding |
 
 ### Touch Input Pipeline & Camera Projection:
@@ -128,3 +133,24 @@ This ledger records active tuning variables across physics, input, track geometr
 2. **Zero-Allocation Scratch Instances**: Reuses internal `scratchPoint` and `scratchEvent` to eliminate runtime garbage collection churn on WebGL and mobile targets.
 3. **Multi-Touch Concurrency**: Maintains an active touch pointer map (`activeTouches: Map<Int, String>`) assigning unique finger touch IDs (`e.touchId`) to button states. Supports simultaneous throttle, steering, and boost actuation without input cancellations.
 4. **Touch Cancel Safeguard**: Listens to browser `touchcancel` events to immediately reset input registers if an OS gesture, notification shade, or window blur occurs.
+5. **Touch Layout Customization**: Supports Default mode (ergonomic tablet schematic) and Custom mode (repositioning analog stick, nitro, gas, brake, and handbrake offsets and scale in real-time) via Options $\to$ Touch tab.
+
+---
+
+## 8. Dual-Tier Automated Testing Infrastructure
+
+### 1. Headless Unit Test Suite (`tests/` & `test.hxml`)
+- Powered by `utest` (1.13.2) and `vshaxe.haxe-test-adapter`.
+- Statically builds via `haxe test.hxml` and runs headlessly in Node.js via `tests/node-runner.js`.
+- Shims DOM and local storage environments cleanly for Heaps.
+- 12 comprehensive test fixtures with 197 assertions passing in under 0.10s.
+
+### 2. Browser Visual / UI Automation Suite (`web/test-suite.html` & `tests/run-browser-tests.js`)
+- Runs Microsoft Edge headlessly with an isolated profile and dynamic CDP debugging port.
+- Verifies:
+  1. Trademark disclosure screen display and 1280x720 baseline resolution.
+  2. 2D UI resolution decoupling from 3D render scaling.
+  3. Graphics options dependency locking and `[DISABLED]` graying out.
+  4. Steering sensitivity slider persistence across Keyboard, Gamepad, and Touch tabs.
+  5. Dedicated Touch tab Default schematic vs Custom offset adjustment and Reset Defaults.
+  6. In-game physics and track drive simulation with throttle acceleration and nitrous depletion/recharge.

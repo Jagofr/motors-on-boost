@@ -1,0 +1,11 @@
+-cp src
+-cp tests
+-lib heaps
+-lib format
+-lib json2object
+-lib utest
+-main TestMain
+-js bin/test.js
+-D js-es=6
+-D resourcesPath=res
+--cmd node tests/node-runner.js
