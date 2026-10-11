@@ -412,3 +412,4 @@
 2. **Automated Browser Visual Suite (`tests/run-browser-tests.js` / `web/test-suite.html`)**:
    - Spawns headless Microsoft Edge via CDP on dynamic debugging ports.
    - Verifies trademark disclosure boot resolution, decoupled 3D render scaling, graphics dependency graying out, global steering sensitivity persistence, dedicated touch tab customization, and simulated in-game track driving with nitrous depletion/recharge (15/15 scenarios passed).
+
