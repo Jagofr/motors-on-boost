@@ -5,6 +5,52 @@ import input.InputController;
 import physics.CarConfig.VehicleConfigData;
 
 /**
+ * Zero-overhead strongly typed enum abstract for four-wheel suspension and contact indexing.
+ */
+enum abstract WheelIndex(Int) from Int to Int {
+    /** Front-left wheel index (0). */
+    var FrontLeft = 0;
+
+    /** Front-right wheel index (1). */
+    var FrontRight = 1;
+
+    /** Rear-left wheel index (2). */
+    var RearLeft = 2;
+
+    /** Rear-right wheel index (3). */
+    var RearRight = 3;
+}
+
+/**
+ * Zero-overhead strongly typed enum abstract for transmission gear ratios.
+ */
+enum abstract Gear(Int) from Int to Int {
+    /** Reverse transmission gear (-1). */
+    var Reverse = -1;
+
+    /** Neutral transmission idle (0). */
+    var Neutral = 0;
+
+    /** First forward transmission gear (1). */
+    var First = 1;
+
+    /** Second forward transmission gear (2). */
+    var Second = 2;
+
+    /** Third forward transmission gear (3). */
+    var Third = 3;
+
+    /** Fourth forward transmission gear (4). */
+    var Fourth = 4;
+
+    /** Fifth forward transmission gear (5). */
+    var Fifth = 5;
+
+    /** Sixth forward transmission gear (6). */
+    var Sixth = 6;
+}
+
+/**
  * First-principles arcade vehicle dynamics, multi-link raycast suspension simulation,
  * slip-angle tire friction modeling, and arcade drift mechanics.
  * Designed with zero runtime allocations in update loops.

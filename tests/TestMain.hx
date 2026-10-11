@@ -1,6 +1,7 @@
 package;
 
 import utest.Runner;
+import utest.ITest;
 import utest.ui.text.PrintReport;
 import tests.core.TestVersion;
 import tests.physics.TestSplineMath;
@@ -17,9 +18,14 @@ import tests.audio.TestAudioManager;
 
 /**
  * Main test runner executing full test suite across all codebase modules.
- * Compatible with CLI execution and VSCode Haxe Test Explorer plugin.
+ * Compatible with CLI execution, Headless Node.js, and VSCode Haxe Test Explorer plugin.
+ * Supports filtering by module name (e.g. 'physics', 'camera') or specific test class name.
  */
 class TestMain {
+    /**
+     * Entry point for test compilation target.
+     * Sets up headless WebGL texture stubs, parses filtering flags, and runs selected suites.
+     */
     public static function main() {
         #if js
         // Headless texture stub for Node.js test execution
@@ -74,7 +80,7 @@ class TestMain {
             return false;
         }
 
-        var cases:Array<{mod:String, name:String, testCase:Dynamic}> = [
+        var cases:Array<{mod:String, name:String, testCase:utest.ITest}> = [
             { mod: "core", name: "TestVersion", testCase: new TestVersion() },
             { mod: "physics", name: "TestSplineMath", testCase: new TestSplineMath() },
             { mod: "physics", name: "TestCarConfig", testCase: new TestCarConfig() },

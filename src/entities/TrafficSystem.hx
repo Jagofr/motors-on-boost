@@ -7,6 +7,17 @@ import physics.SplineMath;
 import camera.ChaseCamera;
 
 /**
+ * Highway traffic lane orientation and corridor assignment.
+ */
+enum abstract TrafficLane(Int) from Int to Int {
+    /** Right-hand travel corridor along travel direction (+4.8m offset). */
+    var RightLane = 0;
+
+    /** Left-hand passing/oncoming corridor (-4.8m offset). */
+    var LeftLane = 1;
+}
+
+/**
  * Individual civilian autonomous traffic vehicle instance.
  * Maintains assigned spline navigation waypoint, target cruise speed, lane offset, and heading.
  */

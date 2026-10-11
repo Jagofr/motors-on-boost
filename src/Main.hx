@@ -64,6 +64,14 @@ class Main extends hxd.App {
     public var appState:AppState = IntroSequence;
     public var introState:IntroState = Studio;
 
+    // Core Engine & Display Constants
+    public static inline var VIRTUAL_BASE_WIDTH:Int = 1280;
+    public static inline var VIRTUAL_BASE_HEIGHT:Int = 720;
+    public static inline var DISCLAIMER_MIN_DURATION:Float = 5.5;
+    public static inline var SHOWCASE_FADE_DURATION:Float = 1.2;
+    public static inline var RADIAL_BLUR_SPEED_THRESHOLD_KMH:Float = 140.0;
+    public static inline var CAMERA_FAR_PLANE:Float = 1500.0;
+
     // Intro Phase Timers & Transitions
     var introTimer:Float = 0.0;
     var introAlpha:Float = 0.0;
@@ -76,7 +84,7 @@ class Main extends hxd.App {
 
     // Post-Intro Showcase Fade-in Transition
     var showcaseFadeTimer:Float = 0.0;
-    var showcaseFadeDuration:Float = 1.2;
+    var showcaseFadeDuration:Float = SHOWCASE_FADE_DURATION;
     var isShowcaseFadingIn:Bool = false;
     var showcaseCurtain:Bitmap;
 
@@ -92,7 +100,7 @@ class Main extends hxd.App {
     // Background Asset Pre-loading
     var isLoadingStarted:Bool = false;
     var isLoadingComplete:Bool = false;
-    var disclaimerMinDuration:Float = 5.5; // Locked time (seconds)
+    var disclaimerMinDuration:Float = DISCLAIMER_MIN_DURATION; // Locked time (seconds)
 
     // Game Core Systems & Singletons
     var fpsText:Text;
@@ -137,7 +145,7 @@ class Main extends hxd.App {
         // Responsive High-DPI & Multi-Resolution UI Scaling
         // Target virtual baseline: 1280x720. AutoZoom scales UI elements, fonts,
         // and interactive touch hitboxes proportionally on 2K/4K and mobile Retina displays.
-        s2d.scaleMode = AutoZoom(1280, 720, false);
+        s2d.scaleMode = AutoZoom(VIRTUAL_BASE_WIDTH, VIRTUAL_BASE_HEIGHT, false);
 
         buildIntroScreens();
         setIntroScreen(Studio);
@@ -192,10 +200,10 @@ class Main extends hxd.App {
         #end
     }
 
-    // =========================================================================
-    // INTRO SCREEN BUILDERS & STATE MACHINE
-    // =========================================================================
-
+    /**
+     * Constructs and initializes the intro sequence container and its three stages:
+     * Studio splash, Engine splash, and the Trademark & Legal Disclosures notice screen.
+     */
     function buildIntroScreens() {
         introContainer = new Object(s2d);
 
@@ -263,6 +271,12 @@ class Main extends hxd.App {
         layoutIntro();
     }
 
+    /**
+     * Switches the active intro stage and begins its cross-fade lifecycle.
+     * Initiates asynchronous background resource allocation when transitioning to the disclaimer.
+     *
+     * @param target The target IntroState stage to transition into.
+     */
     public function setIntroScreen(target:IntroState) {
         introState = target;
         introTimer = 0.0;
@@ -284,6 +298,12 @@ class Main extends hxd.App {
         layoutIntro();
     }
 
+    /**
+     * Advances the active intro screen timer, manages alpha cross-fading, evaluates
+     * user skip inputs for the studio/engine screens, and enforces mandatory minimum duration for the disclaimer.
+     *
+     * @param dt Delta time in seconds since last frame.
+     */
     function updateIntro(dt:Float) {
         introTimer += dt;
 
@@ -339,6 +359,10 @@ class Main extends hxd.App {
         }
     }
 
+    /**
+     * Finalizes the boot sequence, disposes of intro DOM containers, initializes the 3D scene,
+     * triggers the smooth 1.2s cross-fade curtain, and presents the main splash menu.
+     */
     public function finishIntroSequence() {
         if (!isLoadingStarted) {
             startBackgroundLoading();
@@ -366,10 +390,10 @@ class Main extends hxd.App {
         }
     }
 
-    // =========================================================================
-    // BACKGROUND PRE-LOADING HOOK
-    // =========================================================================
-
+    /**
+     * Asynchronously loads player save data, initializes audio subsystems, allocates 3D world meshes,
+     * builds highway track waypoints, spawns traffic fleet, and prepares UI while disclaimer is active.
+     */
     function startBackgroundLoading() {
         isLoadingStarted = true;
 
@@ -387,7 +411,7 @@ class Main extends hxd.App {
         // High-performance post-processing renderer supporting radial directional blur
         postRenderer = new PostProcessRenderer();
         s3d.renderer = postRenderer;
-        s3d.camera.zFar = 1500.0;
+        s3d.camera.zFar = CAMERA_FAR_PLANE;
 
         // Atmospheric panoramic gradient blue skybox
         skybox = new Skybox(s3d);
@@ -509,6 +533,13 @@ class Main extends hxd.App {
         }
     }
 
+    /**
+     * Scales and centers a splash screen bitmap proportionally within the specified viewport dimensions.
+     *
+     * @param bmp The Bitmap instance to scale and position.
+     * @param sw Viewport target width in pixels.
+     * @param sh Viewport target height in pixels.
+     */
     function scaleAndCenterSplash(bmp:Bitmap, sw:Float, sh:Float) {
         if (bmp == null || bmp.tile == null) return;
         var naturalW = bmp.tile.width;
@@ -522,6 +553,10 @@ class Main extends hxd.App {
         bmp.y = (sh - (naturalH * scale)) * 0.5;
     }
 
+    /**
+     * Responsive layout calculator for the boot intro sequence.
+     * Positions headers, legal body text, partner logos, and build version indicators.
+     */
     function layoutIntro() {
         var sw = s2d != null ? s2d.width : hxd.Window.getInstance().width;
         var sh = s2d != null ? s2d.height : hxd.Window.getInstance().height;
@@ -607,6 +642,11 @@ class Main extends hxd.App {
         }
     }
 
+    /**
+     * Responds to browser canvas resize and device orientation changes.
+     * Synchronizes 2D UI scene scaling, applies 3D offscreen render scales,
+     * adjusts full-screen curtain dimensions, and triggers responsive UI layouts.
+     */
     override function onResize() {
         super.onResize();
 
@@ -629,6 +669,14 @@ class Main extends hxd.App {
         }
     }
 
+    /**
+     * Primary per-frame update loop.
+     * Polls player inputs, advances intro sequence or in-game state machines, updates
+     * vehicle raycast physics, simulates traffic AI, updates third-person spring camera,
+     * scales radial blur post-processing, and refreshes UI telemetry.
+     *
+     * @param dt Delta time elapsed since last frame in seconds.
+     */
     override function update(dt:Float) {
         input.update(dt);
 
@@ -702,8 +750,8 @@ class Main extends hxd.App {
                 // High-speed radial directional blur scaling
                 var kmh = Math.round(Math.abs(carPhysics.forwardSpeed) * 3.6);
                 var blurIntensity = 0.0;
-                if (kmh > 140) {
-                    blurIntensity = Math.min(0.065, ((kmh - 140.0) / 180.0) * 0.055);
+                if (kmh > RADIAL_BLUR_SPEED_THRESHOLD_KMH) {
+                    blurIntensity = Math.min(0.065, ((kmh - RADIAL_BLUR_SPEED_THRESHOLD_KMH) / 180.0) * 0.055);
                 }
                 if (input.boost && kmh > 70) blurIntensity = Math.min(0.08, blurIntensity + 0.025);
                 if (postRenderer != null) postRenderer.blurShader.blurIntensity = blurIntensity;

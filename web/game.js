@@ -296,7 +296,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 			onLoaded(tile);
 		};
 		img.onerror = function(err) {
-			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 187, className : "Main", methodName : "loadWebpTile"});
+			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 195, className : "Main", methodName : "loadWebpTile"});
 		};
 		img.src = path;
 	}
@@ -812,7 +812,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 			}
 			var kmh = Math.round(Math.abs(this.carPhysics.forwardSpeed) * 3.6);
 			var blurIntensity = 0.0;
-			if(kmh > 140) {
+			if(kmh > 140.0) {
 				blurIntensity = Math.min(0.065,(kmh - 140.0) / 180.0 * 0.055);
 			}
 			if(this.input.boost && kmh > 70) {
