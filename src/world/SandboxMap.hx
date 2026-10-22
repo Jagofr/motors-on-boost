@@ -173,8 +173,41 @@ class SandboxMap extends Object implements IGroundProvider {
             lMult = 0.5;
         }
 
-        pos.z = getGroundElevation(pos.x, pos.y);
         return { hitWall: hit, speedMult: sMult, latMult: lMult };
+    }
+
+    /**
+     * Registers static rigid body boundary walls in the OimoPhysics world.
+     *
+     * @param world Target Oimo physics world.
+     */
+    public function registerPhysicsColliders(world:oimo.dynamics.World):Void {
+        if (world == null) return;
+        var wallThickness = 4.0;
+        var wallHeight = 40.0;
+
+        // West wall (-X)
+        createStaticWall(world, -WALL_LIMIT - (wallThickness * 0.5), 0.0, 10.0, wallThickness * 0.5, HALF_SPAN, wallHeight * 0.5);
+        // East wall (+X)
+        createStaticWall(world,  WALL_LIMIT + (wallThickness * 0.5), 0.0, 10.0, wallThickness * 0.5, HALF_SPAN, wallHeight * 0.5);
+        // South wall (-Y)
+        createStaticWall(world, 0.0, -WALL_LIMIT - (wallThickness * 0.5), 10.0, HALF_SPAN, wallThickness * 0.5, wallHeight * 0.5);
+        // North wall (+Y)
+        createStaticWall(world, 0.0,  WALL_LIMIT + (wallThickness * 0.5), 10.0, HALF_SPAN, wallThickness * 0.5, wallHeight * 0.5);
+    }
+
+    function createStaticWall(world:oimo.dynamics.World, x:Float, y:Float, z:Float, hx:Float, hy:Float, hz:Float) {
+        var rbConfig = new oimo.dynamics.rigidbody.RigidBodyConfig();
+        rbConfig.type = oimo.dynamics.rigidbody.RigidBodyType.STATIC;
+        rbConfig.position = new oimo.common.Vec3(x, y, z);
+        var body = new oimo.dynamics.rigidbody.RigidBody(rbConfig);
+
+        var shapeConfig = new oimo.dynamics.rigidbody.ShapeConfig();
+        shapeConfig.geometry = new oimo.collision.geometry.BoxGeometry(new oimo.common.Vec3(hx, hy, hz));
+        shapeConfig.restitution = 0.4;
+        shapeConfig.friction = 0.3;
+        body.addShape(new oimo.dynamics.rigidbody.Shape(shapeConfig));
+        world.addRigidBody(body);
     }
 
     /**
@@ -185,6 +218,7 @@ class SandboxMap extends Object implements IGroundProvider {
         var step = (HALF_SPAN * 2.0) / divisions;
 
         var pts:Array<Point> = [];
+        var uvs:Array<h3d.prim.UV> = [];
         var idxBuf = new IndexBuffer();
 
         for (iy in 0...(divisions + 1)) {
@@ -193,6 +227,7 @@ class SandboxMap extends Object implements IGroundProvider {
                 var x = -HALF_SPAN + (ix * step);
                 var z = getGroundElevation(x, y);
                 pts.push(new Point(x, y, z));
+                uvs.push(new h3d.prim.UV((x + HALF_SPAN) * 0.16, (y + HALF_SPAN) * 0.16));
             }
         }
 
@@ -204,16 +239,47 @@ class SandboxMap extends Object implements IGroundProvider {
                 var i2 = (iy + 1) * stride + ix;
                 var i3 = i2 + 1;
 
-                idxBuf.push(i0); idxBuf.push(i2); idxBuf.push(i1);
-                idxBuf.push(i1); idxBuf.push(i2); idxBuf.push(i3);
+                // Counter-clockwise triangle winding for upward facing surface normals (+Z)
+                idxBuf.push(i0); idxBuf.push(i1); idxBuf.push(i2);
+                idxBuf.push(i1); idxBuf.push(i3); idxBuf.push(i2);
             }
         }
 
         var poly = new Polygon(pts, idxBuf);
+        poly.uvs = uvs;
         poly.addNormals();
         terrainMesh = new Mesh(poly, this);
-        // Cyber slate green / charcoal terrain surface
-        terrainMesh.material.color.setColor(0x222C28);
+        terrainMesh.material.mainPass.culling = None;
+        terrainMesh.material.color.setColor(0xFFFFFF);
+
+        // Procedural high-contrast cyber coordinates grid texture
+        #if js
+        try {
+            var size = 256;
+            var pixels = hxd.Pixels.alloc(size, size, hxd.PixelFormat.ARGB);
+            for (py in 0...size) {
+                for (px in 0...size) {
+                    var isMajor = (px == 0 || px == size - 1 || py == 0 || py == size - 1 || px % 32 == 0 || py % 32 == 0);
+                    var isMinor = (px % 8 == 0 || py % 8 == 0);
+                    var col:Int = 0xFF222C28; // Deep slate-charcoal asphalt
+                    if (isMajor) {
+                        col = 0xFF3E5048; // Crisp terrain coordinate grid line
+                    } else if (isMinor) {
+                        col = 0xFF2A3632; // Subtle contour sub-grid
+                    }
+                    if (px % 32 == 0 && py % 32 == 0) {
+                        col = 0xFF00E5FF; // High-visibility electric cyan intersection node
+                    }
+                    pixels.setPixel(px, py, col);
+                }
+            }
+            var tex = h3d.mat.Texture.fromPixels(pixels);
+            tex.wrap = Repeat;
+            terrainMesh.material.texture = tex;
+        } catch (e:Dynamic) {
+            // Headless testing environment fallback
+        }
+        #end
     }
 
     /**
@@ -223,14 +289,17 @@ class SandboxMap extends Object implements IGroundProvider {
         var segments = 32;
         var radius = 35.0;
         var pts:Array<Point> = [];
+        var uvs:Array<h3d.prim.UV> = [];
         var idxBuf = new IndexBuffer();
 
         pts.push(new Point(0, 0, 0.05));
+        uvs.push(new h3d.prim.UV(0.5, 0.5));
         for (i in 0...segments) {
             var angle = (i / segments) * (Math.PI * 2.0);
             var px = Math.cos(angle) * radius;
             var py = Math.sin(angle) * radius;
             pts.push(new Point(px, py, 0.05));
+            uvs.push(new h3d.prim.UV(0.5 + Math.cos(angle) * 0.5, 0.5 + Math.sin(angle) * 0.5));
         }
 
         for (i in 0...segments) {
@@ -241,8 +310,10 @@ class SandboxMap extends Object implements IGroundProvider {
         }
 
         var poly = new Polygon(pts, idxBuf);
+        poly.uvs = uvs;
         poly.addNormals();
         skidpadMesh = new Mesh(poly, this);
+        skidpadMesh.material.mainPass.culling = None;
         skidpadMesh.material.color.setColor(0x2A2E35);
     }
 
@@ -350,3 +421,4 @@ class SandboxMap extends Object implements IGroundProvider {
         }
     }
 }
+

@@ -143,5 +143,37 @@ class TestCarPhysics extends Test {
         car.update(1.0 / 60.0, input);
         Assert.isFalse(car.isDrifting, "Drift should terminate when speed drops below threshold");
     }
+
+    public function testOimoRigidBodyBackbone() {
+        Assert.notNull(car.physicsWorld, "Oimo physics world must be initialized");
+        Assert.notNull(car.chassisBody, "Oimo chassis rigid body must be instantiated");
+
+        // Verify gravity along -Z
+        var g = car.physicsWorld.getGravity();
+        Assert.floatEquals(0.0, g.x, 0.001);
+        Assert.floatEquals(0.0, g.y, 0.001);
+        Assert.floatEquals(-9.81, g.z, 0.001);
+
+        // Verify chassis position
+        var pos = car.chassisBody.getPosition();
+        Assert.floatEquals(car.pos.x, pos.x, 0.001);
+        Assert.floatEquals(car.pos.y, pos.y, 0.001);
+        Assert.floatEquals(car.pos.z + 0.35, pos.z, 0.001);
+    }
+
+    public function testResetStateOimoSync() {
+        car.resetState(50.0, -120.0, 5.0, 3.14159);
+        Assert.floatEquals(50.0, car.pos.x, 0.001);
+        Assert.floatEquals(-120.0, car.pos.y, 0.001);
+        Assert.floatEquals(5.0, car.pos.z, 0.001);
+
+        var bPos = car.chassisBody.getPosition();
+        Assert.floatEquals(50.0, bPos.x, 0.001);
+        Assert.floatEquals(-120.0, bPos.y, 0.001);
+        Assert.floatEquals(5.35, bPos.z, 0.001);
+
+        var bVel = car.chassisBody.getLinearVelocity();
+        Assert.floatEquals(0.0, bVel.length(), 0.001);
+    }
 }
 

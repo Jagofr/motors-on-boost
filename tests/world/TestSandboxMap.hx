@@ -100,4 +100,12 @@ class TestSandboxMap extends Test {
         Assert.isTrue(map.floodlights.length >= 12, "4 floodlight towers should contain mast, housing, and luminaires");
         Assert.isTrue(map.obstacles.length >= 8, "Slalom course and boundary markers should be instantiated");
     }
+
+    public function testPhysicsCollidersRegistration() {
+        var map = new SandboxMap(null);
+        var world = new oimo.dynamics.World();
+        map.registerPhysicsColliders(world);
+        Assert.equals(4, world.getNumRigidBodies(), "4 static boundary wall rigid bodies should be registered");
+    }
 }
+

@@ -8,43 +8,74 @@
 ---
 
 ## Table of Contents
-1. [Core & Boot State Machine (`src/`)](#1-core--boot-state-machine-src)
-   - [Main](#main)
-   - [Version](#version)
-2. [Vehicle Dynamics & Raycast Simulation (`src/physics/`)](#2-vehicle-dynamics--raycast-simulation-srcphysics)
-   - [CarPhysics](#carphysics)
-   - [CarConfig](#carconfig)
-   - [SplineMath](#splinemath)
-3. [Camera & Visual Perspective (`src/camera/`)](#3-camera--visual-perspective-srccamera)
-   - [ChaseCamera](#chasecamera)
-4. [Input & Hardware Control (`src/input/`)](#4-input--hardware-control-srcinput)
-   - [InputController](#inputcontroller)
-   - [InputBindings](#inputbindings)
-5. [World, Environment & Celestial Rendering (`src/world/`)](#5-world-environment--celestial-rendering-srcworld)
-   - [IGroundProvider](#igroundprovider)
-   - [Track](#track)
-   - [SandboxMap](#sandboxmap)
-   - [Skybox & SkyGradientShader](#skybox--skygradientshader)
-6. [Autonomous Highway Traffic AI (`src/entities/`)](#6-autonomous-highway-traffic-ai-srcentities)
-   - [TrafficSystem](#trafficsystem)
-   - [TrafficCar](#trafficcar)
-   - [CarMesh & TrafficCarMesh](#carmesh--trafficcarmesh)
-7. [Graphics Hardware Pipeline & Post-Processing (`src/graphics/`)](#7-graphics-hardware-pipeline--post-processing-srcgraphics)
-   - [GraphicsManager](#graphicsmanager)
-   - [PostProcessRenderer](#postprocessrenderer)
-   - [RadialBlurShader](#radialblurshader)
-8. [Audio Synthesis & Sound Engine (`src/audio/`)](#8-audio-synthesis--sound-engine-srcaudio)
-   - [AudioManager](#audiomanager)
-9. [Persistence & Save Migration (`src/save/`)](#9-persistence--save-migration-srcsave)
-   - [SaveSystem](#savesystem)
-10. [User Interface & Touch Controls Layer (`src/ui/`)](#10-user-interface--touch-controls-layer-srcui)
-    - [UIManager & UIBuilder](#uimanager--uibuilder)
-    - [FontManager & UIIcons](#fontmanager--uiicons)
-    - [UIEnums & UITheme](#uienums--uitheme)
-    - [TouchControlsHUD](#touchcontrolshud)
-    - [InGameHUDView & Options Panels](#ingamehudview--options-panels)
-11. [Automated Testing Infrastructure (`tests/`)](#11-automated-testing-infrastructure-tests)
-    - [TestMain & Test Runners](#testmain--test-runners)
+- [M.O.B. // MOTORS ON BOOST — API \& Function Reference Manual](#mob--motors-on-boost--api--function-reference-manual)
+  - [Table of Contents](#table-of-contents)
+  - [1. Core \& Boot State Machine (`src/`)](#1-core--boot-state-machine-src)
+    - [`Main`](#main)
+      - [Constants \& Static Properties:](#constants--static-properties)
+      - [Core State Fields:](#core-state-fields)
+      - [Methods:](#methods)
+    - [`Version`](#version)
+      - [Static Properties:](#static-properties)
+  - [2. Vehicle Dynamics \& Raycast Simulation (`src/physics/`)](#2-vehicle-dynamics--raycast-simulation-srcphysics)
+    - [`CarPhysics`](#carphysics)
+      - [Enums:](#enums)
+      - [Runtime Tunable Properties:](#runtime-tunable-properties)
+      - [Telemetry \& State Fields:](#telemetry--state-fields)
+      - [Methods:](#methods-1)
+    - [`CarConfig`](#carconfig)
+      - [Typedefs:](#typedefs)
+      - [Methods:](#methods-2)
+    - [`SplineMath`](#splinemath)
+      - [Typedefs:](#typedefs-1)
+      - [Methods:](#methods-3)
+  - [3. Camera \& Visual Perspective (`src/camera/`)](#3-camera--visual-perspective-srccamera)
+    - [`ChaseCamera`](#chasecamera)
+      - [Constants:](#constants)
+      - [Methods:](#methods-4)
+  - [4. Input \& Hardware Control (`src/input/`)](#4-input--hardware-control-srcinput)
+    - [`InputController`](#inputcontroller)
+      - [Enums:](#enums-1)
+      - [Driving Registers:](#driving-registers)
+      - [Touch Driving Direct Registers:](#touch-driving-direct-registers)
+      - [Methods:](#methods-5)
+  - [5. World, Environment \& Celestial Rendering (`src/world/`)](#5-world-environment--celestial-rendering-srcworld)
+    - [`IGroundProvider`](#igroundprovider)
+      - [Methods:](#methods-6)
+    - [`Track`](#track)
+      - [Constants:](#constants-1)
+      - [Methods:](#methods-7)
+    - [`SandboxMap`](#sandboxmap)
+      - [Constants:](#constants-2)
+      - [Methods:](#methods-8)
+    - [`Skybox & SkyGradientShader`](#skybox--skygradientshader)
+      - [Methods:](#methods-9)
+  - [6. Autonomous Highway Traffic AI (`src/entities/`)](#6-autonomous-highway-traffic-ai-srcentities)
+    - [`TrafficSystem`](#trafficsystem)
+      - [Enums \& Constants:](#enums--constants)
+      - [Methods:](#methods-10)
+    - [`CarMesh & TrafficCarMesh`](#carmesh--trafficcarmesh)
+  - [7. Graphics Hardware Pipeline \& Post-Processing (`src/graphics/`)](#7-graphics-hardware-pipeline--post-processing-srcgraphics)
+    - [`GraphicsManager`](#graphicsmanager)
+      - [Methods:](#methods-11)
+    - [`PostProcessRenderer & RadialBlurShader`](#postprocessrenderer--radialblurshader)
+  - [8. Audio Synthesis \& Sound Engine (`src/audio/`)](#8-audio-synthesis--sound-engine-srcaudio)
+    - [`AudioManager`](#audiomanager)
+      - [Methods:](#methods-12)
+  - [9. Persistence \& Save Migration (`src/save/`)](#9-persistence--save-migration-srcsave)
+    - [`SaveSystem`](#savesystem)
+      - [Typedefs:](#typedefs-2)
+      - [Methods:](#methods-13)
+  - [10. User Interface \& Touch Controls Layer (`src/ui/`)](#10-user-interface--touch-controls-layer-srcui)
+    - [`UIManager & UIBuilder`](#uimanager--uibuilder)
+    - [`FontManager & UIIcons`](#fontmanager--uiicons)
+    - [`TouchControlsHUD`](#touchcontrolshud)
+      - [Methods:](#methods-14)
+    - [`InGameHUDView & Options Panels`](#ingamehudview--options-panels)
+  - [11. Automated Testing Infrastructure (`tests/`)](#11-automated-testing-infrastructure-tests)
+    - [`TestMain`](#testmain)
+      - [Features:](#features)
+    - [Dual-Tier Test Suite Summary](#dual-tier-test-suite-summary)
 
 ---
 
@@ -115,7 +146,7 @@
 
 ### `CarPhysics`
 **Location:** [`src/physics/CarPhysics.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/physics/CarPhysics.hx)  
-**Description:** First-principles arcade raycast vehicle physics engine. Simulates 4-wheel independent spring-damper suspension, transverse anti-roll bars, Pacejka-like normalized lateral slip adhesion curves, front/rear slip bias, dedicated handbrake breakaway, burnout wheelspin, engine flywheel RPM, progressive automatic transmission, and limited-slip differential. Operates with zero runtime allocations in frame loops.
+**Description:** High-performance hybrid vehicle dynamics simulator combining an OimoPhysics 3D rigid body backbone for mass, inertia, world collisions, and restitution, driven by analytical multi-link raycast suspension, Pacejka slip-angle tire adhesion, and Criterion-style (*Need for Speed: Most Wanted 2012*) arcade drift mechanics. Designed with zero runtime allocations in frame update loops.
 
 #### Enums:
 - `WheelIndex`:
@@ -136,6 +167,8 @@
 - `boostAcceleration:Float` — Nitrous oxide augmented acceleration rate in m/s².
 
 #### Telemetry & State Fields:
+- `physicsWorld:oimo.dynamics.World` — Underlying OimoPhysics rigid body simulation world (gravity: $Z = -9.81\text{ m/s}^2$).
+- `chassisBody:oimo.dynamics.rigidbody.RigidBody` — 3D inertial rigid body representing vehicle chassis and collision hull.
 - `pos:Vector` — World coordinates of vehicle chassis center point.
 - `yaw:Float`, `pitch:Float`, `roll:Float` — Chassis rotational orientation in radians.
 - `forwardSpeed:Float`, `lateralVelocity:Float`, `verticalVelocity:Float` — Longitudinal, lateral, and vertical velocity vectors in m/s.
@@ -146,12 +179,10 @@
 - `wheelSlipAngles:Array<Float>`, `wheelSpinVelocity:Array<Float>` — Wheel kinematics.
 
 #### Methods:
-- `new(startX:Float, startY:Float, startZ:Float, ?initialConfig:VehicleConfigData)` — Constructs simulator and initializes spring resting lengths.
+- `new(startX:Float, startY:Float, startZ:Float, ?initialConfig:VehicleConfigData)` — Constructs simulator, allocates OimoPhysics rigid body, and initializes spring resting lengths.
 - `setConfig(newConfig:VehicleConfigData):Void` — Replaces active physics configuration at runtime.
-- `update(dt:Float, input:InputController, ?waypoints:Array<Vector>):Void` — Master physics integration step executing suspension raycasts, drivetrain shifts, acceleration/braking, lateral slip, and attitude settling.
-- `updateSuspension(dt:Float, fwdX:Float, fwdY:Float, rightX:Float, rightY:Float, waypoints:Array<Vector>):Void` — Evaluates 4-wheel spring-damper compression, contact normals, and anti-roll bar torque distribution.
-- `updateDrivetrain(dt:Float, input:InputController):Void` — Simulates flywheel RPM, automatic up/down-shifts, clutch latency, and LSD rear-wheel speed balancing.
-- `updateLongitudinal(dt:Float, input:InputController):Void` — Integrates engine propulsion, burnout launch spin, service braking, and aerodynamic quadratic drag.
+- `resetState(startX:Float, startY:Float, startZ:Float, newYaw:Float = 1.5707963):Void` — Resets vehicle transform, velocities, transmission, and Oimo rigid body.
+- `update(dt:Float, input:InputController, ?waypoints:Array<Vector>, ?groundProvider:world.IGroundProvider):Void` — Master physics integration step executing suspension raycasts, drivetrain shifts, acceleration/braking, lateral slip, and stepping Oimo rigid body dynamics.
 - `updateLateralAndDrift(dt:Float, input:InputController, fwdX:Float, fwdY:Float, rightX:Float, rightY:Float):Void` — Evaluates slip angles, Pacejka-like grip curves, handbrake rear traction breakaway, drift counter-steer assist, and forward velocity momentum biasing.
 - `updateChassisAttitude(dt:Float, input:InputController):Void` — Calculates centrifugal body roll lean (clamped on flat surfaces) and acceleration squat / braking dive pitch.
 

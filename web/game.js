@@ -332,7 +332,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.discBody.set_lineSpacing(5.0);
 		this.discBody.set_text("M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" + "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" + "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" + "are the intellectual property of their respective creators. All rights reserved.\n\n" + "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" + "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" + "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" + "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" + "Please play in a well-lit environment and take a 15-minute break for every hour of play.");
 		this.discVersion = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
-		this.discVersion.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
+		this.discVersion.set_text("v" + "0.4.1" + " (Build " + "0007" + ")");
 		this.discVersion.set_textColor(5927822);
 		this.discVersion.set_textAlign(h2d_Align.Center);
 		this.logoRow = new h2d_Object(this.screenDisclaimer);
@@ -544,6 +544,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		}
 		this.track = new world_Track(this.s3d);
 		this.sandboxMap = new world_SandboxMap(this.s3d);
+		this.sandboxMap.registerPhysicsColliders(this.carPhysics.physicsWorld);
 		this.sandboxMap.flags &= -3;
 		this.traffic = new entities_TrafficSystem(this.track.waypoints,this.s3d);
 		this.playerMesh = new entities_CarMesh(this.s3d);
@@ -591,16 +592,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		}
 	}
 	,resetCarToSandboxCenter: function() {
-		var _this = this.carPhysics.pos;
-		_this.x = 0.0;
-		_this.y = 0.0;
-		_this.z = 0.05;
-		this.carPhysics.yaw = 1.5707963;
-		this.carPhysics.forwardSpeed = 0.0;
-		this.carPhysics.lateralVelocity = 0.0;
-		this.carPhysics.isDrifting = false;
-		this.carPhysics.boostFuel = 1.0;
-		this.carPhysics.isBoosting = false;
+		this.carPhysics.resetState(0.0,0.0,0.05,1.5707963);
 		var _this = this.playerMesh;
 		_this.x = 0.0;
 		_this.flags |= 1;
@@ -619,19 +611,10 @@ Main.prototype = $extend(hxd_App.prototype,{
 		if((_this.flags & 131072) != 0) {
 			_this.flags |= 262144;
 		}
-		this.playerMesh.setRotation(0,0,0);
+		this.playerMesh.setRotation(0,0,1.5707963);
 	}
 	,resetCarToStartLine: function() {
-		var _this = this.carPhysics.pos;
-		_this.x = 0.0;
-		_this.y = 0.0;
-		_this.z = 0.0;
-		this.carPhysics.yaw = 1.5707963;
-		this.carPhysics.forwardSpeed = 0.0;
-		this.carPhysics.lateralVelocity = 0.0;
-		this.carPhysics.isDrifting = false;
-		this.carPhysics.boostFuel = 1.0;
-		this.carPhysics.isBoosting = false;
+		this.carPhysics.resetState(0.0,0.0,0.0,1.5707963);
 		var _this = this.playerMesh;
 		_this.x = 0.0;
 		_this.flags |= 1;
@@ -650,7 +633,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		if((_this.flags & 131072) != 0) {
 			_this.flags |= 262144;
 		}
-		this.playerMesh.setRotation(0,0,0);
+		this.playerMesh.setRotation(0,0,1.5707963);
 	}
 	,saveCurrentRun: function() {
 		this.saveData.hasActiveRun = true;
@@ -698,8 +681,8 @@ Main.prototype = $extend(hxd_App.prototype,{
 				_this.x = x;
 				_this.y = y;
 				_this.z = z;
-				this.carPhysics.yaw = this.saveData.playerState.yaw;
-				this.carPhysics.forwardSpeed = this.saveData.playerState.forwardSpeed;
+				this.carPhysics.set_yaw(this.saveData.playerState.yaw);
+				this.carPhysics.set_forwardSpeed(this.saveData.playerState.forwardSpeed);
 			}
 			this.ui.showInGame();
 			break;
@@ -947,7 +930,9 @@ Main.prototype = $extend(hxd_App.prototype,{
 			if((_this.flags & 131072) != 0) {
 				_this.flags |= 262144;
 			}
-			this.playerMesh.setRotation(this.carPhysics.pitch,this.carPhysics.roll,this.carPhysics.yaw + this.carPhysics.driftAngle);
+			this.playerMesh.setRotation(0,0,this.carPhysics.yaw + this.carPhysics.driftAngle);
+			this.playerMesh.rotate(this.carPhysics.pitch,0,0);
+			this.playerMesh.rotate(0,this.carPhysics.roll,0);
 			this.wheelSpinAngle += this.carPhysics.forwardSpeed * dt / 0.36;
 			this.rearWheelSpinAngle += (this.carPhysics.forwardSpeed / 0.36 + this.carPhysics.wheelSpinVelocity[2]) * dt;
 			var currentSteer = this.input.steer * 0.55;
@@ -3198,18 +3183,18 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 				playerPhysics.pos.y -= ny * overlap * 0.6;
 				tc.pos.x += nx * overlap * 0.4;
 				tc.pos.y += ny * overlap * 0.4;
-				playerPhysics.forwardSpeed *= 0.75;
+				playerPhysics.set_forwardSpeed(playerPhysics.forwardSpeed * 0.75);
 				tc.currentSpeed = Math.max(tc.currentSpeed,Math.abs(playerPhysics.forwardSpeed) * 0.9);
 				chaseCam.addTrauma(0.35);
 			}
 		}
 		if(this.clampToTrack(playerPhysics.pos,9.7)) {
-			playerPhysics.forwardSpeed = Math.min(playerPhysics.forwardSpeed * 0.94,95.0);
+			playerPhysics.set_forwardSpeed(Math.min(playerPhysics.forwardSpeed * 0.94,95.0));
 			playerPhysics.lateralVelocity = 0.0;
 			chaseCam.addTrauma(0.12);
 		}
 		if(Math.abs(playerPhysics.forwardSpeed) > 95.0) {
-			playerPhysics.forwardSpeed = (playerPhysics.forwardSpeed > 0 ? 1 : -1) * 95.0;
+			playerPhysics.set_forwardSpeed((playerPhysics.forwardSpeed > 0 ? 1 : -1) * 95.0);
 		}
 	}
 	,clampToTrack: function(point,maxHalfWidth) {
@@ -17882,6 +17867,11 @@ h3d_mat_Texture.fromBitmap = function(bmp) {
 	t.uploadBitmap(bmp);
 	return t;
 };
+h3d_mat_Texture.fromPixels = function(pixels,format) {
+	var t = new h3d_mat_Texture(pixels.width,pixels.height,null,format != null ? format : pixels.innerFormat);
+	t.uploadPixels(pixels);
+	return t;
+};
 h3d_mat_Texture.fromColor = function(color,alpha) {
 	if(alpha == null) {
 		alpha = 1.;
@@ -31058,6 +31048,31 @@ hxd_Pixels.prototype = {
 			throw haxe_Exception.thrown("Cannot convert from " + Std.string(this.innerFormat) + " to " + Std.string(target));
 		}
 		this.set_innerFormat(target);
+	}
+	,setPixel: function(x,y,color) {
+		var p = (x + y * this.width) * this.bytesPerPixel + this.offset;
+		if((this.flags & 1) != 0) {
+			this.copyInner();
+		}
+		switch(this.innerFormat._hx_index) {
+		case 0:
+			this.bytes.setInt32(p,color >>> 24 | color >> 8 & 65280 | color << 8 & 16711680 | color << 24);
+			break;
+		case 1:
+			this.bytes.setInt32(p,color);
+			break;
+		case 2:
+			this.bytes.setInt32(p,color & -16711936 | color << 16 & 16711680 | color >> 16 & 255);
+			break;
+		case 5:
+			this.bytes.b[p] = color;
+			break;
+		case 8:
+			this.bytes.setUInt16(p,(color & 255) << 8 | (color & 65280) >> 8);
+			break;
+		default:
+			this.invalidFormat();
+		}
 	}
 	,dispose: function() {
 		this.bytes = null;
@@ -51684,6 +51699,15931 @@ js_html__$CanvasElement_CanvasUtil.getContextWebGL = function(canvas,attribs) {
 	return null;
 };
 Math.__name__ = "Math";
+var oimo_collision_broadphase_BroadPhase = function(type) {
+	this._type = type;
+	this._numProxies = 0;
+	this._proxyList = null;
+	this._proxyListLast = null;
+	this._proxyPairList = null;
+	this._incremental = false;
+	this._testCount = 0;
+	this._proxyPairPool = null;
+	this._idCount = 0;
+	this._convexSweep = new oimo_collision_broadphase__$BroadPhase_ConvexSweepGeometry();
+	this._aabb = new oimo_collision_broadphase__$BroadPhase_AabbGeometry();
+	this.identity = new oimo_common_Transform();
+	this.zero = new oimo_common_Vec3();
+	this.rayCastHit = new oimo_collision_geometry_RayCastHit();
+};
+$hxClasses["oimo.collision.broadphase.BroadPhase"] = oimo_collision_broadphase_BroadPhase;
+oimo_collision_broadphase_BroadPhase.__name__ = "oimo.collision.broadphase.BroadPhase";
+oimo_collision_broadphase_BroadPhase.prototype = {
+	createProxy: function(userData,aabb) {
+		return null;
+	}
+	,moveProxy: function(proxy,aabb,displacement) {
+	}
+	,collectPairs: function() {
+	}
+	,__class__: oimo_collision_broadphase_BroadPhase
+};
+var oimo_collision_geometry_Geometry = function(type) {
+	this._type = type;
+	this._volume = 0;
+};
+$hxClasses["oimo.collision.geometry.Geometry"] = oimo_collision_geometry_Geometry;
+oimo_collision_geometry_Geometry.__name__ = "oimo.collision.geometry.Geometry";
+oimo_collision_geometry_Geometry.prototype = {
+	_updateMass: function() {
+	}
+	,_computeAabb: function(aabb,tf) {
+	}
+	,__class__: oimo_collision_geometry_Geometry
+};
+var oimo_collision_geometry_ConvexGeometry = function(type) {
+	oimo_collision_geometry_Geometry.call(this,type);
+	this._gjkMargin = oimo_common_Setting.defaultGJKMargin;
+	this._useGjkRayCast = false;
+};
+$hxClasses["oimo.collision.geometry.ConvexGeometry"] = oimo_collision_geometry_ConvexGeometry;
+oimo_collision_geometry_ConvexGeometry.__name__ = "oimo.collision.geometry.ConvexGeometry";
+oimo_collision_geometry_ConvexGeometry.__super__ = oimo_collision_geometry_Geometry;
+oimo_collision_geometry_ConvexGeometry.prototype = $extend(oimo_collision_geometry_Geometry.prototype,{
+	computeLocalSupportingVertex: function(dir,out) {
+	}
+	,__class__: oimo_collision_geometry_ConvexGeometry
+});
+var oimo_collision_broadphase__$BroadPhase_ConvexSweepGeometry = function() {
+	oimo_collision_geometry_ConvexGeometry.call(this,-1);
+};
+$hxClasses["oimo.collision.broadphase._BroadPhase.ConvexSweepGeometry"] = oimo_collision_broadphase__$BroadPhase_ConvexSweepGeometry;
+oimo_collision_broadphase__$BroadPhase_ConvexSweepGeometry.__name__ = "oimo.collision.broadphase._BroadPhase.ConvexSweepGeometry";
+oimo_collision_broadphase__$BroadPhase_ConvexSweepGeometry.__super__ = oimo_collision_geometry_ConvexGeometry;
+oimo_collision_broadphase__$BroadPhase_ConvexSweepGeometry.prototype = $extend(oimo_collision_geometry_ConvexGeometry.prototype,{
+	computeLocalSupportingVertex: function(dir,out) {
+		this.c.computeLocalSupportingVertex(dir,out);
+		var v = this.localTranslation;
+		if(dir.x * v.x + dir.y * v.y + dir.z * v.z > 0) {
+			var v = this.localTranslation;
+			out.x += v.x;
+			out.y += v.y;
+			out.z += v.z;
+		}
+	}
+	,__class__: oimo_collision_broadphase__$BroadPhase_ConvexSweepGeometry
+});
+var oimo_collision_broadphase__$BroadPhase_AabbGeometry = function() {
+	oimo_collision_geometry_ConvexGeometry.call(this,-1);
+	this.min = new oimo_common_Vec3();
+	this.max = new oimo_common_Vec3();
+};
+$hxClasses["oimo.collision.broadphase._BroadPhase.AabbGeometry"] = oimo_collision_broadphase__$BroadPhase_AabbGeometry;
+oimo_collision_broadphase__$BroadPhase_AabbGeometry.__name__ = "oimo.collision.broadphase._BroadPhase.AabbGeometry";
+oimo_collision_broadphase__$BroadPhase_AabbGeometry.__super__ = oimo_collision_geometry_ConvexGeometry;
+oimo_collision_broadphase__$BroadPhase_AabbGeometry.prototype = $extend(oimo_collision_geometry_ConvexGeometry.prototype,{
+	computeLocalSupportingVertex: function(dir,out) {
+		out.x = dir.x > 0 ? this.max.x : this.min.x;
+		out.y = dir.y > 0 ? this.max.y : this.min.y;
+		out.z = dir.z > 0 ? this.max.z : this.min.z;
+	}
+	,__class__: oimo_collision_broadphase__$BroadPhase_AabbGeometry
+});
+var oimo_collision_broadphase_BroadPhaseProxyCallback = function() {
+};
+$hxClasses["oimo.collision.broadphase.BroadPhaseProxyCallback"] = oimo_collision_broadphase_BroadPhaseProxyCallback;
+oimo_collision_broadphase_BroadPhaseProxyCallback.__name__ = "oimo.collision.broadphase.BroadPhaseProxyCallback";
+oimo_collision_broadphase_BroadPhaseProxyCallback.prototype = {
+	__class__: oimo_collision_broadphase_BroadPhaseProxyCallback
+};
+var oimo_collision_broadphase_Proxy = function(userData,id) {
+	this.userData = userData;
+	this._id = id;
+	this._prev = null;
+	this._next = null;
+	this._aabbMinX = 0;
+	this._aabbMinY = 0;
+	this._aabbMinZ = 0;
+	this._aabbMaxX = 0;
+	this._aabbMaxY = 0;
+	this._aabbMaxZ = 0;
+};
+$hxClasses["oimo.collision.broadphase.Proxy"] = oimo_collision_broadphase_Proxy;
+oimo_collision_broadphase_Proxy.__name__ = "oimo.collision.broadphase.Proxy";
+oimo_collision_broadphase_Proxy.prototype = {
+	__class__: oimo_collision_broadphase_Proxy
+};
+var oimo_collision_broadphase_ProxyPair = function() {
+	this._p1 = null;
+	this._p2 = null;
+};
+$hxClasses["oimo.collision.broadphase.ProxyPair"] = oimo_collision_broadphase_ProxyPair;
+oimo_collision_broadphase_ProxyPair.__name__ = "oimo.collision.broadphase.ProxyPair";
+oimo_collision_broadphase_ProxyPair.prototype = {
+	__class__: oimo_collision_broadphase_ProxyPair
+};
+var oimo_collision_broadphase_bruteforce_BruteForceBroadPhase = function() {
+	oimo_collision_broadphase_BroadPhase.call(this,1);
+	this._incremental = false;
+};
+$hxClasses["oimo.collision.broadphase.bruteforce.BruteForceBroadPhase"] = oimo_collision_broadphase_bruteforce_BruteForceBroadPhase;
+oimo_collision_broadphase_bruteforce_BruteForceBroadPhase.__name__ = "oimo.collision.broadphase.bruteforce.BruteForceBroadPhase";
+oimo_collision_broadphase_bruteforce_BruteForceBroadPhase.__super__ = oimo_collision_broadphase_BroadPhase;
+oimo_collision_broadphase_bruteforce_BruteForceBroadPhase.prototype = $extend(oimo_collision_broadphase_BroadPhase.prototype,{
+	createProxy: function(userData,aabb) {
+		var proxy = new oimo_collision_broadphase_Proxy(userData,this._idCount++);
+		this._numProxies++;
+		if(this._proxyList == null) {
+			this._proxyList = proxy;
+			this._proxyListLast = proxy;
+		} else {
+			this._proxyListLast._next = proxy;
+			proxy._prev = this._proxyListLast;
+			this._proxyListLast = proxy;
+		}
+		proxy._aabbMinX = aabb._minX;
+		proxy._aabbMinY = aabb._minY;
+		proxy._aabbMinZ = aabb._minZ;
+		proxy._aabbMaxX = aabb._maxX;
+		proxy._aabbMaxY = aabb._maxY;
+		proxy._aabbMaxZ = aabb._maxZ;
+		return proxy;
+	}
+	,moveProxy: function(proxy,aabb,dislacement) {
+		proxy._aabbMinX = aabb._minX;
+		proxy._aabbMinY = aabb._minY;
+		proxy._aabbMinZ = aabb._minZ;
+		proxy._aabbMaxX = aabb._maxX;
+		proxy._aabbMaxY = aabb._maxY;
+		proxy._aabbMaxZ = aabb._maxZ;
+	}
+	,collectPairs: function() {
+		var p = this._proxyPairList;
+		if(p != null) {
+			do {
+				p._p1 = null;
+				p._p2 = null;
+				p = p._next;
+			} while(p != null);
+			this._proxyPairList._next = this._proxyPairPool;
+			this._proxyPairPool = this._proxyPairList;
+			this._proxyPairList = null;
+		}
+		this._testCount = 0;
+		var p1 = this._proxyList;
+		while(p1 != null) {
+			var n = p1._next;
+			var p2 = p1._next;
+			while(p2 != null) {
+				var n1 = p2._next;
+				this._testCount++;
+				if(p1._aabbMinX < p2._aabbMaxX && p1._aabbMaxX > p2._aabbMinX && p1._aabbMinY < p2._aabbMaxY && p1._aabbMaxY > p2._aabbMinY && p1._aabbMinZ < p2._aabbMaxZ && p1._aabbMaxZ > p2._aabbMinZ) {
+					var first = this._proxyPairPool;
+					if(first != null) {
+						this._proxyPairPool = first._next;
+						first._next = null;
+					} else {
+						first = new oimo_collision_broadphase_ProxyPair();
+					}
+					var pp = first;
+					if(this._proxyPairList == null) {
+						this._proxyPairList = pp;
+					} else {
+						pp._next = this._proxyPairList;
+						this._proxyPairList = pp;
+					}
+					pp._p1 = p1;
+					pp._p2 = p2;
+				}
+				p2 = n1;
+			}
+			p1 = n;
+		}
+	}
+	,__class__: oimo_collision_broadphase_bruteforce_BruteForceBroadPhase
+});
+var oimo_collision_broadphase_bvh_BvhBroadPhase = function() {
+	oimo_collision_broadphase_BroadPhase.call(this,2);
+	this._incremental = true;
+	this._tree = new oimo_collision_broadphase_bvh_BvhTree();
+	this.movedProxies = new Array(1024);
+	this.numMovedProxies = 0;
+};
+$hxClasses["oimo.collision.broadphase.bvh.BvhBroadPhase"] = oimo_collision_broadphase_bvh_BvhBroadPhase;
+oimo_collision_broadphase_bvh_BvhBroadPhase.__name__ = "oimo.collision.broadphase.bvh.BvhBroadPhase";
+oimo_collision_broadphase_bvh_BvhBroadPhase.__super__ = oimo_collision_broadphase_BroadPhase;
+oimo_collision_broadphase_bvh_BvhBroadPhase.prototype = $extend(oimo_collision_broadphase_BroadPhase.prototype,{
+	collide: function(n1,n2) {
+		this._testCount++;
+		var l1 = n1._height == 0;
+		var l2 = n2._height == 0;
+		if(n1 == n2) {
+			if(l1) {
+				return;
+			}
+			this.collide(n1._children[0],n2);
+			this.collide(n1._children[1],n2);
+			return;
+		}
+		if(!(n1._aabbMinX < n2._aabbMaxX && n1._aabbMaxX > n2._aabbMinX && n1._aabbMinY < n2._aabbMaxY && n1._aabbMaxY > n2._aabbMinY && n1._aabbMinZ < n2._aabbMaxZ && n1._aabbMaxZ > n2._aabbMinZ)) {
+			return;
+		}
+		if(l1 && l2) {
+			var first = this._proxyPairPool;
+			if(first != null) {
+				this._proxyPairPool = first._next;
+				first._next = null;
+			} else {
+				first = new oimo_collision_broadphase_ProxyPair();
+			}
+			var pp = first;
+			if(this._proxyPairList == null) {
+				this._proxyPairList = pp;
+			} else {
+				pp._next = this._proxyPairList;
+				this._proxyPairList = pp;
+			}
+			pp._p1 = n1._proxy;
+			pp._p2 = n2._proxy;
+			return;
+		}
+		if(l2 || n1._height > n2._height) {
+			this.collide(n1._children[0],n2);
+			this.collide(n1._children[1],n2);
+		} else {
+			this.collide(n2._children[0],n1);
+			this.collide(n2._children[1],n1);
+		}
+	}
+	,createProxy: function(userData,aabb) {
+		var p = new oimo_collision_broadphase_bvh_BvhProxy(userData,this._idCount++);
+		this._numProxies++;
+		if(this._proxyList == null) {
+			this._proxyList = p;
+			this._proxyListLast = p;
+		} else {
+			this._proxyListLast._next = p;
+			p._prev = this._proxyListLast;
+			this._proxyListLast = p;
+		}
+		p._aabbMinX = aabb._minX;
+		p._aabbMinY = aabb._minY;
+		p._aabbMinZ = aabb._minZ;
+		p._aabbMaxX = aabb._maxX;
+		p._aabbMaxY = aabb._maxY;
+		p._aabbMaxZ = aabb._maxZ;
+		var padding = oimo_common_Setting.bvhProxyPadding;
+		p._aabbMinX -= padding;
+		p._aabbMinY -= padding;
+		p._aabbMinZ -= padding;
+		p._aabbMaxX += padding;
+		p._aabbMaxY += padding;
+		p._aabbMaxZ += padding;
+		var _this = this._tree;
+		var first = _this._nodePool;
+		if(first != null) {
+			_this._nodePool = first._next;
+			first._next = null;
+		} else {
+			first = new oimo_collision_broadphase_bvh_BvhNode();
+		}
+		var leaf = first;
+		leaf._proxy = p;
+		p._leaf = leaf;
+		leaf._aabbMinX = p._aabbMinX;
+		leaf._aabbMinY = p._aabbMinY;
+		leaf._aabbMinZ = p._aabbMinZ;
+		leaf._aabbMaxX = p._aabbMaxX;
+		leaf._aabbMaxY = p._aabbMaxY;
+		leaf._aabbMaxZ = p._aabbMaxZ;
+		_this._numLeaves++;
+		if(_this.leafList == null) {
+			_this.leafList = leaf;
+			_this.leafListLast = leaf;
+		} else {
+			_this.leafListLast._nextLeaf = leaf;
+			leaf._prevLeaf = _this.leafListLast;
+			_this.leafListLast = leaf;
+		}
+		if(_this._root == null) {
+			_this._root = leaf;
+		} else {
+			var sibling = _this._root;
+			while(sibling._height > 0) {
+				var nextStep = _this._strategy._decideInsertion(sibling,leaf);
+				if(nextStep == -1) {
+					break;
+				} else {
+					sibling = sibling._children[nextStep];
+				}
+			}
+			var parent = sibling._parent;
+			var first = _this._nodePool;
+			if(first != null) {
+				_this._nodePool = first._next;
+				first._next = null;
+			} else {
+				first = new oimo_collision_broadphase_bvh_BvhNode();
+			}
+			var node = first;
+			if(parent == null) {
+				_this._root = node;
+			} else {
+				var index = sibling._childIndex;
+				parent._children[index] = node;
+				node._parent = parent;
+				node._childIndex = index;
+			}
+			var index = sibling._childIndex;
+			node._children[index] = sibling;
+			sibling._parent = node;
+			sibling._childIndex = index;
+			var index = sibling._childIndex ^ 1;
+			node._children[index] = leaf;
+			leaf._parent = node;
+			leaf._childIndex = index;
+			while(node != null) {
+				if(_this._strategy._balancingEnabled) {
+					if(node._height >= 2) {
+						var p1 = node._parent;
+						var l = node._children[0];
+						var r = node._children[1];
+						var balance = l._height - r._height;
+						var nodeIndex = node._childIndex;
+						if(balance > 1) {
+							var ll = l._children[0];
+							var lr = l._children[1];
+							if(ll._height > lr._height) {
+								l._children[1] = node;
+								node._parent = l;
+								node._childIndex = 1;
+								node._children[0] = lr;
+								lr._parent = node;
+								lr._childIndex = 0;
+								var c1 = l._children[0];
+								var c2 = l._children[1];
+								l._aabbMinX = c1._aabbMinX < c2._aabbMinX ? c1._aabbMinX : c2._aabbMinX;
+								l._aabbMinY = c1._aabbMinY < c2._aabbMinY ? c1._aabbMinY : c2._aabbMinY;
+								l._aabbMinZ = c1._aabbMinZ < c2._aabbMinZ ? c1._aabbMinZ : c2._aabbMinZ;
+								l._aabbMaxX = c1._aabbMaxX > c2._aabbMaxX ? c1._aabbMaxX : c2._aabbMaxX;
+								l._aabbMaxY = c1._aabbMaxY > c2._aabbMaxY ? c1._aabbMaxY : c2._aabbMaxY;
+								l._aabbMaxZ = c1._aabbMaxZ > c2._aabbMaxZ ? c1._aabbMaxZ : c2._aabbMaxZ;
+								var h1 = l._children[0]._height;
+								var h2 = l._children[1]._height;
+								l._height = (h1 > h2 ? h1 : h2) + 1;
+								var c11 = node._children[0];
+								var c21 = node._children[1];
+								node._aabbMinX = c11._aabbMinX < c21._aabbMinX ? c11._aabbMinX : c21._aabbMinX;
+								node._aabbMinY = c11._aabbMinY < c21._aabbMinY ? c11._aabbMinY : c21._aabbMinY;
+								node._aabbMinZ = c11._aabbMinZ < c21._aabbMinZ ? c11._aabbMinZ : c21._aabbMinZ;
+								node._aabbMaxX = c11._aabbMaxX > c21._aabbMaxX ? c11._aabbMaxX : c21._aabbMaxX;
+								node._aabbMaxY = c11._aabbMaxY > c21._aabbMaxY ? c11._aabbMaxY : c21._aabbMaxY;
+								node._aabbMaxZ = c11._aabbMaxZ > c21._aabbMaxZ ? c11._aabbMaxZ : c21._aabbMaxZ;
+								var h11 = node._children[0]._height;
+								var h21 = node._children[1]._height;
+								node._height = (h11 > h21 ? h11 : h21) + 1;
+							} else {
+								l._children[0] = node;
+								node._parent = l;
+								node._childIndex = 0;
+								node._children[0] = ll;
+								ll._parent = node;
+								ll._childIndex = 0;
+								var c12 = l._children[0];
+								var c22 = l._children[1];
+								l._aabbMinX = c12._aabbMinX < c22._aabbMinX ? c12._aabbMinX : c22._aabbMinX;
+								l._aabbMinY = c12._aabbMinY < c22._aabbMinY ? c12._aabbMinY : c22._aabbMinY;
+								l._aabbMinZ = c12._aabbMinZ < c22._aabbMinZ ? c12._aabbMinZ : c22._aabbMinZ;
+								l._aabbMaxX = c12._aabbMaxX > c22._aabbMaxX ? c12._aabbMaxX : c22._aabbMaxX;
+								l._aabbMaxY = c12._aabbMaxY > c22._aabbMaxY ? c12._aabbMaxY : c22._aabbMaxY;
+								l._aabbMaxZ = c12._aabbMaxZ > c22._aabbMaxZ ? c12._aabbMaxZ : c22._aabbMaxZ;
+								var h12 = l._children[0]._height;
+								var h22 = l._children[1]._height;
+								l._height = (h12 > h22 ? h12 : h22) + 1;
+								var c13 = node._children[0];
+								var c23 = node._children[1];
+								node._aabbMinX = c13._aabbMinX < c23._aabbMinX ? c13._aabbMinX : c23._aabbMinX;
+								node._aabbMinY = c13._aabbMinY < c23._aabbMinY ? c13._aabbMinY : c23._aabbMinY;
+								node._aabbMinZ = c13._aabbMinZ < c23._aabbMinZ ? c13._aabbMinZ : c23._aabbMinZ;
+								node._aabbMaxX = c13._aabbMaxX > c23._aabbMaxX ? c13._aabbMaxX : c23._aabbMaxX;
+								node._aabbMaxY = c13._aabbMaxY > c23._aabbMaxY ? c13._aabbMaxY : c23._aabbMaxY;
+								node._aabbMaxZ = c13._aabbMaxZ > c23._aabbMaxZ ? c13._aabbMaxZ : c23._aabbMaxZ;
+								var h13 = node._children[0]._height;
+								var h23 = node._children[1]._height;
+								node._height = (h13 > h23 ? h13 : h23) + 1;
+							}
+							if(p1 != null) {
+								p1._children[nodeIndex] = l;
+								l._parent = p1;
+								l._childIndex = nodeIndex;
+							} else {
+								_this._root = l;
+								l._parent = null;
+							}
+							node = l;
+						} else if(balance < -1) {
+							var rl = r._children[0];
+							var rr = r._children[1];
+							if(rl._height > rr._height) {
+								r._children[1] = node;
+								node._parent = r;
+								node._childIndex = 1;
+								node._children[1] = rr;
+								rr._parent = node;
+								rr._childIndex = 1;
+								var c14 = r._children[0];
+								var c24 = r._children[1];
+								r._aabbMinX = c14._aabbMinX < c24._aabbMinX ? c14._aabbMinX : c24._aabbMinX;
+								r._aabbMinY = c14._aabbMinY < c24._aabbMinY ? c14._aabbMinY : c24._aabbMinY;
+								r._aabbMinZ = c14._aabbMinZ < c24._aabbMinZ ? c14._aabbMinZ : c24._aabbMinZ;
+								r._aabbMaxX = c14._aabbMaxX > c24._aabbMaxX ? c14._aabbMaxX : c24._aabbMaxX;
+								r._aabbMaxY = c14._aabbMaxY > c24._aabbMaxY ? c14._aabbMaxY : c24._aabbMaxY;
+								r._aabbMaxZ = c14._aabbMaxZ > c24._aabbMaxZ ? c14._aabbMaxZ : c24._aabbMaxZ;
+								var h14 = r._children[0]._height;
+								var h24 = r._children[1]._height;
+								r._height = (h14 > h24 ? h14 : h24) + 1;
+								var c15 = node._children[0];
+								var c25 = node._children[1];
+								node._aabbMinX = c15._aabbMinX < c25._aabbMinX ? c15._aabbMinX : c25._aabbMinX;
+								node._aabbMinY = c15._aabbMinY < c25._aabbMinY ? c15._aabbMinY : c25._aabbMinY;
+								node._aabbMinZ = c15._aabbMinZ < c25._aabbMinZ ? c15._aabbMinZ : c25._aabbMinZ;
+								node._aabbMaxX = c15._aabbMaxX > c25._aabbMaxX ? c15._aabbMaxX : c25._aabbMaxX;
+								node._aabbMaxY = c15._aabbMaxY > c25._aabbMaxY ? c15._aabbMaxY : c25._aabbMaxY;
+								node._aabbMaxZ = c15._aabbMaxZ > c25._aabbMaxZ ? c15._aabbMaxZ : c25._aabbMaxZ;
+								var h15 = node._children[0]._height;
+								var h25 = node._children[1]._height;
+								node._height = (h15 > h25 ? h15 : h25) + 1;
+							} else {
+								r._children[0] = node;
+								node._parent = r;
+								node._childIndex = 0;
+								node._children[1] = rl;
+								rl._parent = node;
+								rl._childIndex = 1;
+								var c16 = r._children[0];
+								var c26 = r._children[1];
+								r._aabbMinX = c16._aabbMinX < c26._aabbMinX ? c16._aabbMinX : c26._aabbMinX;
+								r._aabbMinY = c16._aabbMinY < c26._aabbMinY ? c16._aabbMinY : c26._aabbMinY;
+								r._aabbMinZ = c16._aabbMinZ < c26._aabbMinZ ? c16._aabbMinZ : c26._aabbMinZ;
+								r._aabbMaxX = c16._aabbMaxX > c26._aabbMaxX ? c16._aabbMaxX : c26._aabbMaxX;
+								r._aabbMaxY = c16._aabbMaxY > c26._aabbMaxY ? c16._aabbMaxY : c26._aabbMaxY;
+								r._aabbMaxZ = c16._aabbMaxZ > c26._aabbMaxZ ? c16._aabbMaxZ : c26._aabbMaxZ;
+								var h16 = r._children[0]._height;
+								var h26 = r._children[1]._height;
+								r._height = (h16 > h26 ? h16 : h26) + 1;
+								var c17 = node._children[0];
+								var c27 = node._children[1];
+								node._aabbMinX = c17._aabbMinX < c27._aabbMinX ? c17._aabbMinX : c27._aabbMinX;
+								node._aabbMinY = c17._aabbMinY < c27._aabbMinY ? c17._aabbMinY : c27._aabbMinY;
+								node._aabbMinZ = c17._aabbMinZ < c27._aabbMinZ ? c17._aabbMinZ : c27._aabbMinZ;
+								node._aabbMaxX = c17._aabbMaxX > c27._aabbMaxX ? c17._aabbMaxX : c27._aabbMaxX;
+								node._aabbMaxY = c17._aabbMaxY > c27._aabbMaxY ? c17._aabbMaxY : c27._aabbMaxY;
+								node._aabbMaxZ = c17._aabbMaxZ > c27._aabbMaxZ ? c17._aabbMaxZ : c27._aabbMaxZ;
+								var h17 = node._children[0]._height;
+								var h27 = node._children[1]._height;
+								node._height = (h17 > h27 ? h17 : h27) + 1;
+							}
+							if(p1 != null) {
+								p1._children[nodeIndex] = r;
+								r._parent = p1;
+								r._childIndex = nodeIndex;
+							} else {
+								_this._root = r;
+								r._parent = null;
+							}
+							node = r;
+						}
+					}
+				}
+				var h18 = node._children[0]._height;
+				var h28 = node._children[1]._height;
+				node._height = (h18 > h28 ? h18 : h28) + 1;
+				var c18 = node._children[0];
+				var c28 = node._children[1];
+				node._aabbMinX = c18._aabbMinX < c28._aabbMinX ? c18._aabbMinX : c28._aabbMinX;
+				node._aabbMinY = c18._aabbMinY < c28._aabbMinY ? c18._aabbMinY : c28._aabbMinY;
+				node._aabbMinZ = c18._aabbMinZ < c28._aabbMinZ ? c18._aabbMinZ : c28._aabbMinZ;
+				node._aabbMaxX = c18._aabbMaxX > c28._aabbMaxX ? c18._aabbMaxX : c28._aabbMaxX;
+				node._aabbMaxY = c18._aabbMaxY > c28._aabbMaxY ? c18._aabbMaxY : c28._aabbMaxY;
+				node._aabbMaxZ = c18._aabbMaxZ > c28._aabbMaxZ ? c18._aabbMaxZ : c28._aabbMaxZ;
+				node = node._parent;
+			}
+		}
+		if(!p._moved) {
+			p._moved = true;
+			if(this.movedProxies.length == this.numMovedProxies) {
+				var newArray = new Array(this.numMovedProxies << 1);
+				var _g = 0;
+				var _g1 = this.numMovedProxies;
+				while(_g < _g1) {
+					var i = _g++;
+					newArray[i] = this.movedProxies[i];
+					this.movedProxies[i] = null;
+				}
+				this.movedProxies = newArray;
+			}
+			this.movedProxies[this.numMovedProxies++] = p;
+		}
+		return p;
+	}
+	,moveProxy: function(proxy,aabb,displacement) {
+		var p = proxy;
+		if(p._aabbMinX <= aabb._minX && p._aabbMaxX >= aabb._maxX && p._aabbMinY <= aabb._minY && p._aabbMaxY >= aabb._maxY && p._aabbMinZ <= aabb._minZ && p._aabbMaxZ >= aabb._maxZ) {
+			return;
+		}
+		p._aabbMinX = aabb._minX;
+		p._aabbMinY = aabb._minY;
+		p._aabbMinZ = aabb._minZ;
+		p._aabbMaxX = aabb._maxX;
+		p._aabbMaxY = aabb._maxY;
+		p._aabbMaxZ = aabb._maxZ;
+		var padding = oimo_common_Setting.bvhProxyPadding;
+		p._aabbMinX -= padding;
+		p._aabbMinY -= padding;
+		p._aabbMinZ -= padding;
+		p._aabbMaxX += padding;
+		p._aabbMaxY += padding;
+		p._aabbMaxZ += padding;
+		if(displacement != null) {
+			var dX;
+			var dY;
+			var dZ;
+			var zeroX;
+			var zeroY;
+			var zeroZ;
+			var addToMinX;
+			var addToMinY;
+			var addToMinZ;
+			var addToMaxX;
+			var addToMaxY;
+			var addToMaxZ;
+			zeroX = 0;
+			zeroY = 0;
+			zeroZ = 0;
+			dX = displacement.x;
+			dY = displacement.y;
+			dZ = displacement.z;
+			addToMinX = zeroX < dX ? zeroX : dX;
+			addToMinY = zeroY < dY ? zeroY : dY;
+			addToMinZ = zeroZ < dZ ? zeroZ : dZ;
+			addToMaxX = zeroX > dX ? zeroX : dX;
+			addToMaxY = zeroY > dY ? zeroY : dY;
+			addToMaxZ = zeroZ > dZ ? zeroZ : dZ;
+			p._aabbMinX += addToMinX;
+			p._aabbMinY += addToMinY;
+			p._aabbMinZ += addToMinZ;
+			p._aabbMaxX += addToMaxX;
+			p._aabbMaxY += addToMaxY;
+			p._aabbMaxZ += addToMaxZ;
+		}
+		if(!p._moved) {
+			p._moved = true;
+			if(this.movedProxies.length == this.numMovedProxies) {
+				var newArray = new Array(this.numMovedProxies << 1);
+				var _g = 0;
+				var _g1 = this.numMovedProxies;
+				while(_g < _g1) {
+					var i = _g++;
+					newArray[i] = this.movedProxies[i];
+					this.movedProxies[i] = null;
+				}
+				this.movedProxies = newArray;
+			}
+			this.movedProxies[this.numMovedProxies++] = p;
+		}
+	}
+	,collectPairs: function() {
+		var p = this._proxyPairList;
+		if(p != null) {
+			do {
+				p._p1 = null;
+				p._p2 = null;
+				p = p._next;
+			} while(p != null);
+			this._proxyPairList._next = this._proxyPairPool;
+			this._proxyPairPool = this._proxyPairList;
+			this._proxyPairList = null;
+		}
+		this._testCount = 0;
+		if(this._numProxies < 2) {
+			return;
+		}
+		var incrementalCollision = this.numMovedProxies / this._numProxies < oimo_common_Setting.bvhIncrementalCollisionThreshold;
+		var _g = 0;
+		var _g1 = this.numMovedProxies;
+		while(_g < _g1) {
+			var i = _g++;
+			var p = this.movedProxies[i];
+			if(p._moved) {
+				var _this = this._tree;
+				var leaf = p._leaf;
+				_this._numLeaves--;
+				var prev = leaf._prevLeaf;
+				var next = leaf._nextLeaf;
+				if(prev != null) {
+					prev._nextLeaf = next;
+				}
+				if(next != null) {
+					next._prevLeaf = prev;
+				}
+				if(leaf == _this.leafList) {
+					_this.leafList = _this.leafList._nextLeaf;
+				}
+				if(leaf == _this.leafListLast) {
+					_this.leafListLast = _this.leafListLast._prevLeaf;
+				}
+				leaf._nextLeaf = null;
+				leaf._prevLeaf = null;
+				if(_this._root == leaf) {
+					_this._root = null;
+				} else {
+					var parent = leaf._parent;
+					var sibling = parent._children[leaf._childIndex ^ 1];
+					var grandParent = parent._parent;
+					if(grandParent == null) {
+						sibling._parent = null;
+						sibling._childIndex = 0;
+						_this._root = sibling;
+						parent._next = null;
+						parent._childIndex = 0;
+						parent._children[0] = null;
+						parent._children[1] = null;
+						parent._childIndex = 0;
+						parent._parent = null;
+						parent._height = 0;
+						parent._proxy = null;
+						parent._next = _this._nodePool;
+						_this._nodePool = parent;
+					} else {
+						sibling._parent = grandParent;
+						var index = parent._childIndex;
+						grandParent._children[index] = sibling;
+						sibling._parent = grandParent;
+						sibling._childIndex = index;
+						parent._next = null;
+						parent._childIndex = 0;
+						parent._children[0] = null;
+						parent._children[1] = null;
+						parent._childIndex = 0;
+						parent._parent = null;
+						parent._height = 0;
+						parent._proxy = null;
+						parent._next = _this._nodePool;
+						_this._nodePool = parent;
+						var node = grandParent;
+						while(node != null) {
+							if(_this._strategy._balancingEnabled) {
+								if(node._height >= 2) {
+									var p1 = node._parent;
+									var l = node._children[0];
+									var r = node._children[1];
+									var balance = l._height - r._height;
+									var nodeIndex = node._childIndex;
+									if(balance > 1) {
+										var ll = l._children[0];
+										var lr = l._children[1];
+										if(ll._height > lr._height) {
+											l._children[1] = node;
+											node._parent = l;
+											node._childIndex = 1;
+											node._children[0] = lr;
+											lr._parent = node;
+											lr._childIndex = 0;
+											var c1 = l._children[0];
+											var c2 = l._children[1];
+											l._aabbMinX = c1._aabbMinX < c2._aabbMinX ? c1._aabbMinX : c2._aabbMinX;
+											l._aabbMinY = c1._aabbMinY < c2._aabbMinY ? c1._aabbMinY : c2._aabbMinY;
+											l._aabbMinZ = c1._aabbMinZ < c2._aabbMinZ ? c1._aabbMinZ : c2._aabbMinZ;
+											l._aabbMaxX = c1._aabbMaxX > c2._aabbMaxX ? c1._aabbMaxX : c2._aabbMaxX;
+											l._aabbMaxY = c1._aabbMaxY > c2._aabbMaxY ? c1._aabbMaxY : c2._aabbMaxY;
+											l._aabbMaxZ = c1._aabbMaxZ > c2._aabbMaxZ ? c1._aabbMaxZ : c2._aabbMaxZ;
+											var h1 = l._children[0]._height;
+											var h2 = l._children[1]._height;
+											l._height = (h1 > h2 ? h1 : h2) + 1;
+											var c11 = node._children[0];
+											var c21 = node._children[1];
+											node._aabbMinX = c11._aabbMinX < c21._aabbMinX ? c11._aabbMinX : c21._aabbMinX;
+											node._aabbMinY = c11._aabbMinY < c21._aabbMinY ? c11._aabbMinY : c21._aabbMinY;
+											node._aabbMinZ = c11._aabbMinZ < c21._aabbMinZ ? c11._aabbMinZ : c21._aabbMinZ;
+											node._aabbMaxX = c11._aabbMaxX > c21._aabbMaxX ? c11._aabbMaxX : c21._aabbMaxX;
+											node._aabbMaxY = c11._aabbMaxY > c21._aabbMaxY ? c11._aabbMaxY : c21._aabbMaxY;
+											node._aabbMaxZ = c11._aabbMaxZ > c21._aabbMaxZ ? c11._aabbMaxZ : c21._aabbMaxZ;
+											var h11 = node._children[0]._height;
+											var h21 = node._children[1]._height;
+											node._height = (h11 > h21 ? h11 : h21) + 1;
+										} else {
+											l._children[0] = node;
+											node._parent = l;
+											node._childIndex = 0;
+											node._children[0] = ll;
+											ll._parent = node;
+											ll._childIndex = 0;
+											var c12 = l._children[0];
+											var c22 = l._children[1];
+											l._aabbMinX = c12._aabbMinX < c22._aabbMinX ? c12._aabbMinX : c22._aabbMinX;
+											l._aabbMinY = c12._aabbMinY < c22._aabbMinY ? c12._aabbMinY : c22._aabbMinY;
+											l._aabbMinZ = c12._aabbMinZ < c22._aabbMinZ ? c12._aabbMinZ : c22._aabbMinZ;
+											l._aabbMaxX = c12._aabbMaxX > c22._aabbMaxX ? c12._aabbMaxX : c22._aabbMaxX;
+											l._aabbMaxY = c12._aabbMaxY > c22._aabbMaxY ? c12._aabbMaxY : c22._aabbMaxY;
+											l._aabbMaxZ = c12._aabbMaxZ > c22._aabbMaxZ ? c12._aabbMaxZ : c22._aabbMaxZ;
+											var h12 = l._children[0]._height;
+											var h22 = l._children[1]._height;
+											l._height = (h12 > h22 ? h12 : h22) + 1;
+											var c13 = node._children[0];
+											var c23 = node._children[1];
+											node._aabbMinX = c13._aabbMinX < c23._aabbMinX ? c13._aabbMinX : c23._aabbMinX;
+											node._aabbMinY = c13._aabbMinY < c23._aabbMinY ? c13._aabbMinY : c23._aabbMinY;
+											node._aabbMinZ = c13._aabbMinZ < c23._aabbMinZ ? c13._aabbMinZ : c23._aabbMinZ;
+											node._aabbMaxX = c13._aabbMaxX > c23._aabbMaxX ? c13._aabbMaxX : c23._aabbMaxX;
+											node._aabbMaxY = c13._aabbMaxY > c23._aabbMaxY ? c13._aabbMaxY : c23._aabbMaxY;
+											node._aabbMaxZ = c13._aabbMaxZ > c23._aabbMaxZ ? c13._aabbMaxZ : c23._aabbMaxZ;
+											var h13 = node._children[0]._height;
+											var h23 = node._children[1]._height;
+											node._height = (h13 > h23 ? h13 : h23) + 1;
+										}
+										if(p1 != null) {
+											p1._children[nodeIndex] = l;
+											l._parent = p1;
+											l._childIndex = nodeIndex;
+										} else {
+											_this._root = l;
+											l._parent = null;
+										}
+										node = l;
+									} else if(balance < -1) {
+										var rl = r._children[0];
+										var rr = r._children[1];
+										if(rl._height > rr._height) {
+											r._children[1] = node;
+											node._parent = r;
+											node._childIndex = 1;
+											node._children[1] = rr;
+											rr._parent = node;
+											rr._childIndex = 1;
+											var c14 = r._children[0];
+											var c24 = r._children[1];
+											r._aabbMinX = c14._aabbMinX < c24._aabbMinX ? c14._aabbMinX : c24._aabbMinX;
+											r._aabbMinY = c14._aabbMinY < c24._aabbMinY ? c14._aabbMinY : c24._aabbMinY;
+											r._aabbMinZ = c14._aabbMinZ < c24._aabbMinZ ? c14._aabbMinZ : c24._aabbMinZ;
+											r._aabbMaxX = c14._aabbMaxX > c24._aabbMaxX ? c14._aabbMaxX : c24._aabbMaxX;
+											r._aabbMaxY = c14._aabbMaxY > c24._aabbMaxY ? c14._aabbMaxY : c24._aabbMaxY;
+											r._aabbMaxZ = c14._aabbMaxZ > c24._aabbMaxZ ? c14._aabbMaxZ : c24._aabbMaxZ;
+											var h14 = r._children[0]._height;
+											var h24 = r._children[1]._height;
+											r._height = (h14 > h24 ? h14 : h24) + 1;
+											var c15 = node._children[0];
+											var c25 = node._children[1];
+											node._aabbMinX = c15._aabbMinX < c25._aabbMinX ? c15._aabbMinX : c25._aabbMinX;
+											node._aabbMinY = c15._aabbMinY < c25._aabbMinY ? c15._aabbMinY : c25._aabbMinY;
+											node._aabbMinZ = c15._aabbMinZ < c25._aabbMinZ ? c15._aabbMinZ : c25._aabbMinZ;
+											node._aabbMaxX = c15._aabbMaxX > c25._aabbMaxX ? c15._aabbMaxX : c25._aabbMaxX;
+											node._aabbMaxY = c15._aabbMaxY > c25._aabbMaxY ? c15._aabbMaxY : c25._aabbMaxY;
+											node._aabbMaxZ = c15._aabbMaxZ > c25._aabbMaxZ ? c15._aabbMaxZ : c25._aabbMaxZ;
+											var h15 = node._children[0]._height;
+											var h25 = node._children[1]._height;
+											node._height = (h15 > h25 ? h15 : h25) + 1;
+										} else {
+											r._children[0] = node;
+											node._parent = r;
+											node._childIndex = 0;
+											node._children[1] = rl;
+											rl._parent = node;
+											rl._childIndex = 1;
+											var c16 = r._children[0];
+											var c26 = r._children[1];
+											r._aabbMinX = c16._aabbMinX < c26._aabbMinX ? c16._aabbMinX : c26._aabbMinX;
+											r._aabbMinY = c16._aabbMinY < c26._aabbMinY ? c16._aabbMinY : c26._aabbMinY;
+											r._aabbMinZ = c16._aabbMinZ < c26._aabbMinZ ? c16._aabbMinZ : c26._aabbMinZ;
+											r._aabbMaxX = c16._aabbMaxX > c26._aabbMaxX ? c16._aabbMaxX : c26._aabbMaxX;
+											r._aabbMaxY = c16._aabbMaxY > c26._aabbMaxY ? c16._aabbMaxY : c26._aabbMaxY;
+											r._aabbMaxZ = c16._aabbMaxZ > c26._aabbMaxZ ? c16._aabbMaxZ : c26._aabbMaxZ;
+											var h16 = r._children[0]._height;
+											var h26 = r._children[1]._height;
+											r._height = (h16 > h26 ? h16 : h26) + 1;
+											var c17 = node._children[0];
+											var c27 = node._children[1];
+											node._aabbMinX = c17._aabbMinX < c27._aabbMinX ? c17._aabbMinX : c27._aabbMinX;
+											node._aabbMinY = c17._aabbMinY < c27._aabbMinY ? c17._aabbMinY : c27._aabbMinY;
+											node._aabbMinZ = c17._aabbMinZ < c27._aabbMinZ ? c17._aabbMinZ : c27._aabbMinZ;
+											node._aabbMaxX = c17._aabbMaxX > c27._aabbMaxX ? c17._aabbMaxX : c27._aabbMaxX;
+											node._aabbMaxY = c17._aabbMaxY > c27._aabbMaxY ? c17._aabbMaxY : c27._aabbMaxY;
+											node._aabbMaxZ = c17._aabbMaxZ > c27._aabbMaxZ ? c17._aabbMaxZ : c27._aabbMaxZ;
+											var h17 = node._children[0]._height;
+											var h27 = node._children[1]._height;
+											node._height = (h17 > h27 ? h17 : h27) + 1;
+										}
+										if(p1 != null) {
+											p1._children[nodeIndex] = r;
+											r._parent = p1;
+											r._childIndex = nodeIndex;
+										} else {
+											_this._root = r;
+											r._parent = null;
+										}
+										node = r;
+									}
+								}
+							}
+							var h18 = node._children[0]._height;
+							var h28 = node._children[1]._height;
+							node._height = (h18 > h28 ? h18 : h28) + 1;
+							var c18 = node._children[0];
+							var c28 = node._children[1];
+							node._aabbMinX = c18._aabbMinX < c28._aabbMinX ? c18._aabbMinX : c28._aabbMinX;
+							node._aabbMinY = c18._aabbMinY < c28._aabbMinY ? c18._aabbMinY : c28._aabbMinY;
+							node._aabbMinZ = c18._aabbMinZ < c28._aabbMinZ ? c18._aabbMinZ : c28._aabbMinZ;
+							node._aabbMaxX = c18._aabbMaxX > c28._aabbMaxX ? c18._aabbMaxX : c28._aabbMaxX;
+							node._aabbMaxY = c18._aabbMaxY > c28._aabbMaxY ? c18._aabbMaxY : c28._aabbMaxY;
+							node._aabbMaxZ = c18._aabbMaxZ > c28._aabbMaxZ ? c18._aabbMaxZ : c28._aabbMaxZ;
+							node = node._parent;
+						}
+					}
+				}
+				p._leaf = null;
+				leaf._next = null;
+				leaf._childIndex = 0;
+				leaf._children[0] = null;
+				leaf._children[1] = null;
+				leaf._childIndex = 0;
+				leaf._parent = null;
+				leaf._height = 0;
+				leaf._proxy = null;
+				leaf._next = _this._nodePool;
+				_this._nodePool = leaf;
+				var _this1 = this._tree;
+				var first = _this1._nodePool;
+				if(first != null) {
+					_this1._nodePool = first._next;
+					first._next = null;
+				} else {
+					first = new oimo_collision_broadphase_bvh_BvhNode();
+				}
+				var leaf1 = first;
+				leaf1._proxy = p;
+				p._leaf = leaf1;
+				leaf1._aabbMinX = p._aabbMinX;
+				leaf1._aabbMinY = p._aabbMinY;
+				leaf1._aabbMinZ = p._aabbMinZ;
+				leaf1._aabbMaxX = p._aabbMaxX;
+				leaf1._aabbMaxY = p._aabbMaxY;
+				leaf1._aabbMaxZ = p._aabbMaxZ;
+				_this1._numLeaves++;
+				if(_this1.leafList == null) {
+					_this1.leafList = leaf1;
+					_this1.leafListLast = leaf1;
+				} else {
+					_this1.leafListLast._nextLeaf = leaf1;
+					leaf1._prevLeaf = _this1.leafListLast;
+					_this1.leafListLast = leaf1;
+				}
+				if(_this1._root == null) {
+					_this1._root = leaf1;
+				} else {
+					var sibling1 = _this1._root;
+					while(sibling1._height > 0) {
+						var nextStep = _this1._strategy._decideInsertion(sibling1,leaf1);
+						if(nextStep == -1) {
+							break;
+						} else {
+							sibling1 = sibling1._children[nextStep];
+						}
+					}
+					var parent1 = sibling1._parent;
+					var first1 = _this1._nodePool;
+					if(first1 != null) {
+						_this1._nodePool = first1._next;
+						first1._next = null;
+					} else {
+						first1 = new oimo_collision_broadphase_bvh_BvhNode();
+					}
+					var node1 = first1;
+					if(parent1 == null) {
+						_this1._root = node1;
+					} else {
+						var index1 = sibling1._childIndex;
+						parent1._children[index1] = node1;
+						node1._parent = parent1;
+						node1._childIndex = index1;
+					}
+					var index2 = sibling1._childIndex;
+					node1._children[index2] = sibling1;
+					sibling1._parent = node1;
+					sibling1._childIndex = index2;
+					var index3 = sibling1._childIndex ^ 1;
+					node1._children[index3] = leaf1;
+					leaf1._parent = node1;
+					leaf1._childIndex = index3;
+					while(node1 != null) {
+						if(_this1._strategy._balancingEnabled) {
+							if(node1._height >= 2) {
+								var p2 = node1._parent;
+								var l1 = node1._children[0];
+								var r1 = node1._children[1];
+								var balance1 = l1._height - r1._height;
+								var nodeIndex1 = node1._childIndex;
+								if(balance1 > 1) {
+									var ll1 = l1._children[0];
+									var lr1 = l1._children[1];
+									if(ll1._height > lr1._height) {
+										l1._children[1] = node1;
+										node1._parent = l1;
+										node1._childIndex = 1;
+										node1._children[0] = lr1;
+										lr1._parent = node1;
+										lr1._childIndex = 0;
+										var c19 = l1._children[0];
+										var c29 = l1._children[1];
+										l1._aabbMinX = c19._aabbMinX < c29._aabbMinX ? c19._aabbMinX : c29._aabbMinX;
+										l1._aabbMinY = c19._aabbMinY < c29._aabbMinY ? c19._aabbMinY : c29._aabbMinY;
+										l1._aabbMinZ = c19._aabbMinZ < c29._aabbMinZ ? c19._aabbMinZ : c29._aabbMinZ;
+										l1._aabbMaxX = c19._aabbMaxX > c29._aabbMaxX ? c19._aabbMaxX : c29._aabbMaxX;
+										l1._aabbMaxY = c19._aabbMaxY > c29._aabbMaxY ? c19._aabbMaxY : c29._aabbMaxY;
+										l1._aabbMaxZ = c19._aabbMaxZ > c29._aabbMaxZ ? c19._aabbMaxZ : c29._aabbMaxZ;
+										var h19 = l1._children[0]._height;
+										var h29 = l1._children[1]._height;
+										l1._height = (h19 > h29 ? h19 : h29) + 1;
+										var c110 = node1._children[0];
+										var c210 = node1._children[1];
+										node1._aabbMinX = c110._aabbMinX < c210._aabbMinX ? c110._aabbMinX : c210._aabbMinX;
+										node1._aabbMinY = c110._aabbMinY < c210._aabbMinY ? c110._aabbMinY : c210._aabbMinY;
+										node1._aabbMinZ = c110._aabbMinZ < c210._aabbMinZ ? c110._aabbMinZ : c210._aabbMinZ;
+										node1._aabbMaxX = c110._aabbMaxX > c210._aabbMaxX ? c110._aabbMaxX : c210._aabbMaxX;
+										node1._aabbMaxY = c110._aabbMaxY > c210._aabbMaxY ? c110._aabbMaxY : c210._aabbMaxY;
+										node1._aabbMaxZ = c110._aabbMaxZ > c210._aabbMaxZ ? c110._aabbMaxZ : c210._aabbMaxZ;
+										var h110 = node1._children[0]._height;
+										var h210 = node1._children[1]._height;
+										node1._height = (h110 > h210 ? h110 : h210) + 1;
+									} else {
+										l1._children[0] = node1;
+										node1._parent = l1;
+										node1._childIndex = 0;
+										node1._children[0] = ll1;
+										ll1._parent = node1;
+										ll1._childIndex = 0;
+										var c111 = l1._children[0];
+										var c211 = l1._children[1];
+										l1._aabbMinX = c111._aabbMinX < c211._aabbMinX ? c111._aabbMinX : c211._aabbMinX;
+										l1._aabbMinY = c111._aabbMinY < c211._aabbMinY ? c111._aabbMinY : c211._aabbMinY;
+										l1._aabbMinZ = c111._aabbMinZ < c211._aabbMinZ ? c111._aabbMinZ : c211._aabbMinZ;
+										l1._aabbMaxX = c111._aabbMaxX > c211._aabbMaxX ? c111._aabbMaxX : c211._aabbMaxX;
+										l1._aabbMaxY = c111._aabbMaxY > c211._aabbMaxY ? c111._aabbMaxY : c211._aabbMaxY;
+										l1._aabbMaxZ = c111._aabbMaxZ > c211._aabbMaxZ ? c111._aabbMaxZ : c211._aabbMaxZ;
+										var h111 = l1._children[0]._height;
+										var h211 = l1._children[1]._height;
+										l1._height = (h111 > h211 ? h111 : h211) + 1;
+										var c112 = node1._children[0];
+										var c212 = node1._children[1];
+										node1._aabbMinX = c112._aabbMinX < c212._aabbMinX ? c112._aabbMinX : c212._aabbMinX;
+										node1._aabbMinY = c112._aabbMinY < c212._aabbMinY ? c112._aabbMinY : c212._aabbMinY;
+										node1._aabbMinZ = c112._aabbMinZ < c212._aabbMinZ ? c112._aabbMinZ : c212._aabbMinZ;
+										node1._aabbMaxX = c112._aabbMaxX > c212._aabbMaxX ? c112._aabbMaxX : c212._aabbMaxX;
+										node1._aabbMaxY = c112._aabbMaxY > c212._aabbMaxY ? c112._aabbMaxY : c212._aabbMaxY;
+										node1._aabbMaxZ = c112._aabbMaxZ > c212._aabbMaxZ ? c112._aabbMaxZ : c212._aabbMaxZ;
+										var h112 = node1._children[0]._height;
+										var h212 = node1._children[1]._height;
+										node1._height = (h112 > h212 ? h112 : h212) + 1;
+									}
+									if(p2 != null) {
+										p2._children[nodeIndex1] = l1;
+										l1._parent = p2;
+										l1._childIndex = nodeIndex1;
+									} else {
+										_this1._root = l1;
+										l1._parent = null;
+									}
+									node1 = l1;
+								} else if(balance1 < -1) {
+									var rl1 = r1._children[0];
+									var rr1 = r1._children[1];
+									if(rl1._height > rr1._height) {
+										r1._children[1] = node1;
+										node1._parent = r1;
+										node1._childIndex = 1;
+										node1._children[1] = rr1;
+										rr1._parent = node1;
+										rr1._childIndex = 1;
+										var c113 = r1._children[0];
+										var c213 = r1._children[1];
+										r1._aabbMinX = c113._aabbMinX < c213._aabbMinX ? c113._aabbMinX : c213._aabbMinX;
+										r1._aabbMinY = c113._aabbMinY < c213._aabbMinY ? c113._aabbMinY : c213._aabbMinY;
+										r1._aabbMinZ = c113._aabbMinZ < c213._aabbMinZ ? c113._aabbMinZ : c213._aabbMinZ;
+										r1._aabbMaxX = c113._aabbMaxX > c213._aabbMaxX ? c113._aabbMaxX : c213._aabbMaxX;
+										r1._aabbMaxY = c113._aabbMaxY > c213._aabbMaxY ? c113._aabbMaxY : c213._aabbMaxY;
+										r1._aabbMaxZ = c113._aabbMaxZ > c213._aabbMaxZ ? c113._aabbMaxZ : c213._aabbMaxZ;
+										var h113 = r1._children[0]._height;
+										var h213 = r1._children[1]._height;
+										r1._height = (h113 > h213 ? h113 : h213) + 1;
+										var c114 = node1._children[0];
+										var c214 = node1._children[1];
+										node1._aabbMinX = c114._aabbMinX < c214._aabbMinX ? c114._aabbMinX : c214._aabbMinX;
+										node1._aabbMinY = c114._aabbMinY < c214._aabbMinY ? c114._aabbMinY : c214._aabbMinY;
+										node1._aabbMinZ = c114._aabbMinZ < c214._aabbMinZ ? c114._aabbMinZ : c214._aabbMinZ;
+										node1._aabbMaxX = c114._aabbMaxX > c214._aabbMaxX ? c114._aabbMaxX : c214._aabbMaxX;
+										node1._aabbMaxY = c114._aabbMaxY > c214._aabbMaxY ? c114._aabbMaxY : c214._aabbMaxY;
+										node1._aabbMaxZ = c114._aabbMaxZ > c214._aabbMaxZ ? c114._aabbMaxZ : c214._aabbMaxZ;
+										var h114 = node1._children[0]._height;
+										var h214 = node1._children[1]._height;
+										node1._height = (h114 > h214 ? h114 : h214) + 1;
+									} else {
+										r1._children[0] = node1;
+										node1._parent = r1;
+										node1._childIndex = 0;
+										node1._children[1] = rl1;
+										rl1._parent = node1;
+										rl1._childIndex = 1;
+										var c115 = r1._children[0];
+										var c215 = r1._children[1];
+										r1._aabbMinX = c115._aabbMinX < c215._aabbMinX ? c115._aabbMinX : c215._aabbMinX;
+										r1._aabbMinY = c115._aabbMinY < c215._aabbMinY ? c115._aabbMinY : c215._aabbMinY;
+										r1._aabbMinZ = c115._aabbMinZ < c215._aabbMinZ ? c115._aabbMinZ : c215._aabbMinZ;
+										r1._aabbMaxX = c115._aabbMaxX > c215._aabbMaxX ? c115._aabbMaxX : c215._aabbMaxX;
+										r1._aabbMaxY = c115._aabbMaxY > c215._aabbMaxY ? c115._aabbMaxY : c215._aabbMaxY;
+										r1._aabbMaxZ = c115._aabbMaxZ > c215._aabbMaxZ ? c115._aabbMaxZ : c215._aabbMaxZ;
+										var h115 = r1._children[0]._height;
+										var h215 = r1._children[1]._height;
+										r1._height = (h115 > h215 ? h115 : h215) + 1;
+										var c116 = node1._children[0];
+										var c216 = node1._children[1];
+										node1._aabbMinX = c116._aabbMinX < c216._aabbMinX ? c116._aabbMinX : c216._aabbMinX;
+										node1._aabbMinY = c116._aabbMinY < c216._aabbMinY ? c116._aabbMinY : c216._aabbMinY;
+										node1._aabbMinZ = c116._aabbMinZ < c216._aabbMinZ ? c116._aabbMinZ : c216._aabbMinZ;
+										node1._aabbMaxX = c116._aabbMaxX > c216._aabbMaxX ? c116._aabbMaxX : c216._aabbMaxX;
+										node1._aabbMaxY = c116._aabbMaxY > c216._aabbMaxY ? c116._aabbMaxY : c216._aabbMaxY;
+										node1._aabbMaxZ = c116._aabbMaxZ > c216._aabbMaxZ ? c116._aabbMaxZ : c216._aabbMaxZ;
+										var h116 = node1._children[0]._height;
+										var h216 = node1._children[1]._height;
+										node1._height = (h116 > h216 ? h116 : h216) + 1;
+									}
+									if(p2 != null) {
+										p2._children[nodeIndex1] = r1;
+										r1._parent = p2;
+										r1._childIndex = nodeIndex1;
+									} else {
+										_this1._root = r1;
+										r1._parent = null;
+									}
+									node1 = r1;
+								}
+							}
+						}
+						var h117 = node1._children[0]._height;
+						var h217 = node1._children[1]._height;
+						node1._height = (h117 > h217 ? h117 : h217) + 1;
+						var c117 = node1._children[0];
+						var c217 = node1._children[1];
+						node1._aabbMinX = c117._aabbMinX < c217._aabbMinX ? c117._aabbMinX : c217._aabbMinX;
+						node1._aabbMinY = c117._aabbMinY < c217._aabbMinY ? c117._aabbMinY : c217._aabbMinY;
+						node1._aabbMinZ = c117._aabbMinZ < c217._aabbMinZ ? c117._aabbMinZ : c217._aabbMinZ;
+						node1._aabbMaxX = c117._aabbMaxX > c217._aabbMaxX ? c117._aabbMaxX : c217._aabbMaxX;
+						node1._aabbMaxY = c117._aabbMaxY > c217._aabbMaxY ? c117._aabbMaxY : c217._aabbMaxY;
+						node1._aabbMaxZ = c117._aabbMaxZ > c217._aabbMaxZ ? c117._aabbMaxZ : c217._aabbMaxZ;
+						node1 = node1._parent;
+					}
+				}
+				if(incrementalCollision) {
+					this.collide(this._tree._root,p._leaf);
+				}
+				p._moved = false;
+			}
+			this.movedProxies[i] = null;
+		}
+		if(!incrementalCollision) {
+			this.collide(this._tree._root,this._tree._root);
+		}
+		this.numMovedProxies = 0;
+	}
+	,__class__: oimo_collision_broadphase_bvh_BvhBroadPhase
+});
+var oimo_collision_broadphase_bvh_BvhNode = function() {
+	this._next = null;
+	this._prevLeaf = null;
+	this._nextLeaf = null;
+	this._children = new Array(2);
+	this._childIndex = 0;
+	this._parent = null;
+	this._height = 0;
+	this._proxy = null;
+	this._aabbMinX = 0;
+	this._aabbMinY = 0;
+	this._aabbMinZ = 0;
+	this._aabbMaxX = 0;
+	this._aabbMaxY = 0;
+	this._aabbMaxZ = 0;
+};
+$hxClasses["oimo.collision.broadphase.bvh.BvhNode"] = oimo_collision_broadphase_bvh_BvhNode;
+oimo_collision_broadphase_bvh_BvhNode.__name__ = "oimo.collision.broadphase.bvh.BvhNode";
+oimo_collision_broadphase_bvh_BvhNode.prototype = {
+	__class__: oimo_collision_broadphase_bvh_BvhNode
+};
+var oimo_collision_broadphase_bvh_BvhProxy = function(userData,id) {
+	oimo_collision_broadphase_Proxy.call(this,userData,id);
+	this._leaf = null;
+	this._moved = false;
+};
+$hxClasses["oimo.collision.broadphase.bvh.BvhProxy"] = oimo_collision_broadphase_bvh_BvhProxy;
+oimo_collision_broadphase_bvh_BvhProxy.__name__ = "oimo.collision.broadphase.bvh.BvhProxy";
+oimo_collision_broadphase_bvh_BvhProxy.__super__ = oimo_collision_broadphase_Proxy;
+oimo_collision_broadphase_bvh_BvhProxy.prototype = $extend(oimo_collision_broadphase_Proxy.prototype,{
+	__class__: oimo_collision_broadphase_bvh_BvhProxy
+});
+var oimo_collision_broadphase_bvh_BvhStrategy = function() {
+	this._insertionStrategy = 0;
+	this._balancingEnabled = false;
+};
+$hxClasses["oimo.collision.broadphase.bvh.BvhStrategy"] = oimo_collision_broadphase_bvh_BvhStrategy;
+oimo_collision_broadphase_bvh_BvhStrategy.__name__ = "oimo.collision.broadphase.bvh.BvhStrategy";
+oimo_collision_broadphase_bvh_BvhStrategy.prototype = {
+	_decideInsertion: function(currentNode,leaf) {
+		switch(this._insertionStrategy) {
+		case 0:
+			var centerX;
+			var centerY;
+			var centerZ;
+			centerX = leaf._aabbMinX + leaf._aabbMaxX;
+			centerY = leaf._aabbMinY + leaf._aabbMaxY;
+			centerZ = leaf._aabbMinZ + leaf._aabbMaxZ;
+			var c1 = currentNode._children[0];
+			var c2 = currentNode._children[1];
+			var diff1X;
+			var diff1Y;
+			var diff1Z;
+			var diff2X;
+			var diff2Y;
+			var diff2Z;
+			diff1X = c1._aabbMinX + c1._aabbMaxX;
+			diff1Y = c1._aabbMinY + c1._aabbMaxY;
+			diff1Z = c1._aabbMinZ + c1._aabbMaxZ;
+			diff2X = c2._aabbMinX + c2._aabbMaxX;
+			diff2Y = c2._aabbMinY + c2._aabbMaxY;
+			diff2Z = c2._aabbMinZ + c2._aabbMaxZ;
+			diff1X -= centerX;
+			diff1Y -= centerY;
+			diff1Z -= centerZ;
+			diff2X -= centerX;
+			diff2Y -= centerY;
+			diff2Z -= centerZ;
+			if(diff1X * diff1X + diff1Y * diff1Y + diff1Z * diff1Z < diff2X * diff2X + diff2Y * diff2Y + diff2Z * diff2Z) {
+				return 0;
+			} else {
+				return 1;
+			}
+			break;
+		case 1:
+			var c1 = currentNode._children[0];
+			var c2 = currentNode._children[1];
+			var ey = currentNode._aabbMaxY - currentNode._aabbMinY;
+			var ez = currentNode._aabbMaxZ - currentNode._aabbMinZ;
+			var combinedMinX;
+			var combinedMinY;
+			var combinedMinZ;
+			var combinedMaxX;
+			var combinedMaxY;
+			var combinedMaxZ;
+			combinedMinX = currentNode._aabbMinX < leaf._aabbMinX ? currentNode._aabbMinX : leaf._aabbMinX;
+			combinedMinY = currentNode._aabbMinY < leaf._aabbMinY ? currentNode._aabbMinY : leaf._aabbMinY;
+			combinedMinZ = currentNode._aabbMinZ < leaf._aabbMinZ ? currentNode._aabbMinZ : leaf._aabbMinZ;
+			combinedMaxX = currentNode._aabbMaxX > leaf._aabbMaxX ? currentNode._aabbMaxX : leaf._aabbMaxX;
+			combinedMaxY = currentNode._aabbMaxY > leaf._aabbMaxY ? currentNode._aabbMaxY : leaf._aabbMaxY;
+			combinedMaxZ = currentNode._aabbMaxZ > leaf._aabbMaxZ ? currentNode._aabbMaxZ : leaf._aabbMaxZ;
+			var ey1 = combinedMaxY - combinedMinY;
+			var ez1 = combinedMaxZ - combinedMinZ;
+			var newArea = ((combinedMaxX - combinedMinX) * (ey1 + ez1) + ey1 * ez1) * 2;
+			var creatingCost = newArea * 2;
+			var incrementalCost = (newArea - ((currentNode._aabbMaxX - currentNode._aabbMinX) * (ey + ez) + ey * ez) * 2) * 2;
+			var descendingCost1 = incrementalCost;
+			combinedMinX = c1._aabbMinX < leaf._aabbMinX ? c1._aabbMinX : leaf._aabbMinX;
+			combinedMinY = c1._aabbMinY < leaf._aabbMinY ? c1._aabbMinY : leaf._aabbMinY;
+			combinedMinZ = c1._aabbMinZ < leaf._aabbMinZ ? c1._aabbMinZ : leaf._aabbMinZ;
+			combinedMaxX = c1._aabbMaxX > leaf._aabbMaxX ? c1._aabbMaxX : leaf._aabbMaxX;
+			combinedMaxY = c1._aabbMaxY > leaf._aabbMaxY ? c1._aabbMaxY : leaf._aabbMaxY;
+			combinedMaxZ = c1._aabbMaxZ > leaf._aabbMaxZ ? c1._aabbMaxZ : leaf._aabbMaxZ;
+			if(c1._height == 0) {
+				var ey = combinedMaxY - combinedMinY;
+				var ez = combinedMaxZ - combinedMinZ;
+				descendingCost1 = incrementalCost + ((combinedMaxX - combinedMinX) * (ey + ez) + ey * ez) * 2;
+			} else {
+				var ey = combinedMaxY - combinedMinY;
+				var ez = combinedMaxZ - combinedMinZ;
+				var ey1 = c1._aabbMaxY - c1._aabbMinY;
+				var ez1 = c1._aabbMaxZ - c1._aabbMinZ;
+				descendingCost1 = incrementalCost + (((combinedMaxX - combinedMinX) * (ey + ez) + ey * ez) * 2 - ((c1._aabbMaxX - c1._aabbMinX) * (ey1 + ez1) + ey1 * ez1) * 2);
+			}
+			var descendingCost2 = incrementalCost;
+			combinedMinX = c2._aabbMinX < leaf._aabbMinX ? c2._aabbMinX : leaf._aabbMinX;
+			combinedMinY = c2._aabbMinY < leaf._aabbMinY ? c2._aabbMinY : leaf._aabbMinY;
+			combinedMinZ = c2._aabbMinZ < leaf._aabbMinZ ? c2._aabbMinZ : leaf._aabbMinZ;
+			combinedMaxX = c2._aabbMaxX > leaf._aabbMaxX ? c2._aabbMaxX : leaf._aabbMaxX;
+			combinedMaxY = c2._aabbMaxY > leaf._aabbMaxY ? c2._aabbMaxY : leaf._aabbMaxY;
+			combinedMaxZ = c2._aabbMaxZ > leaf._aabbMaxZ ? c2._aabbMaxZ : leaf._aabbMaxZ;
+			if(c2._height == 0) {
+				var ey = combinedMaxY - combinedMinY;
+				var ez = combinedMaxZ - combinedMinZ;
+				descendingCost2 = incrementalCost + ((combinedMaxX - combinedMinX) * (ey + ez) + ey * ez) * 2;
+			} else {
+				var ey = combinedMaxY - combinedMinY;
+				var ez = combinedMaxZ - combinedMinZ;
+				var ey1 = c2._aabbMaxY - c2._aabbMinY;
+				var ez1 = c2._aabbMaxZ - c2._aabbMinZ;
+				descendingCost2 = incrementalCost + (((combinedMaxX - combinedMinX) * (ey + ez) + ey * ez) * 2 - ((c2._aabbMaxX - c2._aabbMinX) * (ey1 + ez1) + ey1 * ez1) * 2);
+			}
+			if(creatingCost < descendingCost1) {
+				if(creatingCost < descendingCost2) {
+					return -1;
+				} else {
+					return 1;
+				}
+			} else if(descendingCost1 < descendingCost2) {
+				return 0;
+			} else {
+				return 1;
+			}
+			break;
+		default:
+			haxe_Log.trace("invalid BVH insertion strategy: " + this._insertionStrategy,{ fileName : "oimo/collision/broadphase/bvh/BvhStrategy.hx", lineNumber : 37, className : "oimo.collision.broadphase.bvh.BvhStrategy", methodName : "_decideInsertion"});
+			return -1;
+		}
+	}
+	,__class__: oimo_collision_broadphase_bvh_BvhStrategy
+};
+var oimo_collision_broadphase_bvh_BvhTree = function() {
+	this._root = null;
+	this._numLeaves = 0;
+	this._strategy = new oimo_collision_broadphase_bvh_BvhStrategy();
+	this._nodePool = null;
+	this.leafList = null;
+	this.leafListLast = null;
+	this.tmp = new Array(1024);
+};
+$hxClasses["oimo.collision.broadphase.bvh.BvhTree"] = oimo_collision_broadphase_bvh_BvhTree;
+oimo_collision_broadphase_bvh_BvhTree.__name__ = "oimo.collision.broadphase.bvh.BvhTree";
+oimo_collision_broadphase_bvh_BvhTree.prototype = {
+	__class__: oimo_collision_broadphase_bvh_BvhTree
+};
+var oimo_collision_geometry_Aabb = function() {
+	this._minX = 0;
+	this._minY = 0;
+	this._minZ = 0;
+	this._maxX = 0;
+	this._maxY = 0;
+	this._maxZ = 0;
+};
+$hxClasses["oimo.collision.geometry.Aabb"] = oimo_collision_geometry_Aabb;
+oimo_collision_geometry_Aabb.__name__ = "oimo.collision.geometry.Aabb";
+oimo_collision_geometry_Aabb.prototype = {
+	__class__: oimo_collision_geometry_Aabb
+};
+var oimo_collision_geometry_BoxGeometry = function(halfExtents) {
+	oimo_collision_geometry_ConvexGeometry.call(this,1);
+	this._halfExtentsX = halfExtents.x;
+	this._halfExtentsY = halfExtents.y;
+	this._halfExtentsZ = halfExtents.z;
+	this._halfAxisXX = halfExtents.x;
+	this._halfAxisXY = 0;
+	this._halfAxisXZ = 0;
+	this._halfAxisYX = 0;
+	this._halfAxisYY = halfExtents.y;
+	this._halfAxisYZ = 0;
+	this._halfAxisZX = 0;
+	this._halfAxisZY = 0;
+	this._halfAxisZZ = halfExtents.z;
+	this._updateMass();
+	var minHalfExtents = halfExtents.x < halfExtents.y ? halfExtents.z < halfExtents.x ? halfExtents.z : halfExtents.x : halfExtents.z < halfExtents.y ? halfExtents.z : halfExtents.y;
+	if(this._gjkMargin > minHalfExtents * 0.2) {
+		this._gjkMargin = minHalfExtents * 0.2;
+	}
+};
+$hxClasses["oimo.collision.geometry.BoxGeometry"] = oimo_collision_geometry_BoxGeometry;
+oimo_collision_geometry_BoxGeometry.__name__ = "oimo.collision.geometry.BoxGeometry";
+oimo_collision_geometry_BoxGeometry.__super__ = oimo_collision_geometry_ConvexGeometry;
+oimo_collision_geometry_BoxGeometry.prototype = $extend(oimo_collision_geometry_ConvexGeometry.prototype,{
+	_updateMass: function() {
+		this._volume = 8 * (this._halfExtentsX * this._halfExtentsY * this._halfExtentsZ);
+		var sqX;
+		var sqY;
+		var sqZ;
+		sqX = this._halfExtentsX * this._halfExtentsX;
+		sqY = this._halfExtentsY * this._halfExtentsY;
+		sqZ = this._halfExtentsZ * this._halfExtentsZ;
+		this._inertiaCoeff00 = 0.33333333333333331 * (sqY + sqZ);
+		this._inertiaCoeff01 = 0;
+		this._inertiaCoeff02 = 0;
+		this._inertiaCoeff10 = 0;
+		this._inertiaCoeff11 = 0.33333333333333331 * (sqZ + sqX);
+		this._inertiaCoeff12 = 0;
+		this._inertiaCoeff20 = 0;
+		this._inertiaCoeff21 = 0;
+		this._inertiaCoeff22 = 0.33333333333333331 * (sqX + sqY);
+	}
+	,_computeAabb: function(aabb,tf) {
+		var tfxX;
+		var tfxY;
+		var tfxZ;
+		var tfyX;
+		var tfyY;
+		var tfyZ;
+		var tfzX;
+		var tfzY;
+		var tfzZ;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf._rotation00 * this._halfAxisXX + tf._rotation01 * this._halfAxisXY + tf._rotation02 * this._halfAxisXZ;
+		__tmp__Y = tf._rotation10 * this._halfAxisXX + tf._rotation11 * this._halfAxisXY + tf._rotation12 * this._halfAxisXZ;
+		__tmp__Z = tf._rotation20 * this._halfAxisXX + tf._rotation21 * this._halfAxisXY + tf._rotation22 * this._halfAxisXZ;
+		tfxX = __tmp__X;
+		tfxY = __tmp__Y;
+		tfxZ = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf._rotation00 * this._halfAxisYX + tf._rotation01 * this._halfAxisYY + tf._rotation02 * this._halfAxisYZ;
+		__tmp__Y = tf._rotation10 * this._halfAxisYX + tf._rotation11 * this._halfAxisYY + tf._rotation12 * this._halfAxisYZ;
+		__tmp__Z = tf._rotation20 * this._halfAxisYX + tf._rotation21 * this._halfAxisYY + tf._rotation22 * this._halfAxisYZ;
+		tfyX = __tmp__X;
+		tfyY = __tmp__Y;
+		tfyZ = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf._rotation00 * this._halfAxisZX + tf._rotation01 * this._halfAxisZY + tf._rotation02 * this._halfAxisZZ;
+		__tmp__Y = tf._rotation10 * this._halfAxisZX + tf._rotation11 * this._halfAxisZY + tf._rotation12 * this._halfAxisZZ;
+		__tmp__Z = tf._rotation20 * this._halfAxisZX + tf._rotation21 * this._halfAxisZY + tf._rotation22 * this._halfAxisZZ;
+		tfzX = __tmp__X;
+		tfzY = __tmp__Y;
+		tfzZ = __tmp__Z;
+		if(tfxX < 0) {
+			tfxX = -tfxX;
+		}
+		if(tfxY < 0) {
+			tfxY = -tfxY;
+		}
+		if(tfxZ < 0) {
+			tfxZ = -tfxZ;
+		}
+		if(tfyX < 0) {
+			tfyX = -tfyX;
+		}
+		if(tfyY < 0) {
+			tfyY = -tfyY;
+		}
+		if(tfyZ < 0) {
+			tfyZ = -tfyZ;
+		}
+		if(tfzX < 0) {
+			tfzX = -tfzX;
+		}
+		if(tfzY < 0) {
+			tfzY = -tfzY;
+		}
+		if(tfzZ < 0) {
+			tfzZ = -tfzZ;
+		}
+		var tfsX;
+		var tfsY;
+		var tfsZ;
+		tfsX = tfxX + tfyX;
+		tfsY = tfxY + tfyY;
+		tfsZ = tfxZ + tfyZ;
+		tfsX += tfzX;
+		tfsY += tfzY;
+		tfsZ += tfzZ;
+		aabb._minX = tf._positionX - tfsX;
+		aabb._minY = tf._positionY - tfsY;
+		aabb._minZ = tf._positionZ - tfsZ;
+		aabb._maxX = tf._positionX + tfsX;
+		aabb._maxY = tf._positionY + tfsY;
+		aabb._maxZ = tf._positionZ + tfsZ;
+	}
+	,computeLocalSupportingVertex: function(dir,out) {
+		var gjkMarginsX;
+		var gjkMarginsY;
+		var gjkMarginsZ;
+		var coreExtentsX;
+		var coreExtentsY;
+		var coreExtentsZ;
+		gjkMarginsX = this._gjkMargin;
+		gjkMarginsY = this._gjkMargin;
+		gjkMarginsZ = this._gjkMargin;
+		if(!(gjkMarginsX < this._halfExtentsX)) {
+			gjkMarginsX = this._halfExtentsX;
+		}
+		if(!(gjkMarginsY < this._halfExtentsY)) {
+			gjkMarginsY = this._halfExtentsY;
+		}
+		if(!(gjkMarginsZ < this._halfExtentsZ)) {
+			gjkMarginsZ = this._halfExtentsZ;
+		}
+		coreExtentsX = this._halfExtentsX - gjkMarginsX;
+		coreExtentsY = this._halfExtentsY - gjkMarginsY;
+		coreExtentsZ = this._halfExtentsZ - gjkMarginsZ;
+		out.x = dir.x > 0 ? coreExtentsX : -coreExtentsX;
+		out.y = dir.y > 0 ? coreExtentsY : -coreExtentsY;
+		out.z = dir.z > 0 ? coreExtentsZ : -coreExtentsZ;
+	}
+	,__class__: oimo_collision_geometry_BoxGeometry
+});
+var oimo_collision_geometry_CapsuleGeometry = function(radius,halfHeight) {
+	oimo_collision_geometry_ConvexGeometry.call(this,4);
+	this._radius = radius;
+	this._halfHeight = halfHeight;
+	this._gjkMargin = this._radius;
+	this._updateMass();
+};
+$hxClasses["oimo.collision.geometry.CapsuleGeometry"] = oimo_collision_geometry_CapsuleGeometry;
+oimo_collision_geometry_CapsuleGeometry.__name__ = "oimo.collision.geometry.CapsuleGeometry";
+oimo_collision_geometry_CapsuleGeometry.__super__ = oimo_collision_geometry_ConvexGeometry;
+oimo_collision_geometry_CapsuleGeometry.prototype = $extend(oimo_collision_geometry_ConvexGeometry.prototype,{
+	_updateMass: function() {
+		var r2 = this._radius * this._radius;
+		var hh2 = this._halfHeight * this._halfHeight;
+		var cylinderVolume = 6.28318530717958 * r2 * this._halfHeight;
+		var sphereVolume = 3.14159265358979 * r2 * this._radius * 4 / 3;
+		this._volume = cylinderVolume + sphereVolume;
+		var invVolume = this._volume == 0 ? 0 : 1 / this._volume;
+		var inertiaXZ = invVolume * (cylinderVolume * (r2 * 0.25 + hh2 / 3) + sphereVolume * (r2 * 0.4 + this._halfHeight * this._radius * 0.75 + hh2));
+		this._inertiaCoeff00 = inertiaXZ;
+		this._inertiaCoeff01 = 0;
+		this._inertiaCoeff02 = 0;
+		this._inertiaCoeff10 = 0;
+		this._inertiaCoeff11 = invVolume * (cylinderVolume * r2 * 0.5 + sphereVolume * r2 * 0.4);
+		this._inertiaCoeff12 = 0;
+		this._inertiaCoeff20 = 0;
+		this._inertiaCoeff21 = 0;
+		this._inertiaCoeff22 = inertiaXZ;
+	}
+	,_computeAabb: function(aabb,tf) {
+		var radVecX;
+		var radVecY;
+		var radVecZ;
+		radVecX = this._radius;
+		radVecY = this._radius;
+		radVecZ = this._radius;
+		var axisX;
+		var axisY;
+		var axisZ;
+		axisX = tf._rotation01;
+		axisY = tf._rotation11;
+		axisZ = tf._rotation21;
+		if(axisX < 0) {
+			axisX = -axisX;
+		}
+		if(axisY < 0) {
+			axisY = -axisY;
+		}
+		if(axisZ < 0) {
+			axisZ = -axisZ;
+		}
+		axisX *= this._halfHeight;
+		axisY *= this._halfHeight;
+		axisZ *= this._halfHeight;
+		radVecX += axisX;
+		radVecY += axisY;
+		radVecZ += axisZ;
+		aabb._minX = tf._positionX - radVecX;
+		aabb._minY = tf._positionY - radVecY;
+		aabb._minZ = tf._positionZ - radVecZ;
+		aabb._maxX = tf._positionX + radVecX;
+		aabb._maxY = tf._positionY + radVecY;
+		aabb._maxZ = tf._positionZ + radVecZ;
+	}
+	,computeLocalSupportingVertex: function(dir,out) {
+		if(dir.y > 0) {
+			out.init(0,this._halfHeight,0);
+		} else {
+			out.init(0,-this._halfHeight,0);
+		}
+	}
+	,__class__: oimo_collision_geometry_CapsuleGeometry
+});
+var oimo_collision_geometry_RayCastHit = function() {
+	this.position = new oimo_common_Vec3();
+	this.normal = new oimo_common_Vec3();
+	this.fraction = 0;
+};
+$hxClasses["oimo.collision.geometry.RayCastHit"] = oimo_collision_geometry_RayCastHit;
+oimo_collision_geometry_RayCastHit.__name__ = "oimo.collision.geometry.RayCastHit";
+oimo_collision_geometry_RayCastHit.prototype = {
+	__class__: oimo_collision_geometry_RayCastHit
+};
+var oimo_collision_geometry_SphereGeometry = function(radius) {
+	oimo_collision_geometry_ConvexGeometry.call(this,0);
+	this._radius = radius;
+	this._gjkMargin = this._radius;
+	this._updateMass();
+};
+$hxClasses["oimo.collision.geometry.SphereGeometry"] = oimo_collision_geometry_SphereGeometry;
+oimo_collision_geometry_SphereGeometry.__name__ = "oimo.collision.geometry.SphereGeometry";
+oimo_collision_geometry_SphereGeometry.__super__ = oimo_collision_geometry_ConvexGeometry;
+oimo_collision_geometry_SphereGeometry.prototype = $extend(oimo_collision_geometry_ConvexGeometry.prototype,{
+	_updateMass: function() {
+		this._volume = 4.1887902047863861 * this._radius * this._radius * this._radius;
+		this._inertiaCoeff00 = 0.4 * this._radius * this._radius;
+		this._inertiaCoeff01 = 0;
+		this._inertiaCoeff02 = 0;
+		this._inertiaCoeff10 = 0;
+		this._inertiaCoeff11 = 0.4 * this._radius * this._radius;
+		this._inertiaCoeff12 = 0;
+		this._inertiaCoeff20 = 0;
+		this._inertiaCoeff21 = 0;
+		this._inertiaCoeff22 = 0.4 * this._radius * this._radius;
+	}
+	,_computeAabb: function(aabb,tf) {
+		var radVecX;
+		var radVecY;
+		var radVecZ;
+		radVecX = this._radius;
+		radVecY = this._radius;
+		radVecZ = this._radius;
+		aabb._minX = tf._positionX - radVecX;
+		aabb._minY = tf._positionY - radVecY;
+		aabb._minZ = tf._positionZ - radVecZ;
+		aabb._maxX = tf._positionX + radVecX;
+		aabb._maxY = tf._positionY + radVecY;
+		aabb._maxZ = tf._positionZ + radVecZ;
+	}
+	,computeLocalSupportingVertex: function(dir,out) {
+		out.zero();
+	}
+	,__class__: oimo_collision_geometry_SphereGeometry
+});
+var oimo_collision_narrowphase_CollisionMatrix = function() {
+	this.detectors = new Array(8);
+	this.detectors[0] = new Array(8);
+	this.detectors[1] = new Array(8);
+	this.detectors[2] = new Array(8);
+	this.detectors[3] = new Array(8);
+	this.detectors[4] = new Array(8);
+	this.detectors[5] = new Array(8);
+	var gjkEpaDetector = new oimo_collision_narrowphase_detector_GjkEpaDetector();
+	this.detectors[0][0] = new oimo_collision_narrowphase_detector_SphereSphereDetector();
+	this.detectors[0][1] = new oimo_collision_narrowphase_detector_SphereBoxDetector(false);
+	this.detectors[0][2] = gjkEpaDetector;
+	this.detectors[0][3] = gjkEpaDetector;
+	this.detectors[0][4] = new oimo_collision_narrowphase_detector_SphereCapsuleDetector(false);
+	this.detectors[0][5] = gjkEpaDetector;
+	this.detectors[1][0] = new oimo_collision_narrowphase_detector_SphereBoxDetector(true);
+	this.detectors[1][1] = new oimo_collision_narrowphase_detector_BoxBoxDetector();
+	this.detectors[1][2] = gjkEpaDetector;
+	this.detectors[1][3] = gjkEpaDetector;
+	this.detectors[1][4] = gjkEpaDetector;
+	this.detectors[1][5] = gjkEpaDetector;
+	this.detectors[2][0] = gjkEpaDetector;
+	this.detectors[2][1] = gjkEpaDetector;
+	this.detectors[2][2] = gjkEpaDetector;
+	this.detectors[2][3] = gjkEpaDetector;
+	this.detectors[2][4] = gjkEpaDetector;
+	this.detectors[2][5] = gjkEpaDetector;
+	this.detectors[3][0] = gjkEpaDetector;
+	this.detectors[3][1] = gjkEpaDetector;
+	this.detectors[3][2] = gjkEpaDetector;
+	this.detectors[3][3] = gjkEpaDetector;
+	this.detectors[3][4] = gjkEpaDetector;
+	this.detectors[3][5] = gjkEpaDetector;
+	this.detectors[4][0] = new oimo_collision_narrowphase_detector_SphereCapsuleDetector(true);
+	this.detectors[4][1] = gjkEpaDetector;
+	this.detectors[4][2] = gjkEpaDetector;
+	this.detectors[4][3] = gjkEpaDetector;
+	this.detectors[4][4] = new oimo_collision_narrowphase_detector_CapsuleCapsuleDetector();
+	this.detectors[4][5] = gjkEpaDetector;
+	this.detectors[5][0] = gjkEpaDetector;
+	this.detectors[5][1] = gjkEpaDetector;
+	this.detectors[5][2] = gjkEpaDetector;
+	this.detectors[5][3] = gjkEpaDetector;
+	this.detectors[5][4] = gjkEpaDetector;
+	this.detectors[5][5] = gjkEpaDetector;
+};
+$hxClasses["oimo.collision.narrowphase.CollisionMatrix"] = oimo_collision_narrowphase_CollisionMatrix;
+oimo_collision_narrowphase_CollisionMatrix.__name__ = "oimo.collision.narrowphase.CollisionMatrix";
+oimo_collision_narrowphase_CollisionMatrix.prototype = {
+	__class__: oimo_collision_narrowphase_CollisionMatrix
+};
+var oimo_collision_narrowphase_DetectorResult = function() {
+	this.numPoints = 0;
+	this.normal = new oimo_common_Vec3();
+	this.points = new Array(oimo_common_Setting.maxManifoldPoints);
+	this.incremental = false;
+	var _g = 0;
+	var _g1 = oimo_common_Setting.maxManifoldPoints;
+	while(_g < _g1) this.points[_g++] = new oimo_collision_narrowphase_DetectorResultPoint();
+};
+$hxClasses["oimo.collision.narrowphase.DetectorResult"] = oimo_collision_narrowphase_DetectorResult;
+oimo_collision_narrowphase_DetectorResult.__name__ = "oimo.collision.narrowphase.DetectorResult";
+oimo_collision_narrowphase_DetectorResult.prototype = {
+	getMaxDepth: function() {
+		var max = 0;
+		var _g = 0;
+		var _g1 = this.numPoints;
+		while(_g < _g1) {
+			var i = _g++;
+			if(this.points[i].depth > max) {
+				max = this.points[i].depth;
+			}
+		}
+		return max;
+	}
+	,__class__: oimo_collision_narrowphase_DetectorResult
+};
+var oimo_collision_narrowphase_DetectorResultPoint = function() {
+	this.position1 = new oimo_common_Vec3();
+	this.position2 = new oimo_common_Vec3();
+	this.depth = 0;
+	this.id = 0;
+};
+$hxClasses["oimo.collision.narrowphase.DetectorResultPoint"] = oimo_collision_narrowphase_DetectorResultPoint;
+oimo_collision_narrowphase_DetectorResultPoint.__name__ = "oimo.collision.narrowphase.DetectorResultPoint";
+oimo_collision_narrowphase_DetectorResultPoint.prototype = {
+	__class__: oimo_collision_narrowphase_DetectorResultPoint
+};
+var oimo_collision_narrowphase_detector_Detector = function(swapped) {
+	this.swapped = swapped;
+};
+$hxClasses["oimo.collision.narrowphase.detector.Detector"] = oimo_collision_narrowphase_detector_Detector;
+oimo_collision_narrowphase_detector_Detector.__name__ = "oimo.collision.narrowphase.detector.Detector";
+oimo_collision_narrowphase_detector_Detector.prototype = {
+	setNormal: function(result,nX,nY,nZ) {
+		var v = result.normal;
+		v.x = nX;
+		v.y = nY;
+		v.z = nZ;
+		if(this.swapped) {
+			var _this = result.normal;
+			_this.x = -_this.x;
+			_this.y = -_this.y;
+			_this.z = -_this.z;
+		}
+	}
+	,addPoint: function(result,pos1X,pos1Y,pos1Z,pos2X,pos2Y,pos2Z,depth,id) {
+		var p = result.points[result.numPoints++];
+		p.depth = depth;
+		p.id = id;
+		if(this.swapped) {
+			var v = p.position1;
+			v.x = pos2X;
+			v.y = pos2Y;
+			v.z = pos2Z;
+			var v = p.position2;
+			v.x = pos1X;
+			v.y = pos1Y;
+			v.z = pos1Z;
+		} else {
+			var v = p.position1;
+			v.x = pos1X;
+			v.y = pos1Y;
+			v.z = pos1Z;
+			var v = p.position2;
+			v.x = pos2X;
+			v.y = pos2Y;
+			v.z = pos2Z;
+		}
+	}
+	,detectImpl: function(result,geom1,geom2,tf1,tf2,cachedData) {
+	}
+	,detect: function(result,geom1,geom2,transform1,transform2,cachedData) {
+		result.numPoints = 0;
+		var _g = 0;
+		var _g1 = result.points;
+		while(_g < _g1.length) {
+			var p = _g1[_g];
+			++_g;
+			p.position1.zero();
+			p.position2.zero();
+			p.depth = 0;
+			p.id = 0;
+		}
+		result.normal.zero();
+		if(this.swapped) {
+			this.detectImpl(result,geom2,geom1,transform2,transform1,cachedData);
+		} else {
+			this.detectImpl(result,geom1,geom2,transform1,transform2,cachedData);
+		}
+	}
+	,__class__: oimo_collision_narrowphase_detector_Detector
+};
+var oimo_collision_narrowphase_detector_BoxBoxDetector = function() {
+	oimo_collision_narrowphase_detector_Detector.call(this,false);
+	this.clipper = new oimo_collision_narrowphase_detector__$BoxBoxDetector_FaceClipper();
+};
+$hxClasses["oimo.collision.narrowphase.detector.BoxBoxDetector"] = oimo_collision_narrowphase_detector_BoxBoxDetector;
+oimo_collision_narrowphase_detector_BoxBoxDetector.__name__ = "oimo.collision.narrowphase.detector.BoxBoxDetector";
+oimo_collision_narrowphase_detector_BoxBoxDetector.__super__ = oimo_collision_narrowphase_detector_Detector;
+oimo_collision_narrowphase_detector_BoxBoxDetector.prototype = $extend(oimo_collision_narrowphase_detector_Detector.prototype,{
+	detectImpl: function(result,geom1,geom2,tf1,tf2,cachedData) {
+		var b1 = geom1;
+		var b2 = geom2;
+		result.incremental = false;
+		var c1X;
+		var c1Y;
+		var c1Z;
+		var c2X;
+		var c2Y;
+		var c2Z;
+		var c12X;
+		var c12Y;
+		var c12Z;
+		c1X = tf1._positionX;
+		c1Y = tf1._positionY;
+		c1Z = tf1._positionZ;
+		c2X = tf2._positionX;
+		c2Y = tf2._positionY;
+		c2Z = tf2._positionZ;
+		c12X = c2X - c1X;
+		c12Y = c2Y - c1Y;
+		c12Z = c2Z - c1Z;
+		var x1X;
+		var x1Y;
+		var x1Z;
+		var y1X;
+		var y1Y;
+		var y1Z;
+		var z1X;
+		var z1Y;
+		var z1Z;
+		var x2X;
+		var x2Y;
+		var x2Z;
+		var y2X;
+		var y2Y;
+		var y2Z;
+		var z2X;
+		var z2Y;
+		var z2Z;
+		x1X = tf1._rotation00;
+		x1Y = tf1._rotation10;
+		x1Z = tf1._rotation20;
+		y1X = tf1._rotation01;
+		y1Y = tf1._rotation11;
+		y1Z = tf1._rotation21;
+		z1X = tf1._rotation02;
+		z1Y = tf1._rotation12;
+		z1Z = tf1._rotation22;
+		x2X = tf2._rotation00;
+		x2Y = tf2._rotation10;
+		x2Z = tf2._rotation20;
+		y2X = tf2._rotation01;
+		y2Y = tf2._rotation11;
+		y2Z = tf2._rotation21;
+		z2X = tf2._rotation02;
+		z2Y = tf2._rotation12;
+		z2Z = tf2._rotation22;
+		var w1 = b1._halfExtentsX;
+		var h1 = b1._halfExtentsY;
+		var d1 = b1._halfExtentsZ;
+		var w2 = b2._halfExtentsX;
+		var h2 = b2._halfExtentsY;
+		var d2 = b2._halfExtentsZ;
+		var sx1X;
+		var sx1Y;
+		var sx1Z;
+		var sy1X;
+		var sy1Y;
+		var sy1Z;
+		var sz1X;
+		var sz1Y;
+		var sz1Z;
+		var sx2X;
+		var sx2Y;
+		var sx2Z;
+		var sy2X;
+		var sy2Y;
+		var sy2Z;
+		var sz2X;
+		var sz2Y;
+		var sz2Z;
+		sx1X = x1X * w1;
+		sx1Y = x1Y * w1;
+		sx1Z = x1Z * w1;
+		sy1X = y1X * h1;
+		sy1Y = y1Y * h1;
+		sy1Z = y1Z * h1;
+		sz1X = z1X * d1;
+		sz1Y = z1Y * d1;
+		sz1Z = z1Z * d1;
+		sx2X = x2X * w2;
+		sx2Y = x2Y * w2;
+		sx2Z = x2Z * w2;
+		sy2X = y2X * h2;
+		sy2Y = y2Y * h2;
+		sy2Z = y2Z * h2;
+		sz2X = z2X * d2;
+		sz2Y = z2Y * d2;
+		sz2Z = z2Z * d2;
+		var mDepth = 1e65536;
+		var mId = -1;
+		var mSign = 0;
+		var mAxisX;
+		var mAxisY;
+		var mAxisZ;
+		mAxisX = 0;
+		mAxisY = 0;
+		mAxisZ = 0;
+		var proj1 = w1;
+		var dx = x1X * sx2X + x1Y * sx2Y + x1Z * sx2Z;
+		var dy = x1X * sy2X + x1Y * sy2Y + x1Z * sy2Z;
+		var dz = x1X * sz2X + x1Y * sz2Y + x1Z * sz2Z;
+		if(dx < 0) {
+			dx = -dx;
+		}
+		if(dy < 0) {
+			dy = -dy;
+		}
+		if(dz < 0) {
+			dz = -dz;
+		}
+		var proj2 = dx + dy + dz;
+		var projC12 = x1X * c12X + x1Y * c12Y + x1Z * c12Z;
+		var sum = proj1 + proj2;
+		var neg = projC12 < 0;
+		var abs = neg ? -projC12 : projC12;
+		if(abs < sum) {
+			var depth = sum - abs;
+			if(depth < 1e65536) {
+				mDepth = depth;
+				mId = 0;
+				mAxisX = x1X;
+				mAxisY = x1Y;
+				mAxisZ = x1Z;
+				mSign = neg ? -1 : 1;
+			}
+		} else {
+			return;
+		}
+		proj1 = h1;
+		var dx = y1X * sx2X + y1Y * sx2Y + y1Z * sx2Z;
+		var dy = y1X * sy2X + y1Y * sy2Y + y1Z * sy2Z;
+		var dz = y1X * sz2X + y1Y * sz2Y + y1Z * sz2Z;
+		if(dx < 0) {
+			dx = -dx;
+		}
+		if(dy < 0) {
+			dy = -dy;
+		}
+		if(dz < 0) {
+			dz = -dz;
+		}
+		proj2 = dx + dy + dz;
+		projC12 = y1X * c12X + y1Y * c12Y + y1Z * c12Z;
+		var sum = proj1 + proj2;
+		var neg = projC12 < 0;
+		var abs = neg ? -projC12 : projC12;
+		if(abs < sum) {
+			var depth = sum - abs;
+			if(depth < mDepth) {
+				mDepth = depth;
+				mId = 1;
+				mAxisX = y1X;
+				mAxisY = y1Y;
+				mAxisZ = y1Z;
+				mSign = neg ? -1 : 1;
+			}
+		} else {
+			return;
+		}
+		proj1 = d1;
+		var dx = z1X * sx2X + z1Y * sx2Y + z1Z * sx2Z;
+		var dy = z1X * sy2X + z1Y * sy2Y + z1Z * sy2Z;
+		var dz = z1X * sz2X + z1Y * sz2Y + z1Z * sz2Z;
+		if(dx < 0) {
+			dx = -dx;
+		}
+		if(dy < 0) {
+			dy = -dy;
+		}
+		if(dz < 0) {
+			dz = -dz;
+		}
+		proj2 = dx + dy + dz;
+		projC12 = z1X * c12X + z1Y * c12Y + z1Z * c12Z;
+		var sum = proj1 + proj2;
+		var neg = projC12 < 0;
+		var abs = neg ? -projC12 : projC12;
+		if(abs < sum) {
+			var depth = sum - abs;
+			if(depth < mDepth) {
+				mDepth = depth;
+				mId = 2;
+				mAxisX = z1X;
+				mAxisY = z1Y;
+				mAxisZ = z1Z;
+				mSign = neg ? -1 : 1;
+			}
+		} else {
+			return;
+		}
+		if(mDepth > oimo_common_Setting.linearSlop) {
+			mDepth -= oimo_common_Setting.linearSlop;
+		} else {
+			mDepth = 0;
+		}
+		var dx = x2X * sx1X + x2Y * sx1Y + x2Z * sx1Z;
+		var dy = x2X * sy1X + x2Y * sy1Y + x2Z * sy1Z;
+		var dz = x2X * sz1X + x2Y * sz1Y + x2Z * sz1Z;
+		if(dx < 0) {
+			dx = -dx;
+		}
+		if(dy < 0) {
+			dy = -dy;
+		}
+		if(dz < 0) {
+			dz = -dz;
+		}
+		proj1 = dx + dy + dz;
+		proj2 = w2;
+		projC12 = x2X * c12X + x2Y * c12Y + x2Z * c12Z;
+		var sum = proj1 + proj2;
+		var neg = projC12 < 0;
+		var abs = neg ? -projC12 : projC12;
+		if(abs < sum) {
+			var depth = sum - abs;
+			if(depth < mDepth) {
+				mDepth = depth;
+				mId = 3;
+				mAxisX = x2X;
+				mAxisY = x2Y;
+				mAxisZ = x2Z;
+				mSign = neg ? -1 : 1;
+			}
+		} else {
+			return;
+		}
+		var dx = y2X * sx1X + y2Y * sx1Y + y2Z * sx1Z;
+		var dy = y2X * sy1X + y2Y * sy1Y + y2Z * sy1Z;
+		var dz = y2X * sz1X + y2Y * sz1Y + y2Z * sz1Z;
+		if(dx < 0) {
+			dx = -dx;
+		}
+		if(dy < 0) {
+			dy = -dy;
+		}
+		if(dz < 0) {
+			dz = -dz;
+		}
+		proj1 = dx + dy + dz;
+		proj2 = h2;
+		projC12 = y2X * c12X + y2Y * c12Y + y2Z * c12Z;
+		var sum = proj1 + proj2;
+		var neg = projC12 < 0;
+		var abs = neg ? -projC12 : projC12;
+		if(abs < sum) {
+			var depth = sum - abs;
+			if(depth < mDepth) {
+				mDepth = depth;
+				mId = 4;
+				mAxisX = y2X;
+				mAxisY = y2Y;
+				mAxisZ = y2Z;
+				mSign = neg ? -1 : 1;
+			}
+		} else {
+			return;
+		}
+		var dx = z2X * sx1X + z2Y * sx1Y + z2Z * sx1Z;
+		var dy = z2X * sy1X + z2Y * sy1Y + z2Z * sy1Z;
+		var dz = z2X * sz1X + z2Y * sz1Y + z2Z * sz1Z;
+		if(dx < 0) {
+			dx = -dx;
+		}
+		if(dy < 0) {
+			dy = -dy;
+		}
+		if(dz < 0) {
+			dz = -dz;
+		}
+		proj1 = dx + dy + dz;
+		proj2 = d2;
+		projC12 = z2X * c12X + z2Y * c12Y + z2Z * c12Z;
+		var sum = proj1 + proj2;
+		var neg = projC12 < 0;
+		var abs = neg ? -projC12 : projC12;
+		if(abs < sum) {
+			var depth = sum - abs;
+			if(depth < mDepth) {
+				mDepth = depth;
+				mId = 5;
+				mAxisX = z2X;
+				mAxisY = z2Y;
+				mAxisZ = z2Z;
+				mSign = neg ? -1 : 1;
+			}
+		} else {
+			return;
+		}
+		if(mDepth > oimo_common_Setting.linearSlop) {
+			mDepth -= oimo_common_Setting.linearSlop;
+		} else {
+			mDepth = 0;
+		}
+		var edgeAxisX;
+		var edgeAxisY;
+		var edgeAxisZ;
+		edgeAxisX = x1Y * x2Z - x1Z * x2Y;
+		edgeAxisY = x1Z * x2X - x1X * x2Z;
+		edgeAxisZ = x1X * x2Y - x1Y * x2X;
+		if(!(edgeAxisX == 0 && edgeAxisY == 0 && edgeAxisZ == 0)) {
+			var l = edgeAxisX * edgeAxisX + edgeAxisY * edgeAxisY + edgeAxisZ * edgeAxisZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			edgeAxisX *= l;
+			edgeAxisY *= l;
+			edgeAxisZ *= l;
+			var dx = edgeAxisX * sy1X + edgeAxisY * sy1Y + edgeAxisZ * sy1Z;
+			var dy = edgeAxisX * sz1X + edgeAxisY * sz1Y + edgeAxisZ * sz1Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj1 = dx + dy;
+			var dx = edgeAxisX * sy2X + edgeAxisY * sy2Y + edgeAxisZ * sy2Z;
+			var dy = edgeAxisX * sz2X + edgeAxisY * sz2Y + edgeAxisZ * sz2Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj2 = dx + dy;
+			projC12 = edgeAxisX * c12X + edgeAxisY * c12Y + edgeAxisZ * c12Z;
+			var sum = proj1 + proj2;
+			var neg = projC12 < 0;
+			var abs = neg ? -projC12 : projC12;
+			if(abs < sum) {
+				var depth = sum - abs;
+				if(depth < mDepth) {
+					mDepth = depth;
+					mId = 6;
+					mAxisX = edgeAxisX;
+					mAxisY = edgeAxisY;
+					mAxisZ = edgeAxisZ;
+					mSign = neg ? -1 : 1;
+				}
+			} else {
+				return;
+			}
+		}
+		edgeAxisX = x1Y * y2Z - x1Z * y2Y;
+		edgeAxisY = x1Z * y2X - x1X * y2Z;
+		edgeAxisZ = x1X * y2Y - x1Y * y2X;
+		if(!(edgeAxisX == 0 && edgeAxisY == 0 && edgeAxisZ == 0)) {
+			var l = edgeAxisX * edgeAxisX + edgeAxisY * edgeAxisY + edgeAxisZ * edgeAxisZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			edgeAxisX *= l;
+			edgeAxisY *= l;
+			edgeAxisZ *= l;
+			var dx = edgeAxisX * sy1X + edgeAxisY * sy1Y + edgeAxisZ * sy1Z;
+			var dy = edgeAxisX * sz1X + edgeAxisY * sz1Y + edgeAxisZ * sz1Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj1 = dx + dy;
+			var dx = edgeAxisX * sx2X + edgeAxisY * sx2Y + edgeAxisZ * sx2Z;
+			var dy = edgeAxisX * sz2X + edgeAxisY * sz2Y + edgeAxisZ * sz2Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj2 = dx + dy;
+			projC12 = edgeAxisX * c12X + edgeAxisY * c12Y + edgeAxisZ * c12Z;
+			var sum = proj1 + proj2;
+			var neg = projC12 < 0;
+			var abs = neg ? -projC12 : projC12;
+			if(abs < sum) {
+				var depth = sum - abs;
+				if(depth < mDepth) {
+					mDepth = depth;
+					mId = 7;
+					mAxisX = edgeAxisX;
+					mAxisY = edgeAxisY;
+					mAxisZ = edgeAxisZ;
+					mSign = neg ? -1 : 1;
+				}
+			} else {
+				return;
+			}
+		}
+		edgeAxisX = x1Y * z2Z - x1Z * z2Y;
+		edgeAxisY = x1Z * z2X - x1X * z2Z;
+		edgeAxisZ = x1X * z2Y - x1Y * z2X;
+		if(!(edgeAxisX == 0 && edgeAxisY == 0 && edgeAxisZ == 0)) {
+			var l = edgeAxisX * edgeAxisX + edgeAxisY * edgeAxisY + edgeAxisZ * edgeAxisZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			edgeAxisX *= l;
+			edgeAxisY *= l;
+			edgeAxisZ *= l;
+			var dx = edgeAxisX * sy1X + edgeAxisY * sy1Y + edgeAxisZ * sy1Z;
+			var dy = edgeAxisX * sz1X + edgeAxisY * sz1Y + edgeAxisZ * sz1Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj1 = dx + dy;
+			var dx = edgeAxisX * sx2X + edgeAxisY * sx2Y + edgeAxisZ * sx2Z;
+			var dy = edgeAxisX * sy2X + edgeAxisY * sy2Y + edgeAxisZ * sy2Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj2 = dx + dy;
+			projC12 = edgeAxisX * c12X + edgeAxisY * c12Y + edgeAxisZ * c12Z;
+			var sum = proj1 + proj2;
+			var neg = projC12 < 0;
+			var abs = neg ? -projC12 : projC12;
+			if(abs < sum) {
+				var depth = sum - abs;
+				if(depth < mDepth) {
+					mDepth = depth;
+					mId = 8;
+					mAxisX = edgeAxisX;
+					mAxisY = edgeAxisY;
+					mAxisZ = edgeAxisZ;
+					mSign = neg ? -1 : 1;
+				}
+			} else {
+				return;
+			}
+		}
+		edgeAxisX = y1Y * x2Z - y1Z * x2Y;
+		edgeAxisY = y1Z * x2X - y1X * x2Z;
+		edgeAxisZ = y1X * x2Y - y1Y * x2X;
+		if(!(edgeAxisX == 0 && edgeAxisY == 0 && edgeAxisZ == 0)) {
+			var l = edgeAxisX * edgeAxisX + edgeAxisY * edgeAxisY + edgeAxisZ * edgeAxisZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			edgeAxisX *= l;
+			edgeAxisY *= l;
+			edgeAxisZ *= l;
+			var dx = edgeAxisX * sx1X + edgeAxisY * sx1Y + edgeAxisZ * sx1Z;
+			var dy = edgeAxisX * sz1X + edgeAxisY * sz1Y + edgeAxisZ * sz1Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj1 = dx + dy;
+			var dx = edgeAxisX * sy2X + edgeAxisY * sy2Y + edgeAxisZ * sy2Z;
+			var dy = edgeAxisX * sz2X + edgeAxisY * sz2Y + edgeAxisZ * sz2Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj2 = dx + dy;
+			projC12 = edgeAxisX * c12X + edgeAxisY * c12Y + edgeAxisZ * c12Z;
+			var sum = proj1 + proj2;
+			var neg = projC12 < 0;
+			var abs = neg ? -projC12 : projC12;
+			if(abs < sum) {
+				var depth = sum - abs;
+				if(depth < mDepth) {
+					mDepth = depth;
+					mId = 9;
+					mAxisX = edgeAxisX;
+					mAxisY = edgeAxisY;
+					mAxisZ = edgeAxisZ;
+					mSign = neg ? -1 : 1;
+				}
+			} else {
+				return;
+			}
+		}
+		edgeAxisX = y1Y * y2Z - y1Z * y2Y;
+		edgeAxisY = y1Z * y2X - y1X * y2Z;
+		edgeAxisZ = y1X * y2Y - y1Y * y2X;
+		if(!(edgeAxisX == 0 && edgeAxisY == 0 && edgeAxisZ == 0)) {
+			var l = edgeAxisX * edgeAxisX + edgeAxisY * edgeAxisY + edgeAxisZ * edgeAxisZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			edgeAxisX *= l;
+			edgeAxisY *= l;
+			edgeAxisZ *= l;
+			var dx = edgeAxisX * sx1X + edgeAxisY * sx1Y + edgeAxisZ * sx1Z;
+			var dy = edgeAxisX * sz1X + edgeAxisY * sz1Y + edgeAxisZ * sz1Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj1 = dx + dy;
+			var dx = edgeAxisX * sx2X + edgeAxisY * sx2Y + edgeAxisZ * sx2Z;
+			var dy = edgeAxisX * sz2X + edgeAxisY * sz2Y + edgeAxisZ * sz2Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj2 = dx + dy;
+			projC12 = edgeAxisX * c12X + edgeAxisY * c12Y + edgeAxisZ * c12Z;
+			var sum = proj1 + proj2;
+			var neg = projC12 < 0;
+			var abs = neg ? -projC12 : projC12;
+			if(abs < sum) {
+				var depth = sum - abs;
+				if(depth < mDepth) {
+					mDepth = depth;
+					mId = 10;
+					mAxisX = edgeAxisX;
+					mAxisY = edgeAxisY;
+					mAxisZ = edgeAxisZ;
+					mSign = neg ? -1 : 1;
+				}
+			} else {
+				return;
+			}
+		}
+		edgeAxisX = y1Y * z2Z - y1Z * z2Y;
+		edgeAxisY = y1Z * z2X - y1X * z2Z;
+		edgeAxisZ = y1X * z2Y - y1Y * z2X;
+		if(!(edgeAxisX == 0 && edgeAxisY == 0 && edgeAxisZ == 0)) {
+			var l = edgeAxisX * edgeAxisX + edgeAxisY * edgeAxisY + edgeAxisZ * edgeAxisZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			edgeAxisX *= l;
+			edgeAxisY *= l;
+			edgeAxisZ *= l;
+			var dx = edgeAxisX * sx1X + edgeAxisY * sx1Y + edgeAxisZ * sx1Z;
+			var dy = edgeAxisX * sz1X + edgeAxisY * sz1Y + edgeAxisZ * sz1Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj1 = dx + dy;
+			var dx = edgeAxisX * sx2X + edgeAxisY * sx2Y + edgeAxisZ * sx2Z;
+			var dy = edgeAxisX * sy2X + edgeAxisY * sy2Y + edgeAxisZ * sy2Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj2 = dx + dy;
+			projC12 = edgeAxisX * c12X + edgeAxisY * c12Y + edgeAxisZ * c12Z;
+			var sum = proj1 + proj2;
+			var neg = projC12 < 0;
+			var abs = neg ? -projC12 : projC12;
+			if(abs < sum) {
+				var depth = sum - abs;
+				if(depth < mDepth) {
+					mDepth = depth;
+					mId = 11;
+					mAxisX = edgeAxisX;
+					mAxisY = edgeAxisY;
+					mAxisZ = edgeAxisZ;
+					mSign = neg ? -1 : 1;
+				}
+			} else {
+				return;
+			}
+		}
+		edgeAxisX = z1Y * x2Z - z1Z * x2Y;
+		edgeAxisY = z1Z * x2X - z1X * x2Z;
+		edgeAxisZ = z1X * x2Y - z1Y * x2X;
+		if(!(edgeAxisX == 0 && edgeAxisY == 0 && edgeAxisZ == 0)) {
+			var l = edgeAxisX * edgeAxisX + edgeAxisY * edgeAxisY + edgeAxisZ * edgeAxisZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			edgeAxisX *= l;
+			edgeAxisY *= l;
+			edgeAxisZ *= l;
+			var dx = edgeAxisX * sx1X + edgeAxisY * sx1Y + edgeAxisZ * sx1Z;
+			var dy = edgeAxisX * sy1X + edgeAxisY * sy1Y + edgeAxisZ * sy1Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj1 = dx + dy;
+			var dx = edgeAxisX * sy2X + edgeAxisY * sy2Y + edgeAxisZ * sy2Z;
+			var dy = edgeAxisX * sz2X + edgeAxisY * sz2Y + edgeAxisZ * sz2Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj2 = dx + dy;
+			projC12 = edgeAxisX * c12X + edgeAxisY * c12Y + edgeAxisZ * c12Z;
+			var sum = proj1 + proj2;
+			var neg = projC12 < 0;
+			var abs = neg ? -projC12 : projC12;
+			if(abs < sum) {
+				var depth = sum - abs;
+				if(depth < mDepth) {
+					mDepth = depth;
+					mId = 12;
+					mAxisX = edgeAxisX;
+					mAxisY = edgeAxisY;
+					mAxisZ = edgeAxisZ;
+					mSign = neg ? -1 : 1;
+				}
+			} else {
+				return;
+			}
+		}
+		edgeAxisX = z1Y * y2Z - z1Z * y2Y;
+		edgeAxisY = z1Z * y2X - z1X * y2Z;
+		edgeAxisZ = z1X * y2Y - z1Y * y2X;
+		if(!(edgeAxisX == 0 && edgeAxisY == 0 && edgeAxisZ == 0)) {
+			var l = edgeAxisX * edgeAxisX + edgeAxisY * edgeAxisY + edgeAxisZ * edgeAxisZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			edgeAxisX *= l;
+			edgeAxisY *= l;
+			edgeAxisZ *= l;
+			var dx = edgeAxisX * sx1X + edgeAxisY * sx1Y + edgeAxisZ * sx1Z;
+			var dy = edgeAxisX * sy1X + edgeAxisY * sy1Y + edgeAxisZ * sy1Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj1 = dx + dy;
+			var dx = edgeAxisX * sx2X + edgeAxisY * sx2Y + edgeAxisZ * sx2Z;
+			var dy = edgeAxisX * sz2X + edgeAxisY * sz2Y + edgeAxisZ * sz2Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj2 = dx + dy;
+			projC12 = edgeAxisX * c12X + edgeAxisY * c12Y + edgeAxisZ * c12Z;
+			var sum = proj1 + proj2;
+			var neg = projC12 < 0;
+			var abs = neg ? -projC12 : projC12;
+			if(abs < sum) {
+				var depth = sum - abs;
+				if(depth < mDepth) {
+					mDepth = depth;
+					mId = 13;
+					mAxisX = edgeAxisX;
+					mAxisY = edgeAxisY;
+					mAxisZ = edgeAxisZ;
+					mSign = neg ? -1 : 1;
+				}
+			} else {
+				return;
+			}
+		}
+		edgeAxisX = z1Y * z2Z - z1Z * z2Y;
+		edgeAxisY = z1Z * z2X - z1X * z2Z;
+		edgeAxisZ = z1X * z2Y - z1Y * z2X;
+		if(!(edgeAxisX == 0 && edgeAxisY == 0 && edgeAxisZ == 0)) {
+			var l = edgeAxisX * edgeAxisX + edgeAxisY * edgeAxisY + edgeAxisZ * edgeAxisZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			edgeAxisX *= l;
+			edgeAxisY *= l;
+			edgeAxisZ *= l;
+			var dx = edgeAxisX * sx1X + edgeAxisY * sx1Y + edgeAxisZ * sx1Z;
+			var dy = edgeAxisX * sy1X + edgeAxisY * sy1Y + edgeAxisZ * sy1Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj1 = dx + dy;
+			var dx = edgeAxisX * sx2X + edgeAxisY * sx2Y + edgeAxisZ * sx2Z;
+			var dy = edgeAxisX * sy2X + edgeAxisY * sy2Y + edgeAxisZ * sy2Z;
+			if(dx < 0) {
+				dx = -dx;
+			}
+			if(dy < 0) {
+				dy = -dy;
+			}
+			proj2 = dx + dy;
+			projC12 = edgeAxisX * c12X + edgeAxisY * c12Y + edgeAxisZ * c12Z;
+			var sum = proj1 + proj2;
+			var neg = projC12 < 0;
+			var abs = neg ? -projC12 : projC12;
+			if(abs < sum) {
+				var depth = sum - abs;
+				if(depth < mDepth) {
+					mDepth = depth;
+					mId = 14;
+					mAxisX = edgeAxisX;
+					mAxisY = edgeAxisY;
+					mAxisZ = edgeAxisZ;
+					mSign = neg ? -1 : 1;
+				}
+			} else {
+				return;
+			}
+		}
+		if(mId >= 6) {
+			mAxisX *= mSign;
+			mAxisY *= mSign;
+			mAxisZ *= mSign;
+			var id1 = (mId - 6) / 3 | 0;
+			var id2 = mId - 6 - id1 * 3;
+			var p1X;
+			var p1Y;
+			var p1Z;
+			var p2X;
+			var p2Y;
+			var p2Z;
+			var d1X;
+			var d1Y;
+			var d1Z;
+			var d2X;
+			var d2Y;
+			var d2Z;
+			switch(id1) {
+			case 0:
+				d1X = x1X;
+				d1Y = x1Y;
+				d1Z = x1Z;
+				var signY = sz1X * mAxisX + sz1Y * mAxisY + sz1Z * mAxisZ > 0;
+				if(sy1X * mAxisX + sy1Y * mAxisY + sy1Z * mAxisZ > 0) {
+					if(signY) {
+						p1X = sy1X + sz1X;
+						p1Y = sy1Y + sz1Y;
+						p1Z = sy1Z + sz1Z;
+					} else {
+						p1X = sy1X - sz1X;
+						p1Y = sy1Y - sz1Y;
+						p1Z = sy1Z - sz1Z;
+					}
+				} else if(signY) {
+					p1X = sz1X - sy1X;
+					p1Y = sz1Y - sy1Y;
+					p1Z = sz1Z - sy1Z;
+				} else {
+					p1X = sy1X + sz1X;
+					p1Y = sy1Y + sz1Y;
+					p1Z = sy1Z + sz1Z;
+					p1X = -p1X;
+					p1Y = -p1Y;
+					p1Z = -p1Z;
+				}
+				break;
+			case 1:
+				d1X = y1X;
+				d1Y = y1Y;
+				d1Z = y1Z;
+				var signY = sz1X * mAxisX + sz1Y * mAxisY + sz1Z * mAxisZ > 0;
+				if(sx1X * mAxisX + sx1Y * mAxisY + sx1Z * mAxisZ > 0) {
+					if(signY) {
+						p1X = sx1X + sz1X;
+						p1Y = sx1Y + sz1Y;
+						p1Z = sx1Z + sz1Z;
+					} else {
+						p1X = sx1X - sz1X;
+						p1Y = sx1Y - sz1Y;
+						p1Z = sx1Z - sz1Z;
+					}
+				} else if(signY) {
+					p1X = sz1X - sx1X;
+					p1Y = sz1Y - sx1Y;
+					p1Z = sz1Z - sx1Z;
+				} else {
+					p1X = sx1X + sz1X;
+					p1Y = sx1Y + sz1Y;
+					p1Z = sx1Z + sz1Z;
+					p1X = -p1X;
+					p1Y = -p1Y;
+					p1Z = -p1Z;
+				}
+				break;
+			default:
+				d1X = z1X;
+				d1Y = z1Y;
+				d1Z = z1Z;
+				var signY = sy1X * mAxisX + sy1Y * mAxisY + sy1Z * mAxisZ > 0;
+				if(sx1X * mAxisX + sx1Y * mAxisY + sx1Z * mAxisZ > 0) {
+					if(signY) {
+						p1X = sx1X + sy1X;
+						p1Y = sx1Y + sy1Y;
+						p1Z = sx1Z + sy1Z;
+					} else {
+						p1X = sx1X - sy1X;
+						p1Y = sx1Y - sy1Y;
+						p1Z = sx1Z - sy1Z;
+					}
+				} else if(signY) {
+					p1X = sy1X - sx1X;
+					p1Y = sy1Y - sx1Y;
+					p1Z = sy1Z - sx1Z;
+				} else {
+					p1X = sx1X + sy1X;
+					p1Y = sx1Y + sy1Y;
+					p1Z = sx1Z + sy1Z;
+					p1X = -p1X;
+					p1Y = -p1Y;
+					p1Z = -p1Z;
+				}
+			}
+			p1X = c1X + p1X;
+			p1Y = c1Y + p1Y;
+			p1Z = c1Z + p1Z;
+			switch(id2) {
+			case 0:
+				d2X = x2X;
+				d2Y = x2Y;
+				d2Z = x2Z;
+				var signY = sz2X * mAxisX + sz2Y * mAxisY + sz2Z * mAxisZ > 0;
+				if(sy2X * mAxisX + sy2Y * mAxisY + sy2Z * mAxisZ > 0) {
+					if(signY) {
+						p2X = sy2X + sz2X;
+						p2Y = sy2Y + sz2Y;
+						p2Z = sy2Z + sz2Z;
+					} else {
+						p2X = sy2X - sz2X;
+						p2Y = sy2Y - sz2Y;
+						p2Z = sy2Z - sz2Z;
+					}
+				} else if(signY) {
+					p2X = sz2X - sy2X;
+					p2Y = sz2Y - sy2Y;
+					p2Z = sz2Z - sy2Z;
+				} else {
+					p2X = sy2X + sz2X;
+					p2Y = sy2Y + sz2Y;
+					p2Z = sy2Z + sz2Z;
+					p2X = -p2X;
+					p2Y = -p2Y;
+					p2Z = -p2Z;
+				}
+				break;
+			case 1:
+				d2X = y2X;
+				d2Y = y2Y;
+				d2Z = y2Z;
+				var signY = sz2X * mAxisX + sz2Y * mAxisY + sz2Z * mAxisZ > 0;
+				if(sx2X * mAxisX + sx2Y * mAxisY + sx2Z * mAxisZ > 0) {
+					if(signY) {
+						p2X = sx2X + sz2X;
+						p2Y = sx2Y + sz2Y;
+						p2Z = sx2Z + sz2Z;
+					} else {
+						p2X = sx2X - sz2X;
+						p2Y = sx2Y - sz2Y;
+						p2Z = sx2Z - sz2Z;
+					}
+				} else if(signY) {
+					p2X = sz2X - sx2X;
+					p2Y = sz2Y - sx2Y;
+					p2Z = sz2Z - sx2Z;
+				} else {
+					p2X = sx2X + sz2X;
+					p2Y = sx2Y + sz2Y;
+					p2Z = sx2Z + sz2Z;
+					p2X = -p2X;
+					p2Y = -p2Y;
+					p2Z = -p2Z;
+				}
+				break;
+			default:
+				d2X = z2X;
+				d2Y = z2Y;
+				d2Z = z2Z;
+				var signY = sy2X * mAxisX + sy2Y * mAxisY + sy2Z * mAxisZ > 0;
+				if(sx2X * mAxisX + sx2Y * mAxisY + sx2Z * mAxisZ > 0) {
+					if(signY) {
+						p2X = sx2X + sy2X;
+						p2Y = sx2Y + sy2Y;
+						p2Z = sx2Z + sy2Z;
+					} else {
+						p2X = sx2X - sy2X;
+						p2Y = sx2Y - sy2Y;
+						p2Z = sx2Z - sy2Z;
+					}
+				} else if(signY) {
+					p2X = sy2X - sx2X;
+					p2Y = sy2Y - sx2Y;
+					p2Z = sy2Z - sx2Z;
+				} else {
+					p2X = sx2X + sy2X;
+					p2Y = sx2Y + sy2Y;
+					p2Z = sx2Z + sy2Z;
+					p2X = -p2X;
+					p2Y = -p2Y;
+					p2Z = -p2Z;
+				}
+			}
+			p2X = c2X - p2X;
+			p2Y = c2Y - p2Y;
+			p2Z = c2Z - p2Z;
+			var rX;
+			var rY;
+			var rZ;
+			rX = p1X - p2X;
+			rY = p1Y - p2Y;
+			rZ = p1Z - p2Z;
+			var dot12 = d1X * d2X + d1Y * d2Y + d1Z * d2Z;
+			var dot1r = d1X * rX + d1Y * rY + d1Z * rZ;
+			var dot2r = d2X * rX + d2Y * rY + d2Z * rZ;
+			var invDet = 1 / (1 - dot12 * dot12);
+			var t1 = (dot12 * dot2r - dot1r) * invDet;
+			var t2 = (dot2r - dot12 * dot1r) * invDet;
+			var cp1X;
+			var cp1Y;
+			var cp1Z;
+			var cp2X;
+			var cp2Y;
+			var cp2Z;
+			cp1X = p1X + d1X * t1;
+			cp1Y = p1Y + d1Y * t1;
+			cp1Z = p1Z + d1Z * t1;
+			cp2X = p2X + d2X * t2;
+			cp2Y = p2Y + d2Y * t2;
+			cp2Z = p2Z + d2Z * t2;
+			var normalX;
+			var normalY;
+			var normalZ;
+			normalX = -mAxisX;
+			normalY = -mAxisY;
+			normalZ = -mAxisZ;
+			this.setNormal(result,normalX,normalY,normalZ);
+			this.addPoint(result,cp1X,cp1Y,cp1Z,cp2X,cp2Y,cp2Z,mDepth,4);
+			return;
+		}
+		var tmpX;
+		var tmpY;
+		var tmpZ;
+		var swapped;
+		if(mId >= 3) {
+			mSign = -mSign;
+			c12X = -c12X;
+			c12Y = -c12Y;
+			c12Z = -c12Z;
+			w1 = w2;
+			h1 = h2;
+			d1 = d2;
+			tmpX = c1X;
+			tmpY = c1Y;
+			tmpZ = c1Z;
+			c1X = c2X;
+			c1Y = c2Y;
+			c1Z = c2Z;
+			tmpX = x1X;
+			tmpY = x1Y;
+			tmpZ = x1Z;
+			x1X = x2X;
+			x1Y = x2Y;
+			x1Z = x2Z;
+			x2X = tmpX;
+			x2Y = tmpY;
+			x2Z = tmpZ;
+			tmpX = y1X;
+			tmpY = y1Y;
+			tmpZ = y1Z;
+			y1X = y2X;
+			y1Y = y2Y;
+			y1Z = y2Z;
+			y2X = tmpX;
+			y2Y = tmpY;
+			y2Z = tmpZ;
+			tmpX = z1X;
+			tmpY = z1Y;
+			tmpZ = z1Z;
+			z1X = z2X;
+			z1Y = z2Y;
+			z1Z = z2Z;
+			z2X = tmpX;
+			z2Y = tmpY;
+			z2Z = tmpZ;
+			tmpX = sx1X;
+			tmpY = sx1Y;
+			tmpZ = sx1Z;
+			sx1X = sx2X;
+			sx1Y = sx2Y;
+			sx1Z = sx2Z;
+			sx2X = tmpX;
+			sx2Y = tmpY;
+			sx2Z = tmpZ;
+			tmpX = sy1X;
+			tmpY = sy1Y;
+			tmpZ = sy1Z;
+			sy1X = sy2X;
+			sy1Y = sy2Y;
+			sy1Z = sy2Z;
+			sy2X = tmpX;
+			sy2Y = tmpY;
+			sy2Z = tmpZ;
+			tmpX = sz1X;
+			tmpY = sz1Y;
+			tmpZ = sz1Z;
+			sz1X = sz2X;
+			sz1Y = sz2Y;
+			sz1Z = sz2Z;
+			sz2X = tmpX;
+			sz2Y = tmpY;
+			sz2Z = tmpZ;
+			mId -= 3;
+			swapped = true;
+		} else {
+			swapped = false;
+		}
+		var refCenterX;
+		var refCenterY;
+		var refCenterZ;
+		var refNormalX;
+		var refNormalY;
+		var refNormalZ;
+		var refXX;
+		var refXY;
+		var refXZ;
+		var refYX;
+		var refYY;
+		var refYZ;
+		var refW;
+		var refH;
+		switch(mId) {
+		case 0:
+			refCenterX = sx1X;
+			refCenterY = sx1Y;
+			refCenterZ = sx1Z;
+			refNormalX = x1X;
+			refNormalY = x1Y;
+			refNormalZ = x1Z;
+			refXX = y1X;
+			refXY = y1Y;
+			refXZ = y1Z;
+			refYX = z1X;
+			refYY = z1Y;
+			refYZ = z1Z;
+			refW = h1;
+			refH = d1;
+			break;
+		case 1:
+			refCenterX = sy1X;
+			refCenterY = sy1Y;
+			refCenterZ = sy1Z;
+			refNormalX = y1X;
+			refNormalY = y1Y;
+			refNormalZ = y1Z;
+			refXX = z1X;
+			refXY = z1Y;
+			refXZ = z1Z;
+			refYX = x1X;
+			refYY = x1Y;
+			refYZ = x1Z;
+			refW = d1;
+			refH = w1;
+			break;
+		default:
+			refCenterX = sz1X;
+			refCenterY = sz1Y;
+			refCenterZ = sz1Z;
+			refNormalX = z1X;
+			refNormalY = z1Y;
+			refNormalZ = z1Z;
+			refXX = x1X;
+			refXY = x1Y;
+			refXZ = x1Z;
+			refYX = y1X;
+			refYY = y1Y;
+			refYZ = y1Z;
+			refW = w1;
+			refH = h1;
+		}
+		if(mSign < 0) {
+			refCenterX = -refCenterX;
+			refCenterY = -refCenterY;
+			refCenterZ = -refCenterZ;
+			refNormalX = -refNormalX;
+			refNormalY = -refNormalY;
+			refNormalZ = -refNormalZ;
+			tmpX = refXX;
+			tmpY = refXY;
+			tmpZ = refXZ;
+			refXX = refYX;
+			refXY = refYY;
+			refXZ = refYZ;
+			refYX = tmpX;
+			refYY = tmpY;
+			refYZ = tmpZ;
+			var tmp = refW;
+			refW = refH;
+			refH = tmp;
+		}
+		refCenterX += c1X;
+		refCenterY += c1Y;
+		refCenterZ += c1Z;
+		var minIncDot = 1;
+		var incId = 0;
+		var incDot = refNormalX * x2X + refNormalY * x2Y + refNormalZ * x2Z;
+		if(incDot < minIncDot) {
+			minIncDot = incDot;
+			incId = 0;
+		}
+		if(-incDot < minIncDot) {
+			minIncDot = -incDot;
+			incId = 1;
+		}
+		incDot = refNormalX * y2X + refNormalY * y2Y + refNormalZ * y2Z;
+		if(incDot < minIncDot) {
+			minIncDot = incDot;
+			incId = 2;
+		}
+		if(-incDot < minIncDot) {
+			minIncDot = -incDot;
+			incId = 3;
+		}
+		incDot = refNormalX * z2X + refNormalY * z2Y + refNormalZ * z2Z;
+		if(incDot < minIncDot) {
+			minIncDot = incDot;
+			incId = 4;
+		}
+		if(-incDot < minIncDot) {
+			incId = 5;
+		}
+		var incV1X;
+		var incV1Y;
+		var incV1Z;
+		var incV2X;
+		var incV2Y;
+		var incV2Z;
+		var incV3X;
+		var incV3Y;
+		var incV3Z;
+		var incV4X;
+		var incV4Y;
+		var incV4Z;
+		switch(incId) {
+		case 0:
+			incV1X = sx2X + sy2X;
+			incV1Y = sx2Y + sy2Y;
+			incV1Z = sx2Z + sy2Z;
+			incV1X += sz2X;
+			incV1Y += sz2Y;
+			incV1Z += sz2Z;
+			incV2X = sx2X - sy2X;
+			incV2Y = sx2Y - sy2Y;
+			incV2Z = sx2Z - sy2Z;
+			incV2X += sz2X;
+			incV2Y += sz2Y;
+			incV2Z += sz2Z;
+			incV3X = sx2X - sy2X;
+			incV3Y = sx2Y - sy2Y;
+			incV3Z = sx2Z - sy2Z;
+			incV3X -= sz2X;
+			incV3Y -= sz2Y;
+			incV3Z -= sz2Z;
+			incV4X = sx2X + sy2X;
+			incV4Y = sx2Y + sy2Y;
+			incV4Z = sx2Z + sy2Z;
+			incV4X -= sz2X;
+			incV4Y -= sz2Y;
+			incV4Z -= sz2Z;
+			break;
+		case 1:
+			incV1X = sy2X - sx2X;
+			incV1Y = sy2Y - sx2Y;
+			incV1Z = sy2Z - sx2Z;
+			incV1X += sz2X;
+			incV1Y += sz2Y;
+			incV1Z += sz2Z;
+			incV2X = sy2X - sx2X;
+			incV2Y = sy2Y - sx2Y;
+			incV2Z = sy2Z - sx2Z;
+			incV2X -= sz2X;
+			incV2Y -= sz2Y;
+			incV2Z -= sz2Z;
+			incV3X = sx2X + sy2X;
+			incV3Y = sx2Y + sy2Y;
+			incV3Z = sx2Z + sy2Z;
+			incV3X = -incV3X;
+			incV3Y = -incV3Y;
+			incV3Z = -incV3Z;
+			incV3X -= sz2X;
+			incV3Y -= sz2Y;
+			incV3Z -= sz2Z;
+			incV4X = sx2X + sy2X;
+			incV4Y = sx2Y + sy2Y;
+			incV4Z = sx2Z + sy2Z;
+			incV4X = -incV4X;
+			incV4Y = -incV4Y;
+			incV4Z = -incV4Z;
+			incV4X += sz2X;
+			incV4Y += sz2Y;
+			incV4Z += sz2Z;
+			break;
+		case 2:
+			incV1X = sx2X + sy2X;
+			incV1Y = sx2Y + sy2Y;
+			incV1Z = sx2Z + sy2Z;
+			incV1X += sz2X;
+			incV1Y += sz2Y;
+			incV1Z += sz2Z;
+			incV2X = sx2X + sy2X;
+			incV2Y = sx2Y + sy2Y;
+			incV2Z = sx2Z + sy2Z;
+			incV2X -= sz2X;
+			incV2Y -= sz2Y;
+			incV2Z -= sz2Z;
+			incV3X = sy2X - sx2X;
+			incV3Y = sy2Y - sx2Y;
+			incV3Z = sy2Z - sx2Z;
+			incV3X -= sz2X;
+			incV3Y -= sz2Y;
+			incV3Z -= sz2Z;
+			incV4X = sy2X - sx2X;
+			incV4Y = sy2Y - sx2Y;
+			incV4Z = sy2Z - sx2Z;
+			incV4X += sz2X;
+			incV4Y += sz2Y;
+			incV4Z += sz2Z;
+			break;
+		case 3:
+			incV1X = sx2X - sy2X;
+			incV1Y = sx2Y - sy2Y;
+			incV1Z = sx2Z - sy2Z;
+			incV1X += sz2X;
+			incV1Y += sz2Y;
+			incV1Z += sz2Z;
+			incV2X = sx2X + sy2X;
+			incV2Y = sx2Y + sy2Y;
+			incV2Z = sx2Z + sy2Z;
+			incV2X = -incV2X;
+			incV2Y = -incV2Y;
+			incV2Z = -incV2Z;
+			incV2X += sz2X;
+			incV2Y += sz2Y;
+			incV2Z += sz2Z;
+			incV3X = sx2X + sy2X;
+			incV3Y = sx2Y + sy2Y;
+			incV3Z = sx2Z + sy2Z;
+			incV3X = -incV3X;
+			incV3Y = -incV3Y;
+			incV3Z = -incV3Z;
+			incV3X -= sz2X;
+			incV3Y -= sz2Y;
+			incV3Z -= sz2Z;
+			incV4X = sx2X - sy2X;
+			incV4Y = sx2Y - sy2Y;
+			incV4Z = sx2Z - sy2Z;
+			incV4X -= sz2X;
+			incV4Y -= sz2Y;
+			incV4Z -= sz2Z;
+			break;
+		case 4:
+			incV1X = sx2X + sy2X;
+			incV1Y = sx2Y + sy2Y;
+			incV1Z = sx2Z + sy2Z;
+			incV1X += sz2X;
+			incV1Y += sz2Y;
+			incV1Z += sz2Z;
+			incV2X = sy2X - sx2X;
+			incV2Y = sy2Y - sx2Y;
+			incV2Z = sy2Z - sx2Z;
+			incV2X += sz2X;
+			incV2Y += sz2Y;
+			incV2Z += sz2Z;
+			incV3X = sx2X + sy2X;
+			incV3Y = sx2Y + sy2Y;
+			incV3Z = sx2Z + sy2Z;
+			incV3X = -incV3X;
+			incV3Y = -incV3Y;
+			incV3Z = -incV3Z;
+			incV3X += sz2X;
+			incV3Y += sz2Y;
+			incV3Z += sz2Z;
+			incV4X = sx2X - sy2X;
+			incV4Y = sx2Y - sy2Y;
+			incV4Z = sx2Z - sy2Z;
+			incV4X += sz2X;
+			incV4Y += sz2Y;
+			incV4Z += sz2Z;
+			break;
+		default:
+			incV1X = sx2X + sy2X;
+			incV1Y = sx2Y + sy2Y;
+			incV1Z = sx2Z + sy2Z;
+			incV1X -= sz2X;
+			incV1Y -= sz2Y;
+			incV1Z -= sz2Z;
+			incV2X = sx2X - sy2X;
+			incV2Y = sx2Y - sy2Y;
+			incV2Z = sx2Z - sy2Z;
+			incV2X -= sz2X;
+			incV2Y -= sz2Y;
+			incV2Z -= sz2Z;
+			incV3X = sx2X + sy2X;
+			incV3Y = sx2Y + sy2Y;
+			incV3Z = sx2Z + sy2Z;
+			incV3X = -incV3X;
+			incV3Y = -incV3Y;
+			incV3Z = -incV3Z;
+			incV3X -= sz2X;
+			incV3Y -= sz2Y;
+			incV3Z -= sz2Z;
+			incV4X = sy2X - sx2X;
+			incV4Y = sy2Y - sx2Y;
+			incV4Z = sy2Z - sx2Z;
+			incV4X -= sz2X;
+			incV4Y -= sz2Y;
+			incV4Z -= sz2Z;
+		}
+		incV1X += c12X;
+		incV1Y += c12Y;
+		incV1Z += c12Z;
+		incV2X += c12X;
+		incV2Y += c12Y;
+		incV2Z += c12Z;
+		incV3X += c12X;
+		incV3Y += c12Y;
+		incV3Z += c12Z;
+		incV4X += c12X;
+		incV4Y += c12Y;
+		incV4Z += c12Z;
+		var _this = this.clipper;
+		_this.w = refW;
+		_this.h = refH;
+		_this.numVertices = 0;
+		_this.numTmpVertices = 0;
+		var _this = this.clipper;
+		var _this1 = _this.vertices[_this.numVertices++];
+		_this1.x = incV1X * refXX + incV1Y * refXY + incV1Z * refXZ;
+		_this1.y = incV1X * refYX + incV1Y * refYY + incV1Z * refYZ;
+		_this1.wx = incV1X;
+		_this1.wy = incV1Y;
+		_this1.wz = incV1Z;
+		var _this = this.clipper;
+		var _this1 = _this.vertices[_this.numVertices++];
+		_this1.x = incV2X * refXX + incV2Y * refXY + incV2Z * refXZ;
+		_this1.y = incV2X * refYX + incV2Y * refYY + incV2Z * refYZ;
+		_this1.wx = incV2X;
+		_this1.wy = incV2Y;
+		_this1.wz = incV2Z;
+		var _this = this.clipper;
+		var _this1 = _this.vertices[_this.numVertices++];
+		_this1.x = incV3X * refXX + incV3Y * refXY + incV3Z * refXZ;
+		_this1.y = incV3X * refYX + incV3Y * refYY + incV3Z * refYZ;
+		_this1.wx = incV3X;
+		_this1.wy = incV3Y;
+		_this1.wz = incV3Z;
+		var _this = this.clipper;
+		var _this1 = _this.vertices[_this.numVertices++];
+		_this1.x = incV4X * refXX + incV4Y * refXY + incV4Z * refXZ;
+		_this1.y = incV4X * refYX + incV4Y * refYY + incV4Z * refYZ;
+		_this1.wx = incV4X;
+		_this1.wy = incV4Y;
+		_this1.wz = incV4Z;
+		this.clipper.clip();
+		this.clipper.reduce();
+		var normalX;
+		var normalY;
+		var normalZ;
+		if(swapped) {
+			normalX = refNormalX;
+			normalY = refNormalY;
+			normalZ = refNormalZ;
+		} else {
+			normalX = -refNormalX;
+			normalY = -refNormalY;
+			normalZ = -refNormalZ;
+		}
+		this.setNormal(result,normalX,normalY,normalZ);
+		var _g = 0;
+		var _g1 = this.clipper.numVertices;
+		while(_g < _g1) {
+			var i = _g++;
+			var v = this.clipper.vertices[i];
+			var clippedVertexX;
+			var clippedVertexY;
+			var clippedVertexZ;
+			clippedVertexX = v.wx;
+			clippedVertexY = v.wy;
+			clippedVertexZ = v.wz;
+			clippedVertexX += c1X;
+			clippedVertexY += c1Y;
+			clippedVertexZ += c1Z;
+			var clippedVertexToRefCenterX;
+			var clippedVertexToRefCenterY;
+			var clippedVertexToRefCenterZ;
+			clippedVertexToRefCenterX = refCenterX - clippedVertexX;
+			clippedVertexToRefCenterY = refCenterY - clippedVertexY;
+			clippedVertexToRefCenterZ = refCenterZ - clippedVertexZ;
+			var depth = clippedVertexToRefCenterX * refNormalX + clippedVertexToRefCenterY * refNormalY + clippedVertexToRefCenterZ * refNormalZ;
+			var clippedVertexOnRefFaceX;
+			var clippedVertexOnRefFaceY;
+			var clippedVertexOnRefFaceZ;
+			clippedVertexOnRefFaceX = clippedVertexX + refNormalX * depth;
+			clippedVertexOnRefFaceY = clippedVertexY + refNormalY * depth;
+			clippedVertexOnRefFaceZ = clippedVertexZ + refNormalZ * depth;
+			if(depth > -oimo_common_Setting.contactPersistenceThreshold) {
+				if(swapped) {
+					this.addPoint(result,clippedVertexX,clippedVertexY,clippedVertexZ,clippedVertexOnRefFaceX,clippedVertexOnRefFaceY,clippedVertexOnRefFaceZ,depth,i);
+				} else {
+					this.addPoint(result,clippedVertexOnRefFaceX,clippedVertexOnRefFaceY,clippedVertexOnRefFaceZ,clippedVertexX,clippedVertexY,clippedVertexZ,depth,i);
+				}
+			}
+		}
+	}
+	,__class__: oimo_collision_narrowphase_detector_BoxBoxDetector
+});
+var oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex = function() {
+	this.x = 0;
+	this.y = 0;
+	this.wx = 0;
+	this.wy = 0;
+	this.wz = 0;
+};
+$hxClasses["oimo.collision.narrowphase.detector._BoxBoxDetector.IncidentVertex"] = oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex;
+oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex.__name__ = "oimo.collision.narrowphase.detector._BoxBoxDetector.IncidentVertex";
+oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex.prototype = {
+	__class__: oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex
+};
+var oimo_collision_narrowphase_detector__$BoxBoxDetector_FaceClipper = function() {
+	this.w = 0;
+	this.h = 0;
+	this.numVertices = 0;
+	this.numTmpVertices = 0;
+	this.vertices = new Array(8);
+	this.tmpVertices = new Array(8);
+	this.vertices[0] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.tmpVertices[0] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.vertices[1] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.tmpVertices[1] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.vertices[2] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.tmpVertices[2] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.vertices[3] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.tmpVertices[3] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.vertices[4] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.tmpVertices[4] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.vertices[5] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.tmpVertices[5] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.vertices[6] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.tmpVertices[6] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.vertices[7] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+	this.tmpVertices[7] = new oimo_collision_narrowphase_detector__$BoxBoxDetector_IncidentVertex();
+};
+$hxClasses["oimo.collision.narrowphase.detector._BoxBoxDetector.FaceClipper"] = oimo_collision_narrowphase_detector__$BoxBoxDetector_FaceClipper;
+oimo_collision_narrowphase_detector__$BoxBoxDetector_FaceClipper.__name__ = "oimo.collision.narrowphase.detector._BoxBoxDetector.FaceClipper";
+oimo_collision_narrowphase_detector__$BoxBoxDetector_FaceClipper.prototype = {
+	clip: function() {
+		var _g = 0;
+		var _g1 = this.numVertices;
+		while(_g < _g1) {
+			var i = _g++;
+			var v1 = this.vertices[i];
+			var v2 = this.vertices[(i + 1) % this.numVertices];
+			var s1 = this.w + v1.x;
+			var s2 = this.w + v2.x;
+			if(s1 > 0 && s2 > 0) {
+				var _this = this.tmpVertices[this.numTmpVertices++];
+				_this.x = v1.x;
+				_this.y = v1.y;
+				_this.wx = v1.wx;
+				_this.wy = v1.wy;
+				_this.wz = v1.wz;
+			} else if(s1 > 0 && s2 <= 0) {
+				var _this1 = this.tmpVertices[this.numTmpVertices++];
+				_this1.x = v1.x;
+				_this1.y = v1.y;
+				_this1.wx = v1.wx;
+				_this1.wy = v1.wy;
+				_this1.wz = v1.wz;
+				var t = s1 / (s1 - s2);
+				var _this2 = this.tmpVertices[this.numTmpVertices++];
+				_this2.x = v1.x + (v2.x - v1.x) * t;
+				_this2.y = v1.y + (v2.y - v1.y) * t;
+				_this2.wx = v1.wx + (v2.wx - v1.wx) * t;
+				_this2.wy = v1.wy + (v2.wy - v1.wy) * t;
+				_this2.wz = v1.wz + (v2.wz - v1.wz) * t;
+			} else if(s1 <= 0 && s2 > 0) {
+				var t1 = s1 / (s1 - s2);
+				var _this3 = this.tmpVertices[this.numTmpVertices++];
+				_this3.x = v1.x + (v2.x - v1.x) * t1;
+				_this3.y = v1.y + (v2.y - v1.y) * t1;
+				_this3.wx = v1.wx + (v2.wx - v1.wx) * t1;
+				_this3.wy = v1.wy + (v2.wy - v1.wy) * t1;
+				_this3.wz = v1.wz + (v2.wz - v1.wz) * t1;
+			}
+		}
+		var tmp = this.vertices;
+		this.vertices = this.tmpVertices;
+		this.tmpVertices = tmp;
+		this.numVertices = this.numTmpVertices;
+		this.numTmpVertices = 0;
+		var _g = 0;
+		var _g1 = this.numVertices;
+		while(_g < _g1) {
+			var i = _g++;
+			var v1 = this.vertices[i];
+			var v2 = this.vertices[(i + 1) % this.numVertices];
+			var s1 = this.w - v1.x;
+			var s2 = this.w - v2.x;
+			if(s1 > 0 && s2 > 0) {
+				var _this = this.tmpVertices[this.numTmpVertices++];
+				_this.x = v1.x;
+				_this.y = v1.y;
+				_this.wx = v1.wx;
+				_this.wy = v1.wy;
+				_this.wz = v1.wz;
+			} else if(s1 > 0 && s2 <= 0) {
+				var _this1 = this.tmpVertices[this.numTmpVertices++];
+				_this1.x = v1.x;
+				_this1.y = v1.y;
+				_this1.wx = v1.wx;
+				_this1.wy = v1.wy;
+				_this1.wz = v1.wz;
+				var t = s1 / (s1 - s2);
+				var _this2 = this.tmpVertices[this.numTmpVertices++];
+				_this2.x = v1.x + (v2.x - v1.x) * t;
+				_this2.y = v1.y + (v2.y - v1.y) * t;
+				_this2.wx = v1.wx + (v2.wx - v1.wx) * t;
+				_this2.wy = v1.wy + (v2.wy - v1.wy) * t;
+				_this2.wz = v1.wz + (v2.wz - v1.wz) * t;
+			} else if(s1 <= 0 && s2 > 0) {
+				var t1 = s1 / (s1 - s2);
+				var _this3 = this.tmpVertices[this.numTmpVertices++];
+				_this3.x = v1.x + (v2.x - v1.x) * t1;
+				_this3.y = v1.y + (v2.y - v1.y) * t1;
+				_this3.wx = v1.wx + (v2.wx - v1.wx) * t1;
+				_this3.wy = v1.wy + (v2.wy - v1.wy) * t1;
+				_this3.wz = v1.wz + (v2.wz - v1.wz) * t1;
+			}
+		}
+		var tmp = this.vertices;
+		this.vertices = this.tmpVertices;
+		this.tmpVertices = tmp;
+		this.numVertices = this.numTmpVertices;
+		this.numTmpVertices = 0;
+		var _g = 0;
+		var _g1 = this.numVertices;
+		while(_g < _g1) {
+			var i = _g++;
+			var v1 = this.vertices[i];
+			var v2 = this.vertices[(i + 1) % this.numVertices];
+			var s1 = this.h + v1.y;
+			var s2 = this.h + v2.y;
+			if(s1 > 0 && s2 > 0) {
+				var _this = this.tmpVertices[this.numTmpVertices++];
+				_this.x = v1.x;
+				_this.y = v1.y;
+				_this.wx = v1.wx;
+				_this.wy = v1.wy;
+				_this.wz = v1.wz;
+			} else if(s1 > 0 && s2 <= 0) {
+				var _this1 = this.tmpVertices[this.numTmpVertices++];
+				_this1.x = v1.x;
+				_this1.y = v1.y;
+				_this1.wx = v1.wx;
+				_this1.wy = v1.wy;
+				_this1.wz = v1.wz;
+				var t = s1 / (s1 - s2);
+				var _this2 = this.tmpVertices[this.numTmpVertices++];
+				_this2.x = v1.x + (v2.x - v1.x) * t;
+				_this2.y = v1.y + (v2.y - v1.y) * t;
+				_this2.wx = v1.wx + (v2.wx - v1.wx) * t;
+				_this2.wy = v1.wy + (v2.wy - v1.wy) * t;
+				_this2.wz = v1.wz + (v2.wz - v1.wz) * t;
+			} else if(s1 <= 0 && s2 > 0) {
+				var t1 = s1 / (s1 - s2);
+				var _this3 = this.tmpVertices[this.numTmpVertices++];
+				_this3.x = v1.x + (v2.x - v1.x) * t1;
+				_this3.y = v1.y + (v2.y - v1.y) * t1;
+				_this3.wx = v1.wx + (v2.wx - v1.wx) * t1;
+				_this3.wy = v1.wy + (v2.wy - v1.wy) * t1;
+				_this3.wz = v1.wz + (v2.wz - v1.wz) * t1;
+			}
+		}
+		var tmp = this.vertices;
+		this.vertices = this.tmpVertices;
+		this.tmpVertices = tmp;
+		this.numVertices = this.numTmpVertices;
+		this.numTmpVertices = 0;
+		var _g = 0;
+		var _g1 = this.numVertices;
+		while(_g < _g1) {
+			var i = _g++;
+			var v1 = this.vertices[i];
+			var v2 = this.vertices[(i + 1) % this.numVertices];
+			var s1 = this.h - v1.y;
+			var s2 = this.h - v2.y;
+			if(s1 > 0 && s2 > 0) {
+				var _this = this.tmpVertices[this.numTmpVertices++];
+				_this.x = v1.x;
+				_this.y = v1.y;
+				_this.wx = v1.wx;
+				_this.wy = v1.wy;
+				_this.wz = v1.wz;
+			} else if(s1 > 0 && s2 <= 0) {
+				var _this1 = this.tmpVertices[this.numTmpVertices++];
+				_this1.x = v1.x;
+				_this1.y = v1.y;
+				_this1.wx = v1.wx;
+				_this1.wy = v1.wy;
+				_this1.wz = v1.wz;
+				var t = s1 / (s1 - s2);
+				var _this2 = this.tmpVertices[this.numTmpVertices++];
+				_this2.x = v1.x + (v2.x - v1.x) * t;
+				_this2.y = v1.y + (v2.y - v1.y) * t;
+				_this2.wx = v1.wx + (v2.wx - v1.wx) * t;
+				_this2.wy = v1.wy + (v2.wy - v1.wy) * t;
+				_this2.wz = v1.wz + (v2.wz - v1.wz) * t;
+			} else if(s1 <= 0 && s2 > 0) {
+				var t1 = s1 / (s1 - s2);
+				var _this3 = this.tmpVertices[this.numTmpVertices++];
+				_this3.x = v1.x + (v2.x - v1.x) * t1;
+				_this3.y = v1.y + (v2.y - v1.y) * t1;
+				_this3.wx = v1.wx + (v2.wx - v1.wx) * t1;
+				_this3.wy = v1.wy + (v2.wy - v1.wy) * t1;
+				_this3.wz = v1.wz + (v2.wz - v1.wz) * t1;
+			}
+		}
+		var tmp = this.vertices;
+		this.vertices = this.tmpVertices;
+		this.tmpVertices = tmp;
+		this.numVertices = this.numTmpVertices;
+		this.numTmpVertices = 0;
+	}
+	,reduce: function() {
+		if(this.numVertices < 4) {
+			return;
+		}
+		var max1 = -1e65536;
+		var min1 = 1e65536;
+		var max2 = -1e65536;
+		var min2 = 1e65536;
+		var max1V = null;
+		var min1V = null;
+		var max2V = null;
+		var min2V = null;
+		var e1x = 1;
+		var e1y = 1;
+		var e2x = -1;
+		var e2y = 1;
+		var _g = 0;
+		var _g1 = this.numVertices;
+		while(_g < _g1) {
+			var i = _g++;
+			var v = this.vertices[i];
+			var dot1 = v.x * e1x + v.y * e1y;
+			var dot2 = v.x * e2x + v.y * e2y;
+			if(i == 0) {
+				max1 = dot1;
+				max1V = v;
+				min1 = dot1;
+				min1V = v;
+				max2 = dot2;
+				max2V = v;
+				min2 = dot2;
+				min2V = v;
+			} else {
+				if(dot1 > max1) {
+					max1 = dot1;
+					max1V = v;
+				}
+				if(dot1 < min1) {
+					min1 = dot1;
+					min1V = v;
+				}
+				if(dot2 > max2) {
+					max2 = dot2;
+					max2V = v;
+				}
+				if(dot2 < min2) {
+					min2 = dot2;
+					min2V = v;
+				}
+			}
+		}
+		var _this = this.tmpVertices[this.numTmpVertices++];
+		_this.x = max1V.x;
+		_this.y = max1V.y;
+		_this.wx = max1V.wx;
+		_this.wy = max1V.wy;
+		_this.wz = max1V.wz;
+		var _this = this.tmpVertices[this.numTmpVertices++];
+		_this.x = max2V.x;
+		_this.y = max2V.y;
+		_this.wx = max2V.wx;
+		_this.wy = max2V.wy;
+		_this.wz = max2V.wz;
+		var _this = this.tmpVertices[this.numTmpVertices++];
+		_this.x = min1V.x;
+		_this.y = min1V.y;
+		_this.wx = min1V.wx;
+		_this.wy = min1V.wy;
+		_this.wz = min1V.wz;
+		var _this = this.tmpVertices[this.numTmpVertices++];
+		_this.x = min2V.x;
+		_this.y = min2V.y;
+		_this.wx = min2V.wx;
+		_this.wy = min2V.wy;
+		_this.wz = min2V.wz;
+		var tmp = this.vertices;
+		this.vertices = this.tmpVertices;
+		this.tmpVertices = tmp;
+		this.numVertices = this.numTmpVertices;
+		this.numTmpVertices = 0;
+	}
+	,__class__: oimo_collision_narrowphase_detector__$BoxBoxDetector_FaceClipper
+};
+var oimo_collision_narrowphase_detector_CachedDetectorData = function() {
+};
+$hxClasses["oimo.collision.narrowphase.detector.CachedDetectorData"] = oimo_collision_narrowphase_detector_CachedDetectorData;
+oimo_collision_narrowphase_detector_CachedDetectorData.__name__ = "oimo.collision.narrowphase.detector.CachedDetectorData";
+oimo_collision_narrowphase_detector_CachedDetectorData.prototype = {
+	_clear: function() {
+		if(this._gjkCache != null) {
+			this._gjkCache.clear();
+		}
+	}
+	,__class__: oimo_collision_narrowphase_detector_CachedDetectorData
+};
+var oimo_collision_narrowphase_detector_CapsuleCapsuleDetector = function() {
+	oimo_collision_narrowphase_detector_Detector.call(this,false);
+};
+$hxClasses["oimo.collision.narrowphase.detector.CapsuleCapsuleDetector"] = oimo_collision_narrowphase_detector_CapsuleCapsuleDetector;
+oimo_collision_narrowphase_detector_CapsuleCapsuleDetector.__name__ = "oimo.collision.narrowphase.detector.CapsuleCapsuleDetector";
+oimo_collision_narrowphase_detector_CapsuleCapsuleDetector.__super__ = oimo_collision_narrowphase_detector_Detector;
+oimo_collision_narrowphase_detector_CapsuleCapsuleDetector.prototype = $extend(oimo_collision_narrowphase_detector_Detector.prototype,{
+	detectImpl: function(result,geom1,geom2,tf1,tf2,cachedData) {
+		var c1 = geom1;
+		var c2 = geom2;
+		result.incremental = false;
+		var axis1X;
+		var axis1Y;
+		var axis1Z;
+		var axis2X;
+		var axis2Y;
+		var axis2Z;
+		axis1X = tf1._rotation01;
+		axis1Y = tf1._rotation11;
+		axis1Z = tf1._rotation21;
+		axis2X = tf2._rotation01;
+		axis2Y = tf2._rotation11;
+		axis2Z = tf2._rotation21;
+		var hh1 = c1._halfHeight;
+		var hh2 = c2._halfHeight;
+		var r1 = c1._radius;
+		var r2 = c2._radius;
+		var p1X;
+		var p1Y;
+		var p1Z;
+		var q1X;
+		var q1Y;
+		var q1Z;
+		var p2X;
+		var p2Y;
+		var p2Z;
+		var q2X;
+		var q2Y;
+		var q2Z;
+		p1X = tf1._positionX + axis1X * -hh1;
+		p1Y = tf1._positionY + axis1Y * -hh1;
+		p1Z = tf1._positionZ + axis1Z * -hh1;
+		q1X = tf1._positionX + axis1X * hh1;
+		q1Y = tf1._positionY + axis1Y * hh1;
+		q1Z = tf1._positionZ + axis1Z * hh1;
+		p2X = tf2._positionX + axis2X * -hh2;
+		p2Y = tf2._positionY + axis2Y * -hh2;
+		p2Z = tf2._positionZ + axis2Z * -hh2;
+		q2X = tf2._positionX + axis2X * hh2;
+		q2Y = tf2._positionY + axis2Y * hh2;
+		q2Z = tf2._positionZ + axis2Z * hh2;
+		var p12X;
+		var p12Y;
+		var p12Z;
+		p12X = p1X - p2X;
+		p12Y = p1Y - p2Y;
+		p12Z = p1Z - p2Z;
+		var d1X;
+		var d1Y;
+		var d1Z;
+		var d2X;
+		var d2Y;
+		var d2Z;
+		d1X = q1X - p1X;
+		d1Y = q1Y - p1Y;
+		d1Z = q1Z - p1Z;
+		d2X = q2X - p2X;
+		d2Y = q2Y - p2Y;
+		d2Z = q2Z - p2Z;
+		var p21d1 = -(p12X * d1X + p12Y * d1Y + p12Z * d1Z);
+		var p12d2 = p12X * d2X + p12Y * d2Y + p12Z * d2Z;
+		var d11 = hh1 * hh1 * 4;
+		var d12 = d1X * d2X + d1Y * d2Y + d1Z * d2Z;
+		var d22 = hh2 * hh2 * 4;
+		var t1;
+		var t2;
+		if(d11 == 0 && d22 == 0) {
+			t1 = 0;
+			t2 = 0;
+		} else if(d11 == 0) {
+			t1 = 0;
+			t2 = p12d2;
+			if(p12d2 < 0) {
+				t2 = 0;
+			} else if(p12d2 > d22) {
+				t2 = 1;
+			} else {
+				t2 = p12d2 / d22;
+			}
+		} else if(d22 == 0) {
+			t2 = 0;
+			t1 = p21d1;
+			if(p21d1 < 0) {
+				t1 = 0;
+			} else if(p21d1 > d11) {
+				t1 = 1;
+			} else {
+				t1 = p21d1 / d11;
+			}
+		} else {
+			var det = d11 * d22 - d12 * d12;
+			if(det == 0) {
+				t1 = 0;
+			} else {
+				t1 = d12 * p12d2 + d22 * p21d1;
+				if(t1 < 0) {
+					t1 = 0;
+				} else if(t1 > det) {
+					t1 = 1;
+				} else {
+					t1 /= det;
+				}
+			}
+			t2 = t1 * d12 + p12d2;
+			if(t2 < 0) {
+				t2 = 0;
+				t1 = p21d1;
+				if(p21d1 < 0) {
+					t1 = 0;
+				} else if(p21d1 > d11) {
+					t1 = 1;
+				} else {
+					t1 = p21d1 / d11;
+				}
+			} else if(t2 > d22) {
+				t2 = 1;
+				t1 = d12 + p21d1;
+				if(t1 < 0) {
+					t1 = 0;
+				} else if(t1 > d11) {
+					t1 = 1;
+				} else {
+					t1 /= d11;
+				}
+			} else {
+				t2 /= d22;
+			}
+		}
+		var cp1X;
+		var cp1Y;
+		var cp1Z;
+		var cp2X;
+		var cp2Y;
+		var cp2Z;
+		cp1X = p1X + d1X * t1;
+		cp1Y = p1Y + d1Y * t1;
+		cp1Z = p1Z + d1Z * t1;
+		cp2X = p2X + d2X * t2;
+		cp2Y = p2Y + d2Y * t2;
+		cp2Z = p2Z + d2Z * t2;
+		var dX;
+		var dY;
+		var dZ;
+		dX = cp1X - cp2X;
+		dY = cp1Y - cp2Y;
+		dZ = cp1Z - cp2Z;
+		var len2 = dX * dX + dY * dY + dZ * dZ;
+		if(len2 >= (r1 + r2) * (r1 + r2)) {
+			return;
+		}
+		var len = Math.sqrt(len2);
+		var nX;
+		var nY;
+		var nZ;
+		if(len > 0) {
+			nX = dX * (1 / len);
+			nY = dY * (1 / len);
+			nZ = dZ * (1 / len);
+		} else {
+			nX = 1;
+			nY = 0;
+			nZ = 0;
+		}
+		this.setNormal(result,nX,nY,nZ);
+		var pos1X;
+		var pos1Y;
+		var pos1Z;
+		var pos2X;
+		var pos2Y;
+		var pos2Z;
+		pos1X = cp1X + nX * -r1;
+		pos1Y = cp1Y + nY * -r1;
+		pos1Z = cp1Z + nZ * -r1;
+		pos2X = cp2X + nX * r2;
+		pos2Y = cp2Y + nY * r2;
+		pos2Z = cp2Z + nZ * r2;
+		this.addPoint(result,pos1X,pos1Y,pos1Z,pos2X,pos2Y,pos2Z,r1 + r2 - len,0);
+	}
+	,__class__: oimo_collision_narrowphase_detector_CapsuleCapsuleDetector
+});
+var oimo_collision_narrowphase_detector_GjkEpaDetector = function() {
+	oimo_collision_narrowphase_detector_Detector.call(this,false);
+};
+$hxClasses["oimo.collision.narrowphase.detector.GjkEpaDetector"] = oimo_collision_narrowphase_detector_GjkEpaDetector;
+oimo_collision_narrowphase_detector_GjkEpaDetector.__name__ = "oimo.collision.narrowphase.detector.GjkEpaDetector";
+oimo_collision_narrowphase_detector_GjkEpaDetector.__super__ = oimo_collision_narrowphase_detector_Detector;
+oimo_collision_narrowphase_detector_GjkEpaDetector.prototype = $extend(oimo_collision_narrowphase_detector_Detector.prototype,{
+	detectImpl: function(result,geom1,geom2,tf1,tf2,cachedData) {
+		var gjkEpa = oimo_collision_narrowphase_detector_gjkepa_GjkEpa.instance;
+		var g1 = geom1;
+		var g2 = geom2;
+		var status = gjkEpa.computeClosestPointsImpl(g1,g2,tf1,tf2,oimo_common_Setting.enableGJKCaching ? cachedData : null,true);
+		result.incremental = true;
+		if(status != oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.SUCCEEDED) {
+			haxe_Log.trace("GJK/EPA failed: status=" + status,{ fileName : "oimo/collision/narrowphase/detector/GjkEpaDetector.hx", lineNumber : 28, className : "oimo.collision.narrowphase.detector.GjkEpaDetector", methodName : "detectImpl"});
+			return;
+		}
+		if(gjkEpa.distance > g1._gjkMargin + g2._gjkMargin) {
+			return;
+		}
+		var pos1X;
+		var pos1Y;
+		var pos1Z;
+		var pos2X;
+		var pos2Y;
+		var pos2Z;
+		var v = gjkEpa.closestPoint1;
+		pos1X = v.x;
+		pos1Y = v.y;
+		pos1Z = v.z;
+		var v = gjkEpa.closestPoint2;
+		pos2X = v.x;
+		pos2Y = v.y;
+		pos2Z = v.z;
+		var normalX;
+		var normalY;
+		var normalZ;
+		normalX = pos1X - pos2X;
+		normalY = pos1Y - pos2Y;
+		normalZ = pos1Z - pos2Z;
+		if(normalX * normalX + normalY * normalY + normalZ * normalZ == 0) {
+			return;
+		}
+		if(gjkEpa.distance < 0) {
+			normalX = -normalX;
+			normalY = -normalY;
+			normalZ = -normalZ;
+		}
+		var l = normalX * normalX + normalY * normalY + normalZ * normalZ;
+		if(l > 0) {
+			l = 1 / Math.sqrt(l);
+		}
+		normalX *= l;
+		normalY *= l;
+		normalZ *= l;
+		this.setNormal(result,normalX,normalY,normalZ);
+		pos1X += normalX * -g1._gjkMargin;
+		pos1Y += normalY * -g1._gjkMargin;
+		pos1Z += normalZ * -g1._gjkMargin;
+		pos2X += normalX * g2._gjkMargin;
+		pos2Y += normalY * g2._gjkMargin;
+		pos2Z += normalZ * g2._gjkMargin;
+		this.addPoint(result,pos1X,pos1Y,pos1Z,pos2X,pos2Y,pos2Z,g1._gjkMargin + g2._gjkMargin - gjkEpa.distance,0);
+	}
+	,__class__: oimo_collision_narrowphase_detector_GjkEpaDetector
+});
+var oimo_collision_narrowphase_detector_SphereBoxDetector = function(swapped) {
+	oimo_collision_narrowphase_detector_Detector.call(this,swapped);
+};
+$hxClasses["oimo.collision.narrowphase.detector.SphereBoxDetector"] = oimo_collision_narrowphase_detector_SphereBoxDetector;
+oimo_collision_narrowphase_detector_SphereBoxDetector.__name__ = "oimo.collision.narrowphase.detector.SphereBoxDetector";
+oimo_collision_narrowphase_detector_SphereBoxDetector.__super__ = oimo_collision_narrowphase_detector_Detector;
+oimo_collision_narrowphase_detector_SphereBoxDetector.prototype = $extend(oimo_collision_narrowphase_detector_Detector.prototype,{
+	detectImpl: function(result,geom1,geom2,tf1,tf2,cachedData) {
+		var b = geom2;
+		result.incremental = false;
+		var halfExtX;
+		var halfExtY;
+		var halfExtZ;
+		var negHalfExtX;
+		var negHalfExtY;
+		var negHalfExtZ;
+		halfExtX = b._halfExtentsX;
+		halfExtY = b._halfExtentsY;
+		halfExtZ = b._halfExtentsZ;
+		negHalfExtX = -halfExtX;
+		negHalfExtY = -halfExtY;
+		negHalfExtZ = -halfExtZ;
+		var r = geom1._radius;
+		var boxToSphereX;
+		var boxToSphereY;
+		var boxToSphereZ;
+		boxToSphereX = tf1._positionX - tf2._positionX;
+		boxToSphereY = tf1._positionY - tf2._positionY;
+		boxToSphereZ = tf1._positionZ - tf2._positionZ;
+		var boxToSphereInBoxX;
+		var boxToSphereInBoxY;
+		var boxToSphereInBoxZ;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf2._rotation00 * boxToSphereX + tf2._rotation10 * boxToSphereY + tf2._rotation20 * boxToSphereZ;
+		__tmp__Y = tf2._rotation01 * boxToSphereX + tf2._rotation11 * boxToSphereY + tf2._rotation21 * boxToSphereZ;
+		__tmp__Z = tf2._rotation02 * boxToSphereX + tf2._rotation12 * boxToSphereY + tf2._rotation22 * boxToSphereZ;
+		boxToSphereInBoxX = __tmp__X;
+		boxToSphereInBoxY = __tmp__Y;
+		boxToSphereInBoxZ = __tmp__Z;
+		if(negHalfExtX < boxToSphereInBoxX && halfExtX > boxToSphereInBoxX && negHalfExtY < boxToSphereInBoxY && halfExtY > boxToSphereInBoxY && negHalfExtZ < boxToSphereInBoxZ && halfExtZ > boxToSphereInBoxZ) {
+			var sphereToBoxSurfaceX;
+			var sphereToBoxSurfaceY;
+			var sphereToBoxSurfaceZ;
+			sphereToBoxSurfaceX = boxToSphereInBoxX < 0 ? -boxToSphereInBoxX : boxToSphereInBoxX;
+			sphereToBoxSurfaceY = boxToSphereInBoxY < 0 ? -boxToSphereInBoxY : boxToSphereInBoxY;
+			sphereToBoxSurfaceZ = boxToSphereInBoxZ < 0 ? -boxToSphereInBoxZ : boxToSphereInBoxZ;
+			sphereToBoxSurfaceX = halfExtX - sphereToBoxSurfaceX;
+			sphereToBoxSurfaceY = halfExtY - sphereToBoxSurfaceY;
+			sphereToBoxSurfaceZ = halfExtZ - sphereToBoxSurfaceZ;
+			var normalInBoxX;
+			var normalInBoxY;
+			var normalInBoxZ;
+			var distX = sphereToBoxSurfaceX;
+			var distY = sphereToBoxSurfaceY;
+			var distZ = sphereToBoxSurfaceZ;
+			var depth;
+			var projectionMaskX;
+			var projectionMaskY;
+			var projectionMaskZ;
+			if(distX < distY) {
+				if(distX < distZ) {
+					if(boxToSphereInBoxX > 0) {
+						normalInBoxX = 1;
+						normalInBoxY = 0;
+						normalInBoxZ = 0;
+					} else {
+						normalInBoxX = -1;
+						normalInBoxY = 0;
+						normalInBoxZ = 0;
+					}
+					projectionMaskX = 0;
+					projectionMaskY = 1;
+					projectionMaskZ = 1;
+					depth = distX;
+				} else {
+					if(boxToSphereInBoxZ > 0) {
+						normalInBoxX = 0;
+						normalInBoxY = 0;
+						normalInBoxZ = 1;
+					} else {
+						normalInBoxX = 0;
+						normalInBoxY = 0;
+						normalInBoxZ = -1;
+					}
+					projectionMaskX = 1;
+					projectionMaskY = 1;
+					projectionMaskZ = 0;
+					depth = distZ;
+				}
+			} else if(distY < distZ) {
+				if(boxToSphereInBoxY > 0) {
+					normalInBoxX = 0;
+					normalInBoxY = 1;
+					normalInBoxZ = 0;
+				} else {
+					normalInBoxX = 0;
+					normalInBoxY = -1;
+					normalInBoxZ = 0;
+				}
+				projectionMaskX = 1;
+				projectionMaskY = 0;
+				projectionMaskZ = 1;
+				depth = distY;
+			} else {
+				if(boxToSphereInBoxZ > 0) {
+					normalInBoxX = 0;
+					normalInBoxY = 0;
+					normalInBoxZ = 1;
+				} else {
+					normalInBoxX = 0;
+					normalInBoxY = 0;
+					normalInBoxZ = -1;
+				}
+				projectionMaskX = 1;
+				projectionMaskY = 1;
+				projectionMaskZ = 0;
+				depth = distZ;
+			}
+			var baseX;
+			var baseY;
+			var baseZ;
+			baseX = projectionMaskX * boxToSphereInBoxX;
+			baseY = projectionMaskY * boxToSphereInBoxY;
+			baseZ = projectionMaskZ * boxToSphereInBoxZ;
+			var boxToClosestPointInBoxX;
+			var boxToClosestPointInBoxY;
+			var boxToClosestPointInBoxZ;
+			boxToClosestPointInBoxX = normalInBoxX * halfExtX;
+			boxToClosestPointInBoxY = normalInBoxY * halfExtY;
+			boxToClosestPointInBoxZ = normalInBoxZ * halfExtZ;
+			boxToClosestPointInBoxX += baseX;
+			boxToClosestPointInBoxY += baseY;
+			boxToClosestPointInBoxZ += baseZ;
+			var boxToClosestPointX;
+			var boxToClosestPointY;
+			var boxToClosestPointZ;
+			var normalX;
+			var normalY;
+			var normalZ;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf2._rotation00 * boxToClosestPointInBoxX + tf2._rotation01 * boxToClosestPointInBoxY + tf2._rotation02 * boxToClosestPointInBoxZ;
+			__tmp__Y = tf2._rotation10 * boxToClosestPointInBoxX + tf2._rotation11 * boxToClosestPointInBoxY + tf2._rotation12 * boxToClosestPointInBoxZ;
+			__tmp__Z = tf2._rotation20 * boxToClosestPointInBoxX + tf2._rotation21 * boxToClosestPointInBoxY + tf2._rotation22 * boxToClosestPointInBoxZ;
+			boxToClosestPointX = __tmp__X;
+			boxToClosestPointY = __tmp__Y;
+			boxToClosestPointZ = __tmp__Z;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf2._rotation00 * normalInBoxX + tf2._rotation01 * normalInBoxY + tf2._rotation02 * normalInBoxZ;
+			__tmp__Y = tf2._rotation10 * normalInBoxX + tf2._rotation11 * normalInBoxY + tf2._rotation12 * normalInBoxZ;
+			__tmp__Z = tf2._rotation20 * normalInBoxX + tf2._rotation21 * normalInBoxY + tf2._rotation22 * normalInBoxZ;
+			normalX = __tmp__X;
+			normalY = __tmp__Y;
+			normalZ = __tmp__Z;
+			this.setNormal(result,normalX,normalY,normalZ);
+			var pos1X;
+			var pos1Y;
+			var pos1Z;
+			var pos2X;
+			var pos2Y;
+			var pos2Z;
+			pos1X = tf1._positionX + normalX * -r;
+			pos1Y = tf1._positionY + normalY * -r;
+			pos1Z = tf1._positionZ + normalZ * -r;
+			pos2X = tf2._positionX + boxToClosestPointX;
+			pos2Y = tf2._positionY + boxToClosestPointY;
+			pos2Z = tf2._positionZ + boxToClosestPointZ;
+			this.addPoint(result,pos1X,pos1Y,pos1Z,pos2X,pos2Y,pos2Z,depth,0);
+			return;
+		}
+		var boxToClosestPointInBoxX;
+		var boxToClosestPointInBoxY;
+		var boxToClosestPointInBoxZ;
+		halfExtX -= 1e-9;
+		halfExtY -= 1e-9;
+		halfExtZ -= 1e-9;
+		negHalfExtX += 1e-9;
+		negHalfExtY += 1e-9;
+		negHalfExtZ += 1e-9;
+		boxToClosestPointInBoxX = boxToSphereInBoxX < halfExtX ? boxToSphereInBoxX : halfExtX;
+		boxToClosestPointInBoxY = boxToSphereInBoxY < halfExtY ? boxToSphereInBoxY : halfExtY;
+		boxToClosestPointInBoxZ = boxToSphereInBoxZ < halfExtZ ? boxToSphereInBoxZ : halfExtZ;
+		if(!(boxToClosestPointInBoxX > negHalfExtX)) {
+			boxToClosestPointInBoxX = negHalfExtX;
+		}
+		if(!(boxToClosestPointInBoxY > negHalfExtY)) {
+			boxToClosestPointInBoxY = negHalfExtY;
+		}
+		if(!(boxToClosestPointInBoxZ > negHalfExtZ)) {
+			boxToClosestPointInBoxZ = negHalfExtZ;
+		}
+		var closestPointToSphereInBoxX;
+		var closestPointToSphereInBoxY;
+		var closestPointToSphereInBoxZ;
+		closestPointToSphereInBoxX = boxToSphereInBoxX - boxToClosestPointInBoxX;
+		closestPointToSphereInBoxY = boxToSphereInBoxY - boxToClosestPointInBoxY;
+		closestPointToSphereInBoxZ = boxToSphereInBoxZ - boxToClosestPointInBoxZ;
+		var dist = closestPointToSphereInBoxX * closestPointToSphereInBoxX + closestPointToSphereInBoxY * closestPointToSphereInBoxY + closestPointToSphereInBoxZ * closestPointToSphereInBoxZ;
+		if(dist >= r * r) {
+			return;
+		}
+		dist = Math.sqrt(dist);
+		var boxToClosestPointX;
+		var boxToClosestPointY;
+		var boxToClosestPointZ;
+		var closestPointToSphereX;
+		var closestPointToSphereY;
+		var closestPointToSphereZ;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf2._rotation00 * boxToClosestPointInBoxX + tf2._rotation01 * boxToClosestPointInBoxY + tf2._rotation02 * boxToClosestPointInBoxZ;
+		__tmp__Y = tf2._rotation10 * boxToClosestPointInBoxX + tf2._rotation11 * boxToClosestPointInBoxY + tf2._rotation12 * boxToClosestPointInBoxZ;
+		__tmp__Z = tf2._rotation20 * boxToClosestPointInBoxX + tf2._rotation21 * boxToClosestPointInBoxY + tf2._rotation22 * boxToClosestPointInBoxZ;
+		boxToClosestPointX = __tmp__X;
+		boxToClosestPointY = __tmp__Y;
+		boxToClosestPointZ = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf2._rotation00 * closestPointToSphereInBoxX + tf2._rotation01 * closestPointToSphereInBoxY + tf2._rotation02 * closestPointToSphereInBoxZ;
+		__tmp__Y = tf2._rotation10 * closestPointToSphereInBoxX + tf2._rotation11 * closestPointToSphereInBoxY + tf2._rotation12 * closestPointToSphereInBoxZ;
+		__tmp__Z = tf2._rotation20 * closestPointToSphereInBoxX + tf2._rotation21 * closestPointToSphereInBoxY + tf2._rotation22 * closestPointToSphereInBoxZ;
+		closestPointToSphereX = __tmp__X;
+		closestPointToSphereY = __tmp__Y;
+		closestPointToSphereZ = __tmp__Z;
+		var normalX;
+		var normalY;
+		var normalZ;
+		var l = closestPointToSphereX * closestPointToSphereX + closestPointToSphereY * closestPointToSphereY + closestPointToSphereZ * closestPointToSphereZ;
+		if(l > 0) {
+			l = 1 / Math.sqrt(l);
+		}
+		normalX = closestPointToSphereX * l;
+		normalY = closestPointToSphereY * l;
+		normalZ = closestPointToSphereZ * l;
+		this.setNormal(result,normalX,normalY,normalZ);
+		var pos1X;
+		var pos1Y;
+		var pos1Z;
+		var pos2X;
+		var pos2Y;
+		var pos2Z;
+		pos1X = tf1._positionX + normalX * -r;
+		pos1Y = tf1._positionY + normalY * -r;
+		pos1Z = tf1._positionZ + normalZ * -r;
+		pos2X = tf2._positionX + boxToClosestPointX;
+		pos2Y = tf2._positionY + boxToClosestPointY;
+		pos2Z = tf2._positionZ + boxToClosestPointZ;
+		this.addPoint(result,pos1X,pos1Y,pos1Z,pos2X,pos2Y,pos2Z,r - dist,0);
+	}
+	,__class__: oimo_collision_narrowphase_detector_SphereBoxDetector
+});
+var oimo_collision_narrowphase_detector_SphereCapsuleDetector = function(swapped) {
+	oimo_collision_narrowphase_detector_Detector.call(this,swapped);
+};
+$hxClasses["oimo.collision.narrowphase.detector.SphereCapsuleDetector"] = oimo_collision_narrowphase_detector_SphereCapsuleDetector;
+oimo_collision_narrowphase_detector_SphereCapsuleDetector.__name__ = "oimo.collision.narrowphase.detector.SphereCapsuleDetector";
+oimo_collision_narrowphase_detector_SphereCapsuleDetector.__super__ = oimo_collision_narrowphase_detector_Detector;
+oimo_collision_narrowphase_detector_SphereCapsuleDetector.prototype = $extend(oimo_collision_narrowphase_detector_Detector.prototype,{
+	detectImpl: function(result,geom1,geom2,tf1,tf2,cachedData) {
+		var c2 = geom2;
+		result.incremental = false;
+		var hh2 = c2._halfHeight;
+		var r1 = geom1._radius;
+		var r2 = c2._radius;
+		var axis2X;
+		var axis2Y;
+		var axis2Z;
+		axis2X = tf2._rotation01;
+		axis2Y = tf2._rotation11;
+		axis2Z = tf2._rotation21;
+		var cp1X;
+		var cp1Y;
+		var cp1Z;
+		cp1X = tf1._positionX;
+		cp1Y = tf1._positionY;
+		cp1Z = tf1._positionZ;
+		var p2X;
+		var p2Y;
+		var p2Z;
+		var q2X;
+		var q2Y;
+		var q2Z;
+		p2X = tf2._positionX + axis2X * -hh2;
+		p2Y = tf2._positionY + axis2Y * -hh2;
+		p2Z = tf2._positionZ + axis2Z * -hh2;
+		q2X = tf2._positionX + axis2X * hh2;
+		q2Y = tf2._positionY + axis2Y * hh2;
+		q2Z = tf2._positionZ + axis2Z * hh2;
+		var p12X;
+		var p12Y;
+		var p12Z;
+		p12X = cp1X - p2X;
+		p12Y = cp1Y - p2Y;
+		p12Z = cp1Z - p2Z;
+		var d2X;
+		var d2Y;
+		var d2Z;
+		d2X = q2X - p2X;
+		d2Y = q2Y - p2Y;
+		d2Z = q2Z - p2Z;
+		var d22 = hh2 * hh2 * 4;
+		var t = p12X * d2X + p12Y * d2Y + p12Z * d2Z;
+		if(t < 0) {
+			t = 0;
+		} else if(t > d22) {
+			t = 1;
+		} else {
+			t /= d22;
+		}
+		var cp2X;
+		var cp2Y;
+		var cp2Z;
+		cp2X = p2X + d2X * t;
+		cp2Y = p2Y + d2Y * t;
+		cp2Z = p2Z + d2Z * t;
+		var dX;
+		var dY;
+		var dZ;
+		dX = cp1X - cp2X;
+		dY = cp1Y - cp2Y;
+		dZ = cp1Z - cp2Z;
+		var len2 = dX * dX + dY * dY + dZ * dZ;
+		if(len2 >= (r1 + r2) * (r1 + r2)) {
+			return;
+		}
+		var len = Math.sqrt(len2);
+		var nX;
+		var nY;
+		var nZ;
+		if(len > 0) {
+			nX = dX * (1 / len);
+			nY = dY * (1 / len);
+			nZ = dZ * (1 / len);
+		} else {
+			nX = 1;
+			nY = 0;
+			nZ = 0;
+		}
+		this.setNormal(result,nX,nY,nZ);
+		var pos1X;
+		var pos1Y;
+		var pos1Z;
+		var pos2X;
+		var pos2Y;
+		var pos2Z;
+		pos1X = cp1X + nX * -r1;
+		pos1Y = cp1Y + nY * -r1;
+		pos1Z = cp1Z + nZ * -r1;
+		pos2X = cp2X + nX * r2;
+		pos2Y = cp2Y + nY * r2;
+		pos2Z = cp2Z + nZ * r2;
+		this.addPoint(result,pos1X,pos1Y,pos1Z,pos2X,pos2Y,pos2Z,r1 + r2 - len,0);
+	}
+	,__class__: oimo_collision_narrowphase_detector_SphereCapsuleDetector
+});
+var oimo_collision_narrowphase_detector_SphereSphereDetector = function() {
+	oimo_collision_narrowphase_detector_Detector.call(this,false);
+};
+$hxClasses["oimo.collision.narrowphase.detector.SphereSphereDetector"] = oimo_collision_narrowphase_detector_SphereSphereDetector;
+oimo_collision_narrowphase_detector_SphereSphereDetector.__name__ = "oimo.collision.narrowphase.detector.SphereSphereDetector";
+oimo_collision_narrowphase_detector_SphereSphereDetector.__super__ = oimo_collision_narrowphase_detector_Detector;
+oimo_collision_narrowphase_detector_SphereSphereDetector.prototype = $extend(oimo_collision_narrowphase_detector_Detector.prototype,{
+	detectImpl: function(result,geom1,geom2,tf1,tf2,cachedData) {
+		result.incremental = false;
+		var dX;
+		var dY;
+		var dZ;
+		dX = tf1._positionX - tf2._positionX;
+		dY = tf1._positionY - tf2._positionY;
+		dZ = tf1._positionZ - tf2._positionZ;
+		var r1 = geom1._radius;
+		var r2 = geom2._radius;
+		var len2 = dX * dX + dY * dY + dZ * dZ;
+		if(len2 >= (r1 + r2) * (r1 + r2)) {
+			return;
+		}
+		var len = Math.sqrt(len2);
+		var nX;
+		var nY;
+		var nZ;
+		if(len > 0) {
+			nX = dX * (1 / len);
+			nY = dY * (1 / len);
+			nZ = dZ * (1 / len);
+		} else {
+			nX = 1;
+			nY = 0;
+			nZ = 0;
+		}
+		this.setNormal(result,nX,nY,nZ);
+		var pos1X;
+		var pos1Y;
+		var pos1Z;
+		var pos2X;
+		var pos2Y;
+		var pos2Z;
+		pos1X = tf1._positionX + nX * -r1;
+		pos1Y = tf1._positionY + nY * -r1;
+		pos1Z = tf1._positionZ + nZ * -r1;
+		pos2X = tf2._positionX + nX * r2;
+		pos2Y = tf2._positionY + nY * r2;
+		pos2Z = tf2._positionZ + nZ * r2;
+		this.addPoint(result,pos1X,pos1Y,pos1Z,pos2X,pos2Y,pos2Z,r1 + r2 - len,0);
+	}
+	,__class__: oimo_collision_narrowphase_detector_SphereSphereDetector
+});
+var oimo_collision_narrowphase_detector_gjkepa_EpaPolyhedron = function() {
+	this._vertices = new Array(oimo_common_Setting.maxEPAVertices);
+	this._center = new oimo_common_Vec3();
+	this._numVertices = 0;
+	this._triangleList = null;
+	this._triangleListLast = null;
+	this._numTriangles = 0;
+	this._trianglePool = null;
+	this._vertexPool = null;
+};
+$hxClasses["oimo.collision.narrowphase.detector.gjkepa.EpaPolyhedron"] = oimo_collision_narrowphase_detector_gjkepa_EpaPolyhedron;
+oimo_collision_narrowphase_detector_gjkepa_EpaPolyhedron.__name__ = "oimo.collision.narrowphase.detector.gjkepa.EpaPolyhedron";
+oimo_collision_narrowphase_detector_gjkepa_EpaPolyhedron.prototype = {
+	validate: function() {
+		var t = this._triangleList;
+		while(t != null) {
+			t._vertices[0]._tmpEdgeLoopOuterTriangle = null;
+			t._vertices[0]._tmpEdgeLoopNext = null;
+			if(t._adjacentPairIndex[0] == -1) {
+				this._status = 2;
+				return false;
+			}
+			if(t._adjacentTriangles[0] == null) {
+				this._status = 3;
+				return false;
+			}
+			t._vertices[1]._tmpEdgeLoopOuterTriangle = null;
+			t._vertices[1]._tmpEdgeLoopNext = null;
+			if(t._adjacentPairIndex[1] == -1) {
+				this._status = 2;
+				return false;
+			}
+			if(t._adjacentTriangles[1] == null) {
+				this._status = 3;
+				return false;
+			}
+			t._vertices[2]._tmpEdgeLoopOuterTriangle = null;
+			t._vertices[2]._tmpEdgeLoopNext = null;
+			if(t._adjacentPairIndex[2] == -1) {
+				this._status = 2;
+				return false;
+			}
+			if(t._adjacentTriangles[2] == null) {
+				this._status = 3;
+				return false;
+			}
+			t = t._next;
+		}
+		return true;
+	}
+	,findEdgeLoop: function(id,base,from) {
+		if(base._tmpDfsId == id) {
+			return;
+		}
+		base._tmpDfsId = id;
+		var _this = base.tmp;
+		_this.x = from.x;
+		_this.y = from.y;
+		_this.z = from.z;
+		var v = base._vertices[0].v;
+		_this.x -= v.x;
+		_this.y -= v.y;
+		_this.z -= v.z;
+		var _this = base.tmp;
+		var v = base._normal;
+		base._tmpDfsVisible = _this.x * v.x + _this.y * v.y + _this.z * v.z > 0;
+		if(!base._tmpDfsVisible) {
+			this._status = 6;
+			return;
+		}
+		var _g = 0;
+		while(_g < 3) {
+			var i = _g++;
+			var t = base._adjacentTriangles[i];
+			if(t == null) {
+				continue;
+			}
+			var _this = t.tmp;
+			_this.x = from.x;
+			_this.y = from.y;
+			_this.z = from.z;
+			var v = t._vertices[0].v;
+			_this.x -= v.x;
+			_this.y -= v.y;
+			_this.z -= v.z;
+			var _this1 = t.tmp;
+			var v1 = t._normal;
+			t._tmpDfsVisible = _this1.x * v1.x + _this1.y * v1.y + _this1.z * v1.z > 0;
+			if(t._tmpDfsVisible) {
+				this.findEdgeLoop(id,t,from);
+			} else {
+				var v11 = base._vertices[i];
+				v11._tmpEdgeLoopNext = base._vertices[base._nextIndex[i]];
+				v11._tmpEdgeLoopOuterTriangle = t;
+			}
+		}
+		var triangle = base._adjacentTriangles[0];
+		if(triangle != null) {
+			var pairIndex = base._adjacentPairIndex[0];
+			triangle._adjacentTriangles[pairIndex] = null;
+			triangle._adjacentPairIndex[pairIndex] = -1;
+			base._adjacentTriangles[0] = null;
+			base._adjacentPairIndex[0] = -1;
+		}
+		var triangle = base._adjacentTriangles[1];
+		if(triangle != null) {
+			var pairIndex = base._adjacentPairIndex[1];
+			triangle._adjacentTriangles[pairIndex] = null;
+			triangle._adjacentPairIndex[pairIndex] = -1;
+			base._adjacentTriangles[1] = null;
+			base._adjacentPairIndex[1] = -1;
+		}
+		var triangle = base._adjacentTriangles[2];
+		if(triangle != null) {
+			var pairIndex = base._adjacentPairIndex[2];
+			triangle._adjacentTriangles[pairIndex] = null;
+			triangle._adjacentPairIndex[pairIndex] = -1;
+			base._adjacentTriangles[2] = null;
+			base._adjacentPairIndex[2] = -1;
+		}
+		this._numTriangles--;
+		var prev = base._prev;
+		var next = base._next;
+		if(prev != null) {
+			prev._next = next;
+		}
+		if(next != null) {
+			next._prev = prev;
+		}
+		if(base == this._triangleList) {
+			this._triangleList = this._triangleList._next;
+		}
+		if(base == this._triangleListLast) {
+			this._triangleListLast = this._triangleListLast._prev;
+		}
+		base._next = null;
+		base._prev = null;
+		base.removeReferences();
+		base._next = this._trianglePool;
+		this._trianglePool = base;
+	}
+	,_init: function(v1,v2,v3,v4) {
+		this._status = 0;
+		this._numVertices = 4;
+		this._vertices[0] = v1;
+		this._vertices[1] = v2;
+		this._vertices[2] = v3;
+		this._vertices[3] = v4;
+		var _this = this._center;
+		var v = v1.v;
+		_this.x = v.x;
+		_this.y = v.y;
+		_this.z = v.z;
+		var v = v2.v;
+		_this.x += v.x;
+		_this.y += v.y;
+		_this.z += v.z;
+		var v = v3.v;
+		_this.x += v.x;
+		_this.y += v.y;
+		_this.z += v.z;
+		var v = v4.v;
+		_this.x += v.x;
+		_this.y += v.y;
+		_this.z += v.z;
+		_this.x *= 0.25;
+		_this.y *= 0.25;
+		_this.z *= 0.25;
+		var first = this._trianglePool;
+		if(first != null) {
+			this._trianglePool = first._next;
+			first._next = null;
+		} else {
+			first = new oimo_collision_narrowphase_detector_gjkepa_EpaTriangle();
+		}
+		var t1 = first;
+		var first = this._trianglePool;
+		if(first != null) {
+			this._trianglePool = first._next;
+			first._next = null;
+		} else {
+			first = new oimo_collision_narrowphase_detector_gjkepa_EpaTriangle();
+		}
+		var t2 = first;
+		var first = this._trianglePool;
+		if(first != null) {
+			this._trianglePool = first._next;
+			first._next = null;
+		} else {
+			first = new oimo_collision_narrowphase_detector_gjkepa_EpaTriangle();
+		}
+		var t3 = first;
+		var first = this._trianglePool;
+		if(first != null) {
+			this._trianglePool = first._next;
+			first._next = null;
+		} else {
+			first = new oimo_collision_narrowphase_detector_gjkepa_EpaTriangle();
+		}
+		var t4 = first;
+		if(!t1.init(v1,v2,v3,this._center,true)) {
+			this._status = 1;
+		}
+		if(!t2.init(v1,v2,v4,this._center,true)) {
+			this._status = 1;
+		}
+		if(!t3.init(v1,v3,v4,this._center,true)) {
+			this._status = 1;
+		}
+		if(!t4.init(v2,v3,v4,this._center,true)) {
+			this._status = 1;
+		}
+		if(!t1.setAdjacentTriangle(t2)) {
+			this._status = 1;
+		}
+		if(!t1.setAdjacentTriangle(t3)) {
+			this._status = 1;
+		}
+		if(!t1.setAdjacentTriangle(t4)) {
+			this._status = 1;
+		}
+		if(!t2.setAdjacentTriangle(t3)) {
+			this._status = 1;
+		}
+		if(!t2.setAdjacentTriangle(t4)) {
+			this._status = 1;
+		}
+		if(!t3.setAdjacentTriangle(t4)) {
+			this._status = 1;
+		}
+		this._numTriangles++;
+		if(this._triangleList == null) {
+			this._triangleList = t1;
+			this._triangleListLast = t1;
+		} else {
+			this._triangleListLast._next = t1;
+			t1._prev = this._triangleListLast;
+			this._triangleListLast = t1;
+		}
+		this._numTriangles++;
+		if(this._triangleList == null) {
+			this._triangleList = t2;
+			this._triangleListLast = t2;
+		} else {
+			this._triangleListLast._next = t2;
+			t2._prev = this._triangleListLast;
+			this._triangleListLast = t2;
+		}
+		this._numTriangles++;
+		if(this._triangleList == null) {
+			this._triangleList = t3;
+			this._triangleListLast = t3;
+		} else {
+			this._triangleListLast._next = t3;
+			t3._prev = this._triangleListLast;
+			this._triangleListLast = t3;
+		}
+		this._numTriangles++;
+		if(this._triangleList == null) {
+			this._triangleList = t4;
+			this._triangleListLast = t4;
+		} else {
+			this._triangleListLast._next = t4;
+			t4._prev = this._triangleListLast;
+			this._triangleListLast = t4;
+		}
+		return this._status == 0;
+	}
+	,_addVertex: function(vertex,base) {
+		this._vertices[this._numVertices++] = vertex;
+		var v1 = base._vertices[0];
+		this.findEdgeLoop(this._numVertices,base,vertex.v);
+		if(this._status != 0) {
+			return false;
+		}
+		var v = v1;
+		var prevT = null;
+		var firstT = null;
+		do {
+			if(v._tmpEdgeLoopNext == null) {
+				this._dumpAsObjModel();
+				this._status = 4;
+				return false;
+			}
+			if(v._tmpEdgeLoopOuterTriangle == null) {
+				this._status = 5;
+				return false;
+			}
+			var first = this._trianglePool;
+			if(first != null) {
+				this._trianglePool = first._next;
+				first._next = null;
+			} else {
+				first = new oimo_collision_narrowphase_detector_gjkepa_EpaTriangle();
+			}
+			var t = first;
+			if(firstT == null) {
+				firstT = t;
+			}
+			if(!t.init(v,v._tmpEdgeLoopNext,vertex,this._center,false)) {
+				this._status = 1;
+			}
+			if(this._status != 0) {
+				return false;
+			}
+			this._numTriangles++;
+			if(this._triangleList == null) {
+				this._triangleList = t;
+				this._triangleListLast = t;
+			} else {
+				this._triangleListLast._next = t;
+				t._prev = this._triangleListLast;
+				this._triangleListLast = t;
+			}
+			if(!t.setAdjacentTriangle(v._tmpEdgeLoopOuterTriangle)) {
+				this._status = 1;
+			}
+			if(prevT != null) {
+				if(!t.setAdjacentTriangle(prevT)) {
+					this._status = 1;
+				}
+			}
+			prevT = t;
+			v = v._tmpEdgeLoopNext;
+		} while(v != v1);
+		if(!prevT.setAdjacentTriangle(firstT)) {
+			this._status = 1;
+		}
+		if(this._status == 0) {
+			return this.validate();
+		} else {
+			return false;
+		}
+	}
+	,_dumpAsObjModel: function() {
+	}
+	,__class__: oimo_collision_narrowphase_detector_gjkepa_EpaPolyhedron
+};
+var oimo_collision_narrowphase_detector_gjkepa_EpaTriangle = function() {
+	this._next = null;
+	this._prev = null;
+	this._normal = new oimo_common_Vec3();
+	this._distanceSq = 0;
+	this._tmpDfsId = 0;
+	this._tmpDfsVisible = false;
+	this._vertices = new Array(3);
+	this._adjacentTriangles = new Array(3);
+	this._adjacentPairIndex = new Array(3);
+	this.tmp = new oimo_common_Vec3();
+	this._nextIndex = new Array(3);
+	this._nextIndex[0] = 1;
+	this._nextIndex[1] = 2;
+	this._nextIndex[2] = 0;
+};
+$hxClasses["oimo.collision.narrowphase.detector.gjkepa.EpaTriangle"] = oimo_collision_narrowphase_detector_gjkepa_EpaTriangle;
+oimo_collision_narrowphase_detector_gjkepa_EpaTriangle.__name__ = "oimo.collision.narrowphase.detector.gjkepa.EpaTriangle";
+oimo_collision_narrowphase_detector_gjkepa_EpaTriangle.prototype = {
+	init: function(vertex1,vertex2,vertex3,center,autoCheck) {
+		if(autoCheck == null) {
+			autoCheck = false;
+		}
+		var v1X;
+		var v1Y;
+		var v1Z;
+		var v2X;
+		var v2Y;
+		var v2Z;
+		var v3X;
+		var v3Y;
+		var v3Z;
+		var vcX;
+		var vcY;
+		var vcZ;
+		var v = vertex1.v;
+		v1X = v.x;
+		v1Y = v.y;
+		v1Z = v.z;
+		var v = vertex2.v;
+		v2X = v.x;
+		v2Y = v.y;
+		v2Z = v.z;
+		var v = vertex3.v;
+		v3X = v.x;
+		v3Y = v.y;
+		v3Z = v.z;
+		vcX = center.x;
+		vcY = center.y;
+		vcZ = center.z;
+		var v12X;
+		var v12Y;
+		var v12Z;
+		var v13X;
+		var v13Y;
+		var v13Z;
+		var vc1X;
+		var vc1Y;
+		var vc1Z;
+		v12X = v2X - v1X;
+		v12Y = v2Y - v1Y;
+		v12Z = v2Z - v1Z;
+		v13X = v3X - v1X;
+		v13Y = v3Y - v1Y;
+		v13Z = v3Z - v1Z;
+		vc1X = v1X - vcX;
+		vc1Y = v1Y - vcY;
+		vc1Z = v1Z - vcZ;
+		var inorX;
+		var inorY;
+		var inorZ;
+		inorX = v12Y * v13Z - v12Z * v13Y;
+		inorY = v12Z * v13X - v12X * v13Z;
+		inorZ = v12X * v13Y - v12Y * v13X;
+		var inverted = false;
+		if(vc1X * inorX + vc1Y * inorY + vc1Z * inorZ < 0) {
+			if(autoCheck) {
+				var tmp = vertex2;
+				vertex2 = vertex3;
+				vertex3 = tmp;
+				inorX *= -1;
+				inorY *= -1;
+				inorZ *= -1;
+			} else {
+				inverted = true;
+			}
+		}
+		this._vertices[0] = vertex1;
+		this._vertices[1] = vertex2;
+		this._vertices[2] = vertex3;
+		var v = this._normal;
+		v.x = inorX;
+		v.y = inorY;
+		v.z = inorZ;
+		var vec1 = vertex1.v;
+		var vec2 = vertex2.v;
+		var vec3 = vertex3.v;
+		var out = this.tmp;
+		var v1X;
+		var v1Y;
+		var v1Z;
+		var v2X;
+		var v2Y;
+		var v2Z;
+		var v3X;
+		var v3Y;
+		var v3Z;
+		var v12X;
+		var v12Y;
+		var v12Z;
+		var v23X;
+		var v23Y;
+		var v23Z;
+		var v31X;
+		var v31Y;
+		var v31Z;
+		v1X = vec1.x;
+		v1Y = vec1.y;
+		v1Z = vec1.z;
+		v2X = vec2.x;
+		v2Y = vec2.y;
+		v2Z = vec2.z;
+		v3X = vec3.x;
+		v3Y = vec3.y;
+		v3Z = vec3.z;
+		v12X = v2X - v1X;
+		v12Y = v2Y - v1Y;
+		v12Z = v2Z - v1Z;
+		v23X = v3X - v2X;
+		v23Y = v3Y - v2Y;
+		v23Z = v3Z - v2Z;
+		v31X = v1X - v3X;
+		v31Y = v1Y - v3Y;
+		v31Z = v1Z - v3Z;
+		var nX;
+		var nY;
+		var nZ;
+		nX = v12Y * v23Z - v12Z * v23Y;
+		nY = v12Z * v23X - v12X * v23Z;
+		nZ = v12X * v23Y - v12Y * v23X;
+		var n12X;
+		var n12Y;
+		var n12Z;
+		var n23X;
+		var n23Y;
+		var n23Z;
+		var n31X;
+		var n31Y;
+		var n31Z;
+		n12X = v12Y * nZ - v12Z * nY;
+		n12Y = v12Z * nX - v12X * nZ;
+		n12Z = v12X * nY - v12Y * nX;
+		n23X = v23Y * nZ - v23Z * nY;
+		n23Y = v23Z * nX - v23X * nZ;
+		n23Z = v23X * nY - v23Y * nX;
+		n31X = v31Y * nZ - v31Z * nY;
+		n31Y = v31Z * nX - v31X * nZ;
+		n31Z = v31X * nY - v31Y * nX;
+		var mind = -1;
+		var minvX;
+		var minvY;
+		var minvZ;
+		minvX = 0;
+		minvY = 0;
+		minvZ = 0;
+		if(v1X * n12X + v1Y * n12Y + v1Z * n12Z < 0) {
+			var v1X1;
+			var v1Y1;
+			var v1Z1;
+			var v2X1;
+			var v2Y1;
+			var v2Z1;
+			v1X1 = vec1.x;
+			v1Y1 = vec1.y;
+			v1Z1 = vec1.z;
+			v2X1 = vec2.x;
+			v2Y1 = vec2.y;
+			v2Z1 = vec2.z;
+			var v12X;
+			var v12Y;
+			var v12Z;
+			v12X = v2X1 - v1X1;
+			v12Y = v2Y1 - v1Y1;
+			v12Z = v2Z1 - v1Z1;
+			var t = v12X * v1X1 + v12Y * v1Y1 + v12Z * v1Z1;
+			t = -t / (v12X * v12X + v12Y * v12Y + v12Z * v12Z);
+			if(t < 0) {
+				out.x = v1X1;
+				out.y = v1Y1;
+				out.z = v1Z1;
+			} else if(t > 1) {
+				out.x = v2X1;
+				out.y = v2Y1;
+				out.z = v2Z1;
+			} else {
+				var pX;
+				var pY;
+				var pZ;
+				pX = v1X1 + v12X * t;
+				pY = v1Y1 + v12Y * t;
+				pZ = v1Z1 + v12Z * t;
+				out.x = pX;
+				out.y = pY;
+				out.z = pZ;
+			}
+			mind = out.x * out.x + out.y * out.y + out.z * out.z;
+			minvX = out.x;
+			minvY = out.y;
+			minvZ = out.z;
+		}
+		if(v2X * n23X + v2Y * n23Y + v2Z * n23Z < 0) {
+			var v1X1;
+			var v1Y1;
+			var v1Z1;
+			var v2X;
+			var v2Y;
+			var v2Z;
+			v1X1 = vec2.x;
+			v1Y1 = vec2.y;
+			v1Z1 = vec2.z;
+			v2X = vec3.x;
+			v2Y = vec3.y;
+			v2Z = vec3.z;
+			var v12X;
+			var v12Y;
+			var v12Z;
+			v12X = v2X - v1X1;
+			v12Y = v2Y - v1Y1;
+			v12Z = v2Z - v1Z1;
+			var t = v12X * v1X1 + v12Y * v1Y1 + v12Z * v1Z1;
+			t = -t / (v12X * v12X + v12Y * v12Y + v12Z * v12Z);
+			if(t < 0) {
+				out.x = v1X1;
+				out.y = v1Y1;
+				out.z = v1Z1;
+			} else if(t > 1) {
+				out.x = v2X;
+				out.y = v2Y;
+				out.z = v2Z;
+			} else {
+				var pX;
+				var pY;
+				var pZ;
+				pX = v1X1 + v12X * t;
+				pY = v1Y1 + v12Y * t;
+				pZ = v1Z1 + v12Z * t;
+				out.x = pX;
+				out.y = pY;
+				out.z = pZ;
+			}
+			var d = out.x * out.x + out.y * out.y + out.z * out.z;
+			if(mind < 0 || d < mind) {
+				mind = d;
+				minvX = out.x;
+				minvY = out.y;
+				minvZ = out.z;
+			}
+		}
+		if(v3X * n31X + v3Y * n31Y + v3Z * n31Z < 0) {
+			var v1X1;
+			var v1Y1;
+			var v1Z1;
+			var v2X;
+			var v2Y;
+			var v2Z;
+			v1X1 = vec1.x;
+			v1Y1 = vec1.y;
+			v1Z1 = vec1.z;
+			v2X = vec3.x;
+			v2Y = vec3.y;
+			v2Z = vec3.z;
+			var v12X;
+			var v12Y;
+			var v12Z;
+			v12X = v2X - v1X1;
+			v12Y = v2Y - v1Y1;
+			v12Z = v2Z - v1Z1;
+			var t = v12X * v1X1 + v12Y * v1Y1 + v12Z * v1Z1;
+			t = -t / (v12X * v12X + v12Y * v12Y + v12Z * v12Z);
+			if(t < 0) {
+				out.x = v1X1;
+				out.y = v1Y1;
+				out.z = v1Z1;
+			} else if(t > 1) {
+				out.x = v2X;
+				out.y = v2Y;
+				out.z = v2Z;
+			} else {
+				var pX;
+				var pY;
+				var pZ;
+				pX = v1X1 + v12X * t;
+				pY = v1Y1 + v12Y * t;
+				pZ = v1Z1 + v12Z * t;
+				out.x = pX;
+				out.y = pY;
+				out.z = pZ;
+			}
+			var d = out.x * out.x + out.y * out.y + out.z * out.z;
+			if(mind < 0 || d < mind) {
+				mind = d;
+				minvX = out.x;
+				minvY = out.y;
+				minvZ = out.z;
+			}
+		}
+		if(mind > 0) {
+			out.x = minvX;
+			out.y = minvY;
+			out.z = minvZ;
+		} else {
+			var l = nX * nX + nY * nY + nZ * nZ;
+			if(l > 0) {
+				l = 1 / Math.sqrt(l);
+			}
+			nX *= l;
+			nY *= l;
+			nZ *= l;
+			var l2 = nX * nX + nY * nY + nZ * nZ;
+			l2 = (v1X * nX + v1Y * nY + v1Z * nZ) / l2;
+			minvX = nX * l2;
+			minvY = nY * l2;
+			minvZ = nZ * l2;
+			out.x = minvX;
+			out.y = minvY;
+			out.z = minvZ;
+		}
+		var _this = this.tmp;
+		this._distanceSq = _this.x * _this.x + _this.y * _this.y + _this.z * _this.z;
+		this._adjacentTriangles[0] = null;
+		this._adjacentTriangles[1] = null;
+		this._adjacentTriangles[2] = null;
+		this._adjacentPairIndex[0] = -1;
+		this._adjacentPairIndex[1] = -1;
+		this._adjacentPairIndex[2] = -1;
+		return !inverted;
+	}
+	,setAdjacentTriangle: function(triangle) {
+		var count = 0;
+		if(this._vertices[0] == triangle._vertices[this._nextIndex[0]] && this._vertices[this._nextIndex[0]] == triangle._vertices[0]) {
+			this._adjacentTriangles[0] = triangle;
+			this._adjacentPairIndex[0] = 0;
+			triangle._adjacentTriangles[0] = this;
+			triangle._adjacentPairIndex[0] = 0;
+			count = 1;
+		}
+		if(this._vertices[0] == triangle._vertices[this._nextIndex[1]] && this._vertices[this._nextIndex[0]] == triangle._vertices[1]) {
+			this._adjacentTriangles[0] = triangle;
+			this._adjacentPairIndex[0] = 1;
+			triangle._adjacentTriangles[1] = this;
+			triangle._adjacentPairIndex[1] = 0;
+			++count;
+		}
+		if(this._vertices[0] == triangle._vertices[this._nextIndex[2]] && this._vertices[this._nextIndex[0]] == triangle._vertices[2]) {
+			this._adjacentTriangles[0] = triangle;
+			this._adjacentPairIndex[0] = 2;
+			triangle._adjacentTriangles[2] = this;
+			triangle._adjacentPairIndex[2] = 0;
+			++count;
+		}
+		if(this._vertices[1] == triangle._vertices[this._nextIndex[0]] && this._vertices[this._nextIndex[1]] == triangle._vertices[0]) {
+			this._adjacentTriangles[1] = triangle;
+			this._adjacentPairIndex[1] = 0;
+			triangle._adjacentTriangles[0] = this;
+			triangle._adjacentPairIndex[0] = 1;
+			++count;
+		}
+		if(this._vertices[1] == triangle._vertices[this._nextIndex[1]] && this._vertices[this._nextIndex[1]] == triangle._vertices[1]) {
+			this._adjacentTriangles[1] = triangle;
+			this._adjacentPairIndex[1] = 1;
+			triangle._adjacentTriangles[1] = this;
+			triangle._adjacentPairIndex[1] = 1;
+			++count;
+		}
+		if(this._vertices[1] == triangle._vertices[this._nextIndex[2]] && this._vertices[this._nextIndex[1]] == triangle._vertices[2]) {
+			this._adjacentTriangles[1] = triangle;
+			this._adjacentPairIndex[1] = 2;
+			triangle._adjacentTriangles[2] = this;
+			triangle._adjacentPairIndex[2] = 1;
+			++count;
+		}
+		if(this._vertices[2] == triangle._vertices[this._nextIndex[0]] && this._vertices[this._nextIndex[2]] == triangle._vertices[0]) {
+			this._adjacentTriangles[2] = triangle;
+			this._adjacentPairIndex[2] = 0;
+			triangle._adjacentTriangles[0] = this;
+			triangle._adjacentPairIndex[0] = 2;
+			++count;
+		}
+		if(this._vertices[2] == triangle._vertices[this._nextIndex[1]] && this._vertices[this._nextIndex[2]] == triangle._vertices[1]) {
+			this._adjacentTriangles[2] = triangle;
+			this._adjacentPairIndex[2] = 1;
+			triangle._adjacentTriangles[1] = this;
+			triangle._adjacentPairIndex[1] = 2;
+			++count;
+		}
+		if(this._vertices[2] == triangle._vertices[this._nextIndex[2]] && this._vertices[this._nextIndex[2]] == triangle._vertices[2]) {
+			this._adjacentTriangles[2] = triangle;
+			this._adjacentPairIndex[2] = 2;
+			triangle._adjacentTriangles[2] = this;
+			triangle._adjacentPairIndex[2] = 2;
+			++count;
+		}
+		if(count != 1) {
+			return false;
+		}
+		return true;
+	}
+	,removeReferences: function() {
+		this._next = null;
+		this._prev = null;
+		this._tmpDfsId = 0;
+		this._tmpDfsVisible = false;
+		this._distanceSq = 0;
+		this._vertices[0] = null;
+		this._vertices[1] = null;
+		this._vertices[2] = null;
+		this._adjacentTriangles[0] = null;
+		this._adjacentTriangles[1] = null;
+		this._adjacentTriangles[2] = null;
+		this._adjacentPairIndex[0] = 0;
+		this._adjacentPairIndex[1] = 0;
+		this._adjacentPairIndex[2] = 0;
+	}
+	,__class__: oimo_collision_narrowphase_detector_gjkepa_EpaTriangle
+};
+var oimo_collision_narrowphase_detector_gjkepa_EpaVertex = function() {
+	this.v = new oimo_common_Vec3();
+	this.w1 = new oimo_common_Vec3();
+	this.w2 = new oimo_common_Vec3();
+};
+$hxClasses["oimo.collision.narrowphase.detector.gjkepa.EpaVertex"] = oimo_collision_narrowphase_detector_gjkepa_EpaVertex;
+oimo_collision_narrowphase_detector_gjkepa_EpaVertex.__name__ = "oimo.collision.narrowphase.detector.gjkepa.EpaVertex";
+oimo_collision_narrowphase_detector_gjkepa_EpaVertex.prototype = {
+	init: function(v,w1,w2) {
+		var _this = this.v;
+		_this.x = v.x;
+		_this.y = v.y;
+		_this.z = v.z;
+		var _this = this.w1;
+		_this.x = w1.x;
+		_this.y = w1.y;
+		_this.z = w1.z;
+		var _this = this.w2;
+		_this.x = w2.x;
+		_this.y = w2.y;
+		_this.z = w2.z;
+		this._next = null;
+		this._tmpEdgeLoopNext = null;
+		this._tmpEdgeLoopOuterTriangle = null;
+		return this;
+	}
+	,removeReferences: function() {
+		this._next = null;
+		this._tmpEdgeLoopNext = null;
+		this._tmpEdgeLoopOuterTriangle = null;
+	}
+	,__class__: oimo_collision_narrowphase_detector_gjkepa_EpaVertex
+};
+var oimo_collision_narrowphase_detector_gjkepa_GjkCache = function() {
+	this.prevClosestDir = new oimo_common_Vec3();
+};
+$hxClasses["oimo.collision.narrowphase.detector.gjkepa.GjkCache"] = oimo_collision_narrowphase_detector_gjkepa_GjkCache;
+oimo_collision_narrowphase_detector_gjkepa_GjkCache.__name__ = "oimo.collision.narrowphase.detector.gjkepa.GjkCache";
+oimo_collision_narrowphase_detector_gjkepa_GjkCache.prototype = {
+	clear: function() {
+		this.prevClosestDir.zero();
+	}
+	,__class__: oimo_collision_narrowphase_detector_gjkepa_GjkCache
+};
+var oimo_common_Vec3 = function(x,y,z) {
+	if(z == null) {
+		z = 0;
+	}
+	if(y == null) {
+		y = 0;
+	}
+	if(x == null) {
+		x = 0;
+	}
+	this.x = x;
+	this.y = y;
+	this.z = z;
+	oimo_common_Vec3.numCreations++;
+};
+$hxClasses["oimo.common.Vec3"] = oimo_common_Vec3;
+oimo_common_Vec3.__name__ = "oimo.common.Vec3";
+oimo_common_Vec3.prototype = {
+	init: function(x,y,z) {
+		this.x = x;
+		this.y = y;
+		this.z = z;
+		return this;
+	}
+	,zero: function() {
+		this.x = 0;
+		this.y = 0;
+		this.z = 0;
+		return this;
+	}
+	,__class__: oimo_common_Vec3
+};
+var oimo_common_Transform = function() {
+	this._positionX = 0;
+	this._positionY = 0;
+	this._positionZ = 0;
+	this._rotation00 = 1;
+	this._rotation01 = 0;
+	this._rotation02 = 0;
+	this._rotation10 = 0;
+	this._rotation11 = 1;
+	this._rotation12 = 0;
+	this._rotation20 = 0;
+	this._rotation21 = 0;
+	this._rotation22 = 1;
+};
+$hxClasses["oimo.common.Transform"] = oimo_common_Transform;
+oimo_common_Transform.__name__ = "oimo.common.Transform";
+oimo_common_Transform.prototype = {
+	__class__: oimo_common_Transform
+};
+var oimo_common_Setting = function() { };
+$hxClasses["oimo.common.Setting"] = oimo_common_Setting;
+oimo_common_Setting.__name__ = "oimo.common.Setting";
+var oimo_collision_narrowphase_detector_gjkepa_GjkEpa = function() {
+	this.s = new Array(4);
+	this.w1 = new Array(4);
+	this.w2 = new Array(4);
+	this.baseDirs = new Array(3);
+	this.baseDirs[0] = new oimo_common_Vec3(1,0,0);
+	this.baseDirs[1] = new oimo_common_Vec3(0,1,0);
+	this.baseDirs[2] = new oimo_common_Vec3(0,0,1);
+	this.tl1 = new oimo_common_Vec3();
+	this.tl2 = new oimo_common_Vec3();
+	this.rayX = new oimo_common_Vec3();
+	this.rayR = new oimo_common_Vec3();
+	this.tempTransform = new oimo_common_Transform();
+	this.s[0] = new oimo_common_Vec3();
+	this.w1[0] = new oimo_common_Vec3();
+	this.w2[0] = new oimo_common_Vec3();
+	this.s[1] = new oimo_common_Vec3();
+	this.w1[1] = new oimo_common_Vec3();
+	this.w2[1] = new oimo_common_Vec3();
+	this.s[2] = new oimo_common_Vec3();
+	this.w1[2] = new oimo_common_Vec3();
+	this.w2[2] = new oimo_common_Vec3();
+	this.s[3] = new oimo_common_Vec3();
+	this.w1[3] = new oimo_common_Vec3();
+	this.w2[3] = new oimo_common_Vec3();
+	this.dir = new oimo_common_Vec3();
+	this.closest = new oimo_common_Vec3();
+	this.closestPoint1 = new oimo_common_Vec3();
+	this.closestPoint2 = new oimo_common_Vec3();
+	this.polyhedron = new oimo_collision_narrowphase_detector_gjkepa_EpaPolyhedron();
+};
+$hxClasses["oimo.collision.narrowphase.detector.gjkepa.GjkEpa"] = oimo_collision_narrowphase_detector_gjkepa_GjkEpa;
+oimo_collision_narrowphase_detector_gjkepa_GjkEpa.__name__ = "oimo.collision.narrowphase.detector.gjkepa.GjkEpa";
+oimo_collision_narrowphase_detector_gjkepa_GjkEpa.prototype = {
+	computeClosestPointsImpl: function(c1,c2,tf1,tf2,cache,useEpa) {
+		this.c1 = c1;
+		this.c2 = c2;
+		this.tf1 = tf1;
+		this.tf2 = tf2;
+		var s = this.s;
+		var w1 = this.w1;
+		var w2 = this.w2;
+		var closest = this.closest;
+		var dir = this.dir;
+		if(cache != null) {
+			if(cache._gjkCache == null) {
+				cache._gjkCache = new oimo_collision_narrowphase_detector_gjkepa_GjkCache();
+			}
+			this.loadCache(cache._gjkCache);
+		} else {
+			dir.zero();
+		}
+		if(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z == 0) {
+			var firstDirX;
+			var firstDirY;
+			var firstDirZ;
+			firstDirX = tf2._positionX - tf1._positionX;
+			firstDirY = tf2._positionY - tf1._positionY;
+			firstDirZ = tf2._positionZ - tf1._positionZ;
+			dir.x = firstDirX;
+			dir.y = firstDirY;
+			dir.z = firstDirZ;
+			if(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z < 1e-6) {
+				dir.init(1,0,0);
+			}
+		}
+		this.simplexSize = 0;
+		this.computeWitnessPoint1(false);
+		this.computeWitnessPoint2(false);
+		var _this = this.s[this.simplexSize];
+		var v = this.w1[this.simplexSize];
+		_this.x = v.x;
+		_this.y = v.y;
+		_this.z = v.z;
+		var v = this.w2[this.simplexSize];
+		_this.x -= v.x;
+		_this.y -= v.y;
+		_this.z -= v.z;
+		this.simplexSize = 1;
+		var count = 0;
+		while(count < 40) {
+			var v = 0;
+			switch(this.simplexSize) {
+			case 1:
+				var v1 = s[0];
+				closest.x = v1.x;
+				closest.y = v1.y;
+				closest.z = v1.z;
+				v = 1;
+				break;
+			case 2:
+				var v1X;
+				var v1Y;
+				var v1Z;
+				var v2X;
+				var v2Y;
+				var v2Z;
+				var v2 = s[0];
+				v1X = v2.x;
+				v1Y = v2.y;
+				v1Z = v2.z;
+				var v3 = s[1];
+				v2X = v3.x;
+				v2Y = v3.y;
+				v2Z = v3.z;
+				var v12X;
+				var v12Y;
+				var v12Z;
+				v12X = v2X - v1X;
+				v12Y = v2Y - v1Y;
+				v12Z = v2Z - v1Z;
+				var t = v12X * v1X + v12Y * v1Y + v12Z * v1Z;
+				t = -t / (v12X * v12X + v12Y * v12Y + v12Z * v12Z);
+				if(t < 0) {
+					closest.x = v1X;
+					closest.y = v1Y;
+					closest.z = v1Z;
+					v = 1;
+				} else if(t > 1) {
+					closest.x = v2X;
+					closest.y = v2Y;
+					closest.z = v2Z;
+					v = 2;
+				} else {
+					var pX;
+					var pY;
+					var pZ;
+					pX = v1X + v12X * t;
+					pY = v1Y + v12Y * t;
+					pZ = v1Z + v12Z * t;
+					closest.x = pX;
+					closest.y = pY;
+					closest.z = pZ;
+					v = 3;
+				}
+				break;
+			case 3:
+				var vec1 = s[0];
+				var vec2 = s[1];
+				var vec3 = s[2];
+				var v1X1;
+				var v1Y1;
+				var v1Z1;
+				var v2X1;
+				var v2Y1;
+				var v2Z1;
+				var v3X;
+				var v3Y;
+				var v3Z;
+				var v12X1;
+				var v12Y1;
+				var v12Z1;
+				var v23X;
+				var v23Y;
+				var v23Z;
+				var v31X;
+				var v31Y;
+				var v31Z;
+				v1X1 = vec1.x;
+				v1Y1 = vec1.y;
+				v1Z1 = vec1.z;
+				v2X1 = vec2.x;
+				v2Y1 = vec2.y;
+				v2Z1 = vec2.z;
+				v3X = vec3.x;
+				v3Y = vec3.y;
+				v3Z = vec3.z;
+				v12X1 = v2X1 - v1X1;
+				v12Y1 = v2Y1 - v1Y1;
+				v12Z1 = v2Z1 - v1Z1;
+				v23X = v3X - v2X1;
+				v23Y = v3Y - v2Y1;
+				v23Z = v3Z - v2Z1;
+				v31X = v1X1 - v3X;
+				v31Y = v1Y1 - v3Y;
+				v31Z = v1Z1 - v3Z;
+				var nX;
+				var nY;
+				var nZ;
+				nX = v12Y1 * v23Z - v12Z1 * v23Y;
+				nY = v12Z1 * v23X - v12X1 * v23Z;
+				nZ = v12X1 * v23Y - v12Y1 * v23X;
+				var n12X;
+				var n12Y;
+				var n12Z;
+				var n23X;
+				var n23Y;
+				var n23Z;
+				var n31X;
+				var n31Y;
+				var n31Z;
+				n12X = v12Y1 * nZ - v12Z1 * nY;
+				n12Y = v12Z1 * nX - v12X1 * nZ;
+				n12Z = v12X1 * nY - v12Y1 * nX;
+				n23X = v23Y * nZ - v23Z * nY;
+				n23Y = v23Z * nX - v23X * nZ;
+				n23Z = v23X * nY - v23Y * nX;
+				n31X = v31Y * nZ - v31Z * nY;
+				n31Y = v31Z * nX - v31X * nZ;
+				n31Z = v31X * nY - v31Y * nX;
+				var mind = -1;
+				var minvX;
+				var minvY;
+				var minvZ;
+				var mini = 0;
+				minvX = 0;
+				minvY = 0;
+				minvZ = 0;
+				if(v1X1 * n12X + v1Y1 * n12Y + v1Z1 * n12Z < 0) {
+					var v1X2;
+					var v1Y2;
+					var v1Z2;
+					var v2X2;
+					var v2Y2;
+					var v2Z2;
+					v1X2 = vec1.x;
+					v1Y2 = vec1.y;
+					v1Z2 = vec1.z;
+					v2X2 = vec2.x;
+					v2Y2 = vec2.y;
+					v2Z2 = vec2.z;
+					var v12X2;
+					var v12Y2;
+					var v12Z2;
+					v12X2 = v2X2 - v1X2;
+					v12Y2 = v2Y2 - v1Y2;
+					v12Z2 = v2Z2 - v1Z2;
+					var t1 = v12X2 * v1X2 + v12Y2 * v1Y2 + v12Z2 * v1Z2;
+					t1 = -t1 / (v12X2 * v12X2 + v12Y2 * v12Y2 + v12Z2 * v12Z2);
+					var b;
+					if(t1 < 0) {
+						closest.x = v1X2;
+						closest.y = v1Y2;
+						closest.z = v1Z2;
+						b = 1;
+					} else if(t1 > 1) {
+						closest.x = v2X2;
+						closest.y = v2Y2;
+						closest.z = v2Z2;
+						b = 2;
+					} else {
+						var pX1;
+						var pY1;
+						var pZ1;
+						pX1 = v1X2 + v12X2 * t1;
+						pY1 = v1Y2 + v12Y2 * t1;
+						pZ1 = v1Z2 + v12Z2 * t1;
+						closest.x = pX1;
+						closest.y = pY1;
+						closest.z = pZ1;
+						b = 3;
+					}
+					mini = b;
+					mind = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					minvX = closest.x;
+					minvY = closest.y;
+					minvZ = closest.z;
+				}
+				if(v2X1 * n23X + v2Y1 * n23Y + v2Z1 * n23Z < 0) {
+					var v1X3;
+					var v1Y3;
+					var v1Z3;
+					var v2X3;
+					var v2Y3;
+					var v2Z3;
+					v1X3 = vec2.x;
+					v1Y3 = vec2.y;
+					v1Z3 = vec2.z;
+					v2X3 = vec3.x;
+					v2Y3 = vec3.y;
+					v2Z3 = vec3.z;
+					var v12X3;
+					var v12Y3;
+					var v12Z3;
+					v12X3 = v2X3 - v1X3;
+					v12Y3 = v2Y3 - v1Y3;
+					v12Z3 = v2Z3 - v1Z3;
+					var t2 = v12X3 * v1X3 + v12Y3 * v1Y3 + v12Z3 * v1Z3;
+					t2 = -t2 / (v12X3 * v12X3 + v12Y3 * v12Y3 + v12Z3 * v12Z3);
+					var b1;
+					if(t2 < 0) {
+						closest.x = v1X3;
+						closest.y = v1Y3;
+						closest.z = v1Z3;
+						b1 = 1;
+					} else if(t2 > 1) {
+						closest.x = v2X3;
+						closest.y = v2Y3;
+						closest.z = v2Z3;
+						b1 = 2;
+					} else {
+						var pX2;
+						var pY2;
+						var pZ2;
+						pX2 = v1X3 + v12X3 * t2;
+						pY2 = v1Y3 + v12Y3 * t2;
+						pZ2 = v1Z3 + v12Z3 * t2;
+						closest.x = pX2;
+						closest.y = pY2;
+						closest.z = pZ2;
+						b1 = 3;
+					}
+					var d = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind < 0 || d < mind) {
+						mini = b1 << 1;
+						mind = d;
+						minvX = closest.x;
+						minvY = closest.y;
+						minvZ = closest.z;
+					}
+				}
+				if(v3X * n31X + v3Y * n31Y + v3Z * n31Z < 0) {
+					var v1X4;
+					var v1Y4;
+					var v1Z4;
+					var v2X4;
+					var v2Y4;
+					var v2Z4;
+					v1X4 = vec1.x;
+					v1Y4 = vec1.y;
+					v1Z4 = vec1.z;
+					v2X4 = vec3.x;
+					v2Y4 = vec3.y;
+					v2Z4 = vec3.z;
+					var v12X4;
+					var v12Y4;
+					var v12Z4;
+					v12X4 = v2X4 - v1X4;
+					v12Y4 = v2Y4 - v1Y4;
+					v12Z4 = v2Z4 - v1Z4;
+					var t3 = v12X4 * v1X4 + v12Y4 * v1Y4 + v12Z4 * v1Z4;
+					t3 = -t3 / (v12X4 * v12X4 + v12Y4 * v12Y4 + v12Z4 * v12Z4);
+					var b2;
+					if(t3 < 0) {
+						closest.x = v1X4;
+						closest.y = v1Y4;
+						closest.z = v1Z4;
+						b2 = 1;
+					} else if(t3 > 1) {
+						closest.x = v2X4;
+						closest.y = v2Y4;
+						closest.z = v2Z4;
+						b2 = 2;
+					} else {
+						var pX3;
+						var pY3;
+						var pZ3;
+						pX3 = v1X4 + v12X4 * t3;
+						pY3 = v1Y4 + v12Y4 * t3;
+						pZ3 = v1Z4 + v12Z4 * t3;
+						closest.x = pX3;
+						closest.y = pY3;
+						closest.z = pZ3;
+						b2 = 3;
+					}
+					var d1 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind < 0 || d1 < mind) {
+						mini = b2 & 1 | (b2 & 2) << 1;
+						mind = d1;
+						minvX = closest.x;
+						minvY = closest.y;
+						minvZ = closest.z;
+					}
+				}
+				if(mind > 0) {
+					closest.x = minvX;
+					closest.y = minvY;
+					closest.z = minvZ;
+					v = mini;
+				} else {
+					var l = nX * nX + nY * nY + nZ * nZ;
+					if(l > 0) {
+						l = 1 / Math.sqrt(l);
+					}
+					nX *= l;
+					nY *= l;
+					nZ *= l;
+					var l2 = nX * nX + nY * nY + nZ * nZ;
+					l2 = (v1X1 * nX + v1Y1 * nY + v1Z1 * nZ) / l2;
+					minvX = nX * l2;
+					minvY = nY * l2;
+					minvZ = nZ * l2;
+					closest.x = minvX;
+					closest.y = minvY;
+					closest.z = minvZ;
+					v = 7;
+				}
+				break;
+			case 4:
+				var vec11 = s[0];
+				var vec21 = s[1];
+				var vec31 = s[2];
+				var vec4 = s[3];
+				var v1X5;
+				var v1Y5;
+				var v1Z5;
+				var v2X5;
+				var v2Y5;
+				var v2Z5;
+				var v3X1;
+				var v3Y1;
+				var v3Z1;
+				var v4X;
+				var v4Y;
+				var v4Z;
+				var v12X5;
+				var v12Y5;
+				var v12Z5;
+				var v13X;
+				var v13Y;
+				var v13Z;
+				var v14X;
+				var v14Y;
+				var v14Z;
+				var v23X1;
+				var v23Y1;
+				var v23Z1;
+				var v24X;
+				var v24Y;
+				var v24Z;
+				v1X5 = vec11.x;
+				v1Y5 = vec11.y;
+				v1Z5 = vec11.z;
+				v2X5 = vec21.x;
+				v2Y5 = vec21.y;
+				v2Z5 = vec21.z;
+				v3X1 = vec31.x;
+				v3Y1 = vec31.y;
+				v3Z1 = vec31.z;
+				v4X = vec4.x;
+				v4Y = vec4.y;
+				v4Z = vec4.z;
+				v12X5 = v2X5 - v1X5;
+				v12Y5 = v2Y5 - v1Y5;
+				v12Z5 = v2Z5 - v1Z5;
+				v13X = v3X1 - v1X5;
+				v13Y = v3Y1 - v1Y5;
+				v13Z = v3Z1 - v1Z5;
+				v14X = v4X - v1X5;
+				v14Y = v4Y - v1Y5;
+				v14Z = v4Z - v1Z5;
+				v23X1 = v3X1 - v2X5;
+				v23Y1 = v3Y1 - v2Y5;
+				v23Z1 = v3Z1 - v2Z5;
+				v24X = v4X - v2X5;
+				v24Y = v4Y - v2Y5;
+				v24Z = v4Z - v2Z5;
+				var n123X;
+				var n123Y;
+				var n123Z;
+				var n134X;
+				var n134Y;
+				var n134Z;
+				var n142X;
+				var n142Y;
+				var n142Z;
+				var n243X;
+				var n243Y;
+				var n243Z;
+				n123X = v12Y5 * v13Z - v12Z5 * v13Y;
+				n123Y = v12Z5 * v13X - v12X5 * v13Z;
+				n123Z = v12X5 * v13Y - v12Y5 * v13X;
+				n134X = v13Y * v14Z - v13Z * v14Y;
+				n134Y = v13Z * v14X - v13X * v14Z;
+				n134Z = v13X * v14Y - v13Y * v14X;
+				n142X = v14Y * v12Z5 - v14Z * v12Y5;
+				n142Y = v14Z * v12X5 - v14X * v12Z5;
+				n142Z = v14X * v12Y5 - v14Y * v12X5;
+				n243X = v24Y * v23Z1 - v24Z * v23Y1;
+				n243Y = v24Z * v23X1 - v24X * v23Z1;
+				n243Z = v24X * v23Y1 - v24Y * v23X1;
+				var sign = v12X5 * n243X + v12Y5 * n243Y + v12Z5 * n243Z > 0 ? 1 : -1;
+				var mind1 = -1;
+				var minvX1;
+				var minvY1;
+				var minvZ1;
+				var mini1 = 0;
+				minvX1 = 0;
+				minvY1 = 0;
+				minvZ1 = 0;
+				if((v1X5 * n123X + v1Y5 * n123Y + v1Z5 * n123Z) * sign < 0) {
+					var v1X6;
+					var v1Y6;
+					var v1Z6;
+					var v2X6;
+					var v2Y6;
+					var v2Z6;
+					var v3X2;
+					var v3Y2;
+					var v3Z2;
+					var v12X6;
+					var v12Y6;
+					var v12Z6;
+					var v23X2;
+					var v23Y2;
+					var v23Z2;
+					var v31X1;
+					var v31Y1;
+					var v31Z1;
+					v1X6 = vec11.x;
+					v1Y6 = vec11.y;
+					v1Z6 = vec11.z;
+					v2X6 = vec21.x;
+					v2Y6 = vec21.y;
+					v2Z6 = vec21.z;
+					v3X2 = vec31.x;
+					v3Y2 = vec31.y;
+					v3Z2 = vec31.z;
+					v12X6 = v2X6 - v1X6;
+					v12Y6 = v2Y6 - v1Y6;
+					v12Z6 = v2Z6 - v1Z6;
+					v23X2 = v3X2 - v2X6;
+					v23Y2 = v3Y2 - v2Y6;
+					v23Z2 = v3Z2 - v2Z6;
+					v31X1 = v1X6 - v3X2;
+					v31Y1 = v1Y6 - v3Y2;
+					v31Z1 = v1Z6 - v3Z2;
+					var nX1;
+					var nY1;
+					var nZ1;
+					nX1 = v12Y6 * v23Z2 - v12Z6 * v23Y2;
+					nY1 = v12Z6 * v23X2 - v12X6 * v23Z2;
+					nZ1 = v12X6 * v23Y2 - v12Y6 * v23X2;
+					var n12X1;
+					var n12Y1;
+					var n12Z1;
+					var n23X1;
+					var n23Y1;
+					var n23Z1;
+					var n31X1;
+					var n31Y1;
+					var n31Z1;
+					n12X1 = v12Y6 * nZ1 - v12Z6 * nY1;
+					n12Y1 = v12Z6 * nX1 - v12X6 * nZ1;
+					n12Z1 = v12X6 * nY1 - v12Y6 * nX1;
+					n23X1 = v23Y2 * nZ1 - v23Z2 * nY1;
+					n23Y1 = v23Z2 * nX1 - v23X2 * nZ1;
+					n23Z1 = v23X2 * nY1 - v23Y2 * nX1;
+					n31X1 = v31Y1 * nZ1 - v31Z1 * nY1;
+					n31Y1 = v31Z1 * nX1 - v31X1 * nZ1;
+					n31Z1 = v31X1 * nY1 - v31Y1 * nX1;
+					var mind2 = -1;
+					var minvX2;
+					var minvY2;
+					var minvZ2;
+					var mini2 = 0;
+					minvX2 = 0;
+					minvY2 = 0;
+					minvZ2 = 0;
+					if(v1X6 * n12X1 + v1Y6 * n12Y1 + v1Z6 * n12Z1 < 0) {
+						var v1X7;
+						var v1Y7;
+						var v1Z7;
+						var v2X7;
+						var v2Y7;
+						var v2Z7;
+						v1X7 = vec11.x;
+						v1Y7 = vec11.y;
+						v1Z7 = vec11.z;
+						v2X7 = vec21.x;
+						v2Y7 = vec21.y;
+						v2Z7 = vec21.z;
+						var v12X7;
+						var v12Y7;
+						var v12Z7;
+						v12X7 = v2X7 - v1X7;
+						v12Y7 = v2Y7 - v1Y7;
+						v12Z7 = v2Z7 - v1Z7;
+						var t4 = v12X7 * v1X7 + v12Y7 * v1Y7 + v12Z7 * v1Z7;
+						t4 = -t4 / (v12X7 * v12X7 + v12Y7 * v12Y7 + v12Z7 * v12Z7);
+						var b3;
+						if(t4 < 0) {
+							closest.x = v1X7;
+							closest.y = v1Y7;
+							closest.z = v1Z7;
+							b3 = 1;
+						} else if(t4 > 1) {
+							closest.x = v2X7;
+							closest.y = v2Y7;
+							closest.z = v2Z7;
+							b3 = 2;
+						} else {
+							var pX4;
+							var pY4;
+							var pZ4;
+							pX4 = v1X7 + v12X7 * t4;
+							pY4 = v1Y7 + v12Y7 * t4;
+							pZ4 = v1Z7 + v12Z7 * t4;
+							closest.x = pX4;
+							closest.y = pY4;
+							closest.z = pZ4;
+							b3 = 3;
+						}
+						mini2 = b3;
+						mind2 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						minvX2 = closest.x;
+						minvY2 = closest.y;
+						minvZ2 = closest.z;
+					}
+					if(v2X6 * n23X1 + v2Y6 * n23Y1 + v2Z6 * n23Z1 < 0) {
+						var v1X8;
+						var v1Y8;
+						var v1Z8;
+						var v2X8;
+						var v2Y8;
+						var v2Z8;
+						v1X8 = vec21.x;
+						v1Y8 = vec21.y;
+						v1Z8 = vec21.z;
+						v2X8 = vec31.x;
+						v2Y8 = vec31.y;
+						v2Z8 = vec31.z;
+						var v12X8;
+						var v12Y8;
+						var v12Z8;
+						v12X8 = v2X8 - v1X8;
+						v12Y8 = v2Y8 - v1Y8;
+						v12Z8 = v2Z8 - v1Z8;
+						var t5 = v12X8 * v1X8 + v12Y8 * v1Y8 + v12Z8 * v1Z8;
+						t5 = -t5 / (v12X8 * v12X8 + v12Y8 * v12Y8 + v12Z8 * v12Z8);
+						var b4;
+						if(t5 < 0) {
+							closest.x = v1X8;
+							closest.y = v1Y8;
+							closest.z = v1Z8;
+							b4 = 1;
+						} else if(t5 > 1) {
+							closest.x = v2X8;
+							closest.y = v2Y8;
+							closest.z = v2Z8;
+							b4 = 2;
+						} else {
+							var pX5;
+							var pY5;
+							var pZ5;
+							pX5 = v1X8 + v12X8 * t5;
+							pY5 = v1Y8 + v12Y8 * t5;
+							pZ5 = v1Z8 + v12Z8 * t5;
+							closest.x = pX5;
+							closest.y = pY5;
+							closest.z = pZ5;
+							b4 = 3;
+						}
+						var d2 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind2 < 0 || d2 < mind2) {
+							mini2 = b4 << 1;
+							mind2 = d2;
+							minvX2 = closest.x;
+							minvY2 = closest.y;
+							minvZ2 = closest.z;
+						}
+					}
+					if(v3X2 * n31X1 + v3Y2 * n31Y1 + v3Z2 * n31Z1 < 0) {
+						var v1X9;
+						var v1Y9;
+						var v1Z9;
+						var v2X9;
+						var v2Y9;
+						var v2Z9;
+						v1X9 = vec11.x;
+						v1Y9 = vec11.y;
+						v1Z9 = vec11.z;
+						v2X9 = vec31.x;
+						v2Y9 = vec31.y;
+						v2Z9 = vec31.z;
+						var v12X9;
+						var v12Y9;
+						var v12Z9;
+						v12X9 = v2X9 - v1X9;
+						v12Y9 = v2Y9 - v1Y9;
+						v12Z9 = v2Z9 - v1Z9;
+						var t6 = v12X9 * v1X9 + v12Y9 * v1Y9 + v12Z9 * v1Z9;
+						t6 = -t6 / (v12X9 * v12X9 + v12Y9 * v12Y9 + v12Z9 * v12Z9);
+						var b5;
+						if(t6 < 0) {
+							closest.x = v1X9;
+							closest.y = v1Y9;
+							closest.z = v1Z9;
+							b5 = 1;
+						} else if(t6 > 1) {
+							closest.x = v2X9;
+							closest.y = v2Y9;
+							closest.z = v2Z9;
+							b5 = 2;
+						} else {
+							var pX6;
+							var pY6;
+							var pZ6;
+							pX6 = v1X9 + v12X9 * t6;
+							pY6 = v1Y9 + v12Y9 * t6;
+							pZ6 = v1Z9 + v12Z9 * t6;
+							closest.x = pX6;
+							closest.y = pY6;
+							closest.z = pZ6;
+							b5 = 3;
+						}
+						var d3 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind2 < 0 || d3 < mind2) {
+							mini2 = b5 & 1 | (b5 & 2) << 1;
+							mind2 = d3;
+							minvX2 = closest.x;
+							minvY2 = closest.y;
+							minvZ2 = closest.z;
+						}
+					}
+					var b6;
+					if(mind2 > 0) {
+						closest.x = minvX2;
+						closest.y = minvY2;
+						closest.z = minvZ2;
+						b6 = mini2;
+					} else {
+						var l1 = nX1 * nX1 + nY1 * nY1 + nZ1 * nZ1;
+						if(l1 > 0) {
+							l1 = 1 / Math.sqrt(l1);
+						}
+						nX1 *= l1;
+						nY1 *= l1;
+						nZ1 *= l1;
+						var l21 = nX1 * nX1 + nY1 * nY1 + nZ1 * nZ1;
+						l21 = (v1X6 * nX1 + v1Y6 * nY1 + v1Z6 * nZ1) / l21;
+						minvX2 = nX1 * l21;
+						minvY2 = nY1 * l21;
+						minvZ2 = nZ1 * l21;
+						closest.x = minvX2;
+						closest.y = minvY2;
+						closest.z = minvZ2;
+						b6 = 7;
+					}
+					mini1 = b6;
+					mind1 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					minvX1 = closest.x;
+					minvY1 = closest.y;
+					minvZ1 = closest.z;
+				}
+				if((v1X5 * n134X + v1Y5 * n134Y + v1Z5 * n134Z) * sign < 0) {
+					var v1X10;
+					var v1Y10;
+					var v1Z10;
+					var v2X10;
+					var v2Y10;
+					var v2Z10;
+					var v3X3;
+					var v3Y3;
+					var v3Z3;
+					var v12X10;
+					var v12Y10;
+					var v12Z10;
+					var v23X3;
+					var v23Y3;
+					var v23Z3;
+					var v31X2;
+					var v31Y2;
+					var v31Z2;
+					v1X10 = vec11.x;
+					v1Y10 = vec11.y;
+					v1Z10 = vec11.z;
+					v2X10 = vec31.x;
+					v2Y10 = vec31.y;
+					v2Z10 = vec31.z;
+					v3X3 = vec4.x;
+					v3Y3 = vec4.y;
+					v3Z3 = vec4.z;
+					v12X10 = v2X10 - v1X10;
+					v12Y10 = v2Y10 - v1Y10;
+					v12Z10 = v2Z10 - v1Z10;
+					v23X3 = v3X3 - v2X10;
+					v23Y3 = v3Y3 - v2Y10;
+					v23Z3 = v3Z3 - v2Z10;
+					v31X2 = v1X10 - v3X3;
+					v31Y2 = v1Y10 - v3Y3;
+					v31Z2 = v1Z10 - v3Z3;
+					var nX2;
+					var nY2;
+					var nZ2;
+					nX2 = v12Y10 * v23Z3 - v12Z10 * v23Y3;
+					nY2 = v12Z10 * v23X3 - v12X10 * v23Z3;
+					nZ2 = v12X10 * v23Y3 - v12Y10 * v23X3;
+					var n12X2;
+					var n12Y2;
+					var n12Z2;
+					var n23X2;
+					var n23Y2;
+					var n23Z2;
+					var n31X2;
+					var n31Y2;
+					var n31Z2;
+					n12X2 = v12Y10 * nZ2 - v12Z10 * nY2;
+					n12Y2 = v12Z10 * nX2 - v12X10 * nZ2;
+					n12Z2 = v12X10 * nY2 - v12Y10 * nX2;
+					n23X2 = v23Y3 * nZ2 - v23Z3 * nY2;
+					n23Y2 = v23Z3 * nX2 - v23X3 * nZ2;
+					n23Z2 = v23X3 * nY2 - v23Y3 * nX2;
+					n31X2 = v31Y2 * nZ2 - v31Z2 * nY2;
+					n31Y2 = v31Z2 * nX2 - v31X2 * nZ2;
+					n31Z2 = v31X2 * nY2 - v31Y2 * nX2;
+					var mind3 = -1;
+					var minvX3;
+					var minvY3;
+					var minvZ3;
+					var mini3 = 0;
+					minvX3 = 0;
+					minvY3 = 0;
+					minvZ3 = 0;
+					if(v1X10 * n12X2 + v1Y10 * n12Y2 + v1Z10 * n12Z2 < 0) {
+						var v1X11;
+						var v1Y11;
+						var v1Z11;
+						var v2X11;
+						var v2Y11;
+						var v2Z11;
+						v1X11 = vec11.x;
+						v1Y11 = vec11.y;
+						v1Z11 = vec11.z;
+						v2X11 = vec31.x;
+						v2Y11 = vec31.y;
+						v2Z11 = vec31.z;
+						var v12X11;
+						var v12Y11;
+						var v12Z11;
+						v12X11 = v2X11 - v1X11;
+						v12Y11 = v2Y11 - v1Y11;
+						v12Z11 = v2Z11 - v1Z11;
+						var t7 = v12X11 * v1X11 + v12Y11 * v1Y11 + v12Z11 * v1Z11;
+						t7 = -t7 / (v12X11 * v12X11 + v12Y11 * v12Y11 + v12Z11 * v12Z11);
+						var b7;
+						if(t7 < 0) {
+							closest.x = v1X11;
+							closest.y = v1Y11;
+							closest.z = v1Z11;
+							b7 = 1;
+						} else if(t7 > 1) {
+							closest.x = v2X11;
+							closest.y = v2Y11;
+							closest.z = v2Z11;
+							b7 = 2;
+						} else {
+							var pX7;
+							var pY7;
+							var pZ7;
+							pX7 = v1X11 + v12X11 * t7;
+							pY7 = v1Y11 + v12Y11 * t7;
+							pZ7 = v1Z11 + v12Z11 * t7;
+							closest.x = pX7;
+							closest.y = pY7;
+							closest.z = pZ7;
+							b7 = 3;
+						}
+						mini3 = b7;
+						mind3 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						minvX3 = closest.x;
+						minvY3 = closest.y;
+						minvZ3 = closest.z;
+					}
+					if(v2X10 * n23X2 + v2Y10 * n23Y2 + v2Z10 * n23Z2 < 0) {
+						var v1X12;
+						var v1Y12;
+						var v1Z12;
+						var v2X12;
+						var v2Y12;
+						var v2Z12;
+						v1X12 = vec31.x;
+						v1Y12 = vec31.y;
+						v1Z12 = vec31.z;
+						v2X12 = vec4.x;
+						v2Y12 = vec4.y;
+						v2Z12 = vec4.z;
+						var v12X12;
+						var v12Y12;
+						var v12Z12;
+						v12X12 = v2X12 - v1X12;
+						v12Y12 = v2Y12 - v1Y12;
+						v12Z12 = v2Z12 - v1Z12;
+						var t8 = v12X12 * v1X12 + v12Y12 * v1Y12 + v12Z12 * v1Z12;
+						t8 = -t8 / (v12X12 * v12X12 + v12Y12 * v12Y12 + v12Z12 * v12Z12);
+						var b8;
+						if(t8 < 0) {
+							closest.x = v1X12;
+							closest.y = v1Y12;
+							closest.z = v1Z12;
+							b8 = 1;
+						} else if(t8 > 1) {
+							closest.x = v2X12;
+							closest.y = v2Y12;
+							closest.z = v2Z12;
+							b8 = 2;
+						} else {
+							var pX8;
+							var pY8;
+							var pZ8;
+							pX8 = v1X12 + v12X12 * t8;
+							pY8 = v1Y12 + v12Y12 * t8;
+							pZ8 = v1Z12 + v12Z12 * t8;
+							closest.x = pX8;
+							closest.y = pY8;
+							closest.z = pZ8;
+							b8 = 3;
+						}
+						var d4 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind3 < 0 || d4 < mind3) {
+							mini3 = b8 << 1;
+							mind3 = d4;
+							minvX3 = closest.x;
+							minvY3 = closest.y;
+							minvZ3 = closest.z;
+						}
+					}
+					if(v3X3 * n31X2 + v3Y3 * n31Y2 + v3Z3 * n31Z2 < 0) {
+						var v1X13;
+						var v1Y13;
+						var v1Z13;
+						var v2X13;
+						var v2Y13;
+						var v2Z13;
+						v1X13 = vec11.x;
+						v1Y13 = vec11.y;
+						v1Z13 = vec11.z;
+						v2X13 = vec4.x;
+						v2Y13 = vec4.y;
+						v2Z13 = vec4.z;
+						var v12X13;
+						var v12Y13;
+						var v12Z13;
+						v12X13 = v2X13 - v1X13;
+						v12Y13 = v2Y13 - v1Y13;
+						v12Z13 = v2Z13 - v1Z13;
+						var t9 = v12X13 * v1X13 + v12Y13 * v1Y13 + v12Z13 * v1Z13;
+						t9 = -t9 / (v12X13 * v12X13 + v12Y13 * v12Y13 + v12Z13 * v12Z13);
+						var b9;
+						if(t9 < 0) {
+							closest.x = v1X13;
+							closest.y = v1Y13;
+							closest.z = v1Z13;
+							b9 = 1;
+						} else if(t9 > 1) {
+							closest.x = v2X13;
+							closest.y = v2Y13;
+							closest.z = v2Z13;
+							b9 = 2;
+						} else {
+							var pX9;
+							var pY9;
+							var pZ9;
+							pX9 = v1X13 + v12X13 * t9;
+							pY9 = v1Y13 + v12Y13 * t9;
+							pZ9 = v1Z13 + v12Z13 * t9;
+							closest.x = pX9;
+							closest.y = pY9;
+							closest.z = pZ9;
+							b9 = 3;
+						}
+						var d5 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind3 < 0 || d5 < mind3) {
+							mini3 = b9 & 1 | (b9 & 2) << 1;
+							mind3 = d5;
+							minvX3 = closest.x;
+							minvY3 = closest.y;
+							minvZ3 = closest.z;
+						}
+					}
+					var b10;
+					if(mind3 > 0) {
+						closest.x = minvX3;
+						closest.y = minvY3;
+						closest.z = minvZ3;
+						b10 = mini3;
+					} else {
+						var l3 = nX2 * nX2 + nY2 * nY2 + nZ2 * nZ2;
+						if(l3 > 0) {
+							l3 = 1 / Math.sqrt(l3);
+						}
+						nX2 *= l3;
+						nY2 *= l3;
+						nZ2 *= l3;
+						var l22 = nX2 * nX2 + nY2 * nY2 + nZ2 * nZ2;
+						l22 = (v1X10 * nX2 + v1Y10 * nY2 + v1Z10 * nZ2) / l22;
+						minvX3 = nX2 * l22;
+						minvY3 = nY2 * l22;
+						minvZ3 = nZ2 * l22;
+						closest.x = minvX3;
+						closest.y = minvY3;
+						closest.z = minvZ3;
+						b10 = 7;
+					}
+					var d6 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind1 < 0 || d6 < mind1) {
+						mini1 = b10 & 1 | (b10 & 6) << 1;
+						mind1 = d6;
+						minvX1 = closest.x;
+						minvY1 = closest.y;
+						minvZ1 = closest.z;
+					}
+				}
+				if((v1X5 * n142X + v1Y5 * n142Y + v1Z5 * n142Z) * sign < 0) {
+					var v1X14;
+					var v1Y14;
+					var v1Z14;
+					var v2X14;
+					var v2Y14;
+					var v2Z14;
+					var v3X4;
+					var v3Y4;
+					var v3Z4;
+					var v12X14;
+					var v12Y14;
+					var v12Z14;
+					var v23X4;
+					var v23Y4;
+					var v23Z4;
+					var v31X3;
+					var v31Y3;
+					var v31Z3;
+					v1X14 = vec11.x;
+					v1Y14 = vec11.y;
+					v1Z14 = vec11.z;
+					v2X14 = vec21.x;
+					v2Y14 = vec21.y;
+					v2Z14 = vec21.z;
+					v3X4 = vec4.x;
+					v3Y4 = vec4.y;
+					v3Z4 = vec4.z;
+					v12X14 = v2X14 - v1X14;
+					v12Y14 = v2Y14 - v1Y14;
+					v12Z14 = v2Z14 - v1Z14;
+					v23X4 = v3X4 - v2X14;
+					v23Y4 = v3Y4 - v2Y14;
+					v23Z4 = v3Z4 - v2Z14;
+					v31X3 = v1X14 - v3X4;
+					v31Y3 = v1Y14 - v3Y4;
+					v31Z3 = v1Z14 - v3Z4;
+					var nX3;
+					var nY3;
+					var nZ3;
+					nX3 = v12Y14 * v23Z4 - v12Z14 * v23Y4;
+					nY3 = v12Z14 * v23X4 - v12X14 * v23Z4;
+					nZ3 = v12X14 * v23Y4 - v12Y14 * v23X4;
+					var n12X3;
+					var n12Y3;
+					var n12Z3;
+					var n23X3;
+					var n23Y3;
+					var n23Z3;
+					var n31X3;
+					var n31Y3;
+					var n31Z3;
+					n12X3 = v12Y14 * nZ3 - v12Z14 * nY3;
+					n12Y3 = v12Z14 * nX3 - v12X14 * nZ3;
+					n12Z3 = v12X14 * nY3 - v12Y14 * nX3;
+					n23X3 = v23Y4 * nZ3 - v23Z4 * nY3;
+					n23Y3 = v23Z4 * nX3 - v23X4 * nZ3;
+					n23Z3 = v23X4 * nY3 - v23Y4 * nX3;
+					n31X3 = v31Y3 * nZ3 - v31Z3 * nY3;
+					n31Y3 = v31Z3 * nX3 - v31X3 * nZ3;
+					n31Z3 = v31X3 * nY3 - v31Y3 * nX3;
+					var mind4 = -1;
+					var minvX4;
+					var minvY4;
+					var minvZ4;
+					var mini4 = 0;
+					minvX4 = 0;
+					minvY4 = 0;
+					minvZ4 = 0;
+					if(v1X14 * n12X3 + v1Y14 * n12Y3 + v1Z14 * n12Z3 < 0) {
+						var v1X15;
+						var v1Y15;
+						var v1Z15;
+						var v2X15;
+						var v2Y15;
+						var v2Z15;
+						v1X15 = vec11.x;
+						v1Y15 = vec11.y;
+						v1Z15 = vec11.z;
+						v2X15 = vec21.x;
+						v2Y15 = vec21.y;
+						v2Z15 = vec21.z;
+						var v12X15;
+						var v12Y15;
+						var v12Z15;
+						v12X15 = v2X15 - v1X15;
+						v12Y15 = v2Y15 - v1Y15;
+						v12Z15 = v2Z15 - v1Z15;
+						var t10 = v12X15 * v1X15 + v12Y15 * v1Y15 + v12Z15 * v1Z15;
+						t10 = -t10 / (v12X15 * v12X15 + v12Y15 * v12Y15 + v12Z15 * v12Z15);
+						var b11;
+						if(t10 < 0) {
+							closest.x = v1X15;
+							closest.y = v1Y15;
+							closest.z = v1Z15;
+							b11 = 1;
+						} else if(t10 > 1) {
+							closest.x = v2X15;
+							closest.y = v2Y15;
+							closest.z = v2Z15;
+							b11 = 2;
+						} else {
+							var pX10;
+							var pY10;
+							var pZ10;
+							pX10 = v1X15 + v12X15 * t10;
+							pY10 = v1Y15 + v12Y15 * t10;
+							pZ10 = v1Z15 + v12Z15 * t10;
+							closest.x = pX10;
+							closest.y = pY10;
+							closest.z = pZ10;
+							b11 = 3;
+						}
+						mini4 = b11;
+						mind4 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						minvX4 = closest.x;
+						minvY4 = closest.y;
+						minvZ4 = closest.z;
+					}
+					if(v2X14 * n23X3 + v2Y14 * n23Y3 + v2Z14 * n23Z3 < 0) {
+						var v1X16;
+						var v1Y16;
+						var v1Z16;
+						var v2X16;
+						var v2Y16;
+						var v2Z16;
+						v1X16 = vec21.x;
+						v1Y16 = vec21.y;
+						v1Z16 = vec21.z;
+						v2X16 = vec4.x;
+						v2Y16 = vec4.y;
+						v2Z16 = vec4.z;
+						var v12X16;
+						var v12Y16;
+						var v12Z16;
+						v12X16 = v2X16 - v1X16;
+						v12Y16 = v2Y16 - v1Y16;
+						v12Z16 = v2Z16 - v1Z16;
+						var t11 = v12X16 * v1X16 + v12Y16 * v1Y16 + v12Z16 * v1Z16;
+						t11 = -t11 / (v12X16 * v12X16 + v12Y16 * v12Y16 + v12Z16 * v12Z16);
+						var b12;
+						if(t11 < 0) {
+							closest.x = v1X16;
+							closest.y = v1Y16;
+							closest.z = v1Z16;
+							b12 = 1;
+						} else if(t11 > 1) {
+							closest.x = v2X16;
+							closest.y = v2Y16;
+							closest.z = v2Z16;
+							b12 = 2;
+						} else {
+							var pX11;
+							var pY11;
+							var pZ11;
+							pX11 = v1X16 + v12X16 * t11;
+							pY11 = v1Y16 + v12Y16 * t11;
+							pZ11 = v1Z16 + v12Z16 * t11;
+							closest.x = pX11;
+							closest.y = pY11;
+							closest.z = pZ11;
+							b12 = 3;
+						}
+						var d7 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind4 < 0 || d7 < mind4) {
+							mini4 = b12 << 1;
+							mind4 = d7;
+							minvX4 = closest.x;
+							minvY4 = closest.y;
+							minvZ4 = closest.z;
+						}
+					}
+					if(v3X4 * n31X3 + v3Y4 * n31Y3 + v3Z4 * n31Z3 < 0) {
+						var v1X17;
+						var v1Y17;
+						var v1Z17;
+						var v2X17;
+						var v2Y17;
+						var v2Z17;
+						v1X17 = vec11.x;
+						v1Y17 = vec11.y;
+						v1Z17 = vec11.z;
+						v2X17 = vec4.x;
+						v2Y17 = vec4.y;
+						v2Z17 = vec4.z;
+						var v12X17;
+						var v12Y17;
+						var v12Z17;
+						v12X17 = v2X17 - v1X17;
+						v12Y17 = v2Y17 - v1Y17;
+						v12Z17 = v2Z17 - v1Z17;
+						var t12 = v12X17 * v1X17 + v12Y17 * v1Y17 + v12Z17 * v1Z17;
+						t12 = -t12 / (v12X17 * v12X17 + v12Y17 * v12Y17 + v12Z17 * v12Z17);
+						var b13;
+						if(t12 < 0) {
+							closest.x = v1X17;
+							closest.y = v1Y17;
+							closest.z = v1Z17;
+							b13 = 1;
+						} else if(t12 > 1) {
+							closest.x = v2X17;
+							closest.y = v2Y17;
+							closest.z = v2Z17;
+							b13 = 2;
+						} else {
+							var pX12;
+							var pY12;
+							var pZ12;
+							pX12 = v1X17 + v12X17 * t12;
+							pY12 = v1Y17 + v12Y17 * t12;
+							pZ12 = v1Z17 + v12Z17 * t12;
+							closest.x = pX12;
+							closest.y = pY12;
+							closest.z = pZ12;
+							b13 = 3;
+						}
+						var d8 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind4 < 0 || d8 < mind4) {
+							mini4 = b13 & 1 | (b13 & 2) << 1;
+							mind4 = d8;
+							minvX4 = closest.x;
+							minvY4 = closest.y;
+							minvZ4 = closest.z;
+						}
+					}
+					var b14;
+					if(mind4 > 0) {
+						closest.x = minvX4;
+						closest.y = minvY4;
+						closest.z = minvZ4;
+						b14 = mini4;
+					} else {
+						var l4 = nX3 * nX3 + nY3 * nY3 + nZ3 * nZ3;
+						if(l4 > 0) {
+							l4 = 1 / Math.sqrt(l4);
+						}
+						nX3 *= l4;
+						nY3 *= l4;
+						nZ3 *= l4;
+						var l23 = nX3 * nX3 + nY3 * nY3 + nZ3 * nZ3;
+						l23 = (v1X14 * nX3 + v1Y14 * nY3 + v1Z14 * nZ3) / l23;
+						minvX4 = nX3 * l23;
+						minvY4 = nY3 * l23;
+						minvZ4 = nZ3 * l23;
+						closest.x = minvX4;
+						closest.y = minvY4;
+						closest.z = minvZ4;
+						b14 = 7;
+					}
+					var d9 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind1 < 0 || d9 < mind1) {
+						mini1 = b14 & 3 | (b14 & 4) << 1;
+						mind1 = d9;
+						minvX1 = closest.x;
+						minvY1 = closest.y;
+						minvZ1 = closest.z;
+					}
+				}
+				if((v2X5 * n243X + v2Y5 * n243Y + v2Z5 * n243Z) * sign < 0) {
+					var v1X18;
+					var v1Y18;
+					var v1Z18;
+					var v2X18;
+					var v2Y18;
+					var v2Z18;
+					var v3X5;
+					var v3Y5;
+					var v3Z5;
+					var v12X18;
+					var v12Y18;
+					var v12Z18;
+					var v23X5;
+					var v23Y5;
+					var v23Z5;
+					var v31X4;
+					var v31Y4;
+					var v31Z4;
+					v1X18 = vec21.x;
+					v1Y18 = vec21.y;
+					v1Z18 = vec21.z;
+					v2X18 = vec31.x;
+					v2Y18 = vec31.y;
+					v2Z18 = vec31.z;
+					v3X5 = vec4.x;
+					v3Y5 = vec4.y;
+					v3Z5 = vec4.z;
+					v12X18 = v2X18 - v1X18;
+					v12Y18 = v2Y18 - v1Y18;
+					v12Z18 = v2Z18 - v1Z18;
+					v23X5 = v3X5 - v2X18;
+					v23Y5 = v3Y5 - v2Y18;
+					v23Z5 = v3Z5 - v2Z18;
+					v31X4 = v1X18 - v3X5;
+					v31Y4 = v1Y18 - v3Y5;
+					v31Z4 = v1Z18 - v3Z5;
+					var nX4;
+					var nY4;
+					var nZ4;
+					nX4 = v12Y18 * v23Z5 - v12Z18 * v23Y5;
+					nY4 = v12Z18 * v23X5 - v12X18 * v23Z5;
+					nZ4 = v12X18 * v23Y5 - v12Y18 * v23X5;
+					var n12X4;
+					var n12Y4;
+					var n12Z4;
+					var n23X4;
+					var n23Y4;
+					var n23Z4;
+					var n31X4;
+					var n31Y4;
+					var n31Z4;
+					n12X4 = v12Y18 * nZ4 - v12Z18 * nY4;
+					n12Y4 = v12Z18 * nX4 - v12X18 * nZ4;
+					n12Z4 = v12X18 * nY4 - v12Y18 * nX4;
+					n23X4 = v23Y5 * nZ4 - v23Z5 * nY4;
+					n23Y4 = v23Z5 * nX4 - v23X5 * nZ4;
+					n23Z4 = v23X5 * nY4 - v23Y5 * nX4;
+					n31X4 = v31Y4 * nZ4 - v31Z4 * nY4;
+					n31Y4 = v31Z4 * nX4 - v31X4 * nZ4;
+					n31Z4 = v31X4 * nY4 - v31Y4 * nX4;
+					var mind5 = -1;
+					var minvX5;
+					var minvY5;
+					var minvZ5;
+					var mini5 = 0;
+					minvX5 = 0;
+					minvY5 = 0;
+					minvZ5 = 0;
+					if(v1X18 * n12X4 + v1Y18 * n12Y4 + v1Z18 * n12Z4 < 0) {
+						var v1X19;
+						var v1Y19;
+						var v1Z19;
+						var v2X19;
+						var v2Y19;
+						var v2Z19;
+						v1X19 = vec21.x;
+						v1Y19 = vec21.y;
+						v1Z19 = vec21.z;
+						v2X19 = vec31.x;
+						v2Y19 = vec31.y;
+						v2Z19 = vec31.z;
+						var v12X19;
+						var v12Y19;
+						var v12Z19;
+						v12X19 = v2X19 - v1X19;
+						v12Y19 = v2Y19 - v1Y19;
+						v12Z19 = v2Z19 - v1Z19;
+						var t13 = v12X19 * v1X19 + v12Y19 * v1Y19 + v12Z19 * v1Z19;
+						t13 = -t13 / (v12X19 * v12X19 + v12Y19 * v12Y19 + v12Z19 * v12Z19);
+						var b15;
+						if(t13 < 0) {
+							closest.x = v1X19;
+							closest.y = v1Y19;
+							closest.z = v1Z19;
+							b15 = 1;
+						} else if(t13 > 1) {
+							closest.x = v2X19;
+							closest.y = v2Y19;
+							closest.z = v2Z19;
+							b15 = 2;
+						} else {
+							var pX13;
+							var pY13;
+							var pZ13;
+							pX13 = v1X19 + v12X19 * t13;
+							pY13 = v1Y19 + v12Y19 * t13;
+							pZ13 = v1Z19 + v12Z19 * t13;
+							closest.x = pX13;
+							closest.y = pY13;
+							closest.z = pZ13;
+							b15 = 3;
+						}
+						mini5 = b15;
+						mind5 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						minvX5 = closest.x;
+						minvY5 = closest.y;
+						minvZ5 = closest.z;
+					}
+					if(v2X18 * n23X4 + v2Y18 * n23Y4 + v2Z18 * n23Z4 < 0) {
+						var v1X20;
+						var v1Y20;
+						var v1Z20;
+						var v2X20;
+						var v2Y20;
+						var v2Z20;
+						v1X20 = vec31.x;
+						v1Y20 = vec31.y;
+						v1Z20 = vec31.z;
+						v2X20 = vec4.x;
+						v2Y20 = vec4.y;
+						v2Z20 = vec4.z;
+						var v12X20;
+						var v12Y20;
+						var v12Z20;
+						v12X20 = v2X20 - v1X20;
+						v12Y20 = v2Y20 - v1Y20;
+						v12Z20 = v2Z20 - v1Z20;
+						var t14 = v12X20 * v1X20 + v12Y20 * v1Y20 + v12Z20 * v1Z20;
+						t14 = -t14 / (v12X20 * v12X20 + v12Y20 * v12Y20 + v12Z20 * v12Z20);
+						var b16;
+						if(t14 < 0) {
+							closest.x = v1X20;
+							closest.y = v1Y20;
+							closest.z = v1Z20;
+							b16 = 1;
+						} else if(t14 > 1) {
+							closest.x = v2X20;
+							closest.y = v2Y20;
+							closest.z = v2Z20;
+							b16 = 2;
+						} else {
+							var pX14;
+							var pY14;
+							var pZ14;
+							pX14 = v1X20 + v12X20 * t14;
+							pY14 = v1Y20 + v12Y20 * t14;
+							pZ14 = v1Z20 + v12Z20 * t14;
+							closest.x = pX14;
+							closest.y = pY14;
+							closest.z = pZ14;
+							b16 = 3;
+						}
+						var d10 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind5 < 0 || d10 < mind5) {
+							mini5 = b16 << 1;
+							mind5 = d10;
+							minvX5 = closest.x;
+							minvY5 = closest.y;
+							minvZ5 = closest.z;
+						}
+					}
+					if(v3X5 * n31X4 + v3Y5 * n31Y4 + v3Z5 * n31Z4 < 0) {
+						var v1X21;
+						var v1Y21;
+						var v1Z21;
+						var v2X21;
+						var v2Y21;
+						var v2Z21;
+						v1X21 = vec21.x;
+						v1Y21 = vec21.y;
+						v1Z21 = vec21.z;
+						v2X21 = vec4.x;
+						v2Y21 = vec4.y;
+						v2Z21 = vec4.z;
+						var v12X21;
+						var v12Y21;
+						var v12Z21;
+						v12X21 = v2X21 - v1X21;
+						v12Y21 = v2Y21 - v1Y21;
+						v12Z21 = v2Z21 - v1Z21;
+						var t15 = v12X21 * v1X21 + v12Y21 * v1Y21 + v12Z21 * v1Z21;
+						t15 = -t15 / (v12X21 * v12X21 + v12Y21 * v12Y21 + v12Z21 * v12Z21);
+						var b17;
+						if(t15 < 0) {
+							closest.x = v1X21;
+							closest.y = v1Y21;
+							closest.z = v1Z21;
+							b17 = 1;
+						} else if(t15 > 1) {
+							closest.x = v2X21;
+							closest.y = v2Y21;
+							closest.z = v2Z21;
+							b17 = 2;
+						} else {
+							var pX15;
+							var pY15;
+							var pZ15;
+							pX15 = v1X21 + v12X21 * t15;
+							pY15 = v1Y21 + v12Y21 * t15;
+							pZ15 = v1Z21 + v12Z21 * t15;
+							closest.x = pX15;
+							closest.y = pY15;
+							closest.z = pZ15;
+							b17 = 3;
+						}
+						var d11 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind5 < 0 || d11 < mind5) {
+							mini5 = b17 & 1 | (b17 & 2) << 1;
+							mind5 = d11;
+							minvX5 = closest.x;
+							minvY5 = closest.y;
+							minvZ5 = closest.z;
+						}
+					}
+					var b18;
+					if(mind5 > 0) {
+						closest.x = minvX5;
+						closest.y = minvY5;
+						closest.z = minvZ5;
+						b18 = mini5;
+					} else {
+						var l5 = nX4 * nX4 + nY4 * nY4 + nZ4 * nZ4;
+						if(l5 > 0) {
+							l5 = 1 / Math.sqrt(l5);
+						}
+						nX4 *= l5;
+						nY4 *= l5;
+						nZ4 *= l5;
+						var l24 = nX4 * nX4 + nY4 * nY4 + nZ4 * nZ4;
+						l24 = (v1X18 * nX4 + v1Y18 * nY4 + v1Z18 * nZ4) / l24;
+						minvX5 = nX4 * l24;
+						minvY5 = nY4 * l24;
+						minvZ5 = nZ4 * l24;
+						closest.x = minvX5;
+						closest.y = minvY5;
+						closest.z = minvZ5;
+						b18 = 7;
+					}
+					var d12 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind1 < 0 || d12 < mind1) {
+						mini1 = b18 << 1;
+						mind1 = d12;
+						minvX1 = closest.x;
+						minvY1 = closest.y;
+						minvZ1 = closest.z;
+					}
+				}
+				if(mind1 > 0) {
+					closest.x = minvX1;
+					closest.y = minvY1;
+					closest.z = minvZ1;
+					v = mini1;
+				} else {
+					closest.zero();
+					v = 15;
+				}
+				break;
+			}
+			if(closest.x * closest.x + closest.y * closest.y + closest.z * closest.z < 1e-008) {
+				if(!useEpa) {
+					this.distance = 0;
+					return 0;
+				}
+				switch(this.simplexSize) {
+				case 1:
+					this.pointToTetrahedron();
+					break;
+				case 2:
+					this.lineToTetrahedron();
+					break;
+				case 3:
+					this.triangleToTetrahedron();
+					break;
+				}
+				if(this.simplexSize == 4) {
+					var epaState = this.computeDepth(c1,c2,tf1,tf2,s,w1,w2);
+					if(epaState != 0) {
+						this.distance = 0;
+						return epaState;
+					}
+					this.distance = -this.depth;
+					return 0;
+				}
+				this.distance = 0;
+				return 1;
+			}
+			this.shrinkSimplex(v);
+			dir.x = closest.x;
+			dir.y = closest.y;
+			dir.z = closest.z;
+			dir.x = -dir.x;
+			dir.y = -dir.y;
+			dir.z = -dir.z;
+			this.computeWitnessPoint1(false);
+			this.computeWitnessPoint2(false);
+			var _this = this.s[this.simplexSize];
+			var v4 = this.w1[this.simplexSize];
+			_this.x = v4.x;
+			_this.y = v4.y;
+			_this.z = v4.z;
+			var v5 = this.w2[this.simplexSize];
+			_this.x -= v5.x;
+			_this.y -= v5.y;
+			_this.z -= v5.z;
+			if(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z < 1e-008) {
+				throw new Error("!?");
+			}
+			var _this1 = s[this.simplexSize];
+			if(_this1.x * dir.x + _this1.y * dir.y + _this1.z * dir.z - (closest.x * dir.x + closest.y * dir.y + closest.z * dir.z) < 1e-008) {
+				this.interpolateClosestPoints();
+				this.distance = Math.sqrt(closest.x * closest.x + closest.y * closest.y + closest.z * closest.z);
+				if(cache != null && cache._gjkCache != null) {
+					this.saveCache(cache._gjkCache);
+				}
+				return 0;
+			}
+			this.simplexSize++;
+			++count;
+		}
+		return 2;
+	}
+	,interpolateClosestPoints: function() {
+		switch(this.simplexSize) {
+		case 1:
+			var _this = this.closestPoint1;
+			var v = this.w1[0];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.closestPoint2;
+			var v = this.w2[0];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 2:
+			var cX;
+			var cY;
+			var cZ;
+			var v = this.closest;
+			cX = v.x;
+			cY = v.y;
+			cZ = v.z;
+			var s0X;
+			var s0Y;
+			var s0Z;
+			var w10X;
+			var w10Y;
+			var w10Z;
+			var w20X;
+			var w20Y;
+			var w20Z;
+			var s1X;
+			var s1Y;
+			var s1Z;
+			var w11X;
+			var w11Y;
+			var w11Z;
+			var w21X;
+			var w21Y;
+			var w21Z;
+			var v = this.s[0];
+			s0X = v.x;
+			s0Y = v.y;
+			s0Z = v.z;
+			var v = this.w1[0];
+			w10X = v.x;
+			w10Y = v.y;
+			w10Z = v.z;
+			var v = this.w2[0];
+			w20X = v.x;
+			w20Y = v.y;
+			w20Z = v.z;
+			var v = this.s[1];
+			s1X = v.x;
+			s1Y = v.y;
+			s1Z = v.z;
+			var v = this.w1[1];
+			w11X = v.x;
+			w11Y = v.y;
+			w11Z = v.z;
+			var v = this.w2[1];
+			w21X = v.x;
+			w21Y = v.y;
+			w21Z = v.z;
+			var s01X;
+			var s01Y;
+			var s01Z;
+			s01X = s1X - s0X;
+			s01Y = s1Y - s0Y;
+			s01Z = s1Z - s0Z;
+			var invDet = s01X * s01X + s01Y * s01Y + s01Z * s01Z;
+			if(invDet != 0) {
+				invDet = 1 / invDet;
+			}
+			var s0cX;
+			var s0cY;
+			var s0cZ;
+			s0cX = cX - s0X;
+			s0cY = cY - s0Y;
+			s0cZ = cZ - s0Z;
+			var t = (s0cX * s01X + s0cY * s01Y + s0cZ * s01Z) * invDet;
+			var diffX;
+			var diffY;
+			var diffZ;
+			var cp1X;
+			var cp1Y;
+			var cp1Z;
+			var cp2X;
+			var cp2Y;
+			var cp2Z;
+			diffX = w11X - w10X;
+			diffY = w11Y - w10Y;
+			diffZ = w11Z - w10Z;
+			cp1X = w10X + diffX * t;
+			cp1Y = w10Y + diffY * t;
+			cp1Z = w10Z + diffZ * t;
+			diffX = w21X - w20X;
+			diffY = w21Y - w20Y;
+			diffZ = w21Z - w20Z;
+			cp2X = w20X + diffX * t;
+			cp2Y = w20Y + diffY * t;
+			cp2Z = w20Z + diffZ * t;
+			var v = this.closestPoint1;
+			v.x = cp1X;
+			v.y = cp1Y;
+			v.z = cp1Z;
+			var v = this.closestPoint2;
+			v.x = cp2X;
+			v.y = cp2Y;
+			v.z = cp2Z;
+			break;
+		case 3:
+			var cX;
+			var cY;
+			var cZ;
+			var v = this.closest;
+			cX = v.x;
+			cY = v.y;
+			cZ = v.z;
+			var s0X;
+			var s0Y;
+			var s0Z;
+			var w10X;
+			var w10Y;
+			var w10Z;
+			var w20X;
+			var w20Y;
+			var w20Z;
+			var s1X;
+			var s1Y;
+			var s1Z;
+			var w11X;
+			var w11Y;
+			var w11Z;
+			var w21X;
+			var w21Y;
+			var w21Z;
+			var s2X;
+			var s2Y;
+			var s2Z;
+			var w12X;
+			var w12Y;
+			var w12Z;
+			var w22X;
+			var w22Y;
+			var w22Z;
+			var v = this.s[0];
+			s0X = v.x;
+			s0Y = v.y;
+			s0Z = v.z;
+			var v = this.w1[0];
+			w10X = v.x;
+			w10Y = v.y;
+			w10Z = v.z;
+			var v = this.w2[0];
+			w20X = v.x;
+			w20Y = v.y;
+			w20Z = v.z;
+			var v = this.s[1];
+			s1X = v.x;
+			s1Y = v.y;
+			s1Z = v.z;
+			var v = this.w1[1];
+			w11X = v.x;
+			w11Y = v.y;
+			w11Z = v.z;
+			var v = this.w2[1];
+			w21X = v.x;
+			w21Y = v.y;
+			w21Z = v.z;
+			var v = this.s[2];
+			s2X = v.x;
+			s2Y = v.y;
+			s2Z = v.z;
+			var v = this.w1[2];
+			w12X = v.x;
+			w12Y = v.y;
+			w12Z = v.z;
+			var v = this.w2[2];
+			w22X = v.x;
+			w22Y = v.y;
+			w22Z = v.z;
+			var s01X;
+			var s01Y;
+			var s01Z;
+			var s02X;
+			var s02Y;
+			var s02Z;
+			var s0cX;
+			var s0cY;
+			var s0cZ;
+			s01X = s1X - s0X;
+			s01Y = s1Y - s0Y;
+			s01Z = s1Z - s0Z;
+			s02X = s2X - s0X;
+			s02Y = s2Y - s0Y;
+			s02Z = s2Z - s0Z;
+			s0cX = cX - s0X;
+			s0cY = cY - s0Y;
+			s0cZ = cZ - s0Z;
+			var d11 = s01X * s01X + s01Y * s01Y + s01Z * s01Z;
+			var d12 = s01X * s02X + s01Y * s02Y + s01Z * s02Z;
+			var d22 = s02X * s02X + s02Y * s02Y + s02Z * s02Z;
+			var d1c = s01X * s0cX + s01Y * s0cY + s01Z * s0cZ;
+			var d2c = s02X * s0cX + s02Y * s0cY + s02Z * s0cZ;
+			var invDet = d11 * d22 - d12 * d12;
+			if(invDet != 0) {
+				invDet = 1 / invDet;
+			}
+			var s = (d1c * d22 - d2c * d12) * invDet;
+			var t = (-d1c * d12 + d2c * d11) * invDet;
+			var diffX;
+			var diffY;
+			var diffZ;
+			var cp1X;
+			var cp1Y;
+			var cp1Z;
+			var cp2X;
+			var cp2Y;
+			var cp2Z;
+			diffX = w11X - w10X;
+			diffY = w11Y - w10Y;
+			diffZ = w11Z - w10Z;
+			cp1X = w10X + diffX * s;
+			cp1Y = w10Y + diffY * s;
+			cp1Z = w10Z + diffZ * s;
+			diffX = w12X - w10X;
+			diffY = w12Y - w10Y;
+			diffZ = w12Z - w10Z;
+			cp1X += diffX * t;
+			cp1Y += diffY * t;
+			cp1Z += diffZ * t;
+			diffX = w21X - w20X;
+			diffY = w21Y - w20Y;
+			diffZ = w21Z - w20Z;
+			cp2X = w20X + diffX * s;
+			cp2Y = w20Y + diffY * s;
+			cp2Z = w20Z + diffZ * s;
+			diffX = w22X - w20X;
+			diffY = w22Y - w20Y;
+			diffZ = w22Z - w20Z;
+			cp2X += diffX * t;
+			cp2Y += diffY * t;
+			cp2Z += diffZ * t;
+			var v = this.closestPoint1;
+			v.x = cp1X;
+			v.y = cp1Y;
+			v.z = cp1Z;
+			var v = this.closestPoint2;
+			v.x = cp2X;
+			v.y = cp2Y;
+			v.z = cp2Z;
+			break;
+		default:
+			throw new Error("!?");
+		}
+	}
+	,loadCache: function(gjkCache) {
+		var _this = this.dir;
+		var v = gjkCache.prevClosestDir;
+		_this.x = v.x;
+		_this.y = v.y;
+		_this.z = v.z;
+	}
+	,saveCache: function(gjkCache) {
+		var _this = gjkCache.prevClosestDir;
+		var v = this.closest;
+		_this.x = v.x;
+		_this.y = v.y;
+		_this.z = v.z;
+		_this.x = -_this.x;
+		_this.y = -_this.y;
+		_this.z = -_this.z;
+	}
+	,shrinkSimplex: function(vertexBits) {
+		this.simplexSize = vertexBits;
+		this.simplexSize = (this.simplexSize & 5) + (this.simplexSize >> 1 & 5);
+		this.simplexSize = (this.simplexSize & 3) + (this.simplexSize >> 2 & 3);
+		switch(vertexBits) {
+		case 2:
+			var _this = this.s[0];
+			var v = this.s[1];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[0];
+			var v = this.w1[1];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[0];
+			var v = this.w2[1];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 4:
+			var _this = this.s[0];
+			var v = this.s[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[0];
+			var v = this.w1[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[0];
+			var v = this.w2[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 5:
+			var _this = this.s[1];
+			var v = this.s[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[1];
+			var v = this.w1[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[1];
+			var v = this.w2[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 6:
+			var _this = this.s[0];
+			var v = this.s[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[0];
+			var v = this.w1[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[0];
+			var v = this.w2[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 8:
+			var _this = this.s[0];
+			var v = this.s[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[0];
+			var v = this.w1[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[0];
+			var v = this.w2[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 9:
+			var _this = this.s[1];
+			var v = this.s[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[1];
+			var v = this.w1[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[1];
+			var v = this.w2[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 10:
+			var _this = this.s[0];
+			var v = this.s[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[0];
+			var v = this.w1[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[0];
+			var v = this.w2[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 11:
+			var _this = this.s[2];
+			var v = this.s[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[2];
+			var v = this.w1[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[2];
+			var v = this.w2[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 12:
+			var _this = this.s[0];
+			var v = this.s[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[0];
+			var v = this.w1[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[0];
+			var v = this.w2[2];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.s[1];
+			var v = this.s[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[1];
+			var v = this.w1[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[1];
+			var v = this.w2[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 13:
+			var _this = this.s[1];
+			var v = this.s[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[1];
+			var v = this.w1[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[1];
+			var v = this.w2[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		case 14:
+			var _this = this.s[0];
+			var v = this.s[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w1[0];
+			var v = this.w1[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var _this = this.w2[0];
+			var v = this.w2[3];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			break;
+		}
+	}
+	,computeWitnessPoint1: function(addMargin) {
+		var tmpX;
+		var tmpY;
+		var tmpZ;
+		var idirX;
+		var idirY;
+		var idirZ;
+		var v = this.dir;
+		idirX = v.x;
+		idirY = v.y;
+		idirZ = v.z;
+		var ldir1X;
+		var ldir1Y;
+		var ldir1Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = this.tf1._rotation00 * idirX + this.tf1._rotation10 * idirY + this.tf1._rotation20 * idirZ;
+		__tmp__Y = this.tf1._rotation01 * idirX + this.tf1._rotation11 * idirY + this.tf1._rotation21 * idirZ;
+		__tmp__Z = this.tf1._rotation02 * idirX + this.tf1._rotation12 * idirY + this.tf1._rotation22 * idirZ;
+		ldir1X = __tmp__X;
+		ldir1Y = __tmp__Y;
+		ldir1Z = __tmp__Z;
+		var iw1X;
+		var iw1Y;
+		var iw1Z;
+		var v = this.dir;
+		v.x = ldir1X;
+		v.y = ldir1Y;
+		v.z = ldir1Z;
+		this.c1.computeLocalSupportingVertex(this.dir,this.w1[this.simplexSize]);
+		if(addMargin) {
+			var _this = this.dir;
+			var invLen = Math.sqrt(_this.x * _this.x + _this.y * _this.y + _this.z * _this.z);
+			if(invLen > 0) {
+				invLen = 1 / invLen;
+			}
+			_this.x *= invLen;
+			_this.y *= invLen;
+			_this.z *= invLen;
+			var _this = this.w1[this.simplexSize];
+			var v = this.dir;
+			var s = this.c1._gjkMargin;
+			_this.x += v.x * s;
+			_this.y += v.y * s;
+			_this.z += v.z * s;
+		}
+		var v = this.w1[this.simplexSize];
+		tmpX = v.x;
+		tmpY = v.y;
+		tmpZ = v.z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = this.tf1._rotation00 * tmpX + this.tf1._rotation01 * tmpY + this.tf1._rotation02 * tmpZ;
+		__tmp__Y = this.tf1._rotation10 * tmpX + this.tf1._rotation11 * tmpY + this.tf1._rotation12 * tmpZ;
+		__tmp__Z = this.tf1._rotation20 * tmpX + this.tf1._rotation21 * tmpY + this.tf1._rotation22 * tmpZ;
+		iw1X = __tmp__X;
+		iw1Y = __tmp__Y;
+		iw1Z = __tmp__Z;
+		iw1X += this.tf1._positionX;
+		iw1Y += this.tf1._positionY;
+		iw1Z += this.tf1._positionZ;
+		var v = this.w1[this.simplexSize];
+		v.x = iw1X;
+		v.y = iw1Y;
+		v.z = iw1Z;
+		var v = this.dir;
+		v.x = idirX;
+		v.y = idirY;
+		v.z = idirZ;
+	}
+	,computeWitnessPoint2: function(addMargin) {
+		var tmpX;
+		var tmpY;
+		var tmpZ;
+		var idirX;
+		var idirY;
+		var idirZ;
+		var v = this.dir;
+		idirX = v.x;
+		idirY = v.y;
+		idirZ = v.z;
+		var ldir2X;
+		var ldir2Y;
+		var ldir2Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = this.tf2._rotation00 * idirX + this.tf2._rotation10 * idirY + this.tf2._rotation20 * idirZ;
+		__tmp__Y = this.tf2._rotation01 * idirX + this.tf2._rotation11 * idirY + this.tf2._rotation21 * idirZ;
+		__tmp__Z = this.tf2._rotation02 * idirX + this.tf2._rotation12 * idirY + this.tf2._rotation22 * idirZ;
+		ldir2X = __tmp__X;
+		ldir2Y = __tmp__Y;
+		ldir2Z = __tmp__Z;
+		ldir2X = -ldir2X;
+		ldir2Y = -ldir2Y;
+		ldir2Z = -ldir2Z;
+		var iw2X;
+		var iw2Y;
+		var iw2Z;
+		var v = this.dir;
+		v.x = ldir2X;
+		v.y = ldir2Y;
+		v.z = ldir2Z;
+		this.c2.computeLocalSupportingVertex(this.dir,this.w2[this.simplexSize]);
+		if(addMargin) {
+			var _this = this.dir;
+			var invLen = Math.sqrt(_this.x * _this.x + _this.y * _this.y + _this.z * _this.z);
+			if(invLen > 0) {
+				invLen = 1 / invLen;
+			}
+			_this.x *= invLen;
+			_this.y *= invLen;
+			_this.z *= invLen;
+			var _this = this.w2[this.simplexSize];
+			var v = this.dir;
+			var s = this.c2._gjkMargin;
+			_this.x += v.x * s;
+			_this.y += v.y * s;
+			_this.z += v.z * s;
+		}
+		var v = this.w2[this.simplexSize];
+		tmpX = v.x;
+		tmpY = v.y;
+		tmpZ = v.z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = this.tf2._rotation00 * tmpX + this.tf2._rotation01 * tmpY + this.tf2._rotation02 * tmpZ;
+		__tmp__Y = this.tf2._rotation10 * tmpX + this.tf2._rotation11 * tmpY + this.tf2._rotation12 * tmpZ;
+		__tmp__Z = this.tf2._rotation20 * tmpX + this.tf2._rotation21 * tmpY + this.tf2._rotation22 * tmpZ;
+		iw2X = __tmp__X;
+		iw2Y = __tmp__Y;
+		iw2Z = __tmp__Z;
+		iw2X += this.tf2._positionX;
+		iw2Y += this.tf2._positionY;
+		iw2Z += this.tf2._positionZ;
+		var v = this.w2[this.simplexSize];
+		v.x = iw2X;
+		v.y = iw2Y;
+		v.z = iw2Z;
+		var v = this.dir;
+		v.x = idirX;
+		v.y = idirY;
+		v.z = idirZ;
+	}
+	,pointToTetrahedron: function() {
+		var _g = 0;
+		while(_g < 3) {
+			var _this = this.dir;
+			var v = this.baseDirs[_g++];
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			this.computeWitnessPoint1(false);
+			this.computeWitnessPoint2(false);
+			var _this1 = this.s[this.simplexSize];
+			var v1 = this.w1[this.simplexSize];
+			_this1.x = v1.x;
+			_this1.y = v1.y;
+			_this1.z = v1.z;
+			var v2 = this.w2[this.simplexSize];
+			_this1.x -= v2.x;
+			_this1.y -= v2.y;
+			_this1.z -= v2.z;
+			this.simplexSize++;
+			this.lineToTetrahedron();
+			if(this.simplexSize == 4) {
+				break;
+			}
+			this.simplexSize--;
+			var _this2 = this.dir;
+			_this2.x = -_this2.x;
+			_this2.y = -_this2.y;
+			_this2.z = -_this2.z;
+			this.computeWitnessPoint1(false);
+			this.computeWitnessPoint2(false);
+			var _this3 = this.s[this.simplexSize];
+			var v3 = this.w1[this.simplexSize];
+			_this3.x = v3.x;
+			_this3.y = v3.y;
+			_this3.z = v3.z;
+			var v4 = this.w2[this.simplexSize];
+			_this3.x -= v4.x;
+			_this3.y -= v4.y;
+			_this3.z -= v4.z;
+			this.simplexSize++;
+			this.lineToTetrahedron();
+			if(this.simplexSize == 4) {
+				break;
+			}
+			this.simplexSize--;
+		}
+	}
+	,lineToTetrahedron: function() {
+		var oldDirX;
+		var oldDirY;
+		var oldDirZ;
+		var v = this.dir;
+		oldDirX = v.x;
+		oldDirY = v.y;
+		oldDirZ = v.z;
+		var s0X;
+		var s0Y;
+		var s0Z;
+		var s1X;
+		var s1Y;
+		var s1Z;
+		var lineDirX;
+		var lineDirY;
+		var lineDirZ;
+		var v = this.s[0];
+		s0X = v.x;
+		s0Y = v.y;
+		s0Z = v.z;
+		var v = this.s[1];
+		s1X = v.x;
+		s1Y = v.y;
+		s1Z = v.z;
+		lineDirX = s0X - s1X;
+		lineDirY = s0Y - s1Y;
+		lineDirZ = s0Z - s1Z;
+		var _g = 0;
+		while(_g < 3) {
+			var baseDirX;
+			var baseDirY;
+			var baseDirZ;
+			var v = this.baseDirs[_g++];
+			baseDirX = v.x;
+			baseDirY = v.y;
+			baseDirZ = v.z;
+			var newDirX;
+			var newDirY;
+			var newDirZ;
+			newDirX = lineDirY * baseDirZ - lineDirZ * baseDirY;
+			newDirY = lineDirZ * baseDirX - lineDirX * baseDirZ;
+			newDirZ = lineDirX * baseDirY - lineDirY * baseDirX;
+			var v1 = this.dir;
+			v1.x = newDirX;
+			v1.y = newDirY;
+			v1.z = newDirZ;
+			this.computeWitnessPoint1(false);
+			this.computeWitnessPoint2(false);
+			var _this = this.s[this.simplexSize];
+			var v2 = this.w1[this.simplexSize];
+			_this.x = v2.x;
+			_this.y = v2.y;
+			_this.z = v2.z;
+			var v3 = this.w2[this.simplexSize];
+			_this.x -= v3.x;
+			_this.y -= v3.y;
+			_this.z -= v3.z;
+			this.simplexSize++;
+			this.triangleToTetrahedron();
+			if(this.simplexSize == 4) {
+				break;
+			}
+			this.simplexSize--;
+			var _this1 = this.dir;
+			_this1.x = -_this1.x;
+			_this1.y = -_this1.y;
+			_this1.z = -_this1.z;
+			this.computeWitnessPoint1(false);
+			this.computeWitnessPoint2(false);
+			var _this2 = this.s[this.simplexSize];
+			var v4 = this.w1[this.simplexSize];
+			_this2.x = v4.x;
+			_this2.y = v4.y;
+			_this2.z = v4.z;
+			var v5 = this.w2[this.simplexSize];
+			_this2.x -= v5.x;
+			_this2.y -= v5.y;
+			_this2.z -= v5.z;
+			this.simplexSize++;
+			this.triangleToTetrahedron();
+			if(this.simplexSize == 4) {
+				break;
+			}
+			this.simplexSize--;
+		}
+		var v = this.dir;
+		v.x = oldDirX;
+		v.y = oldDirY;
+		v.z = oldDirZ;
+	}
+	,triangleToTetrahedron: function() {
+		var oldDirX;
+		var oldDirY;
+		var oldDirZ;
+		var v = this.dir;
+		oldDirX = v.x;
+		oldDirY = v.y;
+		oldDirZ = v.z;
+		do {
+			var s0X;
+			var s0Y;
+			var s0Z;
+			var s1X;
+			var s1Y;
+			var s1Z;
+			var s2X;
+			var s2Y;
+			var s2Z;
+			var s01X;
+			var s01Y;
+			var s01Z;
+			var s02X;
+			var s02Y;
+			var s02Z;
+			var v = this.s[0];
+			s0X = v.x;
+			s0Y = v.y;
+			s0Z = v.z;
+			var v1 = this.s[1];
+			s1X = v1.x;
+			s1Y = v1.y;
+			s1Z = v1.z;
+			var v2 = this.s[2];
+			s2X = v2.x;
+			s2Y = v2.y;
+			s2Z = v2.z;
+			s01X = s1X - s0X;
+			s01Y = s1Y - s0Y;
+			s01Z = s1Z - s0Z;
+			s02X = s2X - s0X;
+			s02Y = s2Y - s0Y;
+			s02Z = s2Z - s0Z;
+			var nX;
+			var nY;
+			var nZ;
+			nX = s01Y * s02Z - s01Z * s02Y;
+			nY = s01Z * s02X - s01X * s02Z;
+			nZ = s01X * s02Y - s01Y * s02X;
+			var v3 = this.dir;
+			v3.x = nX;
+			v3.y = nY;
+			v3.z = nZ;
+			this.computeWitnessPoint1(false);
+			this.computeWitnessPoint2(false);
+			var _this = this.s[this.simplexSize];
+			var v4 = this.w1[this.simplexSize];
+			_this.x = v4.x;
+			_this.y = v4.y;
+			_this.z = v4.z;
+			var v5 = this.w2[this.simplexSize];
+			_this.x -= v5.x;
+			_this.y -= v5.y;
+			_this.z -= v5.z;
+			this.simplexSize++;
+			if(this.isValidTetrahedron()) {
+				break;
+			}
+			this.simplexSize--;
+			var _this1 = this.dir;
+			_this1.x = -_this1.x;
+			_this1.y = -_this1.y;
+			_this1.z = -_this1.z;
+			this.computeWitnessPoint1(false);
+			this.computeWitnessPoint2(false);
+			var _this2 = this.s[this.simplexSize];
+			var v6 = this.w1[this.simplexSize];
+			_this2.x = v6.x;
+			_this2.y = v6.y;
+			_this2.z = v6.z;
+			var v7 = this.w2[this.simplexSize];
+			_this2.x -= v7.x;
+			_this2.y -= v7.y;
+			_this2.z -= v7.z;
+			this.simplexSize++;
+			if(this.isValidTetrahedron()) {
+				break;
+			}
+			this.simplexSize--;
+		} while(false);
+		var v = this.dir;
+		v.x = oldDirX;
+		v.y = oldDirY;
+		v.z = oldDirZ;
+	}
+	,isValidTetrahedron: function() {
+		var e10 = this.s[2].x - this.s[0].x;
+		var e11 = this.s[2].y - this.s[0].y;
+		var e12 = this.s[2].z - this.s[0].z;
+		var e20 = this.s[3].x - this.s[0].x;
+		var e21 = this.s[3].y - this.s[0].y;
+		var e22 = this.s[3].z - this.s[0].z;
+		var det = (this.s[1].x - this.s[0].x) * (e11 * e22 - e12 * e21) - (this.s[1].y - this.s[0].y) * (e10 * e22 - e12 * e20) + (this.s[1].z - this.s[0].z) * (e10 * e21 - e11 * e20);
+		if(!(det > 1e-12)) {
+			return det < -1e-12;
+		} else {
+			return true;
+		}
+	}
+	,computeDepth: function(convex1,convex2,tf1,tf2,initialPolyhedron,initialPolyhedron1,initialPolyhedron2) {
+		var _this = this.polyhedron;
+		while(_this._numTriangles > 0) {
+			var t = _this._triangleList;
+			_this._numTriangles--;
+			var prev = t._prev;
+			var next = t._next;
+			if(prev != null) {
+				prev._next = next;
+			}
+			if(next != null) {
+				next._prev = prev;
+			}
+			if(t == _this._triangleList) {
+				_this._triangleList = _this._triangleList._next;
+			}
+			if(t == _this._triangleListLast) {
+				_this._triangleListLast = _this._triangleListLast._prev;
+			}
+			t._next = null;
+			t._prev = null;
+			t.removeReferences();
+			t._next = _this._trianglePool;
+			_this._trianglePool = t;
+		}
+		while(_this._numVertices > 0) {
+			var v = _this._vertices[--_this._numVertices];
+			v.removeReferences();
+			v._next = _this._vertexPool;
+			_this._vertexPool = v;
+		}
+		var tmp = this.polyhedron;
+		var _this = this.polyhedron;
+		var first = _this._vertexPool;
+		if(first != null) {
+			_this._vertexPool = first._next;
+			first._next = null;
+		} else {
+			first = new oimo_collision_narrowphase_detector_gjkepa_EpaVertex();
+		}
+		var tmp1 = first.init(initialPolyhedron[0],initialPolyhedron1[0],initialPolyhedron2[0]);
+		var _this = this.polyhedron;
+		var first = _this._vertexPool;
+		if(first != null) {
+			_this._vertexPool = first._next;
+			first._next = null;
+		} else {
+			first = new oimo_collision_narrowphase_detector_gjkepa_EpaVertex();
+		}
+		var tmp2 = first.init(initialPolyhedron[1],initialPolyhedron1[1],initialPolyhedron2[1]);
+		var _this = this.polyhedron;
+		var first = _this._vertexPool;
+		if(first != null) {
+			_this._vertexPool = first._next;
+			first._next = null;
+		} else {
+			first = new oimo_collision_narrowphase_detector_gjkepa_EpaVertex();
+		}
+		var tmp3 = first.init(initialPolyhedron[2],initialPolyhedron1[2],initialPolyhedron2[2]);
+		var _this = this.polyhedron;
+		var first = _this._vertexPool;
+		if(first != null) {
+			_this._vertexPool = first._next;
+			first._next = null;
+		} else {
+			first = new oimo_collision_narrowphase_detector_gjkepa_EpaVertex();
+		}
+		if(!tmp._init(tmp1,tmp2,tmp3,first.init(initialPolyhedron[3],initialPolyhedron1[3],initialPolyhedron2[3]))) {
+			return oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_FAILED_TO_INIT;
+		}
+		this.simplexSize = 0;
+		var supportingVertex = this.s[0];
+		var witness1 = this.w1[0];
+		var witness2 = this.w2[0];
+		var count = 0;
+		while(count < 40) {
+			var f = this.polyhedron._triangleList;
+			var mind = 1e65536;
+			var minf = null;
+			while(f != null) {
+				if(f._distanceSq < mind) {
+					mind = f._distanceSq;
+					minf = f;
+				}
+				f = f._next;
+			}
+			var face = minf;
+			var _this = this.dir;
+			var v = face._normal;
+			_this.x = v.x;
+			_this.y = v.y;
+			_this.z = v.z;
+			var invLen = Math.sqrt(_this.x * _this.x + _this.y * _this.y + _this.z * _this.z);
+			if(invLen > 0) {
+				invLen = 1 / invLen;
+			}
+			_this.x *= invLen;
+			_this.y *= invLen;
+			_this.z *= invLen;
+			this.computeWitnessPoint1(false);
+			this.computeWitnessPoint2(false);
+			var _this1 = this.s[this.simplexSize];
+			var v1 = this.w1[this.simplexSize];
+			_this1.x = v1.x;
+			_this1.y = v1.y;
+			_this1.z = v1.z;
+			var v2 = this.w2[this.simplexSize];
+			_this1.x -= v2.x;
+			_this1.y -= v2.y;
+			_this1.z -= v2.z;
+			var v0 = face._vertices[0];
+			var v11 = face._vertices[1];
+			var v21 = face._vertices[2];
+			var _this2 = v0.v;
+			var v3 = this.dir;
+			var v4 = this.dir;
+			if(supportingVertex.x * v4.x + supportingVertex.y * v4.y + supportingVertex.z * v4.z - (_this2.x * v3.x + _this2.y * v3.y + _this2.z * v3.z) < 1e-6 || count == 39) {
+				var _this3 = this.closest;
+				var v5 = this.dir;
+				_this3.x = v5.x;
+				_this3.y = v5.y;
+				_this3.z = v5.z;
+				var _this4 = this.dir;
+				var v6 = v0.v;
+				var _this5 = this.dir;
+				var s = (_this4.x * v6.x + _this4.y * v6.y + _this4.z * v6.z) / (_this5.x * _this5.x + _this5.y * _this5.y + _this5.z * _this5.z);
+				_this3.x *= s;
+				_this3.y *= s;
+				_this3.z *= s;
+				var cX;
+				var cY;
+				var cZ;
+				var v7 = this.closest;
+				cX = v7.x;
+				cY = v7.y;
+				cZ = v7.z;
+				var s0X;
+				var s0Y;
+				var s0Z;
+				var w10X;
+				var w10Y;
+				var w10Z;
+				var w20X;
+				var w20Y;
+				var w20Z;
+				var s1X;
+				var s1Y;
+				var s1Z;
+				var w11X;
+				var w11Y;
+				var w11Z;
+				var w21X;
+				var w21Y;
+				var w21Z;
+				var s2X;
+				var s2Y;
+				var s2Z;
+				var w12X;
+				var w12Y;
+				var w12Z;
+				var w22X;
+				var w22Y;
+				var w22Z;
+				var v8 = v0.v;
+				s0X = v8.x;
+				s0Y = v8.y;
+				s0Z = v8.z;
+				var v9 = v0.w1;
+				w10X = v9.x;
+				w10Y = v9.y;
+				w10Z = v9.z;
+				var v10 = v0.w2;
+				w20X = v10.x;
+				w20Y = v10.y;
+				w20Z = v10.z;
+				var v12 = v11.v;
+				s1X = v12.x;
+				s1Y = v12.y;
+				s1Z = v12.z;
+				var v13 = v11.w1;
+				w11X = v13.x;
+				w11Y = v13.y;
+				w11Z = v13.z;
+				var v14 = v11.w2;
+				w21X = v14.x;
+				w21Y = v14.y;
+				w21Z = v14.z;
+				var v15 = v21.v;
+				s2X = v15.x;
+				s2Y = v15.y;
+				s2Z = v15.z;
+				var v16 = v21.w1;
+				w12X = v16.x;
+				w12Y = v16.y;
+				w12Z = v16.z;
+				var v17 = v21.w2;
+				w22X = v17.x;
+				w22Y = v17.y;
+				w22Z = v17.z;
+				var s01X;
+				var s01Y;
+				var s01Z;
+				var s02X;
+				var s02Y;
+				var s02Z;
+				var s0cX;
+				var s0cY;
+				var s0cZ;
+				s01X = s1X - s0X;
+				s01Y = s1Y - s0Y;
+				s01Z = s1Z - s0Z;
+				s02X = s2X - s0X;
+				s02Y = s2Y - s0Y;
+				s02Z = s2Z - s0Z;
+				s0cX = cX - s0X;
+				s0cY = cY - s0Y;
+				s0cZ = cZ - s0Z;
+				var d11 = s01X * s01X + s01Y * s01Y + s01Z * s01Z;
+				var d12 = s01X * s02X + s01Y * s02Y + s01Z * s02Z;
+				var d22 = s02X * s02X + s02Y * s02Y + s02Z * s02Z;
+				var d1c = s01X * s0cX + s01Y * s0cY + s01Z * s0cZ;
+				var d2c = s02X * s0cX + s02Y * s0cY + s02Z * s0cZ;
+				var invDet = d11 * d22 - d12 * d12;
+				if(invDet != 0) {
+					invDet = 1 / invDet;
+				}
+				var s1 = (d1c * d22 - d2c * d12) * invDet;
+				var t = (-d1c * d12 + d2c * d11) * invDet;
+				var diffX;
+				var diffY;
+				var diffZ;
+				var cp1X;
+				var cp1Y;
+				var cp1Z;
+				var cp2X;
+				var cp2Y;
+				var cp2Z;
+				diffX = w11X - w10X;
+				diffY = w11Y - w10Y;
+				diffZ = w11Z - w10Z;
+				cp1X = w10X + diffX * s1;
+				cp1Y = w10Y + diffY * s1;
+				cp1Z = w10Z + diffZ * s1;
+				diffX = w12X - w10X;
+				diffY = w12Y - w10Y;
+				diffZ = w12Z - w10Z;
+				cp1X += diffX * t;
+				cp1Y += diffY * t;
+				cp1Z += diffZ * t;
+				diffX = w21X - w20X;
+				diffY = w21Y - w20Y;
+				diffZ = w21Z - w20Z;
+				cp2X = w20X + diffX * s1;
+				cp2Y = w20Y + diffY * s1;
+				cp2Z = w20Z + diffZ * s1;
+				diffX = w22X - w20X;
+				diffY = w22Y - w20Y;
+				diffZ = w22Z - w20Z;
+				cp2X += diffX * t;
+				cp2Y += diffY * t;
+				cp2Z += diffZ * t;
+				var v18 = this.closestPoint1;
+				v18.x = cp1X;
+				v18.y = cp1Y;
+				v18.z = cp1Z;
+				var v19 = this.closestPoint2;
+				v19.x = cp2X;
+				v19.y = cp2Y;
+				v19.z = cp2Z;
+				var _this6 = this.closest;
+				this.depth = Math.sqrt(_this6.x * _this6.x + _this6.y * _this6.y + _this6.z * _this6.z);
+				return oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.SUCCEEDED;
+			}
+			var _this7 = this.polyhedron;
+			var first = _this7._vertexPool;
+			if(first != null) {
+				_this7._vertexPool = first._next;
+				first._next = null;
+			} else {
+				first = new oimo_collision_narrowphase_detector_gjkepa_EpaVertex();
+			}
+			var epaVertex = first.init(supportingVertex,witness1,witness2);
+			if(!this.polyhedron._addVertex(epaVertex,face)) {
+				return oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_FAILED_TO_ADD_VERTEX;
+			}
+			++count;
+		}
+		return oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_DID_NOT_CONVERGE;
+	}
+	,__class__: oimo_collision_narrowphase_detector_gjkepa_GjkEpa
+};
+var oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState = function() { };
+$hxClasses["oimo.collision.narrowphase.detector.gjkepa.GjkEpaResultState"] = oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState;
+oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.__name__ = "oimo.collision.narrowphase.detector.gjkepa.GjkEpaResultState";
+var oimo_common_Mat3 = function(e00,e01,e02,e10,e11,e12,e20,e21,e22) {
+	if(e22 == null) {
+		e22 = 1;
+	}
+	if(e21 == null) {
+		e21 = 0;
+	}
+	if(e20 == null) {
+		e20 = 0;
+	}
+	if(e12 == null) {
+		e12 = 0;
+	}
+	if(e11 == null) {
+		e11 = 1;
+	}
+	if(e10 == null) {
+		e10 = 0;
+	}
+	if(e02 == null) {
+		e02 = 0;
+	}
+	if(e01 == null) {
+		e01 = 0;
+	}
+	if(e00 == null) {
+		e00 = 1;
+	}
+	this.e00 = e00;
+	this.e01 = e01;
+	this.e02 = e02;
+	this.e10 = e10;
+	this.e11 = e11;
+	this.e12 = e12;
+	this.e20 = e20;
+	this.e21 = e21;
+	this.e22 = e22;
+	oimo_common_Mat3.numCreations++;
+};
+$hxClasses["oimo.common.Mat3"] = oimo_common_Mat3;
+oimo_common_Mat3.__name__ = "oimo.common.Mat3";
+oimo_common_Mat3.prototype = {
+	__class__: oimo_common_Mat3
+};
+var oimo_common_Mat4 = function() { };
+$hxClasses["oimo.common.Mat4"] = oimo_common_Mat4;
+oimo_common_Mat4.__name__ = "oimo.common.Mat4";
+var oimo_common_Pool = function() {
+	this.stackVec3 = new Array(256);
+	this.sizeVec3 = 0;
+	this.stackMat3 = new Array(256);
+	this.sizeMat3 = 0;
+	this.stackMat4 = new Array(256);
+	this.sizeMat4 = 0;
+	this.stackQuat = new Array(256);
+	this.sizeQuat = 0;
+};
+$hxClasses["oimo.common.Pool"] = oimo_common_Pool;
+oimo_common_Pool.__name__ = "oimo.common.Pool";
+oimo_common_Pool.prototype = {
+	__class__: oimo_common_Pool
+};
+var oimo_common_Quat = function() { };
+$hxClasses["oimo.common.Quat"] = oimo_common_Quat;
+oimo_common_Quat.__name__ = "oimo.common.Quat";
+var oimo_dynamics_Contact = function() {
+	this._next = null;
+	this._prev = null;
+	this._link1 = new oimo_dynamics_ContactLink();
+	this._link2 = new oimo_dynamics_ContactLink();
+	this._s1 = null;
+	this._s2 = null;
+	this._b1 = null;
+	this._b2 = null;
+	this._detector = null;
+	this._cachedDetectorData = new oimo_collision_narrowphase_detector_CachedDetectorData();
+	this._detectorResult = new oimo_collision_narrowphase_DetectorResult();
+	this._latest = false;
+	this._shouldBeSkipped = false;
+	this._manifold = new oimo_dynamics_constraint_contact_Manifold();
+	this._updater = new oimo_dynamics_constraint_contact_ManifoldUpdater(this._manifold);
+	this._contactConstraint = new oimo_dynamics_constraint_contact_ContactConstraint(this._manifold);
+	this._touching = false;
+};
+$hxClasses["oimo.dynamics.Contact"] = oimo_dynamics_Contact;
+oimo_dynamics_Contact.__name__ = "oimo.dynamics.Contact";
+oimo_dynamics_Contact.prototype = {
+	_updateManifold: function() {
+		if(this._detector == null) {
+			return;
+		}
+		var ptouching = this._touching;
+		var result = this._detectorResult;
+		this._detector.detect(result,this._s1._geom,this._s2._geom,this._s1._transform,this._s2._transform,this._cachedDetectorData);
+		this._touching = result.numPoints > 0;
+		if(this._touching) {
+			this._manifold._buildBasis(result.normal);
+			if(result.getMaxDepth() > oimo_common_Setting.contactUseAlternativePositionCorrectionAlgorithmDepthThreshold) {
+				this._contactConstraint._positionCorrectionAlgorithm = oimo_common_Setting.alternativeContactPositionCorrectionAlgorithm;
+			} else {
+				this._contactConstraint._positionCorrectionAlgorithm = oimo_common_Setting.defaultContactPositionCorrectionAlgorithm;
+			}
+			if(result.incremental) {
+				this._updater.incrementalUpdate(result,this._b1._transform,this._b2._transform);
+			} else {
+				this._updater.totalUpdate(result,this._b1._transform,this._b2._transform);
+			}
+		} else {
+			this._manifold._clear();
+		}
+		if(this._touching && !ptouching) {
+			var cc1 = this._s1._contactCallback;
+			var cc2 = this._s2._contactCallback;
+			if(cc1 == cc2) {
+				cc2 = null;
+			}
+			if(cc1 != null) {
+				cc1.beginContact(this);
+			}
+			if(cc2 != null) {
+				cc2.beginContact(this);
+			}
+		}
+		if(!this._touching && ptouching) {
+			var cc1 = this._s1._contactCallback;
+			var cc2 = this._s2._contactCallback;
+			if(cc1 == cc2) {
+				cc2 = null;
+			}
+			if(cc1 != null) {
+				cc1.endContact(this);
+			}
+			if(cc2 != null) {
+				cc2.endContact(this);
+			}
+		}
+		if(this._touching) {
+			var cc1 = this._s1._contactCallback;
+			var cc2 = this._s2._contactCallback;
+			if(cc1 == cc2) {
+				cc2 = null;
+			}
+			if(cc1 != null) {
+				cc1.preSolve(this);
+			}
+			if(cc2 != null) {
+				cc2.preSolve(this);
+			}
+		}
+	}
+	,_postSolve: function() {
+		var cc1 = this._s1._contactCallback;
+		var cc2 = this._s2._contactCallback;
+		if(cc1 == cc2) {
+			cc2 = null;
+		}
+		if(cc1 != null) {
+			cc1.postSolve(this);
+		}
+		if(cc2 != null) {
+			cc2.postSolve(this);
+		}
+	}
+	,__class__: oimo_dynamics_Contact
+};
+var oimo_dynamics_ContactLink = function() {
+	this._prev = null;
+	this._next = null;
+	this._contact = null;
+	this._other = null;
+};
+$hxClasses["oimo.dynamics.ContactLink"] = oimo_dynamics_ContactLink;
+oimo_dynamics_ContactLink.__name__ = "oimo.dynamics.ContactLink";
+oimo_dynamics_ContactLink.prototype = {
+	__class__: oimo_dynamics_ContactLink
+};
+var oimo_dynamics_ContactManager = function(broadPhase) {
+	this._broadPhase = broadPhase;
+	this._collisionMatrix = new oimo_collision_narrowphase_CollisionMatrix();
+	this._numContacts = 0;
+};
+$hxClasses["oimo.dynamics.ContactManager"] = oimo_dynamics_ContactManager;
+oimo_dynamics_ContactManager.__name__ = "oimo.dynamics.ContactManager";
+oimo_dynamics_ContactManager.prototype = {
+	createContacts: function() {
+		var pp = this._broadPhase._proxyPairList;
+		while(pp != null) {
+			var n = pp._next;
+			do {
+				var s1;
+				var s2;
+				if(pp._p1._id < pp._p2._id) {
+					s1 = pp._p1.userData;
+					s2 = pp._p2.userData;
+				} else {
+					s1 = pp._p2.userData;
+					s2 = pp._p1.userData;
+				}
+				if(!this.shouldCollide(s1,s2)) {
+					break;
+				}
+				var b1 = s1._rigidBody;
+				var b2 = s2._rigidBody;
+				var l;
+				if(b1._numContactLinks < b2._numContactLinks) {
+					l = b1._contactLinkList;
+				} else {
+					l = b2._contactLinkList;
+				}
+				var id1 = s1._id;
+				var id2 = s2._id;
+				var found = false;
+				while(l != null) {
+					var c = l._contact;
+					if(c._s1._id == id1 && c._s2._id == id2) {
+						c._latest = true;
+						found = true;
+						break;
+					}
+					l = l._next;
+				}
+				if(!found) {
+					var first = this._contactPool;
+					if(first != null) {
+						this._contactPool = first._next;
+						first._next = null;
+					} else {
+						first = new oimo_dynamics_Contact();
+					}
+					var c1 = first;
+					if(this._contactList == null) {
+						this._contactList = c1;
+						this._contactListLast = c1;
+					} else {
+						this._contactListLast._next = c1;
+						c1._prev = this._contactListLast;
+						this._contactListLast = c1;
+					}
+					c1._latest = true;
+					var detector = this._collisionMatrix.detectors[s1._geom._type][s2._geom._type];
+					c1._s1 = s1;
+					c1._s2 = s2;
+					c1._b1 = s1._rigidBody;
+					c1._b2 = s2._rigidBody;
+					c1._touching = false;
+					if(c1._b1._contactLinkList == null) {
+						c1._b1._contactLinkList = c1._link1;
+						c1._b1._contactLinkListLast = c1._link1;
+					} else {
+						c1._b1._contactLinkListLast._next = c1._link1;
+						c1._link1._prev = c1._b1._contactLinkListLast;
+						c1._b1._contactLinkListLast = c1._link1;
+					}
+					if(c1._b2._contactLinkList == null) {
+						c1._b2._contactLinkList = c1._link2;
+						c1._b2._contactLinkListLast = c1._link2;
+					} else {
+						c1._b2._contactLinkListLast._next = c1._link2;
+						c1._link2._prev = c1._b2._contactLinkListLast;
+						c1._b2._contactLinkListLast = c1._link2;
+					}
+					c1._b1._numContactLinks++;
+					c1._b2._numContactLinks++;
+					c1._link1._other = c1._b2;
+					c1._link2._other = c1._b1;
+					c1._link1._contact = c1;
+					c1._link2._contact = c1;
+					c1._detector = detector;
+					var _this = c1._contactConstraint;
+					_this._s1 = s1;
+					_this._s2 = s2;
+					_this._b1 = _this._s1._rigidBody;
+					_this._b2 = _this._s2._rigidBody;
+					_this._tf1 = _this._b1._transform;
+					_this._tf2 = _this._b2._transform;
+					this._numContacts++;
+				}
+			} while(false);
+			pp = n;
+		}
+	}
+	,destroyOutdatedContacts: function() {
+		var incremental = this._broadPhase._incremental;
+		var c = this._contactList;
+		while(c != null) {
+			var n = c._next;
+			do {
+				if(c._latest) {
+					c._latest = false;
+					c._shouldBeSkipped = false;
+					break;
+				}
+				if(!incremental) {
+					var prev = c._prev;
+					var next = c._next;
+					if(prev != null) {
+						prev._next = next;
+					}
+					if(next != null) {
+						next._prev = prev;
+					}
+					if(c == this._contactList) {
+						this._contactList = this._contactList._next;
+					}
+					if(c == this._contactListLast) {
+						this._contactListLast = this._contactListLast._prev;
+					}
+					c._next = null;
+					c._prev = null;
+					if(c._touching) {
+						var cc1 = c._s1._contactCallback;
+						var cc2 = c._s2._contactCallback;
+						if(cc1 == cc2) {
+							cc2 = null;
+						}
+						if(cc1 != null) {
+							cc1.endContact(c);
+						}
+						if(cc2 != null) {
+							cc2.endContact(c);
+						}
+					}
+					var prev1 = c._link1._prev;
+					var next1 = c._link1._next;
+					if(prev1 != null) {
+						prev1._next = next1;
+					}
+					if(next1 != null) {
+						next1._prev = prev1;
+					}
+					if(c._link1 == c._b1._contactLinkList) {
+						c._b1._contactLinkList = c._b1._contactLinkList._next;
+					}
+					if(c._link1 == c._b1._contactLinkListLast) {
+						c._b1._contactLinkListLast = c._b1._contactLinkListLast._prev;
+					}
+					c._link1._next = null;
+					c._link1._prev = null;
+					var prev2 = c._link2._prev;
+					var next2 = c._link2._next;
+					if(prev2 != null) {
+						prev2._next = next2;
+					}
+					if(next2 != null) {
+						next2._prev = prev2;
+					}
+					if(c._link2 == c._b2._contactLinkList) {
+						c._b2._contactLinkList = c._b2._contactLinkList._next;
+					}
+					if(c._link2 == c._b2._contactLinkListLast) {
+						c._b2._contactLinkListLast = c._b2._contactLinkListLast._prev;
+					}
+					c._link2._next = null;
+					c._link2._prev = null;
+					c._b1._numContactLinks--;
+					c._b2._numContactLinks--;
+					c._link1._other = null;
+					c._link2._other = null;
+					c._link1._contact = null;
+					c._link2._contact = null;
+					c._s1 = null;
+					c._s2 = null;
+					c._b1 = null;
+					c._b2 = null;
+					c._touching = false;
+					c._cachedDetectorData._clear();
+					c._manifold._clear();
+					c._detector = null;
+					var _this = c._contactConstraint;
+					_this._s1 = null;
+					_this._s2 = null;
+					_this._b1 = null;
+					_this._b2 = null;
+					_this._tf1 = null;
+					_this._tf2 = null;
+					c._next = this._contactPool;
+					this._contactPool = c;
+					this._numContacts--;
+					break;
+				}
+				var s1 = c._s1;
+				var s2 = c._s2;
+				var r1 = s1._rigidBody;
+				var r2 = s2._rigidBody;
+				if(!(!r1._sleeping && r1._type != 1) && !(!r2._sleeping && r2._type != 1)) {
+					c._shouldBeSkipped = true;
+					break;
+				}
+				var aabb1 = s1._aabb;
+				var aabb2 = s2._aabb;
+				var proxy1 = s1._proxy;
+				var proxy2 = s2._proxy;
+				if(!(proxy1._aabbMinX < proxy2._aabbMaxX && proxy1._aabbMaxX > proxy2._aabbMinX && proxy1._aabbMinY < proxy2._aabbMaxY && proxy1._aabbMaxY > proxy2._aabbMinY && proxy1._aabbMinZ < proxy2._aabbMaxZ && proxy1._aabbMaxZ > proxy2._aabbMinZ) || !this.shouldCollide(s1,s2)) {
+					var prev3 = c._prev;
+					var next3 = c._next;
+					if(prev3 != null) {
+						prev3._next = next3;
+					}
+					if(next3 != null) {
+						next3._prev = prev3;
+					}
+					if(c == this._contactList) {
+						this._contactList = this._contactList._next;
+					}
+					if(c == this._contactListLast) {
+						this._contactListLast = this._contactListLast._prev;
+					}
+					c._next = null;
+					c._prev = null;
+					if(c._touching) {
+						var cc11 = c._s1._contactCallback;
+						var cc21 = c._s2._contactCallback;
+						if(cc11 == cc21) {
+							cc21 = null;
+						}
+						if(cc11 != null) {
+							cc11.endContact(c);
+						}
+						if(cc21 != null) {
+							cc21.endContact(c);
+						}
+					}
+					var prev4 = c._link1._prev;
+					var next4 = c._link1._next;
+					if(prev4 != null) {
+						prev4._next = next4;
+					}
+					if(next4 != null) {
+						next4._prev = prev4;
+					}
+					if(c._link1 == c._b1._contactLinkList) {
+						c._b1._contactLinkList = c._b1._contactLinkList._next;
+					}
+					if(c._link1 == c._b1._contactLinkListLast) {
+						c._b1._contactLinkListLast = c._b1._contactLinkListLast._prev;
+					}
+					c._link1._next = null;
+					c._link1._prev = null;
+					var prev5 = c._link2._prev;
+					var next5 = c._link2._next;
+					if(prev5 != null) {
+						prev5._next = next5;
+					}
+					if(next5 != null) {
+						next5._prev = prev5;
+					}
+					if(c._link2 == c._b2._contactLinkList) {
+						c._b2._contactLinkList = c._b2._contactLinkList._next;
+					}
+					if(c._link2 == c._b2._contactLinkListLast) {
+						c._b2._contactLinkListLast = c._b2._contactLinkListLast._prev;
+					}
+					c._link2._next = null;
+					c._link2._prev = null;
+					c._b1._numContactLinks--;
+					c._b2._numContactLinks--;
+					c._link1._other = null;
+					c._link2._other = null;
+					c._link1._contact = null;
+					c._link2._contact = null;
+					c._s1 = null;
+					c._s2 = null;
+					c._b1 = null;
+					c._b2 = null;
+					c._touching = false;
+					c._cachedDetectorData._clear();
+					c._manifold._clear();
+					c._detector = null;
+					var _this1 = c._contactConstraint;
+					_this1._s1 = null;
+					_this1._s2 = null;
+					_this1._b1 = null;
+					_this1._b2 = null;
+					_this1._tf1 = null;
+					_this1._tf2 = null;
+					c._next = this._contactPool;
+					this._contactPool = c;
+					this._numContacts--;
+					break;
+				}
+				c._shouldBeSkipped = !(aabb1._minX < aabb2._maxX && aabb1._maxX > aabb2._minX && aabb1._minY < aabb2._maxY && aabb1._maxY > aabb2._minY && aabb1._minZ < aabb2._maxZ && aabb1._maxZ > aabb2._minZ);
+			} while(false);
+			c = n;
+		}
+	}
+	,shouldCollide: function(s1,s2) {
+		var r1 = s1._rigidBody;
+		var r2 = s2._rigidBody;
+		if(r1 == r2) {
+			return false;
+		}
+		if(r1._type != 0 && r2._type != 0) {
+			return false;
+		}
+		if((s1._collisionGroup & s2._collisionMask) == 0 || (s2._collisionGroup & s1._collisionMask) == 0) {
+			return false;
+		}
+		var jl;
+		var other;
+		if(r1._numJointLinks < r2._numJointLinks) {
+			jl = r1._jointLinkList;
+			other = r2;
+		} else {
+			jl = r2._jointLinkList;
+			other = r1;
+		}
+		while(jl != null) {
+			if(jl._other == other && !jl._joint._allowCollision) {
+				return false;
+			}
+			jl = jl._next;
+		}
+		return true;
+	}
+	,_updateContacts: function() {
+		this._broadPhase.collectPairs();
+		this.createContacts();
+		this.destroyOutdatedContacts();
+	}
+	,_postSolve: function() {
+		var c = this._contactList;
+		while(c != null) {
+			var n = c._next;
+			if(c._touching) {
+				c._postSolve();
+			}
+			c = n;
+		}
+	}
+	,__class__: oimo_dynamics_ContactManager
+};
+var oimo_dynamics_Island = function() {
+	this.rigidBodies = new Array(oimo_common_Setting.islandInitialRigidBodyArraySize);
+	this.solvers = new Array(oimo_common_Setting.islandInitialConstraintArraySize);
+	this.solversSi = new Array(oimo_common_Setting.islandInitialConstraintArraySize);
+	this.solversNgs = new Array(oimo_common_Setting.islandInitialConstraintArraySize);
+	this.numRigidBodies = 0;
+	this.numSolvers = 0;
+	this.numSolversSi = 0;
+	this.numSolversNgs = 0;
+};
+$hxClasses["oimo.dynamics.Island"] = oimo_dynamics_Island;
+oimo_dynamics_Island.__name__ = "oimo.dynamics.Island";
+oimo_dynamics_Island.prototype = {
+	_clear: function() {
+		while(this.numRigidBodies > 0) this.rigidBodies[--this.numRigidBodies] = null;
+		while(this.numSolvers > 0) this.solvers[--this.numSolvers] = null;
+		while(this.numSolversSi > 0) this.solversSi[--this.numSolversSi] = null;
+		while(this.numSolversNgs > 0) this.solversNgs[--this.numSolversNgs] = null;
+	}
+	,_addRigidBody: function(rigidBody) {
+		if(this.numRigidBodies == this.rigidBodies.length) {
+			var newArray = new Array(this.numRigidBodies << 1);
+			var _g = 0;
+			var _g1 = this.numRigidBodies;
+			while(_g < _g1) {
+				var i = _g++;
+				newArray[i] = this.rigidBodies[i];
+				this.rigidBodies[i] = null;
+			}
+			this.rigidBodies = newArray;
+		}
+		rigidBody._addedToIsland = true;
+		this.rigidBodies[this.numRigidBodies++] = rigidBody;
+	}
+	,_addConstraintSolver: function(solver,positionCorrection) {
+		if(this.numSolvers == this.solvers.length) {
+			var newArray = new Array(this.numSolvers << 1);
+			var _g = 0;
+			var _g1 = this.numSolvers;
+			while(_g < _g1) {
+				var i = _g++;
+				newArray[i] = this.solvers[i];
+				this.solvers[i] = null;
+			}
+			this.solvers = newArray;
+		}
+		solver._addedToIsland = true;
+		this.solvers[this.numSolvers++] = solver;
+		if(positionCorrection == oimo_dynamics_constraint_PositionCorrectionAlgorithm.SPLIT_IMPULSE) {
+			if(this.numSolversSi == this.solversSi.length) {
+				var newArray = new Array(this.numSolversSi << 1);
+				var _g = 0;
+				var _g1 = this.numSolversSi;
+				while(_g < _g1) {
+					var i = _g++;
+					newArray[i] = this.solversSi[i];
+					this.solversSi[i] = null;
+				}
+				this.solversSi = newArray;
+			}
+			this.solversSi[this.numSolversSi++] = solver;
+		}
+		if(positionCorrection == oimo_dynamics_constraint_PositionCorrectionAlgorithm.NGS) {
+			if(this.numSolversNgs == this.solversNgs.length) {
+				var newArray = new Array(this.numSolversNgs << 1);
+				var _g = 0;
+				var _g1 = this.numSolversNgs;
+				while(_g < _g1) {
+					var i = _g++;
+					newArray[i] = this.solversNgs[i];
+					this.solversNgs[i] = null;
+				}
+				this.solversNgs = newArray;
+			}
+			this.solversNgs[this.numSolversNgs++] = solver;
+		}
+	}
+	,_stepSingleRigidBody: function(timeStep,rb) {
+		var dt = timeStep.dt;
+		var dst = rb._ptransform;
+		var src = rb._transform;
+		dst._positionX = src._positionX;
+		dst._positionY = src._positionY;
+		dst._positionZ = src._positionZ;
+		dst._rotation00 = src._rotation00;
+		dst._rotation01 = src._rotation01;
+		dst._rotation02 = src._rotation02;
+		dst._rotation10 = src._rotation10;
+		dst._rotation11 = src._rotation11;
+		dst._rotation12 = src._rotation12;
+		dst._rotation20 = src._rotation20;
+		dst._rotation21 = src._rotation21;
+		dst._rotation22 = src._rotation22;
+		rb._linearContactImpulseX = 0;
+		rb._linearContactImpulseY = 0;
+		rb._linearContactImpulseZ = 0;
+		rb._angularContactImpulseX = 0;
+		rb._angularContactImpulseY = 0;
+		rb._angularContactImpulseZ = 0;
+		if(rb._autoSleep && rb._velX * rb._velX + rb._velY * rb._velY + rb._velZ * rb._velZ < rb._sleepingVelocityThreshold * rb._sleepingVelocityThreshold && rb._angVelX * rb._angVelX + rb._angVelY * rb._angVelY + rb._angVelZ * rb._angVelZ < rb._sleepingAngularVelocityThreshold * rb._sleepingAngularVelocityThreshold) {
+			rb._sleepTime += dt;
+			if(rb._sleepTime >= rb._sleepingTimeThreshold) {
+				rb._sleeping = true;
+				rb._sleepTime = 0;
+			}
+		} else {
+			rb._sleepTime = 0;
+		}
+		if(!rb._sleeping) {
+			if(rb._type == 0) {
+				var x = dt * rb._linearDamping;
+				var x2 = x * x;
+				var linScale = 1 / (1 + x + x2 * (0.5 + x * 0.16666666666666666 + x2 * 0.041666666666666664));
+				var x = dt * rb._angularDamping;
+				var x2 = x * x;
+				var angScale = 1 / (1 + x + x2 * (0.5 + x * 0.16666666666666666 + x2 * 0.041666666666666664));
+				var linAccX;
+				var linAccY;
+				var linAccZ;
+				var angAccX;
+				var angAccY;
+				var angAccZ;
+				linAccX = this.gravityX * rb._gravityScale;
+				linAccY = this.gravityY * rb._gravityScale;
+				linAccZ = this.gravityZ * rb._gravityScale;
+				linAccX += rb._forceX * rb._invMass;
+				linAccY += rb._forceY * rb._invMass;
+				linAccZ += rb._forceZ * rb._invMass;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = rb._invInertia00 * rb._torqueX + rb._invInertia01 * rb._torqueY + rb._invInertia02 * rb._torqueZ;
+				__tmp__Y = rb._invInertia10 * rb._torqueX + rb._invInertia11 * rb._torqueY + rb._invInertia12 * rb._torqueZ;
+				__tmp__Z = rb._invInertia20 * rb._torqueX + rb._invInertia21 * rb._torqueY + rb._invInertia22 * rb._torqueZ;
+				angAccX = __tmp__X;
+				angAccY = __tmp__Y;
+				angAccZ = __tmp__Z;
+				rb._velX += linAccX * dt;
+				rb._velY += linAccY * dt;
+				rb._velZ += linAccZ * dt;
+				rb._velX *= linScale;
+				rb._velY *= linScale;
+				rb._velZ *= linScale;
+				rb._angVelX += angAccX * dt;
+				rb._angVelY += angAccY * dt;
+				rb._angVelZ += angAccZ * dt;
+				rb._angVelX *= angScale;
+				rb._angVelY *= angScale;
+				rb._angVelZ *= angScale;
+			}
+			rb._integrate(dt);
+			var s = rb._shapeList;
+			while(s != null) {
+				var n = s._next;
+				var tf1 = rb._ptransform;
+				var tf2 = rb._transform;
+				var dst = s._ptransform;
+				var src1 = s._localTransform;
+				var __tmp__00;
+				var __tmp__01;
+				var __tmp__02;
+				var __tmp__10;
+				var __tmp__11;
+				var __tmp__12;
+				var __tmp__20;
+				var __tmp__21;
+				var __tmp__22;
+				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+				dst._rotation00 = __tmp__00;
+				dst._rotation01 = __tmp__01;
+				dst._rotation02 = __tmp__02;
+				dst._rotation10 = __tmp__10;
+				dst._rotation11 = __tmp__11;
+				dst._rotation12 = __tmp__12;
+				dst._rotation20 = __tmp__20;
+				dst._rotation21 = __tmp__21;
+				dst._rotation22 = __tmp__22;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+				dst._positionX = __tmp__X;
+				dst._positionY = __tmp__Y;
+				dst._positionZ = __tmp__Z;
+				dst._positionX += tf1._positionX;
+				dst._positionY += tf1._positionY;
+				dst._positionZ += tf1._positionZ;
+				var dst1 = s._transform;
+				var src11 = s._localTransform;
+				var __tmp__001;
+				var __tmp__011;
+				var __tmp__021;
+				var __tmp__101;
+				var __tmp__111;
+				var __tmp__121;
+				var __tmp__201;
+				var __tmp__211;
+				var __tmp__221;
+				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+				dst1._rotation00 = __tmp__001;
+				dst1._rotation01 = __tmp__011;
+				dst1._rotation02 = __tmp__021;
+				dst1._rotation10 = __tmp__101;
+				dst1._rotation11 = __tmp__111;
+				dst1._rotation12 = __tmp__121;
+				dst1._rotation20 = __tmp__201;
+				dst1._rotation21 = __tmp__211;
+				dst1._rotation22 = __tmp__221;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+				dst1._positionX = __tmp__X1;
+				dst1._positionY = __tmp__Y1;
+				dst1._positionZ = __tmp__Z1;
+				dst1._positionX += tf2._positionX;
+				dst1._positionY += tf2._positionY;
+				dst1._positionZ += tf2._positionZ;
+				var minX;
+				var minY;
+				var minZ;
+				var maxX;
+				var maxY;
+				var maxZ;
+				s._geom._computeAabb(s._aabb,s._ptransform);
+				minX = s._aabb._minX;
+				minY = s._aabb._minY;
+				minZ = s._aabb._minZ;
+				maxX = s._aabb._maxX;
+				maxY = s._aabb._maxY;
+				maxZ = s._aabb._maxZ;
+				s._geom._computeAabb(s._aabb,s._transform);
+				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+				if(s._proxy != null) {
+					var dX;
+					var dY;
+					var dZ;
+					dX = s._transform._positionX - s._ptransform._positionX;
+					dY = s._transform._positionY - s._ptransform._positionY;
+					dZ = s._transform._positionZ - s._ptransform._positionZ;
+					var v = s.displacement;
+					v.x = dX;
+					v.y = dY;
+					v.z = dZ;
+					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+				}
+				s = n;
+			}
+		}
+	}
+	,_step: function(timeStep,numVelocityIterations,numPositionIterations) {
+		var dt = timeStep.dt;
+		var sleepIsland = true;
+		var _g = 0;
+		var _g1 = this.numRigidBodies;
+		while(_g < _g1) {
+			var rb = this.rigidBodies[_g++];
+			var dst = rb._ptransform;
+			var src = rb._transform;
+			dst._positionX = src._positionX;
+			dst._positionY = src._positionY;
+			dst._positionZ = src._positionZ;
+			dst._rotation00 = src._rotation00;
+			dst._rotation01 = src._rotation01;
+			dst._rotation02 = src._rotation02;
+			dst._rotation10 = src._rotation10;
+			dst._rotation11 = src._rotation11;
+			dst._rotation12 = src._rotation12;
+			dst._rotation20 = src._rotation20;
+			dst._rotation21 = src._rotation21;
+			dst._rotation22 = src._rotation22;
+			rb._linearContactImpulseX = 0;
+			rb._linearContactImpulseY = 0;
+			rb._linearContactImpulseZ = 0;
+			rb._angularContactImpulseX = 0;
+			rb._angularContactImpulseY = 0;
+			rb._angularContactImpulseZ = 0;
+			rb._sleeping = false;
+			if(rb._autoSleep && rb._velX * rb._velX + rb._velY * rb._velY + rb._velZ * rb._velZ < rb._sleepingVelocityThreshold * rb._sleepingVelocityThreshold && rb._angVelX * rb._angVelX + rb._angVelY * rb._angVelY + rb._angVelZ * rb._angVelZ < rb._sleepingAngularVelocityThreshold * rb._sleepingAngularVelocityThreshold) {
+				rb._sleepTime += dt;
+			} else {
+				rb._sleepTime = 0;
+			}
+			if(rb._sleepTime < rb._sleepingTimeThreshold) {
+				sleepIsland = false;
+			}
+			if(rb._type == 0) {
+				var x = dt * rb._linearDamping;
+				var x2 = x * x;
+				var linScale = 1 / (1 + x + x2 * (0.5 + x * 0.16666666666666666 + x2 * 0.041666666666666664));
+				var x1 = dt * rb._angularDamping;
+				var x21 = x1 * x1;
+				var angScale = 1 / (1 + x1 + x21 * (0.5 + x1 * 0.16666666666666666 + x21 * 0.041666666666666664));
+				var linAccX;
+				var linAccY;
+				var linAccZ;
+				var angAccX;
+				var angAccY;
+				var angAccZ;
+				linAccX = this.gravityX * rb._gravityScale;
+				linAccY = this.gravityY * rb._gravityScale;
+				linAccZ = this.gravityZ * rb._gravityScale;
+				linAccX += rb._forceX * rb._invMass;
+				linAccY += rb._forceY * rb._invMass;
+				linAccZ += rb._forceZ * rb._invMass;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = rb._invInertia00 * rb._torqueX + rb._invInertia01 * rb._torqueY + rb._invInertia02 * rb._torqueZ;
+				__tmp__Y = rb._invInertia10 * rb._torqueX + rb._invInertia11 * rb._torqueY + rb._invInertia12 * rb._torqueZ;
+				__tmp__Z = rb._invInertia20 * rb._torqueX + rb._invInertia21 * rb._torqueY + rb._invInertia22 * rb._torqueZ;
+				angAccX = __tmp__X;
+				angAccY = __tmp__Y;
+				angAccZ = __tmp__Z;
+				rb._velX += linAccX * dt;
+				rb._velY += linAccY * dt;
+				rb._velZ += linAccZ * dt;
+				rb._velX *= linScale;
+				rb._velY *= linScale;
+				rb._velZ *= linScale;
+				rb._angVelX += angAccX * dt;
+				rb._angVelY += angAccY * dt;
+				rb._angVelZ += angAccZ * dt;
+				rb._angVelX *= angScale;
+				rb._angVelY *= angScale;
+				rb._angVelZ *= angScale;
+			}
+		}
+		if(sleepIsland) {
+			var _g = 0;
+			var _g1 = this.numRigidBodies;
+			while(_g < _g1) {
+				var rb = this.rigidBodies[_g++];
+				rb._sleeping = true;
+				rb._sleepTime = 0;
+			}
+			return;
+		}
+		var _g = 0;
+		var _g1 = this.numSolvers;
+		while(_g < _g1) this.solvers[_g++].preSolveVelocity(timeStep);
+		var _g = 0;
+		var _g1 = this.numSolvers;
+		while(_g < _g1) this.solvers[_g++].warmStart(timeStep);
+		var _g = 0;
+		while(_g < numVelocityIterations) {
+			++_g;
+			var _g1 = 0;
+			var _g2 = this.numSolvers;
+			while(_g1 < _g2) this.solvers[_g1++].solveVelocity();
+		}
+		var _g = 0;
+		var _g1 = this.numSolvers;
+		while(_g < _g1) this.solvers[_g++].postSolveVelocity(timeStep);
+		var _g = 0;
+		var _g1 = this.numRigidBodies;
+		while(_g < _g1) this.rigidBodies[_g++]._integrate(dt);
+		var _g = 0;
+		var _g1 = this.numSolversSi;
+		while(_g < _g1) this.solversSi[_g++].preSolvePosition(timeStep);
+		var _g = 0;
+		while(_g < numPositionIterations) {
+			++_g;
+			var _g1 = 0;
+			var _g2 = this.numSolversSi;
+			while(_g1 < _g2) this.solversSi[_g1++].solvePositionSplitImpulse();
+		}
+		var _g = 0;
+		var _g1 = this.numRigidBodies;
+		while(_g < _g1) this.rigidBodies[_g++]._integratePseudoVelocity();
+		var _g = 0;
+		var _g1 = this.numSolversNgs;
+		while(_g < _g1) this.solversNgs[_g++].preSolvePosition(timeStep);
+		var _g = 0;
+		while(_g < numPositionIterations) {
+			++_g;
+			var _g1 = 0;
+			var _g2 = this.numSolversNgs;
+			while(_g1 < _g2) this.solversNgs[_g1++].solvePositionNgs(timeStep);
+		}
+		var _g = 0;
+		var _g1 = this.numSolvers;
+		while(_g < _g1) this.solvers[_g++].postSolve();
+		var _g = 0;
+		var _g1 = this.numRigidBodies;
+		while(_g < _g1) {
+			var rb = this.rigidBodies[_g++];
+			var s = rb._shapeList;
+			while(s != null) {
+				var n = s._next;
+				var tf1 = rb._ptransform;
+				var tf2 = rb._transform;
+				var dst = s._ptransform;
+				var src1 = s._localTransform;
+				var __tmp__00;
+				var __tmp__01;
+				var __tmp__02;
+				var __tmp__10;
+				var __tmp__11;
+				var __tmp__12;
+				var __tmp__20;
+				var __tmp__21;
+				var __tmp__22;
+				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+				dst._rotation00 = __tmp__00;
+				dst._rotation01 = __tmp__01;
+				dst._rotation02 = __tmp__02;
+				dst._rotation10 = __tmp__10;
+				dst._rotation11 = __tmp__11;
+				dst._rotation12 = __tmp__12;
+				dst._rotation20 = __tmp__20;
+				dst._rotation21 = __tmp__21;
+				dst._rotation22 = __tmp__22;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+				dst._positionX = __tmp__X;
+				dst._positionY = __tmp__Y;
+				dst._positionZ = __tmp__Z;
+				dst._positionX += tf1._positionX;
+				dst._positionY += tf1._positionY;
+				dst._positionZ += tf1._positionZ;
+				var dst1 = s._transform;
+				var src11 = s._localTransform;
+				var __tmp__001;
+				var __tmp__011;
+				var __tmp__021;
+				var __tmp__101;
+				var __tmp__111;
+				var __tmp__121;
+				var __tmp__201;
+				var __tmp__211;
+				var __tmp__221;
+				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+				dst1._rotation00 = __tmp__001;
+				dst1._rotation01 = __tmp__011;
+				dst1._rotation02 = __tmp__021;
+				dst1._rotation10 = __tmp__101;
+				dst1._rotation11 = __tmp__111;
+				dst1._rotation12 = __tmp__121;
+				dst1._rotation20 = __tmp__201;
+				dst1._rotation21 = __tmp__211;
+				dst1._rotation22 = __tmp__221;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+				dst1._positionX = __tmp__X1;
+				dst1._positionY = __tmp__Y1;
+				dst1._positionZ = __tmp__Z1;
+				dst1._positionX += tf2._positionX;
+				dst1._positionY += tf2._positionY;
+				dst1._positionZ += tf2._positionZ;
+				var minX;
+				var minY;
+				var minZ;
+				var maxX;
+				var maxY;
+				var maxZ;
+				s._geom._computeAabb(s._aabb,s._ptransform);
+				minX = s._aabb._minX;
+				minY = s._aabb._minY;
+				minZ = s._aabb._minZ;
+				maxX = s._aabb._maxX;
+				maxY = s._aabb._maxY;
+				maxZ = s._aabb._maxZ;
+				s._geom._computeAabb(s._aabb,s._transform);
+				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+				if(s._proxy != null) {
+					var dX;
+					var dY;
+					var dZ;
+					dX = s._transform._positionX - s._ptransform._positionX;
+					dY = s._transform._positionY - s._ptransform._positionY;
+					dZ = s._transform._positionZ - s._ptransform._positionZ;
+					var v = s.displacement;
+					v.x = dX;
+					v.y = dY;
+					v.z = dZ;
+					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+				}
+				s = n;
+			}
+		}
+	}
+	,__class__: oimo_dynamics_Island
+};
+var oimo_dynamics_TimeStep = function() {
+	this.dt = 0;
+	this.invDt = 0;
+	this.dtRatio = 1;
+};
+$hxClasses["oimo.dynamics.TimeStep"] = oimo_dynamics_TimeStep;
+oimo_dynamics_TimeStep.__name__ = "oimo.dynamics.TimeStep";
+oimo_dynamics_TimeStep.prototype = {
+	__class__: oimo_dynamics_TimeStep
+};
+var oimo_dynamics_World = function(broadPhaseType,gravity) {
+	if(broadPhaseType == null) {
+		broadPhaseType = 2;
+	}
+	switch(broadPhaseType) {
+	case 1:
+		this._broadPhase = new oimo_collision_broadphase_bruteforce_BruteForceBroadPhase();
+		break;
+	case 2:
+		this._broadPhase = new oimo_collision_broadphase_bvh_BvhBroadPhase();
+		break;
+	}
+	this._contactManager = new oimo_dynamics_ContactManager(this._broadPhase);
+	if(gravity == null) {
+		gravity = new oimo_common_Vec3(0,-9.80665,0);
+	}
+	this._gravity = new oimo_common_Vec3(gravity.x,gravity.y,gravity.z);
+	this._rigidBodyList = null;
+	this._rigidBodyListLast = null;
+	this._jointList = null;
+	this._jointListLast = null;
+	this._numRigidBodies = 0;
+	this._numShapes = 0;
+	this._numJoints = 0;
+	this._numIslands = 0;
+	this._numVelocityIterations = 10;
+	this._numPositionIterations = 5;
+	this._rayCastWrapper = new oimo_dynamics__$World_RayCastWrapper();
+	this._convexCastWrapper = new oimo_dynamics__$World_ConvexCastWrapper();
+	this._aabbTestWrapper = new oimo_dynamics__$World_AabbTestWrapper();
+	this._island = new oimo_dynamics_Island();
+	this._solversInIslands = new Array(oimo_common_Setting.islandInitialConstraintArraySize);
+	this._rigidBodyStack = new Array(oimo_common_Setting.islandInitialRigidBodyArraySize);
+	this._timeStep = new oimo_dynamics_TimeStep();
+	this._pool = new oimo_common_Pool();
+	this._shapeIdCount = 0;
+};
+$hxClasses["oimo.dynamics.World"] = oimo_dynamics_World;
+oimo_dynamics_World.__name__ = "oimo.dynamics.World";
+oimo_dynamics_World.prototype = {
+	_updateContacts: function() {
+		var st = HxOverrides.now() / 1000;
+		this._contactManager._updateContacts();
+		oimo_dynamics_common_Performance.broadPhaseCollisionTime = (HxOverrides.now() / 1000 - st) * 1000;
+		var st = HxOverrides.now() / 1000;
+		var c = this._contactManager._contactList;
+		while(c != null) {
+			var n = c._next;
+			if(!c._shouldBeSkipped) {
+				c._updateManifold();
+			}
+			c = n;
+		}
+		oimo_dynamics_common_Performance.narrowPhaseCollisionTime = (HxOverrides.now() / 1000 - st) * 1000;
+	}
+	,_solveIslands: function() {
+		var st = HxOverrides.now() / 1000;
+		if(oimo_common_Setting.disableSleeping) {
+			var b = this._rigidBodyList;
+			while(b != null) {
+				b._sleeping = false;
+				b._sleepTime = 0;
+				b = b._next;
+			}
+		}
+		if(this._rigidBodyStack.length < this._numRigidBodies) {
+			var newStackSize = this._rigidBodyStack.length << 1;
+			while(newStackSize < this._numRigidBodies) newStackSize <<= 1;
+			this._rigidBodyStack = new Array(newStackSize);
+		}
+		this._numIslands = 0;
+		var _this = this._island;
+		var gravity = this._gravity;
+		_this.gravityX = gravity.x;
+		_this.gravityY = gravity.y;
+		_this.gravityZ = gravity.z;
+		var b = this._rigidBodyList;
+		this._numSolversInIslands = 0;
+		while(b != null) {
+			var n = b._next;
+			while(!(b._addedToIsland || b._sleeping || b._type == 1)) {
+				if(b._numContactLinks == 0 && b._numJointLinks == 0) {
+					this._island._stepSingleRigidBody(this._timeStep,b);
+					this._numIslands++;
+					break;
+				}
+				this.buildIsland(b);
+				this._island._step(this._timeStep,this._numVelocityIterations,this._numPositionIterations);
+				this._island._clear();
+				this._numIslands++;
+				break;
+			}
+			b = n;
+		}
+		this._contactManager._postSolve();
+		b = this._rigidBodyList;
+		while(b != null) {
+			b._addedToIsland = false;
+			b = b._next;
+		}
+		b = this._rigidBodyList;
+		while(b != null) {
+			b._forceX = 0;
+			b._forceY = 0;
+			b._forceZ = 0;
+			b._torqueX = 0;
+			b._torqueY = 0;
+			b._torqueZ = 0;
+			b = b._next;
+		}
+		while(this._numSolversInIslands > 0) {
+			this._solversInIslands[--this._numSolversInIslands]._addedToIsland = false;
+			this._solversInIslands[this._numSolversInIslands] = null;
+		}
+		oimo_dynamics_common_Performance.dynamicsTime = (HxOverrides.now() / 1000 - st) * 1000;
+	}
+	,buildIsland: function(base) {
+		var stackCount = 1;
+		this._island._addRigidBody(base);
+		this._rigidBodyStack[0] = base;
+		while(stackCount > 0) {
+			var rb = this._rigidBodyStack[--stackCount];
+			this._rigidBodyStack[stackCount] = null;
+			if(rb._type == 1) {
+				continue;
+			}
+			var cl = rb._contactLinkList;
+			while(cl != null) {
+				var n = cl._next;
+				var cc = cl._contact._contactConstraint;
+				var ccs = cl._contact._contactConstraint._solver;
+				if(cc.isTouching() && !ccs._addedToIsland) {
+					if(this._solversInIslands.length == this._numSolversInIslands) {
+						var newArray = new Array(this._numSolversInIslands << 1);
+						var _g = 0;
+						var _g1 = this._numSolversInIslands;
+						while(_g < _g1) {
+							var i = _g++;
+							newArray[i] = this._solversInIslands[i];
+							this._solversInIslands[i] = null;
+						}
+						this._solversInIslands = newArray;
+					}
+					this._solversInIslands[this._numSolversInIslands++] = ccs;
+					this._island._addConstraintSolver(ccs,cc._positionCorrectionAlgorithm);
+					var other = cl._other;
+					if(!other._addedToIsland) {
+						this._island._addRigidBody(other);
+						this._rigidBodyStack[stackCount++] = other;
+					}
+				}
+				cl = n;
+			}
+			var jl = rb._jointLinkList;
+			while(jl != null) {
+				var n1 = jl._next;
+				var j = jl._joint;
+				var js = j._solver;
+				if(!js._addedToIsland) {
+					if(this._solversInIslands.length == this._numSolversInIslands) {
+						var newArray1 = new Array(this._numSolversInIslands << 1);
+						var _g2 = 0;
+						var _g3 = this._numSolversInIslands;
+						while(_g2 < _g3) {
+							var i1 = _g2++;
+							newArray1[i1] = this._solversInIslands[i1];
+							this._solversInIslands[i1] = null;
+						}
+						this._solversInIslands = newArray1;
+					}
+					this._solversInIslands[this._numSolversInIslands++] = js;
+					this._island._addConstraintSolver(js,j._positionCorrectionAlgorithm);
+					var other1 = jl._other;
+					if(!other1._addedToIsland) {
+						this._island._addRigidBody(other1);
+						this._rigidBodyStack[stackCount++] = other1;
+					}
+				}
+				jl = n1;
+			}
+		}
+	}
+	,step: function(timeStep) {
+		if(this._timeStep.dt > 0) {
+			this._timeStep.dtRatio = timeStep / this._timeStep.dt;
+		}
+		this._timeStep.dt = timeStep;
+		this._timeStep.invDt = 1 / timeStep;
+		var st = HxOverrides.now() / 1000;
+		this._updateContacts();
+		this._solveIslands();
+		oimo_dynamics_common_Performance.totalTime = (HxOverrides.now() / 1000 - st) * 1000;
+	}
+	,addRigidBody: function(rigidBody) {
+		if(rigidBody._world != null) {
+			throw new Error("A rigid body cannot belong to multiple worlds.");
+		}
+		if(this._rigidBodyList == null) {
+			this._rigidBodyList = rigidBody;
+			this._rigidBodyListLast = rigidBody;
+		} else {
+			this._rigidBodyListLast._next = rigidBody;
+			rigidBody._prev = this._rigidBodyListLast;
+			this._rigidBodyListLast = rigidBody;
+		}
+		rigidBody._world = this;
+		var s = rigidBody._shapeList;
+		while(s != null) {
+			var n = s._next;
+			s._proxy = this._broadPhase.createProxy(s,s._aabb);
+			s._id = this._shapeIdCount++;
+			this._numShapes++;
+			s = n;
+		}
+		this._numRigidBodies++;
+	}
+	,removeJoint: function(joint) {
+		if(joint._world != this) {
+			throw new Error("The joint doesn't belong to the world.");
+		}
+		var prev = joint._prev;
+		var next = joint._next;
+		if(prev != null) {
+			prev._next = next;
+		}
+		if(next != null) {
+			next._prev = prev;
+		}
+		if(joint == this._jointList) {
+			this._jointList = this._jointList._next;
+		}
+		if(joint == this._jointListLast) {
+			this._jointListLast = this._jointListLast._prev;
+		}
+		joint._next = null;
+		joint._prev = null;
+		joint._world = null;
+		var prev = joint._link1._prev;
+		var next = joint._link1._next;
+		if(prev != null) {
+			prev._next = next;
+		}
+		if(next != null) {
+			next._prev = prev;
+		}
+		if(joint._link1 == joint._b1._jointLinkList) {
+			joint._b1._jointLinkList = joint._b1._jointLinkList._next;
+		}
+		if(joint._link1 == joint._b1._jointLinkListLast) {
+			joint._b1._jointLinkListLast = joint._b1._jointLinkListLast._prev;
+		}
+		joint._link1._next = null;
+		joint._link1._prev = null;
+		var prev = joint._link2._prev;
+		var next = joint._link2._next;
+		if(prev != null) {
+			prev._next = next;
+		}
+		if(next != null) {
+			next._prev = prev;
+		}
+		if(joint._link2 == joint._b2._jointLinkList) {
+			joint._b2._jointLinkList = joint._b2._jointLinkList._next;
+		}
+		if(joint._link2 == joint._b2._jointLinkListLast) {
+			joint._b2._jointLinkListLast = joint._b2._jointLinkListLast._prev;
+		}
+		joint._link2._next = null;
+		joint._link2._prev = null;
+		joint._link1._other = null;
+		joint._link2._other = null;
+		joint._b1._numJointLinks--;
+		joint._b2._numJointLinks--;
+		var _this = joint._b1;
+		_this._sleeping = false;
+		_this._sleepTime = 0;
+		var _this = joint._b2;
+		_this._sleeping = false;
+		_this._sleepTime = 0;
+		this._numJoints--;
+	}
+	,__class__: oimo_dynamics_World
+};
+var oimo_dynamics__$World_RayCastWrapper = function() {
+	oimo_collision_broadphase_BroadPhaseProxyCallback.call(this);
+	this.rayCastHit = new oimo_collision_geometry_RayCastHit();
+	this.begin = new oimo_common_Vec3();
+	this.end = new oimo_common_Vec3();
+	this.callback = null;
+};
+$hxClasses["oimo.dynamics._World.RayCastWrapper"] = oimo_dynamics__$World_RayCastWrapper;
+oimo_dynamics__$World_RayCastWrapper.__name__ = "oimo.dynamics._World.RayCastWrapper";
+oimo_dynamics__$World_RayCastWrapper.__super__ = oimo_collision_broadphase_BroadPhaseProxyCallback;
+oimo_dynamics__$World_RayCastWrapper.prototype = $extend(oimo_collision_broadphase_BroadPhaseProxyCallback.prototype,{
+	__class__: oimo_dynamics__$World_RayCastWrapper
+});
+var oimo_dynamics__$World_ConvexCastWrapper = function() {
+	oimo_collision_broadphase_BroadPhaseProxyCallback.call(this);
+	this.rayCastHit = new oimo_collision_geometry_RayCastHit();
+	this.begin = new oimo_common_Transform();
+	this.translation = new oimo_common_Vec3();
+	this.zero = new oimo_common_Vec3();
+	this.callback = null;
+	this.convex = null;
+};
+$hxClasses["oimo.dynamics._World.ConvexCastWrapper"] = oimo_dynamics__$World_ConvexCastWrapper;
+oimo_dynamics__$World_ConvexCastWrapper.__name__ = "oimo.dynamics._World.ConvexCastWrapper";
+oimo_dynamics__$World_ConvexCastWrapper.__super__ = oimo_collision_broadphase_BroadPhaseProxyCallback;
+oimo_dynamics__$World_ConvexCastWrapper.prototype = $extend(oimo_collision_broadphase_BroadPhaseProxyCallback.prototype,{
+	__class__: oimo_dynamics__$World_ConvexCastWrapper
+});
+var oimo_dynamics__$World_AabbTestWrapper = function() {
+	oimo_collision_broadphase_BroadPhaseProxyCallback.call(this);
+	this._aabb = new oimo_collision_geometry_Aabb();
+	this._callback = null;
+};
+$hxClasses["oimo.dynamics._World.AabbTestWrapper"] = oimo_dynamics__$World_AabbTestWrapper;
+oimo_dynamics__$World_AabbTestWrapper.__name__ = "oimo.dynamics._World.AabbTestWrapper";
+oimo_dynamics__$World_AabbTestWrapper.__super__ = oimo_collision_broadphase_BroadPhaseProxyCallback;
+oimo_dynamics__$World_AabbTestWrapper.prototype = $extend(oimo_collision_broadphase_BroadPhaseProxyCallback.prototype,{
+	__class__: oimo_dynamics__$World_AabbTestWrapper
+});
+var oimo_dynamics_callback_AabbTestCallback = function() { };
+$hxClasses["oimo.dynamics.callback.AabbTestCallback"] = oimo_dynamics_callback_AabbTestCallback;
+oimo_dynamics_callback_AabbTestCallback.__name__ = "oimo.dynamics.callback.AabbTestCallback";
+var oimo_dynamics_callback_ContactCallback = function() {
+};
+$hxClasses["oimo.dynamics.callback.ContactCallback"] = oimo_dynamics_callback_ContactCallback;
+oimo_dynamics_callback_ContactCallback.__name__ = "oimo.dynamics.callback.ContactCallback";
+oimo_dynamics_callback_ContactCallback.prototype = {
+	beginContact: function(c) {
+	}
+	,preSolve: function(c) {
+	}
+	,postSolve: function(c) {
+	}
+	,endContact: function(c) {
+	}
+	,__class__: oimo_dynamics_callback_ContactCallback
+};
+var oimo_dynamics_callback_RayCastCallback = function() { };
+$hxClasses["oimo.dynamics.callback.RayCastCallback"] = oimo_dynamics_callback_RayCastCallback;
+oimo_dynamics_callback_RayCastCallback.__name__ = "oimo.dynamics.callback.RayCastCallback";
+var oimo_dynamics_common_Performance = function() { };
+$hxClasses["oimo.dynamics.common.Performance"] = oimo_dynamics_common_Performance;
+oimo_dynamics_common_Performance.__name__ = "oimo.dynamics.common.Performance";
+var oimo_dynamics_constraint_ConstraintSolver = function() {
+	this._b1 = null;
+	this._b2 = null;
+	this._addedToIsland = false;
+};
+$hxClasses["oimo.dynamics.constraint.ConstraintSolver"] = oimo_dynamics_constraint_ConstraintSolver;
+oimo_dynamics_constraint_ConstraintSolver.__name__ = "oimo.dynamics.constraint.ConstraintSolver";
+oimo_dynamics_constraint_ConstraintSolver.prototype = {
+	preSolveVelocity: function(timeStep) {
+	}
+	,warmStart: function(timeStep) {
+	}
+	,solveVelocity: function() {
+	}
+	,postSolveVelocity: function(timeStep) {
+	}
+	,preSolvePosition: function(timeStep) {
+	}
+	,solvePositionSplitImpulse: function() {
+	}
+	,solvePositionNgs: function(timeStep) {
+	}
+	,postSolve: function() {
+	}
+	,__class__: oimo_dynamics_constraint_ConstraintSolver
+};
+var oimo_dynamics_constraint_PositionCorrectionAlgorithm = function() { };
+$hxClasses["oimo.dynamics.constraint.PositionCorrectionAlgorithm"] = oimo_dynamics_constraint_PositionCorrectionAlgorithm;
+oimo_dynamics_constraint_PositionCorrectionAlgorithm.__name__ = "oimo.dynamics.constraint.PositionCorrectionAlgorithm";
+var oimo_dynamics_constraint_contact_ContactConstraint = function(manifold) {
+	this._solver = new oimo_dynamics_constraint_solver_pgs_PgsContactConstraintSolver(this);
+	this._manifold = manifold;
+};
+$hxClasses["oimo.dynamics.constraint.contact.ContactConstraint"] = oimo_dynamics_constraint_contact_ContactConstraint;
+oimo_dynamics_constraint_contact_ContactConstraint.__name__ = "oimo.dynamics.constraint.contact.ContactConstraint";
+oimo_dynamics_constraint_contact_ContactConstraint.prototype = {
+	_getVelocitySolverInfo: function(timeStep,info) {
+		info.b1 = this._b1;
+		info.b2 = this._b2;
+		var normalX;
+		var normalY;
+		var normalZ;
+		var tangentX;
+		var tangentY;
+		var tangentZ;
+		var binormalX;
+		var binormalY;
+		var binormalZ;
+		normalX = this._manifold._normalX;
+		normalY = this._manifold._normalY;
+		normalZ = this._manifold._normalZ;
+		tangentX = this._manifold._tangentX;
+		tangentY = this._manifold._tangentY;
+		tangentZ = this._manifold._tangentZ;
+		binormalX = this._manifold._binormalX;
+		binormalY = this._manifold._binormalY;
+		binormalZ = this._manifold._binormalZ;
+		var friction = Math.sqrt(this._s1._friction * this._s2._friction);
+		var restitution = Math.sqrt(this._s1._restitution * this._s2._restitution);
+		var num = this._manifold._numPoints;
+		info.numRows = 0;
+		var _g = 0;
+		while(_g < num) {
+			var p = this._manifold._points[_g++];
+			if(p._depth < 0) {
+				p._disabled = true;
+				var _this = p._impulse;
+				_this.impulseN = 0;
+				_this.impulseT = 0;
+				_this.impulseB = 0;
+				_this.impulseP = 0;
+				_this.impulseLX = 0;
+				_this.impulseLY = 0;
+				_this.impulseLZ = 0;
+				continue;
+			} else {
+				p._disabled = false;
+			}
+			var row = info.rows[info.numRows++];
+			row.friction = friction;
+			row.cfm = 0;
+			var j = row.jacobianN;
+			j.lin1X = normalX;
+			j.lin1Y = normalY;
+			j.lin1Z = normalZ;
+			j.lin2X = normalX;
+			j.lin2Y = normalY;
+			j.lin2Z = normalZ;
+			j.ang1X = p._relPos1Y * normalZ - p._relPos1Z * normalY;
+			j.ang1Y = p._relPos1Z * normalX - p._relPos1X * normalZ;
+			j.ang1Z = p._relPos1X * normalY - p._relPos1Y * normalX;
+			j.ang2X = p._relPos2Y * normalZ - p._relPos2Z * normalY;
+			j.ang2Y = p._relPos2Z * normalX - p._relPos2X * normalZ;
+			j.ang2Z = p._relPos2X * normalY - p._relPos2Y * normalX;
+			j = row.jacobianT;
+			j.lin1X = tangentX;
+			j.lin1Y = tangentY;
+			j.lin1Z = tangentZ;
+			j.lin2X = tangentX;
+			j.lin2Y = tangentY;
+			j.lin2Z = tangentZ;
+			j.ang1X = p._relPos1Y * tangentZ - p._relPos1Z * tangentY;
+			j.ang1Y = p._relPos1Z * tangentX - p._relPos1X * tangentZ;
+			j.ang1Z = p._relPos1X * tangentY - p._relPos1Y * tangentX;
+			j.ang2X = p._relPos2Y * tangentZ - p._relPos2Z * tangentY;
+			j.ang2Y = p._relPos2Z * tangentX - p._relPos2X * tangentZ;
+			j.ang2Z = p._relPos2X * tangentY - p._relPos2Y * tangentX;
+			j = row.jacobianB;
+			j.lin1X = binormalX;
+			j.lin1Y = binormalY;
+			j.lin1Z = binormalZ;
+			j.lin2X = binormalX;
+			j.lin2Y = binormalY;
+			j.lin2Z = binormalZ;
+			j.ang1X = p._relPos1Y * binormalZ - p._relPos1Z * binormalY;
+			j.ang1Y = p._relPos1Z * binormalX - p._relPos1X * binormalZ;
+			j.ang1Z = p._relPos1X * binormalY - p._relPos1Y * binormalX;
+			j.ang2X = p._relPos2Y * binormalZ - p._relPos2Z * binormalY;
+			j.ang2Y = p._relPos2Z * binormalX - p._relPos2X * binormalZ;
+			j.ang2Z = p._relPos2X * binormalY - p._relPos2Y * binormalX;
+			j = row.jacobianN;
+			var rvn = j.lin1X * this._b1._velX + j.lin1Y * this._b1._velY + j.lin1Z * this._b1._velZ + (j.ang1X * this._b1._angVelX + j.ang1Y * this._b1._angVelY + j.ang1Z * this._b1._angVelZ) - (j.lin2X * this._b2._velX + j.lin2Y * this._b2._velY + j.lin2Z * this._b2._velZ + (j.ang2X * this._b2._angVelX + j.ang2Y * this._b2._angVelY + j.ang2Z * this._b2._angVelZ));
+			if(rvn < -oimo_common_Setting.contactEnableBounceThreshold && !p._warmStarted) {
+				row.rhs = -rvn * restitution;
+			} else {
+				row.rhs = 0;
+			}
+			if(this._positionCorrectionAlgorithm == oimo_dynamics_constraint_PositionCorrectionAlgorithm.BAUMGARTE) {
+				if(p._depth > oimo_common_Setting.linearSlop) {
+					var minRhs = (p._depth - oimo_common_Setting.linearSlop) * oimo_common_Setting.velocityBaumgarte * timeStep.invDt;
+					if(row.rhs < minRhs) {
+						row.rhs = minRhs;
+					}
+				}
+			}
+			if(!p._warmStarted) {
+				var _this1 = p._impulse;
+				_this1.impulseN = 0;
+				_this1.impulseT = 0;
+				_this1.impulseB = 0;
+				_this1.impulseP = 0;
+				_this1.impulseLX = 0;
+				_this1.impulseLY = 0;
+				_this1.impulseLZ = 0;
+			}
+			row.impulse = p._impulse;
+		}
+	}
+	,_getPositionSolverInfo: function(info) {
+		info.b1 = this._b1;
+		info.b2 = this._b2;
+		var normalX;
+		var normalY;
+		var normalZ;
+		normalX = this._manifold._normalX;
+		normalY = this._manifold._normalY;
+		normalZ = this._manifold._normalZ;
+		var num = this._manifold._numPoints;
+		info.numRows = 0;
+		var _g = 0;
+		while(_g < num) {
+			var p = this._manifold._points[_g++];
+			if(p._disabled) {
+				continue;
+			}
+			var row = info.rows[info.numRows++];
+			var j = row.jacobianN;
+			j.lin1X = normalX;
+			j.lin1Y = normalY;
+			j.lin1Z = normalZ;
+			j.lin2X = normalX;
+			j.lin2Y = normalY;
+			j.lin2Z = normalZ;
+			j.ang1X = p._relPos1Y * normalZ - p._relPos1Z * normalY;
+			j.ang1Y = p._relPos1Z * normalX - p._relPos1X * normalZ;
+			j.ang1Z = p._relPos1X * normalY - p._relPos1Y * normalX;
+			j.ang2X = p._relPos2Y * normalZ - p._relPos2Z * normalY;
+			j.ang2Y = p._relPos2Z * normalX - p._relPos2X * normalZ;
+			j.ang2Z = p._relPos2X * normalY - p._relPos2Y * normalX;
+			row.rhs = p._depth - oimo_common_Setting.linearSlop;
+			if(row.rhs < 0) {
+				row.rhs = 0;
+			}
+			row.impulse = p._impulse;
+		}
+	}
+	,_syncManifold: function() {
+		this._manifold._updateDepthsAndPositions(this._tf1,this._tf2);
+	}
+	,isTouching: function() {
+		var _g = 0;
+		var _g1 = this._manifold._numPoints;
+		while(_g < _g1) if(this._manifold._points[_g++]._depth >= 0) {
+			return true;
+		}
+		return false;
+	}
+	,__class__: oimo_dynamics_constraint_contact_ContactConstraint
+};
+var oimo_dynamics_constraint_contact_ContactImpulse = function() {
+	this.impulseN = 0;
+	this.impulseT = 0;
+	this.impulseB = 0;
+	this.impulseP = 0;
+	this.impulseLX = 0;
+	this.impulseLY = 0;
+	this.impulseLZ = 0;
+};
+$hxClasses["oimo.dynamics.constraint.contact.ContactImpulse"] = oimo_dynamics_constraint_contact_ContactImpulse;
+oimo_dynamics_constraint_contact_ContactImpulse.__name__ = "oimo.dynamics.constraint.contact.ContactImpulse";
+oimo_dynamics_constraint_contact_ContactImpulse.prototype = {
+	copyFrom: function(imp) {
+		this.impulseN = imp.impulseN;
+		this.impulseT = imp.impulseT;
+		this.impulseB = imp.impulseB;
+		this.impulseLX = imp.impulseLX;
+		this.impulseLY = imp.impulseLY;
+		this.impulseLZ = imp.impulseLZ;
+	}
+	,__class__: oimo_dynamics_constraint_contact_ContactImpulse
+};
+var oimo_dynamics_constraint_contact_Manifold = function() {
+	this._normalX = 0;
+	this._normalY = 0;
+	this._normalZ = 0;
+	this._tangentX = 0;
+	this._tangentY = 0;
+	this._tangentZ = 0;
+	this._binormalX = 0;
+	this._binormalY = 0;
+	this._binormalZ = 0;
+	this._numPoints = 0;
+	this._points = new Array(oimo_common_Setting.maxManifoldPoints);
+	var _g = 0;
+	var _g1 = oimo_common_Setting.maxManifoldPoints;
+	while(_g < _g1) this._points[_g++] = new oimo_dynamics_constraint_contact_ManifoldPoint();
+};
+$hxClasses["oimo.dynamics.constraint.contact.Manifold"] = oimo_dynamics_constraint_contact_Manifold;
+oimo_dynamics_constraint_contact_Manifold.__name__ = "oimo.dynamics.constraint.contact.Manifold";
+oimo_dynamics_constraint_contact_Manifold.prototype = {
+	_clear: function() {
+		var _g = 0;
+		var _g1 = this._numPoints;
+		while(_g < _g1) {
+			var _this = this._points[_g++];
+			_this._localPos1X = 0;
+			_this._localPos1Y = 0;
+			_this._localPos1Z = 0;
+			_this._localPos2X = 0;
+			_this._localPos2Y = 0;
+			_this._localPos2Z = 0;
+			_this._relPos1X = 0;
+			_this._relPos1Y = 0;
+			_this._relPos1Z = 0;
+			_this._relPos2X = 0;
+			_this._relPos2Y = 0;
+			_this._relPos2Z = 0;
+			_this._pos1X = 0;
+			_this._pos1Y = 0;
+			_this._pos1Z = 0;
+			_this._pos2X = 0;
+			_this._pos2Y = 0;
+			_this._pos2Z = 0;
+			_this._depth = 0;
+			var _this1 = _this._impulse;
+			_this1.impulseN = 0;
+			_this1.impulseT = 0;
+			_this1.impulseB = 0;
+			_this1.impulseP = 0;
+			_this1.impulseLX = 0;
+			_this1.impulseLY = 0;
+			_this1.impulseLZ = 0;
+			_this._warmStarted = false;
+			_this._disabled = false;
+			_this._id = -1;
+		}
+		this._numPoints = 0;
+	}
+	,_buildBasis: function(normal) {
+		this._normalX = normal.x;
+		this._normalY = normal.y;
+		this._normalZ = normal.z;
+		var nx = normal.x;
+		var ny = normal.y;
+		var nz = normal.z;
+		var nx2 = nx * nx;
+		var ny2 = ny * ny;
+		var nz2 = nz * nz;
+		var tx;
+		var ty;
+		var tz;
+		var bx;
+		var by;
+		var bz;
+		if(nx2 < ny2) {
+			if(nx2 < nz2) {
+				var invL = 1 / Math.sqrt(ny2 + nz2);
+				tx = 0;
+				ty = -nz * invL;
+				tz = ny * invL;
+				bx = ny * tz - nz * ty;
+				by = -nx * tz;
+				bz = nx * ty;
+			} else {
+				var invL = 1 / Math.sqrt(nx2 + ny2);
+				tx = -ny * invL;
+				ty = nx * invL;
+				tz = 0;
+				bx = -nz * ty;
+				by = nz * tx;
+				bz = nx * ty - ny * tx;
+			}
+		} else if(ny2 < nz2) {
+			var invL = 1 / Math.sqrt(nx2 + nz2);
+			tx = nz * invL;
+			ty = 0;
+			tz = -nx * invL;
+			bx = ny * tz;
+			by = nz * tx - nx * tz;
+			bz = -ny * tx;
+		} else {
+			var invL = 1 / Math.sqrt(nx2 + ny2);
+			tx = -ny * invL;
+			ty = nx * invL;
+			tz = 0;
+			bx = -nz * ty;
+			by = nz * tx;
+			bz = nx * ty - ny * tx;
+		}
+		this._tangentX = tx;
+		this._tangentY = ty;
+		this._tangentZ = tz;
+		this._binormalX = bx;
+		this._binormalY = by;
+		this._binormalZ = bz;
+	}
+	,_updateDepthsAndPositions: function(tf1,tf2) {
+		var _g = 0;
+		var _g1 = this._numPoints;
+		while(_g < _g1) {
+			var p = this._points[_g++];
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf1._rotation00 * p._localPos1X + tf1._rotation01 * p._localPos1Y + tf1._rotation02 * p._localPos1Z;
+			__tmp__Y = tf1._rotation10 * p._localPos1X + tf1._rotation11 * p._localPos1Y + tf1._rotation12 * p._localPos1Z;
+			__tmp__Z = tf1._rotation20 * p._localPos1X + tf1._rotation21 * p._localPos1Y + tf1._rotation22 * p._localPos1Z;
+			p._relPos1X = __tmp__X;
+			p._relPos1Y = __tmp__Y;
+			p._relPos1Z = __tmp__Z;
+			var __tmp__X1;
+			var __tmp__Y1;
+			var __tmp__Z1;
+			__tmp__X1 = tf2._rotation00 * p._localPos2X + tf2._rotation01 * p._localPos2Y + tf2._rotation02 * p._localPos2Z;
+			__tmp__Y1 = tf2._rotation10 * p._localPos2X + tf2._rotation11 * p._localPos2Y + tf2._rotation12 * p._localPos2Z;
+			__tmp__Z1 = tf2._rotation20 * p._localPos2X + tf2._rotation21 * p._localPos2Y + tf2._rotation22 * p._localPos2Z;
+			p._relPos2X = __tmp__X1;
+			p._relPos2Y = __tmp__Y1;
+			p._relPos2Z = __tmp__Z1;
+			p._pos1X = p._relPos1X + tf1._positionX;
+			p._pos1Y = p._relPos1Y + tf1._positionY;
+			p._pos1Z = p._relPos1Z + tf1._positionZ;
+			p._pos2X = p._relPos2X + tf2._positionX;
+			p._pos2Y = p._relPos2Y + tf2._positionY;
+			p._pos2Z = p._relPos2Z + tf2._positionZ;
+			var diffX;
+			var diffY;
+			var diffZ;
+			diffX = p._pos1X - p._pos2X;
+			diffY = p._pos1Y - p._pos2Y;
+			diffZ = p._pos1Z - p._pos2Z;
+			p._depth = -(diffX * this._normalX + diffY * this._normalY + diffZ * this._normalZ);
+		}
+	}
+	,__class__: oimo_dynamics_constraint_contact_Manifold
+};
+var oimo_dynamics_constraint_contact_ManifoldPoint = function() {
+	this._localPos1X = 0;
+	this._localPos1Y = 0;
+	this._localPos1Z = 0;
+	this._localPos2X = 0;
+	this._localPos2Y = 0;
+	this._localPos2Z = 0;
+	this._relPos1X = 0;
+	this._relPos1Y = 0;
+	this._relPos1Z = 0;
+	this._relPos2X = 0;
+	this._relPos2Y = 0;
+	this._relPos2Z = 0;
+	this._pos1X = 0;
+	this._pos1Y = 0;
+	this._pos1Z = 0;
+	this._pos2X = 0;
+	this._pos2Y = 0;
+	this._pos2Z = 0;
+	this._depth = 0;
+	this._impulse = new oimo_dynamics_constraint_contact_ContactImpulse();
+	this._warmStarted = false;
+	this._disabled = false;
+	this._id = -1;
+};
+$hxClasses["oimo.dynamics.constraint.contact.ManifoldPoint"] = oimo_dynamics_constraint_contact_ManifoldPoint;
+oimo_dynamics_constraint_contact_ManifoldPoint.__name__ = "oimo.dynamics.constraint.contact.ManifoldPoint";
+oimo_dynamics_constraint_contact_ManifoldPoint.prototype = {
+	__class__: oimo_dynamics_constraint_contact_ManifoldPoint
+};
+var oimo_dynamics_constraint_contact_ManifoldUpdater = function(manifold) {
+	this._manifold = manifold;
+	this.numOldPoints = 0;
+	this.oldPoints = new Array(oimo_common_Setting.maxManifoldPoints);
+	var _g = 0;
+	var _g1 = oimo_common_Setting.maxManifoldPoints;
+	while(_g < _g1) this.oldPoints[_g++] = new oimo_dynamics_constraint_contact_ManifoldPoint();
+};
+$hxClasses["oimo.dynamics.constraint.contact.ManifoldUpdater"] = oimo_dynamics_constraint_contact_ManifoldUpdater;
+oimo_dynamics_constraint_contact_ManifoldUpdater.__name__ = "oimo.dynamics.constraint.contact.ManifoldUpdater";
+oimo_dynamics_constraint_contact_ManifoldUpdater.prototype = {
+	removeOutdatedPoints: function() {
+		var index = this._manifold._numPoints;
+		while(--index >= 0) {
+			var p = this._manifold._points[index];
+			var diffX;
+			var diffY;
+			var diffZ;
+			diffX = p._pos1X - p._pos2X;
+			diffY = p._pos1Y - p._pos2Y;
+			diffZ = p._pos1Z - p._pos2Z;
+			var dotN = this._manifold._normalX * diffX + this._manifold._normalY * diffY + this._manifold._normalZ * diffZ;
+			if(dotN > oimo_common_Setting.contactPersistenceThreshold) {
+				this.removeManifoldPoint(index);
+				continue;
+			}
+			diffX += this._manifold._normalX * -dotN;
+			diffY += this._manifold._normalY * -dotN;
+			diffZ += this._manifold._normalZ * -dotN;
+			if(diffX * diffX + diffY * diffY + diffZ * diffZ > oimo_common_Setting.contactPersistenceThreshold * oimo_common_Setting.contactPersistenceThreshold) {
+				this.removeManifoldPoint(index);
+				continue;
+			}
+		}
+	}
+	,removeManifoldPoint: function(index) {
+		var lastIndex = --this._manifold._numPoints;
+		if(index != lastIndex) {
+			var tmp = this._manifold._points[index];
+			this._manifold._points[index] = this._manifold._points[lastIndex];
+			this._manifold._points[lastIndex] = tmp;
+		}
+		var _this = this._manifold._points[lastIndex];
+		_this._localPos1X = 0;
+		_this._localPos1Y = 0;
+		_this._localPos1Z = 0;
+		_this._localPos2X = 0;
+		_this._localPos2Y = 0;
+		_this._localPos2Z = 0;
+		_this._relPos1X = 0;
+		_this._relPos1Y = 0;
+		_this._relPos1Z = 0;
+		_this._relPos2X = 0;
+		_this._relPos2Y = 0;
+		_this._relPos2Z = 0;
+		_this._pos1X = 0;
+		_this._pos1Y = 0;
+		_this._pos1Z = 0;
+		_this._pos2X = 0;
+		_this._pos2Y = 0;
+		_this._pos2Z = 0;
+		_this._depth = 0;
+		var _this1 = _this._impulse;
+		_this1.impulseN = 0;
+		_this1.impulseT = 0;
+		_this1.impulseB = 0;
+		_this1.impulseP = 0;
+		_this1.impulseLX = 0;
+		_this1.impulseLY = 0;
+		_this1.impulseLZ = 0;
+		_this._warmStarted = false;
+		_this._disabled = false;
+		_this._id = -1;
+	}
+	,addManifoldPoint: function(point,tf1,tf2) {
+		var num = this._manifold._numPoints;
+		if(num == oimo_common_Setting.maxManifoldPoints) {
+			var targetIndex = this.computeTargetIndex(point,tf1,tf2);
+			var _this = this._manifold._points[targetIndex];
+			var v = point.position1;
+			_this._pos1X = v.x;
+			_this._pos1Y = v.y;
+			_this._pos1Z = v.z;
+			var v = point.position2;
+			_this._pos2X = v.x;
+			_this._pos2Y = v.y;
+			_this._pos2Z = v.z;
+			_this._relPos1X = _this._pos1X - tf1._positionX;
+			_this._relPos1Y = _this._pos1Y - tf1._positionY;
+			_this._relPos1Z = _this._pos1Z - tf1._positionZ;
+			_this._relPos2X = _this._pos2X - tf2._positionX;
+			_this._relPos2Y = _this._pos2Y - tf2._positionY;
+			_this._relPos2Z = _this._pos2Z - tf2._positionZ;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf1._rotation00 * _this._relPos1X + tf1._rotation10 * _this._relPos1Y + tf1._rotation20 * _this._relPos1Z;
+			__tmp__Y = tf1._rotation01 * _this._relPos1X + tf1._rotation11 * _this._relPos1Y + tf1._rotation21 * _this._relPos1Z;
+			__tmp__Z = tf1._rotation02 * _this._relPos1X + tf1._rotation12 * _this._relPos1Y + tf1._rotation22 * _this._relPos1Z;
+			_this._localPos1X = __tmp__X;
+			_this._localPos1Y = __tmp__Y;
+			_this._localPos1Z = __tmp__Z;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf2._rotation00 * _this._relPos2X + tf2._rotation10 * _this._relPos2Y + tf2._rotation20 * _this._relPos2Z;
+			__tmp__Y = tf2._rotation01 * _this._relPos2X + tf2._rotation11 * _this._relPos2Y + tf2._rotation21 * _this._relPos2Z;
+			__tmp__Z = tf2._rotation02 * _this._relPos2X + tf2._rotation12 * _this._relPos2Y + tf2._rotation22 * _this._relPos2Z;
+			_this._localPos2X = __tmp__X;
+			_this._localPos2Y = __tmp__Y;
+			_this._localPos2Z = __tmp__Z;
+			_this._depth = point.depth;
+			var _this1 = _this._impulse;
+			_this1.impulseN = 0;
+			_this1.impulseT = 0;
+			_this1.impulseB = 0;
+			_this1.impulseP = 0;
+			_this1.impulseLX = 0;
+			_this1.impulseLY = 0;
+			_this1.impulseLZ = 0;
+			_this._id = point.id;
+			_this._warmStarted = false;
+			_this._disabled = false;
+			return;
+		}
+		var _this = this._manifold._points[num];
+		var v = point.position1;
+		_this._pos1X = v.x;
+		_this._pos1Y = v.y;
+		_this._pos1Z = v.z;
+		var v = point.position2;
+		_this._pos2X = v.x;
+		_this._pos2Y = v.y;
+		_this._pos2Z = v.z;
+		_this._relPos1X = _this._pos1X - tf1._positionX;
+		_this._relPos1Y = _this._pos1Y - tf1._positionY;
+		_this._relPos1Z = _this._pos1Z - tf1._positionZ;
+		_this._relPos2X = _this._pos2X - tf2._positionX;
+		_this._relPos2Y = _this._pos2Y - tf2._positionY;
+		_this._relPos2Z = _this._pos2Z - tf2._positionZ;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf1._rotation00 * _this._relPos1X + tf1._rotation10 * _this._relPos1Y + tf1._rotation20 * _this._relPos1Z;
+		__tmp__Y = tf1._rotation01 * _this._relPos1X + tf1._rotation11 * _this._relPos1Y + tf1._rotation21 * _this._relPos1Z;
+		__tmp__Z = tf1._rotation02 * _this._relPos1X + tf1._rotation12 * _this._relPos1Y + tf1._rotation22 * _this._relPos1Z;
+		_this._localPos1X = __tmp__X;
+		_this._localPos1Y = __tmp__Y;
+		_this._localPos1Z = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf2._rotation00 * _this._relPos2X + tf2._rotation10 * _this._relPos2Y + tf2._rotation20 * _this._relPos2Z;
+		__tmp__Y = tf2._rotation01 * _this._relPos2X + tf2._rotation11 * _this._relPos2Y + tf2._rotation21 * _this._relPos2Z;
+		__tmp__Z = tf2._rotation02 * _this._relPos2X + tf2._rotation12 * _this._relPos2Y + tf2._rotation22 * _this._relPos2Z;
+		_this._localPos2X = __tmp__X;
+		_this._localPos2Y = __tmp__Y;
+		_this._localPos2Z = __tmp__Z;
+		_this._depth = point.depth;
+		var _this1 = _this._impulse;
+		_this1.impulseN = 0;
+		_this1.impulseT = 0;
+		_this1.impulseB = 0;
+		_this1.impulseP = 0;
+		_this1.impulseLX = 0;
+		_this1.impulseLY = 0;
+		_this1.impulseLZ = 0;
+		_this._id = point.id;
+		_this._warmStarted = false;
+		_this._disabled = false;
+		this._manifold._numPoints++;
+	}
+	,computeTargetIndex: function(newPoint,tf1,tf2) {
+		var p1 = this._manifold._points[0];
+		var p2 = this._manifold._points[1];
+		var p3 = this._manifold._points[2];
+		var p4 = this._manifold._points[3];
+		var maxDepth = p1._depth;
+		var maxDepthIndex = 0;
+		if(p2._depth > maxDepth) {
+			maxDepth = p2._depth;
+			maxDepthIndex = 1;
+		}
+		if(p3._depth > maxDepth) {
+			maxDepth = p3._depth;
+			maxDepthIndex = 2;
+		}
+		if(p4._depth > maxDepth) {
+			maxDepthIndex = 3;
+		}
+		var rp1X;
+		var rp1Y;
+		var rp1Z;
+		var v = newPoint.position1;
+		rp1X = v.x;
+		rp1Y = v.y;
+		rp1Z = v.z;
+		rp1X -= tf1._positionX;
+		rp1Y -= tf1._positionY;
+		rp1Z -= tf1._positionZ;
+		var p1X = p2._relPos1X;
+		var p1Y = p2._relPos1Y;
+		var p1Z = p2._relPos1Z;
+		var p2X = p3._relPos1X;
+		var p2Y = p3._relPos1Y;
+		var p2Z = p3._relPos1Z;
+		var p3X = p4._relPos1X;
+		var p3Y = p4._relPos1Y;
+		var p3Z = p4._relPos1Z;
+		var v12X;
+		var v12Y;
+		var v12Z;
+		var v34X;
+		var v34Y;
+		var v34Z;
+		var v13X;
+		var v13Y;
+		var v13Z;
+		var v24X;
+		var v24Y;
+		var v24Z;
+		var v14X;
+		var v14Y;
+		var v14Z;
+		var v23X;
+		var v23Y;
+		var v23Z;
+		v12X = p2X - p1X;
+		v12Y = p2Y - p1Y;
+		v12Z = p2Z - p1Z;
+		v34X = rp1X - p3X;
+		v34Y = rp1Y - p3Y;
+		v34Z = rp1Z - p3Z;
+		v13X = p3X - p1X;
+		v13Y = p3Y - p1Y;
+		v13Z = p3Z - p1Z;
+		v24X = rp1X - p2X;
+		v24Y = rp1Y - p2Y;
+		v24Z = rp1Z - p2Z;
+		v14X = rp1X - p1X;
+		v14Y = rp1Y - p1Y;
+		v14Z = rp1Z - p1Z;
+		v23X = p3X - p2X;
+		v23Y = p3Y - p2Y;
+		v23Z = p3Z - p2Z;
+		var cross1X;
+		var cross1Y;
+		var cross1Z;
+		var cross2X;
+		var cross2Y;
+		var cross2Z;
+		var cross3X;
+		var cross3Y;
+		var cross3Z;
+		cross1X = v12Y * v34Z - v12Z * v34Y;
+		cross1Y = v12Z * v34X - v12X * v34Z;
+		cross1Z = v12X * v34Y - v12Y * v34X;
+		cross2X = v13Y * v24Z - v13Z * v24Y;
+		cross2Y = v13Z * v24X - v13X * v24Z;
+		cross2Z = v13X * v24Y - v13Y * v24X;
+		cross3X = v14Y * v23Z - v14Z * v23Y;
+		cross3Y = v14Z * v23X - v14X * v23Z;
+		cross3Z = v14X * v23Y - v14Y * v23X;
+		var a1 = cross1X * cross1X + cross1Y * cross1Y + cross1Z * cross1Z;
+		var a2 = cross2X * cross2X + cross2Y * cross2Y + cross2Z * cross2Z;
+		var a3 = cross3X * cross3X + cross3Y * cross3Y + cross3Z * cross3Z;
+		var p1X = p1._relPos1X;
+		var p1Y = p1._relPos1Y;
+		var p1Z = p1._relPos1Z;
+		var p2X = p3._relPos1X;
+		var p2Y = p3._relPos1Y;
+		var p2Z = p3._relPos1Z;
+		var p3X = p4._relPos1X;
+		var p3Y = p4._relPos1Y;
+		var p3Z = p4._relPos1Z;
+		var v12X;
+		var v12Y;
+		var v12Z;
+		var v34X;
+		var v34Y;
+		var v34Z;
+		var v13X;
+		var v13Y;
+		var v13Z;
+		var v24X;
+		var v24Y;
+		var v24Z;
+		var v14X;
+		var v14Y;
+		var v14Z;
+		var v23X;
+		var v23Y;
+		var v23Z;
+		v12X = p2X - p1X;
+		v12Y = p2Y - p1Y;
+		v12Z = p2Z - p1Z;
+		v34X = rp1X - p3X;
+		v34Y = rp1Y - p3Y;
+		v34Z = rp1Z - p3Z;
+		v13X = p3X - p1X;
+		v13Y = p3Y - p1Y;
+		v13Z = p3Z - p1Z;
+		v24X = rp1X - p2X;
+		v24Y = rp1Y - p2Y;
+		v24Z = rp1Z - p2Z;
+		v14X = rp1X - p1X;
+		v14Y = rp1Y - p1Y;
+		v14Z = rp1Z - p1Z;
+		v23X = p3X - p2X;
+		v23Y = p3Y - p2Y;
+		v23Z = p3Z - p2Z;
+		var cross1X;
+		var cross1Y;
+		var cross1Z;
+		var cross2X;
+		var cross2Y;
+		var cross2Z;
+		var cross3X;
+		var cross3Y;
+		var cross3Z;
+		cross1X = v12Y * v34Z - v12Z * v34Y;
+		cross1Y = v12Z * v34X - v12X * v34Z;
+		cross1Z = v12X * v34Y - v12Y * v34X;
+		cross2X = v13Y * v24Z - v13Z * v24Y;
+		cross2Y = v13Z * v24X - v13X * v24Z;
+		cross2Z = v13X * v24Y - v13Y * v24X;
+		cross3X = v14Y * v23Z - v14Z * v23Y;
+		cross3Y = v14Z * v23X - v14X * v23Z;
+		cross3Z = v14X * v23Y - v14Y * v23X;
+		var a11 = cross1X * cross1X + cross1Y * cross1Y + cross1Z * cross1Z;
+		var a21 = cross2X * cross2X + cross2Y * cross2Y + cross2Z * cross2Z;
+		var a31 = cross3X * cross3X + cross3Y * cross3Y + cross3Z * cross3Z;
+		var a22 = a11 > a21 ? a11 > a31 ? a11 : a31 : a21 > a31 ? a21 : a31;
+		var p1X = p1._relPos1X;
+		var p1Y = p1._relPos1Y;
+		var p1Z = p1._relPos1Z;
+		var p2X = p2._relPos1X;
+		var p2Y = p2._relPos1Y;
+		var p2Z = p2._relPos1Z;
+		var p3X = p4._relPos1X;
+		var p3Y = p4._relPos1Y;
+		var p3Z = p4._relPos1Z;
+		var v12X;
+		var v12Y;
+		var v12Z;
+		var v34X;
+		var v34Y;
+		var v34Z;
+		var v13X;
+		var v13Y;
+		var v13Z;
+		var v24X;
+		var v24Y;
+		var v24Z;
+		var v14X;
+		var v14Y;
+		var v14Z;
+		var v23X;
+		var v23Y;
+		var v23Z;
+		v12X = p2X - p1X;
+		v12Y = p2Y - p1Y;
+		v12Z = p2Z - p1Z;
+		v34X = rp1X - p3X;
+		v34Y = rp1Y - p3Y;
+		v34Z = rp1Z - p3Z;
+		v13X = p3X - p1X;
+		v13Y = p3Y - p1Y;
+		v13Z = p3Z - p1Z;
+		v24X = rp1X - p2X;
+		v24Y = rp1Y - p2Y;
+		v24Z = rp1Z - p2Z;
+		v14X = rp1X - p1X;
+		v14Y = rp1Y - p1Y;
+		v14Z = rp1Z - p1Z;
+		v23X = p3X - p2X;
+		v23Y = p3Y - p2Y;
+		v23Z = p3Z - p2Z;
+		var cross1X;
+		var cross1Y;
+		var cross1Z;
+		var cross2X;
+		var cross2Y;
+		var cross2Z;
+		var cross3X;
+		var cross3Y;
+		var cross3Z;
+		cross1X = v12Y * v34Z - v12Z * v34Y;
+		cross1Y = v12Z * v34X - v12X * v34Z;
+		cross1Z = v12X * v34Y - v12Y * v34X;
+		cross2X = v13Y * v24Z - v13Z * v24Y;
+		cross2Y = v13Z * v24X - v13X * v24Z;
+		cross2Z = v13X * v24Y - v13Y * v24X;
+		cross3X = v14Y * v23Z - v14Z * v23Y;
+		cross3Y = v14Z * v23X - v14X * v23Z;
+		cross3Z = v14X * v23Y - v14Y * v23X;
+		var a11 = cross1X * cross1X + cross1Y * cross1Y + cross1Z * cross1Z;
+		var a21 = cross2X * cross2X + cross2Y * cross2Y + cross2Z * cross2Z;
+		var a31 = cross3X * cross3X + cross3Y * cross3Y + cross3Z * cross3Z;
+		var a32 = a11 > a21 ? a11 > a31 ? a11 : a31 : a21 > a31 ? a21 : a31;
+		var p1X = p1._relPos1X;
+		var p1Y = p1._relPos1Y;
+		var p1Z = p1._relPos1Z;
+		var p2X = p2._relPos1X;
+		var p2Y = p2._relPos1Y;
+		var p2Z = p2._relPos1Z;
+		var p3X = p3._relPos1X;
+		var p3Y = p3._relPos1Y;
+		var p3Z = p3._relPos1Z;
+		var v12X;
+		var v12Y;
+		var v12Z;
+		var v34X;
+		var v34Y;
+		var v34Z;
+		var v13X;
+		var v13Y;
+		var v13Z;
+		var v24X;
+		var v24Y;
+		var v24Z;
+		var v14X;
+		var v14Y;
+		var v14Z;
+		var v23X;
+		var v23Y;
+		var v23Z;
+		v12X = p2X - p1X;
+		v12Y = p2Y - p1Y;
+		v12Z = p2Z - p1Z;
+		v34X = rp1X - p3X;
+		v34Y = rp1Y - p3Y;
+		v34Z = rp1Z - p3Z;
+		v13X = p3X - p1X;
+		v13Y = p3Y - p1Y;
+		v13Z = p3Z - p1Z;
+		v24X = rp1X - p2X;
+		v24Y = rp1Y - p2Y;
+		v24Z = rp1Z - p2Z;
+		v14X = rp1X - p1X;
+		v14Y = rp1Y - p1Y;
+		v14Z = rp1Z - p1Z;
+		v23X = p3X - p2X;
+		v23Y = p3Y - p2Y;
+		v23Z = p3Z - p2Z;
+		var cross1X;
+		var cross1Y;
+		var cross1Z;
+		var cross2X;
+		var cross2Y;
+		var cross2Z;
+		var cross3X;
+		var cross3Y;
+		var cross3Z;
+		cross1X = v12Y * v34Z - v12Z * v34Y;
+		cross1Y = v12Z * v34X - v12X * v34Z;
+		cross1Z = v12X * v34Y - v12Y * v34X;
+		cross2X = v13Y * v24Z - v13Z * v24Y;
+		cross2Y = v13Z * v24X - v13X * v24Z;
+		cross2Z = v13X * v24Y - v13Y * v24X;
+		cross3X = v14Y * v23Z - v14Z * v23Y;
+		cross3Y = v14Z * v23X - v14X * v23Z;
+		cross3Z = v14X * v23Y - v14Y * v23X;
+		var a11 = cross1X * cross1X + cross1Y * cross1Y + cross1Z * cross1Z;
+		var a21 = cross2X * cross2X + cross2Y * cross2Y + cross2Z * cross2Z;
+		var a31 = cross3X * cross3X + cross3Y * cross3Y + cross3Z * cross3Z;
+		var max = a1 > a2 ? a1 > a3 ? a1 : a3 : a2 > a3 ? a2 : a3;
+		var target = 0;
+		if(a22 > max && maxDepthIndex != 1 || maxDepthIndex == 0) {
+			max = a22;
+			target = 1;
+		}
+		if(a32 > max && maxDepthIndex != 2) {
+			max = a32;
+			target = 2;
+		}
+		if((a11 > a21 ? a11 > a31 ? a11 : a31 : a21 > a31 ? a21 : a31) > max && maxDepthIndex != 3) {
+			target = 3;
+		}
+		return target;
+	}
+	,findNearestContactPointIndex: function(target,tf1,tf2) {
+		var nearestSq = oimo_common_Setting.contactPersistenceThreshold * oimo_common_Setting.contactPersistenceThreshold;
+		var idx = -1;
+		var _g = 0;
+		var _g1 = this._manifold._numPoints;
+		while(_g < _g1) {
+			var i = _g++;
+			var mp = this._manifold._points[i];
+			var rp1X;
+			var rp1Y;
+			var rp1Z;
+			var rp2X;
+			var rp2Y;
+			var rp2Z;
+			var v = target.position1;
+			rp1X = v.x;
+			rp1Y = v.y;
+			rp1Z = v.z;
+			var v1 = target.position2;
+			rp2X = v1.x;
+			rp2Y = v1.y;
+			rp2Z = v1.z;
+			rp1X -= tf1._positionX;
+			rp1Y -= tf1._positionY;
+			rp1Z -= tf1._positionZ;
+			rp2X -= tf2._positionX;
+			rp2Y -= tf2._positionY;
+			rp2Z -= tf2._positionZ;
+			var diff1X;
+			var diff1Y;
+			var diff1Z;
+			var diff2X;
+			var diff2Y;
+			var diff2Z;
+			diff1X = mp._relPos1X - rp1X;
+			diff1Y = mp._relPos1Y - rp1Y;
+			diff1Z = mp._relPos1Z - rp1Z;
+			diff2X = mp._relPos2X - rp2X;
+			diff2Y = mp._relPos2Y - rp2Y;
+			diff2Z = mp._relPos2Z - rp2Z;
+			var sq1 = diff1X * diff1X + diff1Y * diff1Y + diff1Z * diff1Z;
+			var sq2 = diff2X * diff2X + diff2Y * diff2Y + diff2Z * diff2Z;
+			var d = sq1 < sq2 ? sq1 : sq2;
+			if(d < nearestSq) {
+				nearestSq = d;
+				idx = i;
+			}
+		}
+		return idx;
+	}
+	,totalUpdate: function(result,tf1,tf2) {
+		this.numOldPoints = this._manifold._numPoints;
+		var _g = 0;
+		var _g1 = this.numOldPoints;
+		while(_g < _g1) {
+			var i = _g++;
+			var _this = this.oldPoints[i];
+			var cp = this._manifold._points[i];
+			_this._localPos1X = cp._localPos1X;
+			_this._localPos1Y = cp._localPos1Y;
+			_this._localPos1Z = cp._localPos1Z;
+			_this._localPos2X = cp._localPos2X;
+			_this._localPos2Y = cp._localPos2Y;
+			_this._localPos2Z = cp._localPos2Z;
+			_this._relPos1X = cp._relPos1X;
+			_this._relPos1Y = cp._relPos1Y;
+			_this._relPos1Z = cp._relPos1Z;
+			_this._relPos2X = cp._relPos2X;
+			_this._relPos2Y = cp._relPos2Y;
+			_this._relPos2Z = cp._relPos2Z;
+			_this._pos1X = cp._pos1X;
+			_this._pos1Y = cp._pos1Y;
+			_this._pos1Z = cp._pos1Z;
+			_this._pos2X = cp._pos2X;
+			_this._pos2Y = cp._pos2Y;
+			_this._pos2Z = cp._pos2Z;
+			_this._depth = cp._depth;
+			_this._impulse.copyFrom(cp._impulse);
+			_this._id = cp._id;
+			_this._warmStarted = cp._warmStarted;
+			_this._disabled = false;
+		}
+		var num = result.numPoints;
+		this._manifold._numPoints = num;
+		var _g = 0;
+		while(_g < num) {
+			var i = _g++;
+			var p = this._manifold._points[i];
+			var ref = result.points[i];
+			var v = ref.position1;
+			p._pos1X = v.x;
+			p._pos1Y = v.y;
+			p._pos1Z = v.z;
+			var v1 = ref.position2;
+			p._pos2X = v1.x;
+			p._pos2Y = v1.y;
+			p._pos2Z = v1.z;
+			p._relPos1X = p._pos1X - tf1._positionX;
+			p._relPos1Y = p._pos1Y - tf1._positionY;
+			p._relPos1Z = p._pos1Z - tf1._positionZ;
+			p._relPos2X = p._pos2X - tf2._positionX;
+			p._relPos2Y = p._pos2Y - tf2._positionY;
+			p._relPos2Z = p._pos2Z - tf2._positionZ;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf1._rotation00 * p._relPos1X + tf1._rotation10 * p._relPos1Y + tf1._rotation20 * p._relPos1Z;
+			__tmp__Y = tf1._rotation01 * p._relPos1X + tf1._rotation11 * p._relPos1Y + tf1._rotation21 * p._relPos1Z;
+			__tmp__Z = tf1._rotation02 * p._relPos1X + tf1._rotation12 * p._relPos1Y + tf1._rotation22 * p._relPos1Z;
+			p._localPos1X = __tmp__X;
+			p._localPos1Y = __tmp__Y;
+			p._localPos1Z = __tmp__Z;
+			var __tmp__X1;
+			var __tmp__Y1;
+			var __tmp__Z1;
+			__tmp__X1 = tf2._rotation00 * p._relPos2X + tf2._rotation10 * p._relPos2Y + tf2._rotation20 * p._relPos2Z;
+			__tmp__Y1 = tf2._rotation01 * p._relPos2X + tf2._rotation11 * p._relPos2Y + tf2._rotation21 * p._relPos2Z;
+			__tmp__Z1 = tf2._rotation02 * p._relPos2X + tf2._rotation12 * p._relPos2Y + tf2._rotation22 * p._relPos2Z;
+			p._localPos2X = __tmp__X1;
+			p._localPos2Y = __tmp__Y1;
+			p._localPos2Z = __tmp__Z1;
+			p._depth = ref.depth;
+			var _this = p._impulse;
+			_this.impulseN = 0;
+			_this.impulseT = 0;
+			_this.impulseB = 0;
+			_this.impulseP = 0;
+			_this.impulseLX = 0;
+			_this.impulseLY = 0;
+			_this.impulseLZ = 0;
+			p._id = ref.id;
+			p._warmStarted = false;
+			p._disabled = false;
+			var _g1 = 0;
+			var _g2 = this.numOldPoints;
+			while(_g1 < _g2) {
+				var ocp = this.oldPoints[_g1++];
+				if(p._id == ocp._id) {
+					p._impulse.copyFrom(ocp._impulse);
+					p._warmStarted = true;
+					break;
+				}
+			}
+		}
+	}
+	,incrementalUpdate: function(result,tf1,tf2) {
+		this._manifold._updateDepthsAndPositions(tf1,tf2);
+		var _g = 0;
+		var _g1 = this._manifold._numPoints;
+		while(_g < _g1) this._manifold._points[_g++]._warmStarted = true;
+		var newPoint = result.points[0];
+		var index = this.findNearestContactPointIndex(newPoint,tf1,tf2);
+		if(index == -1) {
+			this.addManifoldPoint(newPoint,tf1,tf2);
+		} else {
+			var cp = this._manifold._points[index];
+			var v = newPoint.position1;
+			cp._pos1X = v.x;
+			cp._pos1Y = v.y;
+			cp._pos1Z = v.z;
+			var v = newPoint.position2;
+			cp._pos2X = v.x;
+			cp._pos2Y = v.y;
+			cp._pos2Z = v.z;
+			cp._relPos1X = cp._pos1X - tf1._positionX;
+			cp._relPos1Y = cp._pos1Y - tf1._positionY;
+			cp._relPos1Z = cp._pos1Z - tf1._positionZ;
+			cp._relPos2X = cp._pos2X - tf2._positionX;
+			cp._relPos2Y = cp._pos2Y - tf2._positionY;
+			cp._relPos2Z = cp._pos2Z - tf2._positionZ;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf1._rotation00 * cp._relPos1X + tf1._rotation10 * cp._relPos1Y + tf1._rotation20 * cp._relPos1Z;
+			__tmp__Y = tf1._rotation01 * cp._relPos1X + tf1._rotation11 * cp._relPos1Y + tf1._rotation21 * cp._relPos1Z;
+			__tmp__Z = tf1._rotation02 * cp._relPos1X + tf1._rotation12 * cp._relPos1Y + tf1._rotation22 * cp._relPos1Z;
+			cp._localPos1X = __tmp__X;
+			cp._localPos1Y = __tmp__Y;
+			cp._localPos1Z = __tmp__Z;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf2._rotation00 * cp._relPos2X + tf2._rotation10 * cp._relPos2Y + tf2._rotation20 * cp._relPos2Z;
+			__tmp__Y = tf2._rotation01 * cp._relPos2X + tf2._rotation11 * cp._relPos2Y + tf2._rotation21 * cp._relPos2Z;
+			__tmp__Z = tf2._rotation02 * cp._relPos2X + tf2._rotation12 * cp._relPos2Y + tf2._rotation22 * cp._relPos2Z;
+			cp._localPos2X = __tmp__X;
+			cp._localPos2Y = __tmp__Y;
+			cp._localPos2Z = __tmp__Z;
+			cp._depth = newPoint.depth;
+		}
+		this.removeOutdatedPoints();
+	}
+	,__class__: oimo_dynamics_constraint_contact_ManifoldUpdater
+};
+var oimo_dynamics_constraint_info_JacobianRow = function() {
+	this.lin1X = 0;
+	this.lin1Y = 0;
+	this.lin1Z = 0;
+	this.lin2X = 0;
+	this.lin2Y = 0;
+	this.lin2Z = 0;
+	this.ang1X = 0;
+	this.ang1Y = 0;
+	this.ang1Z = 0;
+	this.ang2X = 0;
+	this.ang2Y = 0;
+	this.ang2Z = 0;
+	this.flag = 0;
+};
+$hxClasses["oimo.dynamics.constraint.info.JacobianRow"] = oimo_dynamics_constraint_info_JacobianRow;
+oimo_dynamics_constraint_info_JacobianRow.__name__ = "oimo.dynamics.constraint.info.JacobianRow";
+oimo_dynamics_constraint_info_JacobianRow.prototype = {
+	updateSparsity: function() {
+		this.flag = 0;
+		if(!(this.lin1X == 0 && this.lin1Y == 0 && this.lin1Z == 0) || !(this.lin2X == 0 && this.lin2Y == 0 && this.lin2Z == 0)) {
+			this.flag |= 1;
+		}
+		if(!(this.ang1X == 0 && this.ang1Y == 0 && this.ang1Z == 0) || !(this.ang2X == 0 && this.ang2Y == 0 && this.ang2Z == 0)) {
+			this.flag |= 2;
+		}
+	}
+	,__class__: oimo_dynamics_constraint_info_JacobianRow
+};
+var oimo_dynamics_constraint_info_contact_ContactSolverInfo = function() {
+	this.b1 = null;
+	this.b2 = null;
+	this.numRows = 0;
+	this.rows = new Array(oimo_common_Setting.maxManifoldPoints);
+	var _g = 0;
+	var _g1 = this.rows.length;
+	while(_g < _g1) this.rows[_g++] = new oimo_dynamics_constraint_info_contact_ContactSolverInfoRow();
+};
+$hxClasses["oimo.dynamics.constraint.info.contact.ContactSolverInfo"] = oimo_dynamics_constraint_info_contact_ContactSolverInfo;
+oimo_dynamics_constraint_info_contact_ContactSolverInfo.__name__ = "oimo.dynamics.constraint.info.contact.ContactSolverInfo";
+oimo_dynamics_constraint_info_contact_ContactSolverInfo.prototype = {
+	__class__: oimo_dynamics_constraint_info_contact_ContactSolverInfo
+};
+var oimo_dynamics_constraint_info_contact_ContactSolverInfoRow = function() {
+	this.jacobianN = new oimo_dynamics_constraint_info_JacobianRow();
+	this.jacobianT = new oimo_dynamics_constraint_info_JacobianRow();
+	this.jacobianB = new oimo_dynamics_constraint_info_JacobianRow();
+	this.rhs = 0;
+	this.cfm = 0;
+	this.friction = 0;
+	this.impulse = null;
+};
+$hxClasses["oimo.dynamics.constraint.info.contact.ContactSolverInfoRow"] = oimo_dynamics_constraint_info_contact_ContactSolverInfoRow;
+oimo_dynamics_constraint_info_contact_ContactSolverInfoRow.__name__ = "oimo.dynamics.constraint.info.contact.ContactSolverInfoRow";
+oimo_dynamics_constraint_info_contact_ContactSolverInfoRow.prototype = {
+	__class__: oimo_dynamics_constraint_info_contact_ContactSolverInfoRow
+};
+var oimo_dynamics_constraint_info_joint_JointSolverInfo = function() {
+	this.b1 = null;
+	this.b2 = null;
+	this.numRows = 0;
+	this.rows = new Array(oimo_common_Setting.maxJacobianRows);
+	var _g = 0;
+	var _g1 = this.rows.length;
+	while(_g < _g1) this.rows[_g++] = new oimo_dynamics_constraint_info_joint_JointSolverInfoRow();
+};
+$hxClasses["oimo.dynamics.constraint.info.joint.JointSolverInfo"] = oimo_dynamics_constraint_info_joint_JointSolverInfo;
+oimo_dynamics_constraint_info_joint_JointSolverInfo.__name__ = "oimo.dynamics.constraint.info.joint.JointSolverInfo";
+oimo_dynamics_constraint_info_joint_JointSolverInfo.prototype = {
+	__class__: oimo_dynamics_constraint_info_joint_JointSolverInfo
+};
+var oimo_dynamics_constraint_info_joint_JointSolverInfoRow = function() {
+	this.jacobian = new oimo_dynamics_constraint_info_JacobianRow();
+	this.rhs = 0;
+	this.cfm = 0;
+	this.minImpulse = 0;
+	this.maxImpulse = 0;
+	this.motorSpeed = 0;
+	this.motorMaxImpulse = 0;
+	this.impulse = null;
+};
+$hxClasses["oimo.dynamics.constraint.info.joint.JointSolverInfoRow"] = oimo_dynamics_constraint_info_joint_JointSolverInfoRow;
+oimo_dynamics_constraint_info_joint_JointSolverInfoRow.__name__ = "oimo.dynamics.constraint.info.joint.JointSolverInfoRow";
+oimo_dynamics_constraint_info_joint_JointSolverInfoRow.prototype = {
+	__class__: oimo_dynamics_constraint_info_joint_JointSolverInfoRow
+};
+var oimo_dynamics_constraint_joint_Joint = function(config,type) {
+	this._link1 = new oimo_dynamics_constraint_joint_JointLink(this);
+	this._link2 = new oimo_dynamics_constraint_joint_JointLink(this);
+	this._positionCorrectionAlgorithm = oimo_common_Setting.defaultJointPositionCorrectionAlgorithm;
+	this._type = type;
+	this._world = null;
+	this._b1 = config.rigidBody1;
+	this._b2 = config.rigidBody2;
+	this._allowCollision = config.allowCollision;
+	this._breakForce = config.breakForce;
+	this._breakTorque = config.breakTorque;
+	switch(config.solverType) {
+	case 0:
+		this._solver = new oimo_dynamics_constraint_solver_pgs_PgsJointConstraintSolver(this);
+		break;
+	case 1:
+		this._solver = new oimo_dynamics_constraint_solver_direct_DirectJointConstraintSolver(this);
+		break;
+	}
+	var v = config.localAnchor1;
+	this._localAnchor1X = v.x;
+	this._localAnchor1Y = v.y;
+	this._localAnchor1Z = v.z;
+	var v = config.localAnchor2;
+	this._localAnchor2X = v.x;
+	this._localAnchor2Y = v.y;
+	this._localAnchor2Z = v.z;
+	this._relativeAnchor1X = 0;
+	this._relativeAnchor1Y = 0;
+	this._relativeAnchor1Z = 0;
+	this._relativeAnchor2X = 0;
+	this._relativeAnchor2Y = 0;
+	this._relativeAnchor2Z = 0;
+	this._anchor1X = 0;
+	this._anchor1Y = 0;
+	this._anchor1Z = 0;
+	this._anchor2X = 0;
+	this._anchor2Y = 0;
+	this._anchor2Z = 0;
+	this._localBasisX1X = 0;
+	this._localBasisX1Y = 0;
+	this._localBasisX1Z = 0;
+	this._localBasisY1X = 0;
+	this._localBasisY1Y = 0;
+	this._localBasisY1Z = 0;
+	this._localBasisZ1X = 0;
+	this._localBasisZ1Y = 0;
+	this._localBasisZ1Z = 0;
+	this._localBasisX2X = 0;
+	this._localBasisX2Y = 0;
+	this._localBasisX2Z = 0;
+	this._localBasisY2X = 0;
+	this._localBasisY2Y = 0;
+	this._localBasisY2Z = 0;
+	this._localBasisZ2X = 0;
+	this._localBasisZ2Y = 0;
+	this._localBasisZ2Z = 0;
+	this._impulses = new Array(oimo_common_Setting.maxJacobianRows);
+	var _g = 0;
+	var _g1 = oimo_common_Setting.maxJacobianRows;
+	while(_g < _g1) this._impulses[_g++] = new oimo_dynamics_constraint_joint_JointImpulse();
+};
+$hxClasses["oimo.dynamics.constraint.joint.Joint"] = oimo_dynamics_constraint_joint_Joint;
+oimo_dynamics_constraint_joint_Joint.__name__ = "oimo.dynamics.constraint.joint.Joint";
+oimo_dynamics_constraint_joint_Joint.prototype = {
+	_syncAnchors: function() {
+		var tf1 = this._b1._transform;
+		var tf2 = this._b2._transform;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf1._rotation00 * this._localAnchor1X + tf1._rotation01 * this._localAnchor1Y + tf1._rotation02 * this._localAnchor1Z;
+		__tmp__Y = tf1._rotation10 * this._localAnchor1X + tf1._rotation11 * this._localAnchor1Y + tf1._rotation12 * this._localAnchor1Z;
+		__tmp__Z = tf1._rotation20 * this._localAnchor1X + tf1._rotation21 * this._localAnchor1Y + tf1._rotation22 * this._localAnchor1Z;
+		this._relativeAnchor1X = __tmp__X;
+		this._relativeAnchor1Y = __tmp__Y;
+		this._relativeAnchor1Z = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf2._rotation00 * this._localAnchor2X + tf2._rotation01 * this._localAnchor2Y + tf2._rotation02 * this._localAnchor2Z;
+		__tmp__Y = tf2._rotation10 * this._localAnchor2X + tf2._rotation11 * this._localAnchor2Y + tf2._rotation12 * this._localAnchor2Z;
+		__tmp__Z = tf2._rotation20 * this._localAnchor2X + tf2._rotation21 * this._localAnchor2Y + tf2._rotation22 * this._localAnchor2Z;
+		this._relativeAnchor2X = __tmp__X;
+		this._relativeAnchor2Y = __tmp__Y;
+		this._relativeAnchor2Z = __tmp__Z;
+		this._anchor1X = this._relativeAnchor1X + tf1._positionX;
+		this._anchor1Y = this._relativeAnchor1Y + tf1._positionY;
+		this._anchor1Z = this._relativeAnchor1Z + tf1._positionZ;
+		this._anchor2X = this._relativeAnchor2X + tf2._positionX;
+		this._anchor2Y = this._relativeAnchor2Y + tf2._positionY;
+		this._anchor2Z = this._relativeAnchor2Z + tf2._positionZ;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf1._rotation00 * this._localBasisX1X + tf1._rotation01 * this._localBasisX1Y + tf1._rotation02 * this._localBasisX1Z;
+		__tmp__Y = tf1._rotation10 * this._localBasisX1X + tf1._rotation11 * this._localBasisX1Y + tf1._rotation12 * this._localBasisX1Z;
+		__tmp__Z = tf1._rotation20 * this._localBasisX1X + tf1._rotation21 * this._localBasisX1Y + tf1._rotation22 * this._localBasisX1Z;
+		this._basisX1X = __tmp__X;
+		this._basisX1Y = __tmp__Y;
+		this._basisX1Z = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf1._rotation00 * this._localBasisY1X + tf1._rotation01 * this._localBasisY1Y + tf1._rotation02 * this._localBasisY1Z;
+		__tmp__Y = tf1._rotation10 * this._localBasisY1X + tf1._rotation11 * this._localBasisY1Y + tf1._rotation12 * this._localBasisY1Z;
+		__tmp__Z = tf1._rotation20 * this._localBasisY1X + tf1._rotation21 * this._localBasisY1Y + tf1._rotation22 * this._localBasisY1Z;
+		this._basisY1X = __tmp__X;
+		this._basisY1Y = __tmp__Y;
+		this._basisY1Z = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf1._rotation00 * this._localBasisZ1X + tf1._rotation01 * this._localBasisZ1Y + tf1._rotation02 * this._localBasisZ1Z;
+		__tmp__Y = tf1._rotation10 * this._localBasisZ1X + tf1._rotation11 * this._localBasisZ1Y + tf1._rotation12 * this._localBasisZ1Z;
+		__tmp__Z = tf1._rotation20 * this._localBasisZ1X + tf1._rotation21 * this._localBasisZ1Y + tf1._rotation22 * this._localBasisZ1Z;
+		this._basisZ1X = __tmp__X;
+		this._basisZ1Y = __tmp__Y;
+		this._basisZ1Z = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf2._rotation00 * this._localBasisX2X + tf2._rotation01 * this._localBasisX2Y + tf2._rotation02 * this._localBasisX2Z;
+		__tmp__Y = tf2._rotation10 * this._localBasisX2X + tf2._rotation11 * this._localBasisX2Y + tf2._rotation12 * this._localBasisX2Z;
+		__tmp__Z = tf2._rotation20 * this._localBasisX2X + tf2._rotation21 * this._localBasisX2Y + tf2._rotation22 * this._localBasisX2Z;
+		this._basisX2X = __tmp__X;
+		this._basisX2Y = __tmp__Y;
+		this._basisX2Z = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf2._rotation00 * this._localBasisY2X + tf2._rotation01 * this._localBasisY2Y + tf2._rotation02 * this._localBasisY2Z;
+		__tmp__Y = tf2._rotation10 * this._localBasisY2X + tf2._rotation11 * this._localBasisY2Y + tf2._rotation12 * this._localBasisY2Z;
+		__tmp__Z = tf2._rotation20 * this._localBasisY2X + tf2._rotation21 * this._localBasisY2Y + tf2._rotation22 * this._localBasisY2Z;
+		this._basisY2X = __tmp__X;
+		this._basisY2Y = __tmp__Y;
+		this._basisY2Z = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = tf2._rotation00 * this._localBasisZ2X + tf2._rotation01 * this._localBasisZ2Y + tf2._rotation02 * this._localBasisZ2Z;
+		__tmp__Y = tf2._rotation10 * this._localBasisZ2X + tf2._rotation11 * this._localBasisZ2Y + tf2._rotation12 * this._localBasisZ2Z;
+		__tmp__Z = tf2._rotation20 * this._localBasisZ2X + tf2._rotation21 * this._localBasisZ2Y + tf2._rotation22 * this._localBasisZ2Z;
+		this._basisZ2X = __tmp__X;
+		this._basisZ2Y = __tmp__Y;
+		this._basisZ2Z = __tmp__Z;
+	}
+	,_getVelocitySolverInfo: function(timeStep,info) {
+		info.b1 = this._b1;
+		info.b2 = this._b2;
+		info.numRows = 0;
+	}
+	,_getPositionSolverInfo: function(info) {
+		info.b1 = this._b1;
+		info.b2 = this._b2;
+		info.numRows = 0;
+	}
+	,_checkDestruction: function() {
+		var torqueSq = this._appliedTorqueX * this._appliedTorqueX + this._appliedTorqueY * this._appliedTorqueY + this._appliedTorqueZ * this._appliedTorqueZ;
+		if(this._breakForce > 0 && this._appliedForceX * this._appliedForceX + this._appliedForceY * this._appliedForceY + this._appliedForceZ * this._appliedForceZ > this._breakForce * this._breakForce) {
+			this._world.removeJoint(this);
+			return;
+		}
+		if(this._breakTorque > 0 && torqueSq > this._breakTorque * this._breakTorque) {
+			this._world.removeJoint(this);
+			return;
+		}
+	}
+	,__class__: oimo_dynamics_constraint_joint_Joint
+};
+var oimo_dynamics_constraint_joint_JointConfig = function() {
+	this.rigidBody1 = null;
+	this.rigidBody2 = null;
+	this.localAnchor1 = new oimo_common_Vec3();
+	this.localAnchor2 = new oimo_common_Vec3();
+	this.allowCollision = false;
+	this.solverType = oimo_common_Setting.defaultJointConstraintSolverType;
+	this.positionCorrectionAlgorithm = oimo_common_Setting.defaultJointPositionCorrectionAlgorithm;
+	this.breakForce = 0;
+	this.breakTorque = 0;
+};
+$hxClasses["oimo.dynamics.constraint.joint.JointConfig"] = oimo_dynamics_constraint_joint_JointConfig;
+oimo_dynamics_constraint_joint_JointConfig.__name__ = "oimo.dynamics.constraint.joint.JointConfig";
+oimo_dynamics_constraint_joint_JointConfig.prototype = {
+	__class__: oimo_dynamics_constraint_joint_JointConfig
+};
+var oimo_dynamics_constraint_joint_JointImpulse = function() {
+	this.impulse = 0;
+	this.impulseM = 0;
+	this.impulseP = 0;
+};
+$hxClasses["oimo.dynamics.constraint.joint.JointImpulse"] = oimo_dynamics_constraint_joint_JointImpulse;
+oimo_dynamics_constraint_joint_JointImpulse.__name__ = "oimo.dynamics.constraint.joint.JointImpulse";
+oimo_dynamics_constraint_joint_JointImpulse.prototype = {
+	__class__: oimo_dynamics_constraint_joint_JointImpulse
+};
+var oimo_dynamics_constraint_joint_JointLink = function(joint) {
+	this._joint = joint;
+};
+$hxClasses["oimo.dynamics.constraint.joint.JointLink"] = oimo_dynamics_constraint_joint_JointLink;
+oimo_dynamics_constraint_joint_JointLink.__name__ = "oimo.dynamics.constraint.joint.JointLink";
+oimo_dynamics_constraint_joint_JointLink.prototype = {
+	__class__: oimo_dynamics_constraint_joint_JointLink
+};
+var oimo_dynamics_constraint_solver_common_ContactSolverMassDataRow = function() {
+	this.invMLinN1X = 0;
+	this.invMLinN1Y = 0;
+	this.invMLinN1Z = 0;
+	this.invMLinN2X = 0;
+	this.invMLinN2Y = 0;
+	this.invMLinN2Z = 0;
+	this.invMAngN1X = 0;
+	this.invMAngN1Y = 0;
+	this.invMAngN1Z = 0;
+	this.invMAngN2X = 0;
+	this.invMAngN2Y = 0;
+	this.invMAngN2Z = 0;
+	this.invMLinT1X = 0;
+	this.invMLinT1Y = 0;
+	this.invMLinT1Z = 0;
+	this.invMLinT2X = 0;
+	this.invMLinT2Y = 0;
+	this.invMLinT2Z = 0;
+	this.invMAngT1X = 0;
+	this.invMAngT1Y = 0;
+	this.invMAngT1Z = 0;
+	this.invMAngT2X = 0;
+	this.invMAngT2Y = 0;
+	this.invMAngT2Z = 0;
+	this.invMLinB1X = 0;
+	this.invMLinB1Y = 0;
+	this.invMLinB1Z = 0;
+	this.invMLinB2X = 0;
+	this.invMLinB2Y = 0;
+	this.invMLinB2Z = 0;
+	this.invMAngB1X = 0;
+	this.invMAngB1Y = 0;
+	this.invMAngB1Z = 0;
+	this.invMAngB2X = 0;
+	this.invMAngB2Y = 0;
+	this.invMAngB2Z = 0;
+	this.massN = 0;
+	this.massTB00 = 0;
+	this.massTB01 = 0;
+	this.massTB10 = 0;
+	this.massTB11 = 0;
+};
+$hxClasses["oimo.dynamics.constraint.solver.common.ContactSolverMassDataRow"] = oimo_dynamics_constraint_solver_common_ContactSolverMassDataRow;
+oimo_dynamics_constraint_solver_common_ContactSolverMassDataRow.__name__ = "oimo.dynamics.constraint.solver.common.ContactSolverMassDataRow";
+oimo_dynamics_constraint_solver_common_ContactSolverMassDataRow.prototype = {
+	__class__: oimo_dynamics_constraint_solver_common_ContactSolverMassDataRow
+};
+var oimo_dynamics_constraint_solver_common_JointSolverMassDataRow = function() {
+	this.invMLin1X = 0;
+	this.invMLin1Y = 0;
+	this.invMLin1Z = 0;
+	this.invMLin2X = 0;
+	this.invMLin2Y = 0;
+	this.invMLin2Z = 0;
+	this.invMAng1X = 0;
+	this.invMAng1Y = 0;
+	this.invMAng1Z = 0;
+	this.invMAng2X = 0;
+	this.invMAng2Y = 0;
+	this.invMAng2Z = 0;
+	this.mass = 0;
+	this.massWithoutCfm = 0;
+};
+$hxClasses["oimo.dynamics.constraint.solver.common.JointSolverMassDataRow"] = oimo_dynamics_constraint_solver_common_JointSolverMassDataRow;
+oimo_dynamics_constraint_solver_common_JointSolverMassDataRow.__name__ = "oimo.dynamics.constraint.solver.common.JointSolverMassDataRow";
+oimo_dynamics_constraint_solver_common_JointSolverMassDataRow.prototype = {
+	__class__: oimo_dynamics_constraint_solver_common_JointSolverMassDataRow
+};
+var oimo_dynamics_constraint_solver_direct_Boundary = function(maxRows) {
+	this.iBounded = new Array(maxRows);
+	this.iUnbounded = new Array(maxRows);
+	this.signs = new Array(maxRows);
+	this.b = new Array(maxRows);
+	this.numBounded = 0;
+	this.numUnbounded = 0;
+	this.matrixId = 0;
+};
+$hxClasses["oimo.dynamics.constraint.solver.direct.Boundary"] = oimo_dynamics_constraint_solver_direct_Boundary;
+oimo_dynamics_constraint_solver_direct_Boundary.__name__ = "oimo.dynamics.constraint.solver.direct.Boundary";
+oimo_dynamics_constraint_solver_direct_Boundary.prototype = {
+	init: function(buildInfo) {
+		this.numBounded = buildInfo.numBounded;
+		var _g = 0;
+		var _g1 = this.numBounded;
+		while(_g < _g1) {
+			var i = _g++;
+			this.iBounded[i] = buildInfo.iBounded[i];
+			this.signs[i] = buildInfo.signs[i];
+		}
+		this.numUnbounded = buildInfo.numUnbounded;
+		this.matrixId = 0;
+		var _g = 0;
+		var _g1 = this.numUnbounded;
+		while(_g < _g1) {
+			var i = _g++;
+			var idx = buildInfo.iUnbounded[i];
+			this.iUnbounded[i] = idx;
+			this.matrixId |= 1 << idx;
+		}
+	}
+	,computeImpulses: function(info,mass,relVels,impulses,dImpulses,impulseFactor,noCheck) {
+		var _g = 0;
+		var _g1 = this.numUnbounded;
+		while(_g < _g1) {
+			var idx = this.iUnbounded[_g++];
+			var row = info.rows[idx];
+			this.b[idx] = row.rhs * impulseFactor - relVels[idx] - row.cfm * impulses[idx];
+		}
+		var invMassWithoutCfm = mass._invMassWithoutCfm;
+		var _g = 0;
+		var _g1 = this.numBounded;
+		while(_g < _g1) {
+			var i = _g++;
+			var idx = this.iBounded[i];
+			var sign = this.signs[i];
+			var row = info.rows[idx];
+			var dImpulse = (sign < 0 ? row.minImpulse : sign > 0 ? row.maxImpulse : 0) - impulses[idx];
+			dImpulses[idx] = dImpulse;
+			if(dImpulse != 0) {
+				var _g2 = 0;
+				var _g3 = this.numUnbounded;
+				while(_g2 < _g3) {
+					var idx2 = this.iUnbounded[_g2++];
+					this.b[idx2] -= invMassWithoutCfm[idx][idx2] * dImpulse;
+				}
+			}
+		}
+		var indices = this.iUnbounded;
+		var n = this.numUnbounded;
+		var id = 0;
+		var _g = 0;
+		while(_g < n) id |= 1 << indices[_g++];
+		var massMatrix;
+		if(mass._cacheComputed[id]) {
+			massMatrix = mass._cachedSubmatrices[id];
+		} else {
+			mass.computeSubmatrix(id,indices,n);
+			mass._cacheComputed[id] = true;
+			massMatrix = mass._cachedSubmatrices[id];
+		}
+		var ok = true;
+		var _g = 0;
+		var _g1 = this.numUnbounded;
+		while(_g < _g1) {
+			var i = _g++;
+			var idx = this.iUnbounded[i];
+			var row = info.rows[idx];
+			var oldImpulse = impulses[idx];
+			var impulse = oldImpulse;
+			var _g2 = 0;
+			var _g3 = this.numUnbounded;
+			while(_g2 < _g3) {
+				var j = _g2++;
+				impulse += this.b[this.iUnbounded[j]] * massMatrix[i][j];
+			}
+			if(impulse < row.minImpulse - oimo_common_Setting.directMlcpSolverEps || impulse > row.maxImpulse + oimo_common_Setting.directMlcpSolverEps) {
+				ok = false;
+				break;
+			}
+			dImpulses[idx] = impulse - oldImpulse;
+		}
+		if(noCheck) {
+			return true;
+		}
+		if(!ok) {
+			return false;
+		}
+		var _g = 0;
+		var _g1 = this.numBounded;
+		while(_g < _g1) {
+			var i = _g++;
+			var idx = this.iBounded[i];
+			var row = info.rows[idx];
+			var sign = this.signs[i];
+			var error = 0;
+			var newImpulse = impulses[idx] + dImpulses[idx];
+			var relVel = relVels[idx];
+			var _g2 = 0;
+			var _g3 = info.numRows;
+			while(_g2 < _g3) {
+				var j = _g2++;
+				relVel += invMassWithoutCfm[idx][j] * dImpulses[j];
+			}
+			error = row.rhs * impulseFactor - relVel - row.cfm * newImpulse;
+			if(sign < 0 && error > oimo_common_Setting.directMlcpSolverEps || sign > 0 && error < -oimo_common_Setting.directMlcpSolverEps) {
+				ok = false;
+				break;
+			}
+		}
+		return ok;
+	}
+	,__class__: oimo_dynamics_constraint_solver_direct_Boundary
+};
+var oimo_dynamics_constraint_solver_direct_BoundaryBuildInfo = function(size) {
+	this.size = size;
+	this.numBounded = 0;
+	this.iBounded = new Array(size);
+	this.signs = new Array(size);
+	this.numUnbounded = 0;
+	this.iUnbounded = new Array(size);
+};
+$hxClasses["oimo.dynamics.constraint.solver.direct.BoundaryBuildInfo"] = oimo_dynamics_constraint_solver_direct_BoundaryBuildInfo;
+oimo_dynamics_constraint_solver_direct_BoundaryBuildInfo.__name__ = "oimo.dynamics.constraint.solver.direct.BoundaryBuildInfo";
+oimo_dynamics_constraint_solver_direct_BoundaryBuildInfo.prototype = {
+	__class__: oimo_dynamics_constraint_solver_direct_BoundaryBuildInfo
+};
+var oimo_dynamics_constraint_solver_direct_BoundaryBuilder = function(maxRows) {
+	this.maxRows = maxRows;
+	this.numBoundaries = 0;
+	this.boundaries = new Array(1 << maxRows);
+	this.bbInfo = new oimo_dynamics_constraint_solver_direct_BoundaryBuildInfo(maxRows);
+};
+$hxClasses["oimo.dynamics.constraint.solver.direct.BoundaryBuilder"] = oimo_dynamics_constraint_solver_direct_BoundaryBuilder;
+oimo_dynamics_constraint_solver_direct_BoundaryBuilder.__name__ = "oimo.dynamics.constraint.solver.direct.BoundaryBuilder";
+oimo_dynamics_constraint_solver_direct_BoundaryBuilder.prototype = {
+	buildBoundariesRecursive: function(info,i) {
+		if(i == info.numRows) {
+			if(this.boundaries[this.numBoundaries] == null) {
+				this.boundaries[this.numBoundaries] = new oimo_dynamics_constraint_solver_direct_Boundary(this.maxRows);
+			}
+			this.boundaries[this.numBoundaries++].init(this.bbInfo);
+			return;
+		}
+		var row = info.rows[i];
+		var lowerLimitEnabled = row.minImpulse > -1e65536;
+		var upperLimitEnabled = row.maxImpulse < 1e65536;
+		if(row.minImpulse == 0 && row.maxImpulse == 0) {
+			var _this = this.bbInfo;
+			_this.iBounded[_this.numBounded] = i;
+			_this.signs[_this.numBounded] = 0;
+			_this.numBounded++;
+			this.buildBoundariesRecursive(info,i + 1);
+			this.bbInfo.numBounded--;
+			return;
+		}
+		var _this = this.bbInfo;
+		_this.iUnbounded[_this.numUnbounded] = i;
+		_this.numUnbounded++;
+		this.buildBoundariesRecursive(info,i + 1);
+		this.bbInfo.numUnbounded--;
+		if(lowerLimitEnabled) {
+			var _this = this.bbInfo;
+			_this.iBounded[_this.numBounded] = i;
+			_this.signs[_this.numBounded] = -1;
+			_this.numBounded++;
+			this.buildBoundariesRecursive(info,i + 1);
+			this.bbInfo.numBounded--;
+		}
+		if(upperLimitEnabled) {
+			var _this = this.bbInfo;
+			_this.iBounded[_this.numBounded] = i;
+			_this.signs[_this.numBounded] = 1;
+			_this.numBounded++;
+			this.buildBoundariesRecursive(info,i + 1);
+			this.bbInfo.numBounded--;
+		}
+	}
+	,__class__: oimo_dynamics_constraint_solver_direct_BoundaryBuilder
+};
+var oimo_dynamics_constraint_solver_direct_BoundarySelector = function(n) {
+	this.n = n;
+	this.indices = new Array(n);
+	this.tmpIndices = new Array(n);
+	var _g = 0;
+	while(_g < n) {
+		var i = _g++;
+		this.indices[i] = i;
+	}
+};
+$hxClasses["oimo.dynamics.constraint.solver.direct.BoundarySelector"] = oimo_dynamics_constraint_solver_direct_BoundarySelector;
+oimo_dynamics_constraint_solver_direct_BoundarySelector.__name__ = "oimo.dynamics.constraint.solver.direct.BoundarySelector";
+oimo_dynamics_constraint_solver_direct_BoundarySelector.prototype = {
+	__class__: oimo_dynamics_constraint_solver_direct_BoundarySelector
+};
+var oimo_dynamics_constraint_solver_direct_DirectJointConstraintSolver = function(joint) {
+	oimo_dynamics_constraint_ConstraintSolver.call(this);
+	this.joint = joint;
+	this.info = new oimo_dynamics_constraint_info_joint_JointSolverInfo();
+	var maxRows = oimo_common_Setting.maxJacobianRows;
+	this.massMatrix = new oimo_dynamics_constraint_solver_direct_MassMatrix(maxRows);
+	this.boundaryBuilder = new oimo_dynamics_constraint_solver_direct_BoundaryBuilder(maxRows);
+	this.massData = new Array(maxRows);
+	var _g = 0;
+	var _g1 = this.massData.length;
+	while(_g < _g1) this.massData[_g++] = new oimo_dynamics_constraint_solver_common_JointSolverMassDataRow();
+	var numMaxBoundaries = this.boundaryBuilder.boundaries.length;
+	this.velBoundarySelector = new oimo_dynamics_constraint_solver_direct_BoundarySelector(numMaxBoundaries);
+	this.posBoundarySelector = new oimo_dynamics_constraint_solver_direct_BoundarySelector(numMaxBoundaries);
+	this.relVels = new Array(maxRows);
+	this.impulses = new Array(maxRows);
+	this.dImpulses = new Array(maxRows);
+	this.dTotalImpulses = new Array(maxRows);
+	var _g = 0;
+	while(_g < maxRows) {
+		var i = _g++;
+		this.relVels[i] = 0;
+		this.impulses[i] = 0;
+		this.dImpulses[i] = 0;
+		this.dTotalImpulses[i] = 0;
+	}
+};
+$hxClasses["oimo.dynamics.constraint.solver.direct.DirectJointConstraintSolver"] = oimo_dynamics_constraint_solver_direct_DirectJointConstraintSolver;
+oimo_dynamics_constraint_solver_direct_DirectJointConstraintSolver.__name__ = "oimo.dynamics.constraint.solver.direct.DirectJointConstraintSolver";
+oimo_dynamics_constraint_solver_direct_DirectJointConstraintSolver.__super__ = oimo_dynamics_constraint_ConstraintSolver;
+oimo_dynamics_constraint_solver_direct_DirectJointConstraintSolver.prototype = $extend(oimo_dynamics_constraint_ConstraintSolver.prototype,{
+	preSolveVelocity: function(timeStep) {
+		this.joint._syncAnchors();
+		this.joint._getVelocitySolverInfo(timeStep,this.info);
+		this._b1 = this.info.b1;
+		this._b2 = this.info.b2;
+		this.massMatrix.computeInvMass(this.info,this.massData);
+		var _this = this.boundaryBuilder;
+		_this.numBoundaries = 0;
+		var _this1 = _this.bbInfo;
+		_this1.numBounded = 0;
+		_this1.numUnbounded = 0;
+		_this.buildBoundariesRecursive(this.info,0);
+		var _this = this.velBoundarySelector;
+		var size = this.boundaryBuilder.numBoundaries;
+		var numSmaller = 0;
+		var numGreater = 0;
+		var _g = 0;
+		var _g1 = _this.n;
+		while(_g < _g1) {
+			var idx = _this.indices[_g++];
+			if(idx < size) {
+				_this.tmpIndices[numSmaller] = idx;
+				++numSmaller;
+			} else {
+				_this.tmpIndices[size + numGreater] = idx;
+				++numGreater;
+			}
+		}
+		var tmp = _this.indices;
+		_this.indices = _this.tmpIndices;
+		_this.tmpIndices = tmp;
+	}
+	,warmStart: function(timeStep) {
+		var factor = this.joint._positionCorrectionAlgorithm == oimo_dynamics_constraint_PositionCorrectionAlgorithm.BAUMGARTE ? oimo_common_Setting.jointWarmStartingFactorForBaungarte : oimo_common_Setting.jointWarmStartingFactor;
+		factor *= timeStep.dtRatio;
+		if(factor <= 0) {
+			var _g = 0;
+			var _g1 = this.info.numRows;
+			while(_g < _g1) {
+				var _this = this.info.rows[_g++].impulse;
+				_this.impulse = 0;
+				_this.impulseM = 0;
+				_this.impulseP = 0;
+			}
+			return;
+		}
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var imp = row.impulse;
+			var impulse = imp.impulse * factor;
+			if(impulse < row.minImpulse) {
+				impulse = row.minImpulse;
+			} else if(impulse > row.maxImpulse) {
+				impulse = row.maxImpulse;
+			}
+			imp.impulse = impulse;
+			if(row.motorMaxImpulse > 0) {
+				var impulseM = imp.impulseM * factor;
+				var max = row.motorMaxImpulse;
+				if(impulseM < -max) {
+					impulseM = -max;
+				} else if(impulseM > max) {
+					impulseM = max;
+				}
+				imp.impulseM = impulseM;
+			} else {
+				imp.impulseM = 0;
+			}
+			this.dImpulses[i] = imp.impulse + imp.impulseM;
+		}
+		var impulses = this.dImpulses;
+		var linearSet = false;
+		var angularSet = false;
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = this._b1._velX;
+		lv1Y = this._b1._velY;
+		lv1Z = this._b1._velZ;
+		lv2X = this._b2._velX;
+		lv2Y = this._b2._velY;
+		lv2Z = this._b2._velZ;
+		av1X = this._b1._angVelX;
+		av1Y = this._b1._angVelY;
+		av1Z = this._b1._angVelZ;
+		av2X = this._b2._angVelX;
+		av2Y = this._b2._angVelY;
+		av2Z = this._b2._angVelZ;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var j = this.info.rows[i].jacobian;
+			var md = this.massData[i];
+			var imp = impulses[i];
+			if((j.flag & 1) != 0) {
+				lv1X += md.invMLin1X * imp;
+				lv1Y += md.invMLin1Y * imp;
+				lv1Z += md.invMLin1Z * imp;
+				lv2X += md.invMLin2X * -imp;
+				lv2Y += md.invMLin2Y * -imp;
+				lv2Z += md.invMLin2Z * -imp;
+				linearSet = true;
+			}
+			if((j.flag & 2) != 0) {
+				av1X += md.invMAng1X * imp;
+				av1Y += md.invMAng1Y * imp;
+				av1Z += md.invMAng1Z * imp;
+				av2X += md.invMAng2X * -imp;
+				av2Y += md.invMAng2Y * -imp;
+				av2Z += md.invMAng2Z * -imp;
+				angularSet = true;
+			}
+		}
+		if(linearSet) {
+			this._b1._velX = lv1X;
+			this._b1._velY = lv1Y;
+			this._b1._velZ = lv1Z;
+			this._b2._velX = lv2X;
+			this._b2._velY = lv2Y;
+			this._b2._velZ = lv2Z;
+		}
+		if(angularSet) {
+			this._b1._angVelX = av1X;
+			this._b1._angVelY = av1Y;
+			this._b1._angVelZ = av1Z;
+			this._b2._angVelX = av2X;
+			this._b2._angVelY = av2Y;
+			this._b2._angVelZ = av2Z;
+		}
+	}
+	,solveVelocity: function() {
+		var numRows = this.info.numRows;
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = this._b1._velX;
+		lv1Y = this._b1._velY;
+		lv1Z = this._b1._velZ;
+		lv2X = this._b2._velX;
+		lv2Y = this._b2._velY;
+		lv2Z = this._b2._velZ;
+		av1X = this._b1._angVelX;
+		av1Y = this._b1._angVelY;
+		av1Z = this._b1._angVelZ;
+		av2X = this._b2._angVelX;
+		av2Y = this._b2._angVelY;
+		av2Z = this._b2._angVelZ;
+		var _g = 0;
+		while(_g < numRows) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var j = row.jacobian;
+			var relVel = 0;
+			relVel += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			relVel -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			relVel += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			relVel -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			this.relVels[i] = relVel;
+			this.impulses[i] = row.impulse.impulse;
+			this.dTotalImpulses[i] = 0;
+		}
+		var invMass = this.massMatrix._invMassWithoutCfm;
+		var _g = 0;
+		while(_g < numRows) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var imp = row.impulse;
+			if(row.motorMaxImpulse > 0) {
+				var oldImpulseM = imp.impulseM;
+				var impulseM = oldImpulseM + this.massData[i].massWithoutCfm * (-row.motorSpeed - this.relVels[i]);
+				var maxImpulseM = row.motorMaxImpulse;
+				if(impulseM < -maxImpulseM) {
+					impulseM = -maxImpulseM;
+				} else if(impulseM > maxImpulseM) {
+					impulseM = maxImpulseM;
+				}
+				imp.impulseM = impulseM;
+				var dImpulseM = impulseM - oldImpulseM;
+				this.dTotalImpulses[i] = dImpulseM;
+				var _g1 = 0;
+				while(_g1 < numRows) {
+					var j = _g1++;
+					this.relVels[j] += dImpulseM * invMass[i][j];
+				}
+			}
+		}
+		var solved = false;
+		var _g = 0;
+		var _g1 = this.boundaryBuilder.numBoundaries;
+		while(_g < _g1) {
+			var idx = this.velBoundarySelector.indices[_g++];
+			if(this.boundaryBuilder.boundaries[idx].computeImpulses(this.info,this.massMatrix,this.relVels,this.impulses,this.dImpulses,1,false)) {
+				var _g2 = 0;
+				while(_g2 < numRows) {
+					var j = _g2++;
+					var dimp = this.dImpulses[j];
+					this.info.rows[j].impulse.impulse += dimp;
+					this.dTotalImpulses[j] += dimp;
+				}
+				var impulses = this.dTotalImpulses;
+				var linearSet = false;
+				var angularSet = false;
+				var lv1X;
+				var lv1Y;
+				var lv1Z;
+				var lv2X;
+				var lv2Y;
+				var lv2Z;
+				var av1X;
+				var av1Y;
+				var av1Z;
+				var av2X;
+				var av2Y;
+				var av2Z;
+				lv1X = this._b1._velX;
+				lv1Y = this._b1._velY;
+				lv1Z = this._b1._velZ;
+				lv2X = this._b2._velX;
+				lv2Y = this._b2._velY;
+				lv2Z = this._b2._velZ;
+				av1X = this._b1._angVelX;
+				av1Y = this._b1._angVelY;
+				av1Z = this._b1._angVelZ;
+				av2X = this._b2._angVelX;
+				av2Y = this._b2._angVelY;
+				av2Z = this._b2._angVelZ;
+				var _g3 = 0;
+				var _g4 = this.info.numRows;
+				while(_g3 < _g4) {
+					var i = _g3++;
+					var j1 = this.info.rows[i].jacobian;
+					var md = this.massData[i];
+					var imp = impulses[i];
+					if((j1.flag & 1) != 0) {
+						lv1X += md.invMLin1X * imp;
+						lv1Y += md.invMLin1Y * imp;
+						lv1Z += md.invMLin1Z * imp;
+						lv2X += md.invMLin2X * -imp;
+						lv2Y += md.invMLin2Y * -imp;
+						lv2Z += md.invMLin2Z * -imp;
+						linearSet = true;
+					}
+					if((j1.flag & 2) != 0) {
+						av1X += md.invMAng1X * imp;
+						av1Y += md.invMAng1Y * imp;
+						av1Z += md.invMAng1Z * imp;
+						av2X += md.invMAng2X * -imp;
+						av2Y += md.invMAng2Y * -imp;
+						av2Z += md.invMAng2Z * -imp;
+						angularSet = true;
+					}
+				}
+				if(linearSet) {
+					this._b1._velX = lv1X;
+					this._b1._velY = lv1Y;
+					this._b1._velZ = lv1Z;
+					this._b2._velX = lv2X;
+					this._b2._velY = lv2Y;
+					this._b2._velZ = lv2Z;
+				}
+				if(angularSet) {
+					this._b1._angVelX = av1X;
+					this._b1._angVelY = av1Y;
+					this._b1._angVelZ = av1Z;
+					this._b2._angVelX = av2X;
+					this._b2._angVelY = av2Y;
+					this._b2._angVelZ = av2Z;
+				}
+				var _this = this.velBoundarySelector;
+				var i1 = 0;
+				while(_this.indices[i1] != idx) ++i1;
+				while(i1 > 0) {
+					var tmp = _this.indices[i1];
+					_this.indices[i1] = _this.indices[i1 - 1];
+					_this.indices[i1 - 1] = tmp;
+					--i1;
+				}
+				solved = true;
+				break;
+			}
+		}
+		if(!solved) {
+			haxe_Log.trace("could not find solution. (velocity)",{ fileName : "oimo/dynamics/constraint/solver/direct/DirectJointConstraintSolver.hx", lineNumber : 335, className : "oimo.dynamics.constraint.solver.direct.DirectJointConstraintSolver", methodName : "solveVelocity"});
+			return;
+		}
+	}
+	,postSolveVelocity: function(timeStep) {
+		var linX;
+		var linY;
+		var linZ;
+		var angX;
+		var angY;
+		var angZ;
+		linX = 0;
+		linY = 0;
+		linZ = 0;
+		angX = 0;
+		angY = 0;
+		angZ = 0;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var row = this.info.rows[_g++];
+			var imp = row.impulse;
+			var j = row.jacobian;
+			if((j.flag & 1) != 0) {
+				linX += j.lin1X * imp.impulse;
+				linY += j.lin1Y * imp.impulse;
+				linZ += j.lin1Z * imp.impulse;
+			} else if((j.flag & 2) != 0) {
+				angX += j.ang1X * imp.impulse;
+				angY += j.ang1Y * imp.impulse;
+				angZ += j.ang1Z * imp.impulse;
+			}
+		}
+		this.joint._appliedForceX = linX * timeStep.invDt;
+		this.joint._appliedForceY = linY * timeStep.invDt;
+		this.joint._appliedForceZ = linZ * timeStep.invDt;
+		this.joint._appliedTorqueX = angX * timeStep.invDt;
+		this.joint._appliedTorqueY = angY * timeStep.invDt;
+		this.joint._appliedTorqueZ = angZ * timeStep.invDt;
+	}
+	,preSolvePosition: function(timeStep) {
+		this.joint._syncAnchors();
+		this.joint._getPositionSolverInfo(this.info);
+		this._b1 = this.info.b1;
+		this._b2 = this.info.b2;
+		this.massMatrix.computeInvMass(this.info,this.massData);
+		var _this = this.boundaryBuilder;
+		_this.numBoundaries = 0;
+		var _this1 = _this.bbInfo;
+		_this1.numBounded = 0;
+		_this1.numUnbounded = 0;
+		_this.buildBoundariesRecursive(this.info,0);
+		var _this = this.posBoundarySelector;
+		var size = this.boundaryBuilder.numBoundaries;
+		var numSmaller = 0;
+		var numGreater = 0;
+		var _g = 0;
+		var _g1 = _this.n;
+		while(_g < _g1) {
+			var idx = _this.indices[_g++];
+			if(idx < size) {
+				_this.tmpIndices[numSmaller] = idx;
+				++numSmaller;
+			} else {
+				_this.tmpIndices[size + numGreater] = idx;
+				++numGreater;
+			}
+		}
+		var tmp = _this.indices;
+		_this.indices = _this.tmpIndices;
+		_this.tmpIndices = tmp;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) this.info.rows[_g++].impulse.impulseP = 0;
+	}
+	,solvePositionSplitImpulse: function() {
+		var numRows = this.info.numRows;
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = this._b1._pseudoVelX;
+		lv1Y = this._b1._pseudoVelY;
+		lv1Z = this._b1._pseudoVelZ;
+		lv2X = this._b2._pseudoVelX;
+		lv2Y = this._b2._pseudoVelY;
+		lv2Z = this._b2._pseudoVelZ;
+		av1X = this._b1._angPseudoVelX;
+		av1Y = this._b1._angPseudoVelY;
+		av1Z = this._b1._angPseudoVelZ;
+		av2X = this._b2._angPseudoVelX;
+		av2Y = this._b2._angPseudoVelY;
+		av2Z = this._b2._angPseudoVelZ;
+		var _g = 0;
+		while(_g < numRows) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var j = row.jacobian;
+			var relVel = 0;
+			relVel += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			relVel -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			relVel += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			relVel -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			this.relVels[i] = relVel;
+			this.impulses[i] = row.impulse.impulseP;
+		}
+		var solved = false;
+		var _g = 0;
+		var _g1 = this.boundaryBuilder.numBoundaries;
+		while(_g < _g1) {
+			var idx = this.posBoundarySelector.indices[_g++];
+			if(this.boundaryBuilder.boundaries[idx].computeImpulses(this.info,this.massMatrix,this.relVels,this.impulses,this.dImpulses,oimo_common_Setting.positionSplitImpulseBaumgarte,false)) {
+				var _g2 = 0;
+				while(_g2 < numRows) {
+					var j = _g2++;
+					this.info.rows[j].impulse.impulseP += this.dImpulses[j];
+				}
+				var impulses = this.dImpulses;
+				var linearSet = false;
+				var angularSet = false;
+				var lv1X;
+				var lv1Y;
+				var lv1Z;
+				var lv2X;
+				var lv2Y;
+				var lv2Z;
+				var av1X;
+				var av1Y;
+				var av1Z;
+				var av2X;
+				var av2Y;
+				var av2Z;
+				lv1X = this._b1._pseudoVelX;
+				lv1Y = this._b1._pseudoVelY;
+				lv1Z = this._b1._pseudoVelZ;
+				lv2X = this._b2._pseudoVelX;
+				lv2Y = this._b2._pseudoVelY;
+				lv2Z = this._b2._pseudoVelZ;
+				av1X = this._b1._angPseudoVelX;
+				av1Y = this._b1._angPseudoVelY;
+				av1Z = this._b1._angPseudoVelZ;
+				av2X = this._b2._angPseudoVelX;
+				av2Y = this._b2._angPseudoVelY;
+				av2Z = this._b2._angPseudoVelZ;
+				var _g3 = 0;
+				var _g4 = this.info.numRows;
+				while(_g3 < _g4) {
+					var i = _g3++;
+					var j1 = this.info.rows[i].jacobian;
+					var md = this.massData[i];
+					var imp = impulses[i];
+					if((j1.flag & 1) != 0) {
+						lv1X += md.invMLin1X * imp;
+						lv1Y += md.invMLin1Y * imp;
+						lv1Z += md.invMLin1Z * imp;
+						lv2X += md.invMLin2X * -imp;
+						lv2Y += md.invMLin2Y * -imp;
+						lv2Z += md.invMLin2Z * -imp;
+						linearSet = true;
+					}
+					if((j1.flag & 2) != 0) {
+						av1X += md.invMAng1X * imp;
+						av1Y += md.invMAng1Y * imp;
+						av1Z += md.invMAng1Z * imp;
+						av2X += md.invMAng2X * -imp;
+						av2Y += md.invMAng2Y * -imp;
+						av2Z += md.invMAng2Z * -imp;
+						angularSet = true;
+					}
+				}
+				if(linearSet) {
+					this._b1._pseudoVelX = lv1X;
+					this._b1._pseudoVelY = lv1Y;
+					this._b1._pseudoVelZ = lv1Z;
+					this._b2._pseudoVelX = lv2X;
+					this._b2._pseudoVelY = lv2Y;
+					this._b2._pseudoVelZ = lv2Z;
+				}
+				if(angularSet) {
+					this._b1._angPseudoVelX = av1X;
+					this._b1._angPseudoVelY = av1Y;
+					this._b1._angPseudoVelZ = av1Z;
+					this._b2._angPseudoVelX = av2X;
+					this._b2._angPseudoVelY = av2Y;
+					this._b2._angPseudoVelZ = av2Z;
+				}
+				var _this = this.posBoundarySelector;
+				var i1 = 0;
+				while(_this.indices[i1] != idx) ++i1;
+				while(i1 > 0) {
+					var tmp = _this.indices[i1];
+					_this.indices[i1] = _this.indices[i1 - 1];
+					_this.indices[i1 - 1] = tmp;
+					--i1;
+				}
+				solved = true;
+				break;
+			}
+		}
+		if(!solved) {
+			haxe_Log.trace("could not find solution. (split impulse)",{ fileName : "oimo/dynamics/constraint/solver/direct/DirectJointConstraintSolver.hx", lineNumber : 450, className : "oimo.dynamics.constraint.solver.direct.DirectJointConstraintSolver", methodName : "solvePositionSplitImpulse"});
+			return;
+		}
+	}
+	,solvePositionNgs: function(timeStep) {
+		this.joint._syncAnchors();
+		this.joint._getPositionSolverInfo(this.info);
+		this._b1 = this.info.b1;
+		this._b2 = this.info.b2;
+		this.massMatrix.computeInvMass(this.info,this.massData);
+		var _this = this.boundaryBuilder;
+		_this.numBoundaries = 0;
+		var _this1 = _this.bbInfo;
+		_this1.numBounded = 0;
+		_this1.numUnbounded = 0;
+		_this.buildBoundariesRecursive(this.info,0);
+		var _this = this.posBoundarySelector;
+		var size = this.boundaryBuilder.numBoundaries;
+		var numSmaller = 0;
+		var numGreater = 0;
+		var _g = 0;
+		var _g1 = _this.n;
+		while(_g < _g1) {
+			var idx = _this.indices[_g++];
+			if(idx < size) {
+				_this.tmpIndices[numSmaller] = idx;
+				++numSmaller;
+			} else {
+				_this.tmpIndices[size + numGreater] = idx;
+				++numGreater;
+			}
+		}
+		var tmp = _this.indices;
+		_this.indices = _this.tmpIndices;
+		_this.tmpIndices = tmp;
+		var numRows = this.info.numRows;
+		var _g = 0;
+		while(_g < numRows) {
+			var i = _g++;
+			var imp = this.info.rows[i].impulse;
+			this.relVels[i] = 0;
+			this.impulses[i] = imp.impulseP;
+		}
+		var solved = false;
+		var _g = 0;
+		var _g1 = this.boundaryBuilder.numBoundaries;
+		while(_g < _g1) {
+			var idx = this.posBoundarySelector.indices[_g++];
+			if(this.boundaryBuilder.boundaries[idx].computeImpulses(this.info,this.massMatrix,this.relVels,this.impulses,this.dImpulses,oimo_common_Setting.positionNgsBaumgarte,false)) {
+				var _g2 = 0;
+				while(_g2 < numRows) {
+					var j = _g2++;
+					this.info.rows[j].impulse.impulseP += this.dImpulses[j];
+				}
+				var impulses = this.dImpulses;
+				var linearSet = false;
+				var angularSet = false;
+				var lv1X;
+				var lv1Y;
+				var lv1Z;
+				var lv2X;
+				var lv2Y;
+				var lv2Z;
+				var av1X;
+				var av1Y;
+				var av1Z;
+				var av2X;
+				var av2Y;
+				var av2Z;
+				lv1X = 0;
+				lv1Y = 0;
+				lv1Z = 0;
+				lv2X = 0;
+				lv2Y = 0;
+				lv2Z = 0;
+				av1X = 0;
+				av1Y = 0;
+				av1Z = 0;
+				av2X = 0;
+				av2Y = 0;
+				av2Z = 0;
+				var _g3 = 0;
+				var _g4 = this.info.numRows;
+				while(_g3 < _g4) {
+					var i = _g3++;
+					var j1 = this.info.rows[i].jacobian;
+					var md = this.massData[i];
+					var imp = impulses[i];
+					if((j1.flag & 1) != 0) {
+						lv1X += md.invMLin1X * imp;
+						lv1Y += md.invMLin1Y * imp;
+						lv1Z += md.invMLin1Z * imp;
+						lv2X += md.invMLin2X * -imp;
+						lv2Y += md.invMLin2Y * -imp;
+						lv2Z += md.invMLin2Z * -imp;
+						linearSet = true;
+					}
+					if((j1.flag & 2) != 0) {
+						av1X += md.invMAng1X * imp;
+						av1Y += md.invMAng1Y * imp;
+						av1Z += md.invMAng1Z * imp;
+						av2X += md.invMAng2X * -imp;
+						av2Y += md.invMAng2Y * -imp;
+						av2Z += md.invMAng2Z * -imp;
+						angularSet = true;
+					}
+				}
+				if(linearSet) {
+					var _this = this._b1;
+					_this._transform._positionX += lv1X;
+					_this._transform._positionY += lv1Y;
+					_this._transform._positionZ += lv1Z;
+					var _this1 = this._b2;
+					_this1._transform._positionX += lv2X;
+					_this1._transform._positionY += lv2Y;
+					_this1._transform._positionZ += lv2Z;
+				}
+				if(angularSet) {
+					var _this2 = this._b1;
+					var theta = Math.sqrt(av1X * av1X + av1Y * av1Y + av1Z * av1Z);
+					var halfTheta = theta * 0.5;
+					var rotationToSinAxisFactor;
+					var cosHalfTheta;
+					if(halfTheta < 0.5) {
+						var ht2 = halfTheta * halfTheta;
+						rotationToSinAxisFactor = 0.5 * (1 - ht2 * 0.16666666666666666 + ht2 * ht2 * 0.0083333333333333332);
+						cosHalfTheta = 1 - ht2 * 0.5 + ht2 * ht2 * 0.041666666666666664;
+					} else {
+						rotationToSinAxisFactor = Math.sin(halfTheta) / theta;
+						cosHalfTheta = Math.cos(halfTheta);
+					}
+					var sinAxisX;
+					var sinAxisY;
+					var sinAxisZ;
+					sinAxisX = av1X * rotationToSinAxisFactor;
+					sinAxisY = av1Y * rotationToSinAxisFactor;
+					sinAxisZ = av1Z * rotationToSinAxisFactor;
+					var dqX;
+					var dqY;
+					var dqZ;
+					var dqW;
+					dqX = sinAxisX;
+					dqY = sinAxisY;
+					dqZ = sinAxisZ;
+					dqW = cosHalfTheta;
+					var qX;
+					var qY;
+					var qZ;
+					var qW;
+					var e00 = _this2._transform._rotation00;
+					var e11 = _this2._transform._rotation11;
+					var e22 = _this2._transform._rotation22;
+					var t = e00 + e11 + e22;
+					var s;
+					if(t > 0) {
+						s = Math.sqrt(t + 1);
+						qW = 0.5 * s;
+						s = 0.5 / s;
+						qX = (_this2._transform._rotation21 - _this2._transform._rotation12) * s;
+						qY = (_this2._transform._rotation02 - _this2._transform._rotation20) * s;
+						qZ = (_this2._transform._rotation10 - _this2._transform._rotation01) * s;
+					} else if(e00 > e11) {
+						if(e00 > e22) {
+							s = Math.sqrt(e00 - e11 - e22 + 1);
+							qX = 0.5 * s;
+							s = 0.5 / s;
+							qY = (_this2._transform._rotation01 + _this2._transform._rotation10) * s;
+							qZ = (_this2._transform._rotation02 + _this2._transform._rotation20) * s;
+							qW = (_this2._transform._rotation21 - _this2._transform._rotation12) * s;
+						} else {
+							s = Math.sqrt(e22 - e00 - e11 + 1);
+							qZ = 0.5 * s;
+							s = 0.5 / s;
+							qX = (_this2._transform._rotation02 + _this2._transform._rotation20) * s;
+							qY = (_this2._transform._rotation12 + _this2._transform._rotation21) * s;
+							qW = (_this2._transform._rotation10 - _this2._transform._rotation01) * s;
+						}
+					} else if(e11 > e22) {
+						s = Math.sqrt(e11 - e22 - e00 + 1);
+						qY = 0.5 * s;
+						s = 0.5 / s;
+						qX = (_this2._transform._rotation01 + _this2._transform._rotation10) * s;
+						qZ = (_this2._transform._rotation12 + _this2._transform._rotation21) * s;
+						qW = (_this2._transform._rotation02 - _this2._transform._rotation20) * s;
+					} else {
+						s = Math.sqrt(e22 - e00 - e11 + 1);
+						qZ = 0.5 * s;
+						s = 0.5 / s;
+						qX = (_this2._transform._rotation02 + _this2._transform._rotation20) * s;
+						qY = (_this2._transform._rotation12 + _this2._transform._rotation21) * s;
+						qW = (_this2._transform._rotation10 - _this2._transform._rotation01) * s;
+					}
+					qX = dqW * qX + dqX * qW + dqY * qZ - dqZ * qY;
+					qY = dqW * qY - dqX * qZ + dqY * qW + dqZ * qX;
+					qZ = dqW * qZ + dqX * qY - dqY * qX + dqZ * qW;
+					qW = dqW * qW - dqX * qX - dqY * qY - dqZ * qZ;
+					var l = qX * qX + qY * qY + qZ * qZ + qW * qW;
+					if(l > 1e-32) {
+						l = 1 / Math.sqrt(l);
+					}
+					qX *= l;
+					qY *= l;
+					qZ *= l;
+					qW *= l;
+					var x = qX;
+					var y = qY;
+					var z = qZ;
+					var w = qW;
+					var x2 = 2 * x;
+					var y2 = 2 * y;
+					var z2 = 2 * z;
+					var xx = x * x2;
+					var yy = y * y2;
+					var zz = z * z2;
+					var xy = x * y2;
+					var yz = y * z2;
+					var xz = x * z2;
+					var wx = w * x2;
+					var wy = w * y2;
+					var wz = w * z2;
+					_this2._transform._rotation00 = 1 - yy - zz;
+					_this2._transform._rotation01 = xy - wz;
+					_this2._transform._rotation02 = xz + wy;
+					_this2._transform._rotation10 = xy + wz;
+					_this2._transform._rotation11 = 1 - xx - zz;
+					_this2._transform._rotation12 = yz - wx;
+					_this2._transform._rotation20 = xz - wy;
+					_this2._transform._rotation21 = yz + wx;
+					_this2._transform._rotation22 = 1 - xx - yy;
+					var __tmp__00;
+					var __tmp__01;
+					var __tmp__02;
+					var __tmp__10;
+					var __tmp__11;
+					var __tmp__12;
+					var __tmp__20;
+					var __tmp__21;
+					var __tmp__22;
+					__tmp__00 = _this2._transform._rotation00 * _this2._invLocalInertia00 + _this2._transform._rotation01 * _this2._invLocalInertia10 + _this2._transform._rotation02 * _this2._invLocalInertia20;
+					__tmp__01 = _this2._transform._rotation00 * _this2._invLocalInertia01 + _this2._transform._rotation01 * _this2._invLocalInertia11 + _this2._transform._rotation02 * _this2._invLocalInertia21;
+					__tmp__02 = _this2._transform._rotation00 * _this2._invLocalInertia02 + _this2._transform._rotation01 * _this2._invLocalInertia12 + _this2._transform._rotation02 * _this2._invLocalInertia22;
+					__tmp__10 = _this2._transform._rotation10 * _this2._invLocalInertia00 + _this2._transform._rotation11 * _this2._invLocalInertia10 + _this2._transform._rotation12 * _this2._invLocalInertia20;
+					__tmp__11 = _this2._transform._rotation10 * _this2._invLocalInertia01 + _this2._transform._rotation11 * _this2._invLocalInertia11 + _this2._transform._rotation12 * _this2._invLocalInertia21;
+					__tmp__12 = _this2._transform._rotation10 * _this2._invLocalInertia02 + _this2._transform._rotation11 * _this2._invLocalInertia12 + _this2._transform._rotation12 * _this2._invLocalInertia22;
+					__tmp__20 = _this2._transform._rotation20 * _this2._invLocalInertia00 + _this2._transform._rotation21 * _this2._invLocalInertia10 + _this2._transform._rotation22 * _this2._invLocalInertia20;
+					__tmp__21 = _this2._transform._rotation20 * _this2._invLocalInertia01 + _this2._transform._rotation21 * _this2._invLocalInertia11 + _this2._transform._rotation22 * _this2._invLocalInertia21;
+					__tmp__22 = _this2._transform._rotation20 * _this2._invLocalInertia02 + _this2._transform._rotation21 * _this2._invLocalInertia12 + _this2._transform._rotation22 * _this2._invLocalInertia22;
+					_this2._invInertia00 = __tmp__00;
+					_this2._invInertia01 = __tmp__01;
+					_this2._invInertia02 = __tmp__02;
+					_this2._invInertia10 = __tmp__10;
+					_this2._invInertia11 = __tmp__11;
+					_this2._invInertia12 = __tmp__12;
+					_this2._invInertia20 = __tmp__20;
+					_this2._invInertia21 = __tmp__21;
+					_this2._invInertia22 = __tmp__22;
+					var __tmp__001;
+					var __tmp__011;
+					var __tmp__021;
+					var __tmp__101;
+					var __tmp__111;
+					var __tmp__121;
+					var __tmp__201;
+					var __tmp__211;
+					var __tmp__221;
+					__tmp__001 = _this2._invInertia00 * _this2._transform._rotation00 + _this2._invInertia01 * _this2._transform._rotation01 + _this2._invInertia02 * _this2._transform._rotation02;
+					__tmp__011 = _this2._invInertia00 * _this2._transform._rotation10 + _this2._invInertia01 * _this2._transform._rotation11 + _this2._invInertia02 * _this2._transform._rotation12;
+					__tmp__021 = _this2._invInertia00 * _this2._transform._rotation20 + _this2._invInertia01 * _this2._transform._rotation21 + _this2._invInertia02 * _this2._transform._rotation22;
+					__tmp__101 = _this2._invInertia10 * _this2._transform._rotation00 + _this2._invInertia11 * _this2._transform._rotation01 + _this2._invInertia12 * _this2._transform._rotation02;
+					__tmp__111 = _this2._invInertia10 * _this2._transform._rotation10 + _this2._invInertia11 * _this2._transform._rotation11 + _this2._invInertia12 * _this2._transform._rotation12;
+					__tmp__121 = _this2._invInertia10 * _this2._transform._rotation20 + _this2._invInertia11 * _this2._transform._rotation21 + _this2._invInertia12 * _this2._transform._rotation22;
+					__tmp__201 = _this2._invInertia20 * _this2._transform._rotation00 + _this2._invInertia21 * _this2._transform._rotation01 + _this2._invInertia22 * _this2._transform._rotation02;
+					__tmp__211 = _this2._invInertia20 * _this2._transform._rotation10 + _this2._invInertia21 * _this2._transform._rotation11 + _this2._invInertia22 * _this2._transform._rotation12;
+					__tmp__221 = _this2._invInertia20 * _this2._transform._rotation20 + _this2._invInertia21 * _this2._transform._rotation21 + _this2._invInertia22 * _this2._transform._rotation22;
+					_this2._invInertia00 = __tmp__001;
+					_this2._invInertia01 = __tmp__011;
+					_this2._invInertia02 = __tmp__021;
+					_this2._invInertia10 = __tmp__101;
+					_this2._invInertia11 = __tmp__111;
+					_this2._invInertia12 = __tmp__121;
+					_this2._invInertia20 = __tmp__201;
+					_this2._invInertia21 = __tmp__211;
+					_this2._invInertia22 = __tmp__221;
+					_this2._invInertia00 *= _this2._rotFactor.x;
+					_this2._invInertia01 *= _this2._rotFactor.x;
+					_this2._invInertia02 *= _this2._rotFactor.x;
+					_this2._invInertia10 *= _this2._rotFactor.y;
+					_this2._invInertia11 *= _this2._rotFactor.y;
+					_this2._invInertia12 *= _this2._rotFactor.y;
+					_this2._invInertia20 *= _this2._rotFactor.z;
+					_this2._invInertia21 *= _this2._rotFactor.z;
+					_this2._invInertia22 *= _this2._rotFactor.z;
+					var _this3 = this._b2;
+					var theta1 = Math.sqrt(av2X * av2X + av2Y * av2Y + av2Z * av2Z);
+					var halfTheta1 = theta1 * 0.5;
+					var rotationToSinAxisFactor1;
+					var cosHalfTheta1;
+					if(halfTheta1 < 0.5) {
+						var ht21 = halfTheta1 * halfTheta1;
+						rotationToSinAxisFactor1 = 0.5 * (1 - ht21 * 0.16666666666666666 + ht21 * ht21 * 0.0083333333333333332);
+						cosHalfTheta1 = 1 - ht21 * 0.5 + ht21 * ht21 * 0.041666666666666664;
+					} else {
+						rotationToSinAxisFactor1 = Math.sin(halfTheta1) / theta1;
+						cosHalfTheta1 = Math.cos(halfTheta1);
+					}
+					var sinAxisX1;
+					var sinAxisY1;
+					var sinAxisZ1;
+					sinAxisX1 = av2X * rotationToSinAxisFactor1;
+					sinAxisY1 = av2Y * rotationToSinAxisFactor1;
+					sinAxisZ1 = av2Z * rotationToSinAxisFactor1;
+					var dqX1;
+					var dqY1;
+					var dqZ1;
+					var dqW1;
+					dqX1 = sinAxisX1;
+					dqY1 = sinAxisY1;
+					dqZ1 = sinAxisZ1;
+					dqW1 = cosHalfTheta1;
+					var qX1;
+					var qY1;
+					var qZ1;
+					var qW1;
+					var e001 = _this3._transform._rotation00;
+					var e111 = _this3._transform._rotation11;
+					var e221 = _this3._transform._rotation22;
+					var t1 = e001 + e111 + e221;
+					var s1;
+					if(t1 > 0) {
+						s1 = Math.sqrt(t1 + 1);
+						qW1 = 0.5 * s1;
+						s1 = 0.5 / s1;
+						qX1 = (_this3._transform._rotation21 - _this3._transform._rotation12) * s1;
+						qY1 = (_this3._transform._rotation02 - _this3._transform._rotation20) * s1;
+						qZ1 = (_this3._transform._rotation10 - _this3._transform._rotation01) * s1;
+					} else if(e001 > e111) {
+						if(e001 > e221) {
+							s1 = Math.sqrt(e001 - e111 - e221 + 1);
+							qX1 = 0.5 * s1;
+							s1 = 0.5 / s1;
+							qY1 = (_this3._transform._rotation01 + _this3._transform._rotation10) * s1;
+							qZ1 = (_this3._transform._rotation02 + _this3._transform._rotation20) * s1;
+							qW1 = (_this3._transform._rotation21 - _this3._transform._rotation12) * s1;
+						} else {
+							s1 = Math.sqrt(e221 - e001 - e111 + 1);
+							qZ1 = 0.5 * s1;
+							s1 = 0.5 / s1;
+							qX1 = (_this3._transform._rotation02 + _this3._transform._rotation20) * s1;
+							qY1 = (_this3._transform._rotation12 + _this3._transform._rotation21) * s1;
+							qW1 = (_this3._transform._rotation10 - _this3._transform._rotation01) * s1;
+						}
+					} else if(e111 > e221) {
+						s1 = Math.sqrt(e111 - e221 - e001 + 1);
+						qY1 = 0.5 * s1;
+						s1 = 0.5 / s1;
+						qX1 = (_this3._transform._rotation01 + _this3._transform._rotation10) * s1;
+						qZ1 = (_this3._transform._rotation12 + _this3._transform._rotation21) * s1;
+						qW1 = (_this3._transform._rotation02 - _this3._transform._rotation20) * s1;
+					} else {
+						s1 = Math.sqrt(e221 - e001 - e111 + 1);
+						qZ1 = 0.5 * s1;
+						s1 = 0.5 / s1;
+						qX1 = (_this3._transform._rotation02 + _this3._transform._rotation20) * s1;
+						qY1 = (_this3._transform._rotation12 + _this3._transform._rotation21) * s1;
+						qW1 = (_this3._transform._rotation10 - _this3._transform._rotation01) * s1;
+					}
+					qX1 = dqW1 * qX1 + dqX1 * qW1 + dqY1 * qZ1 - dqZ1 * qY1;
+					qY1 = dqW1 * qY1 - dqX1 * qZ1 + dqY1 * qW1 + dqZ1 * qX1;
+					qZ1 = dqW1 * qZ1 + dqX1 * qY1 - dqY1 * qX1 + dqZ1 * qW1;
+					qW1 = dqW1 * qW1 - dqX1 * qX1 - dqY1 * qY1 - dqZ1 * qZ1;
+					var l1 = qX1 * qX1 + qY1 * qY1 + qZ1 * qZ1 + qW1 * qW1;
+					if(l1 > 1e-32) {
+						l1 = 1 / Math.sqrt(l1);
+					}
+					qX1 *= l1;
+					qY1 *= l1;
+					qZ1 *= l1;
+					qW1 *= l1;
+					var x1 = qX1;
+					var y1 = qY1;
+					var z1 = qZ1;
+					var w1 = qW1;
+					var x21 = 2 * x1;
+					var y21 = 2 * y1;
+					var z21 = 2 * z1;
+					var xx1 = x1 * x21;
+					var yy1 = y1 * y21;
+					var zz1 = z1 * z21;
+					var xy1 = x1 * y21;
+					var yz1 = y1 * z21;
+					var xz1 = x1 * z21;
+					var wx1 = w1 * x21;
+					var wy1 = w1 * y21;
+					var wz1 = w1 * z21;
+					_this3._transform._rotation00 = 1 - yy1 - zz1;
+					_this3._transform._rotation01 = xy1 - wz1;
+					_this3._transform._rotation02 = xz1 + wy1;
+					_this3._transform._rotation10 = xy1 + wz1;
+					_this3._transform._rotation11 = 1 - xx1 - zz1;
+					_this3._transform._rotation12 = yz1 - wx1;
+					_this3._transform._rotation20 = xz1 - wy1;
+					_this3._transform._rotation21 = yz1 + wx1;
+					_this3._transform._rotation22 = 1 - xx1 - yy1;
+					var __tmp__002;
+					var __tmp__012;
+					var __tmp__022;
+					var __tmp__102;
+					var __tmp__112;
+					var __tmp__122;
+					var __tmp__202;
+					var __tmp__212;
+					var __tmp__222;
+					__tmp__002 = _this3._transform._rotation00 * _this3._invLocalInertia00 + _this3._transform._rotation01 * _this3._invLocalInertia10 + _this3._transform._rotation02 * _this3._invLocalInertia20;
+					__tmp__012 = _this3._transform._rotation00 * _this3._invLocalInertia01 + _this3._transform._rotation01 * _this3._invLocalInertia11 + _this3._transform._rotation02 * _this3._invLocalInertia21;
+					__tmp__022 = _this3._transform._rotation00 * _this3._invLocalInertia02 + _this3._transform._rotation01 * _this3._invLocalInertia12 + _this3._transform._rotation02 * _this3._invLocalInertia22;
+					__tmp__102 = _this3._transform._rotation10 * _this3._invLocalInertia00 + _this3._transform._rotation11 * _this3._invLocalInertia10 + _this3._transform._rotation12 * _this3._invLocalInertia20;
+					__tmp__112 = _this3._transform._rotation10 * _this3._invLocalInertia01 + _this3._transform._rotation11 * _this3._invLocalInertia11 + _this3._transform._rotation12 * _this3._invLocalInertia21;
+					__tmp__122 = _this3._transform._rotation10 * _this3._invLocalInertia02 + _this3._transform._rotation11 * _this3._invLocalInertia12 + _this3._transform._rotation12 * _this3._invLocalInertia22;
+					__tmp__202 = _this3._transform._rotation20 * _this3._invLocalInertia00 + _this3._transform._rotation21 * _this3._invLocalInertia10 + _this3._transform._rotation22 * _this3._invLocalInertia20;
+					__tmp__212 = _this3._transform._rotation20 * _this3._invLocalInertia01 + _this3._transform._rotation21 * _this3._invLocalInertia11 + _this3._transform._rotation22 * _this3._invLocalInertia21;
+					__tmp__222 = _this3._transform._rotation20 * _this3._invLocalInertia02 + _this3._transform._rotation21 * _this3._invLocalInertia12 + _this3._transform._rotation22 * _this3._invLocalInertia22;
+					_this3._invInertia00 = __tmp__002;
+					_this3._invInertia01 = __tmp__012;
+					_this3._invInertia02 = __tmp__022;
+					_this3._invInertia10 = __tmp__102;
+					_this3._invInertia11 = __tmp__112;
+					_this3._invInertia12 = __tmp__122;
+					_this3._invInertia20 = __tmp__202;
+					_this3._invInertia21 = __tmp__212;
+					_this3._invInertia22 = __tmp__222;
+					var __tmp__003;
+					var __tmp__013;
+					var __tmp__023;
+					var __tmp__103;
+					var __tmp__113;
+					var __tmp__123;
+					var __tmp__203;
+					var __tmp__213;
+					var __tmp__223;
+					__tmp__003 = _this3._invInertia00 * _this3._transform._rotation00 + _this3._invInertia01 * _this3._transform._rotation01 + _this3._invInertia02 * _this3._transform._rotation02;
+					__tmp__013 = _this3._invInertia00 * _this3._transform._rotation10 + _this3._invInertia01 * _this3._transform._rotation11 + _this3._invInertia02 * _this3._transform._rotation12;
+					__tmp__023 = _this3._invInertia00 * _this3._transform._rotation20 + _this3._invInertia01 * _this3._transform._rotation21 + _this3._invInertia02 * _this3._transform._rotation22;
+					__tmp__103 = _this3._invInertia10 * _this3._transform._rotation00 + _this3._invInertia11 * _this3._transform._rotation01 + _this3._invInertia12 * _this3._transform._rotation02;
+					__tmp__113 = _this3._invInertia10 * _this3._transform._rotation10 + _this3._invInertia11 * _this3._transform._rotation11 + _this3._invInertia12 * _this3._transform._rotation12;
+					__tmp__123 = _this3._invInertia10 * _this3._transform._rotation20 + _this3._invInertia11 * _this3._transform._rotation21 + _this3._invInertia12 * _this3._transform._rotation22;
+					__tmp__203 = _this3._invInertia20 * _this3._transform._rotation00 + _this3._invInertia21 * _this3._transform._rotation01 + _this3._invInertia22 * _this3._transform._rotation02;
+					__tmp__213 = _this3._invInertia20 * _this3._transform._rotation10 + _this3._invInertia21 * _this3._transform._rotation11 + _this3._invInertia22 * _this3._transform._rotation12;
+					__tmp__223 = _this3._invInertia20 * _this3._transform._rotation20 + _this3._invInertia21 * _this3._transform._rotation21 + _this3._invInertia22 * _this3._transform._rotation22;
+					_this3._invInertia00 = __tmp__003;
+					_this3._invInertia01 = __tmp__013;
+					_this3._invInertia02 = __tmp__023;
+					_this3._invInertia10 = __tmp__103;
+					_this3._invInertia11 = __tmp__113;
+					_this3._invInertia12 = __tmp__123;
+					_this3._invInertia20 = __tmp__203;
+					_this3._invInertia21 = __tmp__213;
+					_this3._invInertia22 = __tmp__223;
+					_this3._invInertia00 *= _this3._rotFactor.x;
+					_this3._invInertia01 *= _this3._rotFactor.x;
+					_this3._invInertia02 *= _this3._rotFactor.x;
+					_this3._invInertia10 *= _this3._rotFactor.y;
+					_this3._invInertia11 *= _this3._rotFactor.y;
+					_this3._invInertia12 *= _this3._rotFactor.y;
+					_this3._invInertia20 *= _this3._rotFactor.z;
+					_this3._invInertia21 *= _this3._rotFactor.z;
+					_this3._invInertia22 *= _this3._rotFactor.z;
+				}
+				var _this4 = this.posBoundarySelector;
+				var i1 = 0;
+				while(_this4.indices[i1] != idx) ++i1;
+				while(i1 > 0) {
+					var tmp = _this4.indices[i1];
+					_this4.indices[i1] = _this4.indices[i1 - 1];
+					_this4.indices[i1 - 1] = tmp;
+					--i1;
+				}
+				solved = true;
+				break;
+			}
+		}
+		if(!solved) {
+			haxe_Log.trace("could not find solution. (NGS)",{ fileName : "oimo/dynamics/constraint/solver/direct/DirectJointConstraintSolver.hx", lineNumber : 502, className : "oimo.dynamics.constraint.solver.direct.DirectJointConstraintSolver", methodName : "solvePositionNgs"});
+			return;
+		}
+	}
+	,postSolve: function() {
+		this.joint._syncAnchors();
+		this.joint._checkDestruction();
+	}
+	,__class__: oimo_dynamics_constraint_solver_direct_DirectJointConstraintSolver
+});
+var oimo_dynamics_constraint_solver_direct_MassMatrix = function(size) {
+	this._size = size;
+	this.tmpMatrix = new Array(this._size);
+	this._invMass = new Array(this._size);
+	this._invMassWithoutCfm = new Array(this._size);
+	var _g = 0;
+	var _g1 = this._size;
+	while(_g < _g1) {
+		var i = _g++;
+		this.tmpMatrix[i] = new Array(this._size);
+		this._invMass[i] = new Array(this._size);
+		this._invMassWithoutCfm[i] = new Array(this._size);
+		var _g2 = 0;
+		var _g3 = this._size;
+		while(_g2 < _g3) {
+			var j = _g2++;
+			this.tmpMatrix[i][j] = 0;
+			this._invMass[i][j] = 0;
+			this._invMassWithoutCfm[i][j] = 0;
+		}
+	}
+	this._maxSubmatrixId = 1 << this._size;
+	this._cacheComputed = new Array(this._maxSubmatrixId);
+	this._cachedSubmatrices = new Array(this._maxSubmatrixId);
+	var _g = 0;
+	var _g1 = this._maxSubmatrixId;
+	while(_g < _g1) {
+		var i = _g++;
+		var t = i;
+		t = (i & 85) + (i >> 1 & 85);
+		t = (t & 51) + (t >> 2 & 51);
+		t = (t & 15) + (t >> 4 & 15);
+		var matrixSize = t;
+		var subMatrix = new Array(matrixSize);
+		var _g2 = 0;
+		while(_g2 < matrixSize) {
+			var j = _g2++;
+			subMatrix[j] = new Array(matrixSize);
+			var _g3 = 0;
+			while(_g3 < matrixSize) subMatrix[j][_g3++] = 0;
+		}
+		this._cacheComputed[i] = false;
+		this._cachedSubmatrices[i] = subMatrix;
+	}
+};
+$hxClasses["oimo.dynamics.constraint.solver.direct.MassMatrix"] = oimo_dynamics_constraint_solver_direct_MassMatrix;
+oimo_dynamics_constraint_solver_direct_MassMatrix.__name__ = "oimo.dynamics.constraint.solver.direct.MassMatrix";
+oimo_dynamics_constraint_solver_direct_MassMatrix.prototype = {
+	computeSubmatrix: function(id,indices,size) {
+		var _g = 0;
+		while(_g < size) {
+			var i = _g++;
+			var ii = indices[i];
+			var _g1 = 0;
+			while(_g1 < size) {
+				var j = _g1++;
+				this.tmpMatrix[i][j] = this._invMass[ii][indices[j]];
+			}
+		}
+		var src = this.tmpMatrix;
+		var dst = this._cachedSubmatrices[id];
+		var srci;
+		var dsti;
+		var srcj;
+		var dstj;
+		var diag;
+		switch(size) {
+		case 4:
+			srci = src[0];
+			dsti = dst[0];
+			diag = 1 / srci[0];
+			dsti[0] = diag;
+			srci[1] *= diag;
+			srci[2] *= diag;
+			srci[3] *= diag;
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srci = src[1];
+			dsti = dst[1];
+			diag = 1 / srci[1];
+			dsti[1] = diag;
+			dsti[0] *= diag;
+			srci[2] *= diag;
+			srci[3] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] -= dsti[0] * srcj[1];
+			dstj[1] = -diag * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] -= dsti[0] * srcj[1];
+			dstj[1] = -diag * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srci = src[2];
+			dsti = dst[2];
+			diag = 1 / srci[2];
+			dsti[2] = diag;
+			dsti[0] *= diag;
+			dsti[1] *= diag;
+			srci[3] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] -= dsti[0] * srcj[2];
+			dstj[1] -= dsti[1] * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] -= dsti[0] * srcj[2];
+			dstj[1] -= dsti[1] * srcj[2];
+			dstj[2] = -diag * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srci = src[3];
+			dsti = dst[3];
+			diag = 1 / srci[3];
+			dsti[3] = diag;
+			dsti[0] *= diag;
+			dsti[1] *= diag;
+			dsti[2] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[3];
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] -= dsti[0] * srcj[3];
+			dstj[1] -= dsti[1] * srcj[3];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] -= dsti[0] * srcj[3];
+			dstj[1] -= dsti[1] * srcj[3];
+			dstj[2] -= dsti[2] * srcj[3];
+			dsti = dst[1];
+			dst[0][1] = dsti[0];
+			dsti = dst[2];
+			dst[0][2] = dsti[0];
+			dst[1][2] = dsti[1];
+			dsti = dst[3];
+			dst[0][3] = dsti[0];
+			dst[1][3] = dsti[1];
+			dst[2][3] = dsti[2];
+			break;
+		case 5:
+			srci = src[0];
+			dsti = dst[0];
+			diag = 1 / srci[0];
+			dsti[0] = diag;
+			srci[1] *= diag;
+			srci[2] *= diag;
+			srci[3] *= diag;
+			srci[4] *= diag;
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj[4] -= srci[4] * srcj[0];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj[4] -= srci[4] * srcj[0];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj[4] -= srci[4] * srcj[0];
+			srcj = src[4];
+			dstj = dst[4];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj[4] -= srci[4] * srcj[0];
+			srci = src[1];
+			dsti = dst[1];
+			diag = 1 / srci[1];
+			dsti[1] = diag;
+			dsti[0] *= diag;
+			srci[2] *= diag;
+			srci[3] *= diag;
+			srci[4] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj[4] -= srci[4] * srcj[1];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] -= dsti[0] * srcj[1];
+			dstj[1] = -diag * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj[4] -= srci[4] * srcj[1];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] -= dsti[0] * srcj[1];
+			dstj[1] = -diag * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj[4] -= srci[4] * srcj[1];
+			srcj = src[4];
+			dstj = dst[4];
+			dstj[0] -= dsti[0] * srcj[1];
+			dstj[1] = -diag * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj[4] -= srci[4] * srcj[1];
+			srci = src[2];
+			dsti = dst[2];
+			diag = 1 / srci[2];
+			dsti[2] = diag;
+			dsti[0] *= diag;
+			dsti[1] *= diag;
+			srci[3] *= diag;
+			srci[4] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj[4] -= srci[4] * srcj[2];
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] -= dsti[0] * srcj[2];
+			dstj[1] -= dsti[1] * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj[4] -= srci[4] * srcj[2];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] -= dsti[0] * srcj[2];
+			dstj[1] -= dsti[1] * srcj[2];
+			dstj[2] = -diag * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj[4] -= srci[4] * srcj[2];
+			srcj = src[4];
+			dstj = dst[4];
+			dstj[0] -= dsti[0] * srcj[2];
+			dstj[1] -= dsti[1] * srcj[2];
+			dstj[2] = -diag * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj[4] -= srci[4] * srcj[2];
+			srci = src[3];
+			dsti = dst[3];
+			diag = 1 / srci[3];
+			dsti[3] = diag;
+			dsti[0] *= diag;
+			dsti[1] *= diag;
+			dsti[2] *= diag;
+			srci[4] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[3];
+			srcj[4] -= srci[4] * srcj[3];
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] -= dsti[0] * srcj[3];
+			dstj[1] -= dsti[1] * srcj[3];
+			srcj[4] -= srci[4] * srcj[3];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] -= dsti[0] * srcj[3];
+			dstj[1] -= dsti[1] * srcj[3];
+			dstj[2] -= dsti[2] * srcj[3];
+			srcj[4] -= srci[4] * srcj[3];
+			srcj = src[4];
+			dstj = dst[4];
+			dstj[0] -= dsti[0] * srcj[3];
+			dstj[1] -= dsti[1] * srcj[3];
+			dstj[2] -= dsti[2] * srcj[3];
+			dstj[3] = -diag * srcj[3];
+			srcj[4] -= srci[4] * srcj[3];
+			srci = src[4];
+			dsti = dst[4];
+			diag = 1 / srci[4];
+			dsti[4] = diag;
+			dsti[0] *= diag;
+			dsti[1] *= diag;
+			dsti[2] *= diag;
+			dsti[3] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[4];
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] -= dsti[0] * srcj[4];
+			dstj[1] -= dsti[1] * srcj[4];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] -= dsti[0] * srcj[4];
+			dstj[1] -= dsti[1] * srcj[4];
+			dstj[2] -= dsti[2] * srcj[4];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] -= dsti[0] * srcj[4];
+			dstj[1] -= dsti[1] * srcj[4];
+			dstj[2] -= dsti[2] * srcj[4];
+			dstj[3] -= dsti[3] * srcj[4];
+			dsti = dst[1];
+			dst[0][1] = dsti[0];
+			dsti = dst[2];
+			dst[0][2] = dsti[0];
+			dst[1][2] = dsti[1];
+			dsti = dst[3];
+			dst[0][3] = dsti[0];
+			dst[1][3] = dsti[1];
+			dst[2][3] = dsti[2];
+			dsti = dst[4];
+			dst[0][4] = dsti[0];
+			dst[1][4] = dsti[1];
+			dst[2][4] = dsti[2];
+			dst[3][4] = dsti[3];
+			break;
+		case 6:
+			srci = src[0];
+			dsti = dst[0];
+			diag = 1 / srci[0];
+			dsti[0] = diag;
+			srci[1] *= diag;
+			srci[2] *= diag;
+			srci[3] *= diag;
+			srci[4] *= diag;
+			srci[5] *= diag;
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj[4] -= srci[4] * srcj[0];
+			srcj[5] -= srci[5] * srcj[0];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj[4] -= srci[4] * srcj[0];
+			srcj[5] -= srci[5] * srcj[0];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj[4] -= srci[4] * srcj[0];
+			srcj[5] -= srci[5] * srcj[0];
+			srcj = src[4];
+			dstj = dst[4];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj[4] -= srci[4] * srcj[0];
+			srcj[5] -= srci[5] * srcj[0];
+			srcj = src[5];
+			dstj = dst[5];
+			dstj[0] = -diag * srcj[0];
+			srcj[1] -= srci[1] * srcj[0];
+			srcj[2] -= srci[2] * srcj[0];
+			srcj[3] -= srci[3] * srcj[0];
+			srcj[4] -= srci[4] * srcj[0];
+			srcj[5] -= srci[5] * srcj[0];
+			srci = src[1];
+			dsti = dst[1];
+			diag = 1 / srci[1];
+			dsti[1] = diag;
+			dsti[0] *= diag;
+			srci[2] *= diag;
+			srci[3] *= diag;
+			srci[4] *= diag;
+			srci[5] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj[4] -= srci[4] * srcj[1];
+			srcj[5] -= srci[5] * srcj[1];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] -= dsti[0] * srcj[1];
+			dstj[1] = -diag * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj[4] -= srci[4] * srcj[1];
+			srcj[5] -= srci[5] * srcj[1];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] -= dsti[0] * srcj[1];
+			dstj[1] = -diag * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj[4] -= srci[4] * srcj[1];
+			srcj[5] -= srci[5] * srcj[1];
+			srcj = src[4];
+			dstj = dst[4];
+			dstj[0] -= dsti[0] * srcj[1];
+			dstj[1] = -diag * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj[4] -= srci[4] * srcj[1];
+			srcj[5] -= srci[5] * srcj[1];
+			srcj = src[5];
+			dstj = dst[5];
+			dstj[0] -= dsti[0] * srcj[1];
+			dstj[1] = -diag * srcj[1];
+			srcj[2] -= srci[2] * srcj[1];
+			srcj[3] -= srci[3] * srcj[1];
+			srcj[4] -= srci[4] * srcj[1];
+			srcj[5] -= srci[5] * srcj[1];
+			srci = src[2];
+			dsti = dst[2];
+			diag = 1 / srci[2];
+			dsti[2] = diag;
+			dsti[0] *= diag;
+			dsti[1] *= diag;
+			srci[3] *= diag;
+			srci[4] *= diag;
+			srci[5] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj[4] -= srci[4] * srcj[2];
+			srcj[5] -= srci[5] * srcj[2];
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] -= dsti[0] * srcj[2];
+			dstj[1] -= dsti[1] * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj[4] -= srci[4] * srcj[2];
+			srcj[5] -= srci[5] * srcj[2];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] -= dsti[0] * srcj[2];
+			dstj[1] -= dsti[1] * srcj[2];
+			dstj[2] = -diag * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj[4] -= srci[4] * srcj[2];
+			srcj[5] -= srci[5] * srcj[2];
+			srcj = src[4];
+			dstj = dst[4];
+			dstj[0] -= dsti[0] * srcj[2];
+			dstj[1] -= dsti[1] * srcj[2];
+			dstj[2] = -diag * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj[4] -= srci[4] * srcj[2];
+			srcj[5] -= srci[5] * srcj[2];
+			srcj = src[5];
+			dstj = dst[5];
+			dstj[0] -= dsti[0] * srcj[2];
+			dstj[1] -= dsti[1] * srcj[2];
+			dstj[2] = -diag * srcj[2];
+			srcj[3] -= srci[3] * srcj[2];
+			srcj[4] -= srci[4] * srcj[2];
+			srcj[5] -= srci[5] * srcj[2];
+			srci = src[3];
+			dsti = dst[3];
+			diag = 1 / srci[3];
+			dsti[3] = diag;
+			dsti[0] *= diag;
+			dsti[1] *= diag;
+			dsti[2] *= diag;
+			srci[4] *= diag;
+			srci[5] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[3];
+			srcj[4] -= srci[4] * srcj[3];
+			srcj[5] -= srci[5] * srcj[3];
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] -= dsti[0] * srcj[3];
+			dstj[1] -= dsti[1] * srcj[3];
+			srcj[4] -= srci[4] * srcj[3];
+			srcj[5] -= srci[5] * srcj[3];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] -= dsti[0] * srcj[3];
+			dstj[1] -= dsti[1] * srcj[3];
+			dstj[2] -= dsti[2] * srcj[3];
+			srcj[4] -= srci[4] * srcj[3];
+			srcj[5] -= srci[5] * srcj[3];
+			srcj = src[4];
+			dstj = dst[4];
+			dstj[0] -= dsti[0] * srcj[3];
+			dstj[1] -= dsti[1] * srcj[3];
+			dstj[2] -= dsti[2] * srcj[3];
+			dstj[3] = -diag * srcj[3];
+			srcj[4] -= srci[4] * srcj[3];
+			srcj[5] -= srci[5] * srcj[3];
+			srcj = src[5];
+			dstj = dst[5];
+			dstj[0] -= dsti[0] * srcj[3];
+			dstj[1] -= dsti[1] * srcj[3];
+			dstj[2] -= dsti[2] * srcj[3];
+			dstj[3] = -diag * srcj[3];
+			srcj[4] -= srci[4] * srcj[3];
+			srcj[5] -= srci[5] * srcj[3];
+			srci = src[4];
+			dsti = dst[4];
+			diag = 1 / srci[4];
+			dsti[4] = diag;
+			dsti[0] *= diag;
+			dsti[1] *= diag;
+			dsti[2] *= diag;
+			dsti[3] *= diag;
+			srci[5] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[4];
+			srcj[5] -= srci[5] * srcj[4];
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] -= dsti[0] * srcj[4];
+			dstj[1] -= dsti[1] * srcj[4];
+			srcj[5] -= srci[5] * srcj[4];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] -= dsti[0] * srcj[4];
+			dstj[1] -= dsti[1] * srcj[4];
+			dstj[2] -= dsti[2] * srcj[4];
+			srcj[5] -= srci[5] * srcj[4];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] -= dsti[0] * srcj[4];
+			dstj[1] -= dsti[1] * srcj[4];
+			dstj[2] -= dsti[2] * srcj[4];
+			dstj[3] -= dsti[3] * srcj[4];
+			srcj[5] -= srci[5] * srcj[4];
+			srcj = src[5];
+			dstj = dst[5];
+			dstj[0] -= dsti[0] * srcj[4];
+			dstj[1] -= dsti[1] * srcj[4];
+			dstj[2] -= dsti[2] * srcj[4];
+			dstj[3] -= dsti[3] * srcj[4];
+			dstj[4] = -diag * srcj[4];
+			srcj[5] -= srci[5] * srcj[4];
+			srci = src[5];
+			dsti = dst[5];
+			diag = 1 / srci[5];
+			dsti[5] = diag;
+			dsti[0] *= diag;
+			dsti[1] *= diag;
+			dsti[2] *= diag;
+			dsti[3] *= diag;
+			dsti[4] *= diag;
+			srcj = src[0];
+			dstj = dst[0];
+			dstj[0] -= dsti[0] * srcj[5];
+			srcj = src[1];
+			dstj = dst[1];
+			dstj[0] -= dsti[0] * srcj[5];
+			dstj[1] -= dsti[1] * srcj[5];
+			srcj = src[2];
+			dstj = dst[2];
+			dstj[0] -= dsti[0] * srcj[5];
+			dstj[1] -= dsti[1] * srcj[5];
+			dstj[2] -= dsti[2] * srcj[5];
+			srcj = src[3];
+			dstj = dst[3];
+			dstj[0] -= dsti[0] * srcj[5];
+			dstj[1] -= dsti[1] * srcj[5];
+			dstj[2] -= dsti[2] * srcj[5];
+			dstj[3] -= dsti[3] * srcj[5];
+			srcj = src[4];
+			dstj = dst[4];
+			dstj[0] -= dsti[0] * srcj[5];
+			dstj[1] -= dsti[1] * srcj[5];
+			dstj[2] -= dsti[2] * srcj[5];
+			dstj[3] -= dsti[3] * srcj[5];
+			dstj[4] -= dsti[4] * srcj[5];
+			dsti = dst[1];
+			dst[0][1] = dsti[0];
+			dsti = dst[2];
+			dst[0][2] = dsti[0];
+			dst[1][2] = dsti[1];
+			dsti = dst[3];
+			dst[0][3] = dsti[0];
+			dst[1][3] = dsti[1];
+			dst[2][3] = dsti[2];
+			dsti = dst[4];
+			dst[0][4] = dsti[0];
+			dst[1][4] = dsti[1];
+			dst[2][4] = dsti[2];
+			dst[3][4] = dsti[3];
+			dsti = dst[5];
+			dst[0][5] = dsti[0];
+			dst[1][5] = dsti[1];
+			dst[2][5] = dsti[2];
+			dst[3][5] = dsti[3];
+			dst[4][5] = dsti[4];
+			break;
+		default:
+			var _g = 0;
+			while(_g < size) {
+				var i = _g++;
+				srci = src[i];
+				dsti = dst[i];
+				var diag = 1 / srci[i];
+				dsti[i] = diag;
+				var _g1 = 0;
+				while(_g1 < i) dsti[_g1++] *= diag;
+				var _g2 = i + 1;
+				while(_g2 < size) srci[_g2++] *= diag;
+				var _g3 = 0;
+				while(_g3 < i) {
+					var j = _g3++;
+					srcj = src[j];
+					dstj = dst[j];
+					var _g4 = 0;
+					var _g5 = j + 1;
+					while(_g4 < _g5) {
+						var k = _g4++;
+						dstj[k] -= dsti[k] * srcj[i];
+					}
+					var _g6 = i + 1;
+					while(_g6 < size) {
+						var k1 = _g6++;
+						srcj[k1] -= srci[k1] * srcj[i];
+					}
+				}
+				var _g7 = i + 1;
+				while(_g7 < size) {
+					var j1 = _g7++;
+					srcj = src[j1];
+					dstj = dst[j1];
+					var _g8 = 0;
+					while(_g8 < i) {
+						var k2 = _g8++;
+						dstj[k2] -= dsti[k2] * srcj[i];
+					}
+					dstj[i] = -diag * srcj[i];
+					var _g9 = i + 1;
+					while(_g9 < size) {
+						var k3 = _g9++;
+						srcj[k3] -= srci[k3] * srcj[i];
+					}
+				}
+			}
+			var _g = 1;
+			while(_g < size) {
+				var i = _g++;
+				dsti = dst[i];
+				var _g1 = 0;
+				while(_g1 < i) {
+					var j = _g1++;
+					dst[j][i] = dsti[j];
+				}
+			}
+		}
+	}
+	,computeInvMass: function(info,massData) {
+		var invMass = this._invMass;
+		var invMassWithoutCfm = this._invMassWithoutCfm;
+		var numRows = info.numRows;
+		var b1 = info.b1;
+		var b2 = info.b2;
+		var invM1 = b1._invMass;
+		var invM2 = b2._invMass;
+		var invI100;
+		var invI101;
+		var invI102;
+		var invI110;
+		var invI111;
+		var invI112;
+		var invI120;
+		var invI121;
+		var invI122;
+		var invI200;
+		var invI201;
+		var invI202;
+		var invI210;
+		var invI211;
+		var invI212;
+		var invI220;
+		var invI221;
+		var invI222;
+		invI100 = b1._invInertia00;
+		invI101 = b1._invInertia01;
+		invI102 = b1._invInertia02;
+		invI110 = b1._invInertia10;
+		invI111 = b1._invInertia11;
+		invI112 = b1._invInertia12;
+		invI120 = b1._invInertia20;
+		invI121 = b1._invInertia21;
+		invI122 = b1._invInertia22;
+		invI200 = b2._invInertia00;
+		invI201 = b2._invInertia01;
+		invI202 = b2._invInertia02;
+		invI210 = b2._invInertia10;
+		invI211 = b2._invInertia11;
+		invI212 = b2._invInertia12;
+		invI220 = b2._invInertia20;
+		invI221 = b2._invInertia21;
+		invI222 = b2._invInertia22;
+		var _g = 0;
+		while(_g < numRows) {
+			var i = _g++;
+			var j = info.rows[i].jacobian;
+			var md = massData[i];
+			j.updateSparsity();
+			if((j.flag & 1) != 0) {
+				md.invMLin1X = j.lin1X * invM1;
+				md.invMLin1Y = j.lin1Y * invM1;
+				md.invMLin1Z = j.lin1Z * invM1;
+				md.invMLin2X = j.lin2X * invM2;
+				md.invMLin2Y = j.lin2Y * invM2;
+				md.invMLin2Z = j.lin2Z * invM2;
+			} else {
+				md.invMLin1X = 0;
+				md.invMLin1Y = 0;
+				md.invMLin1Z = 0;
+				md.invMLin2X = 0;
+				md.invMLin2Y = 0;
+				md.invMLin2Z = 0;
+			}
+			if((j.flag & 2) != 0) {
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = invI100 * j.ang1X + invI101 * j.ang1Y + invI102 * j.ang1Z;
+				__tmp__Y = invI110 * j.ang1X + invI111 * j.ang1Y + invI112 * j.ang1Z;
+				__tmp__Z = invI120 * j.ang1X + invI121 * j.ang1Y + invI122 * j.ang1Z;
+				md.invMAng1X = __tmp__X;
+				md.invMAng1Y = __tmp__Y;
+				md.invMAng1Z = __tmp__Z;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = invI200 * j.ang2X + invI201 * j.ang2Y + invI202 * j.ang2Z;
+				__tmp__Y1 = invI210 * j.ang2X + invI211 * j.ang2Y + invI212 * j.ang2Z;
+				__tmp__Z1 = invI220 * j.ang2X + invI221 * j.ang2Y + invI222 * j.ang2Z;
+				md.invMAng2X = __tmp__X1;
+				md.invMAng2Y = __tmp__Y1;
+				md.invMAng2Z = __tmp__Z1;
+			} else {
+				md.invMAng1X = 0;
+				md.invMAng1Y = 0;
+				md.invMAng1Z = 0;
+				md.invMAng2X = 0;
+				md.invMAng2Y = 0;
+				md.invMAng2Z = 0;
+			}
+		}
+		var _g = 0;
+		while(_g < numRows) {
+			var i = _g++;
+			var j1 = info.rows[i].jacobian;
+			var _g1 = i;
+			while(_g1 < numRows) {
+				var j = _g1++;
+				var md2 = massData[j];
+				var val = j1.lin1X * md2.invMLin1X + j1.lin1Y * md2.invMLin1Y + j1.lin1Z * md2.invMLin1Z + (j1.ang1X * md2.invMAng1X + j1.ang1Y * md2.invMAng1Y + j1.ang1Z * md2.invMAng1Z) + (j1.lin2X * md2.invMLin2X + j1.lin2Y * md2.invMLin2Y + j1.lin2Z * md2.invMLin2Z) + (j1.ang2X * md2.invMAng2X + j1.ang2Y * md2.invMAng2Y + j1.ang2Z * md2.invMAng2Z);
+				if(i == j) {
+					invMass[i][j] = val + info.rows[i].cfm;
+					invMassWithoutCfm[i][j] = val;
+					md2.mass = val + info.rows[i].cfm;
+					md2.massWithoutCfm = val;
+					if(md2.mass != 0) {
+						md2.mass = 1 / md2.mass;
+					}
+					if(md2.massWithoutCfm != 0) {
+						md2.massWithoutCfm = 1 / md2.massWithoutCfm;
+					}
+				} else {
+					invMass[i][j] = val;
+					invMass[j][i] = val;
+					invMassWithoutCfm[i][j] = val;
+					invMassWithoutCfm[j][i] = val;
+				}
+			}
+		}
+		var _g = 0;
+		var _g1 = this._maxSubmatrixId;
+		while(_g < _g1) this._cacheComputed[_g++] = false;
+	}
+	,__class__: oimo_dynamics_constraint_solver_direct_MassMatrix
+};
+var oimo_dynamics_constraint_solver_pgs_PgsContactConstraintSolver = function(constraint) {
+	oimo_dynamics_constraint_ConstraintSolver.call(this);
+	this.constraint = constraint;
+	this.info = new oimo_dynamics_constraint_info_contact_ContactSolverInfo();
+	this.massData = new Array(oimo_common_Setting.maxManifoldPoints);
+	var _g = 0;
+	var _g1 = this.massData.length;
+	while(_g < _g1) this.massData[_g++] = new oimo_dynamics_constraint_solver_common_ContactSolverMassDataRow();
+};
+$hxClasses["oimo.dynamics.constraint.solver.pgs.PgsContactConstraintSolver"] = oimo_dynamics_constraint_solver_pgs_PgsContactConstraintSolver;
+oimo_dynamics_constraint_solver_pgs_PgsContactConstraintSolver.__name__ = "oimo.dynamics.constraint.solver.pgs.PgsContactConstraintSolver";
+oimo_dynamics_constraint_solver_pgs_PgsContactConstraintSolver.__super__ = oimo_dynamics_constraint_ConstraintSolver;
+oimo_dynamics_constraint_solver_pgs_PgsContactConstraintSolver.prototype = $extend(oimo_dynamics_constraint_ConstraintSolver.prototype,{
+	preSolveVelocity: function(timeStep) {
+		this.constraint._getVelocitySolverInfo(timeStep,this.info);
+		this._b1 = this.info.b1;
+		this._b2 = this.info.b2;
+		var invM1 = this._b1._invMass;
+		var invM2 = this._b2._invMass;
+		var invI100;
+		var invI101;
+		var invI102;
+		var invI110;
+		var invI111;
+		var invI112;
+		var invI120;
+		var invI121;
+		var invI122;
+		var invI200;
+		var invI201;
+		var invI202;
+		var invI210;
+		var invI211;
+		var invI212;
+		var invI220;
+		var invI221;
+		var invI222;
+		invI100 = this._b1._invInertia00;
+		invI101 = this._b1._invInertia01;
+		invI102 = this._b1._invInertia02;
+		invI110 = this._b1._invInertia10;
+		invI111 = this._b1._invInertia11;
+		invI112 = this._b1._invInertia12;
+		invI120 = this._b1._invInertia20;
+		invI121 = this._b1._invInertia21;
+		invI122 = this._b1._invInertia22;
+		invI200 = this._b2._invInertia00;
+		invI201 = this._b2._invInertia01;
+		invI202 = this._b2._invInertia02;
+		invI210 = this._b2._invInertia10;
+		invI211 = this._b2._invInertia11;
+		invI212 = this._b2._invInertia12;
+		invI220 = this._b2._invInertia20;
+		invI221 = this._b2._invInertia21;
+		invI222 = this._b2._invInertia22;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var j = row.jacobianN;
+			md.invMLinN1X = j.lin1X * invM1;
+			md.invMLinN1Y = j.lin1Y * invM1;
+			md.invMLinN1Z = j.lin1Z * invM1;
+			md.invMLinN2X = j.lin2X * invM2;
+			md.invMLinN2Y = j.lin2Y * invM2;
+			md.invMLinN2Z = j.lin2Z * invM2;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = invI100 * j.ang1X + invI101 * j.ang1Y + invI102 * j.ang1Z;
+			__tmp__Y = invI110 * j.ang1X + invI111 * j.ang1Y + invI112 * j.ang1Z;
+			__tmp__Z = invI120 * j.ang1X + invI121 * j.ang1Y + invI122 * j.ang1Z;
+			md.invMAngN1X = __tmp__X;
+			md.invMAngN1Y = __tmp__Y;
+			md.invMAngN1Z = __tmp__Z;
+			var __tmp__X1;
+			var __tmp__Y1;
+			var __tmp__Z1;
+			__tmp__X1 = invI200 * j.ang2X + invI201 * j.ang2Y + invI202 * j.ang2Z;
+			__tmp__Y1 = invI210 * j.ang2X + invI211 * j.ang2Y + invI212 * j.ang2Z;
+			__tmp__Z1 = invI220 * j.ang2X + invI221 * j.ang2Y + invI222 * j.ang2Z;
+			md.invMAngN2X = __tmp__X1;
+			md.invMAngN2Y = __tmp__Y1;
+			md.invMAngN2Z = __tmp__Z1;
+			md.massN = invM1 + invM2 + (md.invMAngN1X * j.ang1X + md.invMAngN1Y * j.ang1Y + md.invMAngN1Z * j.ang1Z) + (md.invMAngN2X * j.ang2X + md.invMAngN2Y * j.ang2Y + md.invMAngN2Z * j.ang2Z);
+			if(md.massN != 0) {
+				md.massN = 1 / md.massN;
+			}
+			var jt = row.jacobianT;
+			var jb = row.jacobianB;
+			md.invMLinT1X = jt.lin1X * invM1;
+			md.invMLinT1Y = jt.lin1Y * invM1;
+			md.invMLinT1Z = jt.lin1Z * invM1;
+			md.invMLinT2X = jt.lin2X * invM2;
+			md.invMLinT2Y = jt.lin2Y * invM2;
+			md.invMLinT2Z = jt.lin2Z * invM2;
+			md.invMLinB1X = jb.lin1X * invM1;
+			md.invMLinB1Y = jb.lin1Y * invM1;
+			md.invMLinB1Z = jb.lin1Z * invM1;
+			md.invMLinB2X = jb.lin2X * invM2;
+			md.invMLinB2Y = jb.lin2Y * invM2;
+			md.invMLinB2Z = jb.lin2Z * invM2;
+			var __tmp__X2;
+			var __tmp__Y2;
+			var __tmp__Z2;
+			__tmp__X2 = invI100 * jt.ang1X + invI101 * jt.ang1Y + invI102 * jt.ang1Z;
+			__tmp__Y2 = invI110 * jt.ang1X + invI111 * jt.ang1Y + invI112 * jt.ang1Z;
+			__tmp__Z2 = invI120 * jt.ang1X + invI121 * jt.ang1Y + invI122 * jt.ang1Z;
+			md.invMAngT1X = __tmp__X2;
+			md.invMAngT1Y = __tmp__Y2;
+			md.invMAngT1Z = __tmp__Z2;
+			var __tmp__X3;
+			var __tmp__Y3;
+			var __tmp__Z3;
+			__tmp__X3 = invI200 * jt.ang2X + invI201 * jt.ang2Y + invI202 * jt.ang2Z;
+			__tmp__Y3 = invI210 * jt.ang2X + invI211 * jt.ang2Y + invI212 * jt.ang2Z;
+			__tmp__Z3 = invI220 * jt.ang2X + invI221 * jt.ang2Y + invI222 * jt.ang2Z;
+			md.invMAngT2X = __tmp__X3;
+			md.invMAngT2Y = __tmp__Y3;
+			md.invMAngT2Z = __tmp__Z3;
+			var __tmp__X4;
+			var __tmp__Y4;
+			var __tmp__Z4;
+			__tmp__X4 = invI100 * jb.ang1X + invI101 * jb.ang1Y + invI102 * jb.ang1Z;
+			__tmp__Y4 = invI110 * jb.ang1X + invI111 * jb.ang1Y + invI112 * jb.ang1Z;
+			__tmp__Z4 = invI120 * jb.ang1X + invI121 * jb.ang1Y + invI122 * jb.ang1Z;
+			md.invMAngB1X = __tmp__X4;
+			md.invMAngB1Y = __tmp__Y4;
+			md.invMAngB1Z = __tmp__Z4;
+			var __tmp__X5;
+			var __tmp__Y5;
+			var __tmp__Z5;
+			__tmp__X5 = invI200 * jb.ang2X + invI201 * jb.ang2Y + invI202 * jb.ang2Z;
+			__tmp__Y5 = invI210 * jb.ang2X + invI211 * jb.ang2Y + invI212 * jb.ang2Z;
+			__tmp__Z5 = invI220 * jb.ang2X + invI221 * jb.ang2Y + invI222 * jb.ang2Z;
+			md.invMAngB2X = __tmp__X5;
+			md.invMAngB2Y = __tmp__Y5;
+			md.invMAngB2Z = __tmp__Z5;
+			var invMassTB00 = invM1 + invM2 + (md.invMAngT1X * jt.ang1X + md.invMAngT1Y * jt.ang1Y + md.invMAngT1Z * jt.ang1Z) + (md.invMAngT2X * jt.ang2X + md.invMAngT2Y * jt.ang2Y + md.invMAngT2Z * jt.ang2Z);
+			var invMassTB01 = md.invMAngT1X * jb.ang1X + md.invMAngT1Y * jb.ang1Y + md.invMAngT1Z * jb.ang1Z + (md.invMAngT2X * jb.ang2X + md.invMAngT2Y * jb.ang2Y + md.invMAngT2Z * jb.ang2Z);
+			var invMassTB11 = invM1 + invM2 + (md.invMAngB1X * jb.ang1X + md.invMAngB1Y * jb.ang1Y + md.invMAngB1Z * jb.ang1Z) + (md.invMAngB2X * jb.ang2X + md.invMAngB2Y * jb.ang2Y + md.invMAngB2Z * jb.ang2Z);
+			var invDet = invMassTB00 * invMassTB11 - invMassTB01 * invMassTB01;
+			if(invDet != 0) {
+				invDet = 1 / invDet;
+			}
+			md.massTB00 = invMassTB11 * invDet;
+			md.massTB01 = -invMassTB01 * invDet;
+			md.massTB10 = -invMassTB01 * invDet;
+			md.massTB11 = invMassTB00 * invDet;
+		}
+	}
+	,warmStart: function(timeStep) {
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = this._b1._velX;
+		lv1Y = this._b1._velY;
+		lv1Z = this._b1._velZ;
+		lv2X = this._b2._velX;
+		lv2Y = this._b2._velY;
+		lv2Z = this._b2._velZ;
+		av1X = this._b1._angVelX;
+		av1Y = this._b1._angVelY;
+		av1Z = this._b1._angVelZ;
+		av2X = this._b2._angVelX;
+		av2Y = this._b2._angVelY;
+		av2Z = this._b2._angVelZ;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var imp = row.impulse;
+			var md = this.massData[i];
+			var jt = row.jacobianT;
+			var jb = row.jacobianB;
+			var impulseN = imp.impulseN;
+			var impulseT = imp.impulseLX * jt.lin1X + imp.impulseLY * jt.lin1Y + imp.impulseLZ * jt.lin1Z;
+			var impulseB = imp.impulseLX * jb.lin1X + imp.impulseLY * jb.lin1Y + imp.impulseLZ * jb.lin1Z;
+			imp.impulseT = impulseT;
+			imp.impulseB = impulseB;
+			imp.impulseN *= timeStep.dtRatio;
+			imp.impulseT *= timeStep.dtRatio;
+			imp.impulseB *= timeStep.dtRatio;
+			lv1X += md.invMLinN1X * impulseN;
+			lv1Y += md.invMLinN1Y * impulseN;
+			lv1Z += md.invMLinN1Z * impulseN;
+			lv1X += md.invMLinT1X * impulseT;
+			lv1Y += md.invMLinT1Y * impulseT;
+			lv1Z += md.invMLinT1Z * impulseT;
+			lv1X += md.invMLinB1X * impulseB;
+			lv1Y += md.invMLinB1Y * impulseB;
+			lv1Z += md.invMLinB1Z * impulseB;
+			lv2X += md.invMLinN2X * -impulseN;
+			lv2Y += md.invMLinN2Y * -impulseN;
+			lv2Z += md.invMLinN2Z * -impulseN;
+			lv2X += md.invMLinT2X * -impulseT;
+			lv2Y += md.invMLinT2Y * -impulseT;
+			lv2Z += md.invMLinT2Z * -impulseT;
+			lv2X += md.invMLinB2X * -impulseB;
+			lv2Y += md.invMLinB2Y * -impulseB;
+			lv2Z += md.invMLinB2Z * -impulseB;
+			av1X += md.invMAngN1X * impulseN;
+			av1Y += md.invMAngN1Y * impulseN;
+			av1Z += md.invMAngN1Z * impulseN;
+			av1X += md.invMAngT1X * impulseT;
+			av1Y += md.invMAngT1Y * impulseT;
+			av1Z += md.invMAngT1Z * impulseT;
+			av1X += md.invMAngB1X * impulseB;
+			av1Y += md.invMAngB1Y * impulseB;
+			av1Z += md.invMAngB1Z * impulseB;
+			av2X += md.invMAngN2X * -impulseN;
+			av2Y += md.invMAngN2Y * -impulseN;
+			av2Z += md.invMAngN2Z * -impulseN;
+			av2X += md.invMAngT2X * -impulseT;
+			av2Y += md.invMAngT2Y * -impulseT;
+			av2Z += md.invMAngT2Z * -impulseT;
+			av2X += md.invMAngB2X * -impulseB;
+			av2Y += md.invMAngB2Y * -impulseB;
+			av2Z += md.invMAngB2Z * -impulseB;
+		}
+		this._b1._velX = lv1X;
+		this._b1._velY = lv1Y;
+		this._b1._velZ = lv1Z;
+		this._b2._velX = lv2X;
+		this._b2._velY = lv2Y;
+		this._b2._velZ = lv2Z;
+		this._b1._angVelX = av1X;
+		this._b1._angVelY = av1Y;
+		this._b1._angVelZ = av1Z;
+		this._b2._angVelX = av2X;
+		this._b2._angVelY = av2Y;
+		this._b2._angVelZ = av2Z;
+	}
+	,solveVelocity: function() {
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = this._b1._velX;
+		lv1Y = this._b1._velY;
+		lv1Z = this._b1._velZ;
+		lv2X = this._b2._velX;
+		lv2Y = this._b2._velY;
+		lv2Z = this._b2._velZ;
+		av1X = this._b1._angVelX;
+		av1Y = this._b1._angVelY;
+		av1Z = this._b1._angVelZ;
+		av2X = this._b2._angVelX;
+		av2Y = this._b2._angVelY;
+		av2Z = this._b2._angVelZ;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var imp = row.impulse;
+			var rvt = 0;
+			var j = row.jacobianT;
+			rvt += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			rvt -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			rvt += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			rvt -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			var rvb = 0;
+			j = row.jacobianB;
+			rvb += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			rvb -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			rvb += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			rvb -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			var impulseT = -(rvt * md.massTB00 + rvb * md.massTB01);
+			var impulseB = -(rvt * md.massTB10 + rvb * md.massTB11);
+			var oldImpulseT = imp.impulseT;
+			var oldImpulseB = imp.impulseB;
+			imp.impulseT += impulseT;
+			imp.impulseB += impulseB;
+			var maxImpulse = row.friction * imp.impulseN;
+			if(maxImpulse == 0) {
+				imp.impulseT = 0;
+				imp.impulseB = 0;
+			} else {
+				var impulseLengthSq = imp.impulseT * imp.impulseT + imp.impulseB * imp.impulseB;
+				if(impulseLengthSq > maxImpulse * maxImpulse) {
+					var invL = maxImpulse / Math.sqrt(impulseLengthSq);
+					imp.impulseT *= invL;
+					imp.impulseB *= invL;
+				}
+			}
+			impulseT = imp.impulseT - oldImpulseT;
+			impulseB = imp.impulseB - oldImpulseB;
+			lv1X += md.invMLinT1X * impulseT;
+			lv1Y += md.invMLinT1Y * impulseT;
+			lv1Z += md.invMLinT1Z * impulseT;
+			lv1X += md.invMLinB1X * impulseB;
+			lv1Y += md.invMLinB1Y * impulseB;
+			lv1Z += md.invMLinB1Z * impulseB;
+			lv2X += md.invMLinT2X * -impulseT;
+			lv2Y += md.invMLinT2Y * -impulseT;
+			lv2Z += md.invMLinT2Z * -impulseT;
+			lv2X += md.invMLinB2X * -impulseB;
+			lv2Y += md.invMLinB2Y * -impulseB;
+			lv2Z += md.invMLinB2Z * -impulseB;
+			av1X += md.invMAngT1X * impulseT;
+			av1Y += md.invMAngT1Y * impulseT;
+			av1Z += md.invMAngT1Z * impulseT;
+			av1X += md.invMAngB1X * impulseB;
+			av1Y += md.invMAngB1Y * impulseB;
+			av1Z += md.invMAngB1Z * impulseB;
+			av2X += md.invMAngT2X * -impulseT;
+			av2Y += md.invMAngT2Y * -impulseT;
+			av2Z += md.invMAngT2Z * -impulseT;
+			av2X += md.invMAngB2X * -impulseB;
+			av2Y += md.invMAngB2Y * -impulseB;
+			av2Z += md.invMAngB2Z * -impulseB;
+		}
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var imp = row.impulse;
+			var rvn = 0;
+			var j = row.jacobianN;
+			rvn += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			rvn -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			rvn += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			rvn -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			var impulseN = (row.rhs - rvn) * md.massN;
+			var oldImpulseN = imp.impulseN;
+			imp.impulseN += impulseN;
+			if(imp.impulseN < 0) {
+				imp.impulseN = 0;
+			}
+			impulseN = imp.impulseN - oldImpulseN;
+			lv1X += md.invMLinN1X * impulseN;
+			lv1Y += md.invMLinN1Y * impulseN;
+			lv1Z += md.invMLinN1Z * impulseN;
+			lv2X += md.invMLinN2X * -impulseN;
+			lv2Y += md.invMLinN2Y * -impulseN;
+			lv2Z += md.invMLinN2Z * -impulseN;
+			av1X += md.invMAngN1X * impulseN;
+			av1Y += md.invMAngN1Y * impulseN;
+			av1Z += md.invMAngN1Z * impulseN;
+			av2X += md.invMAngN2X * -impulseN;
+			av2Y += md.invMAngN2Y * -impulseN;
+			av2Z += md.invMAngN2Z * -impulseN;
+		}
+		this._b1._velX = lv1X;
+		this._b1._velY = lv1Y;
+		this._b1._velZ = lv1Z;
+		this._b2._velX = lv2X;
+		this._b2._velY = lv2Y;
+		this._b2._velZ = lv2Z;
+		this._b1._angVelX = av1X;
+		this._b1._angVelY = av1Y;
+		this._b1._angVelZ = av1Z;
+		this._b2._angVelX = av2X;
+		this._b2._angVelY = av2Y;
+		this._b2._angVelZ = av2Z;
+	}
+	,preSolvePosition: function(timeStep) {
+		this.constraint._syncManifold();
+		this.constraint._getPositionSolverInfo(this.info);
+		var invM1 = this._b1._invMass;
+		var invM2 = this._b2._invMass;
+		var invI100;
+		var invI101;
+		var invI102;
+		var invI110;
+		var invI111;
+		var invI112;
+		var invI120;
+		var invI121;
+		var invI122;
+		var invI200;
+		var invI201;
+		var invI202;
+		var invI210;
+		var invI211;
+		var invI212;
+		var invI220;
+		var invI221;
+		var invI222;
+		invI100 = this._b1._invInertia00;
+		invI101 = this._b1._invInertia01;
+		invI102 = this._b1._invInertia02;
+		invI110 = this._b1._invInertia10;
+		invI111 = this._b1._invInertia11;
+		invI112 = this._b1._invInertia12;
+		invI120 = this._b1._invInertia20;
+		invI121 = this._b1._invInertia21;
+		invI122 = this._b1._invInertia22;
+		invI200 = this._b2._invInertia00;
+		invI201 = this._b2._invInertia01;
+		invI202 = this._b2._invInertia02;
+		invI210 = this._b2._invInertia10;
+		invI211 = this._b2._invInertia11;
+		invI212 = this._b2._invInertia12;
+		invI220 = this._b2._invInertia20;
+		invI221 = this._b2._invInertia21;
+		invI222 = this._b2._invInertia22;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var md = this.massData[i];
+			var j = this.info.rows[i].jacobianN;
+			md.invMLinN1X = j.lin1X * invM1;
+			md.invMLinN1Y = j.lin1Y * invM1;
+			md.invMLinN1Z = j.lin1Z * invM1;
+			md.invMLinN2X = j.lin2X * invM2;
+			md.invMLinN2Y = j.lin2Y * invM2;
+			md.invMLinN2Z = j.lin2Z * invM2;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = invI100 * j.ang1X + invI101 * j.ang1Y + invI102 * j.ang1Z;
+			__tmp__Y = invI110 * j.ang1X + invI111 * j.ang1Y + invI112 * j.ang1Z;
+			__tmp__Z = invI120 * j.ang1X + invI121 * j.ang1Y + invI122 * j.ang1Z;
+			md.invMAngN1X = __tmp__X;
+			md.invMAngN1Y = __tmp__Y;
+			md.invMAngN1Z = __tmp__Z;
+			var __tmp__X1;
+			var __tmp__Y1;
+			var __tmp__Z1;
+			__tmp__X1 = invI200 * j.ang2X + invI201 * j.ang2Y + invI202 * j.ang2Z;
+			__tmp__Y1 = invI210 * j.ang2X + invI211 * j.ang2Y + invI212 * j.ang2Z;
+			__tmp__Z1 = invI220 * j.ang2X + invI221 * j.ang2Y + invI222 * j.ang2Z;
+			md.invMAngN2X = __tmp__X1;
+			md.invMAngN2Y = __tmp__Y1;
+			md.invMAngN2Z = __tmp__Z1;
+			md.massN = invM1 + invM2 + (md.invMAngN1X * j.ang1X + md.invMAngN1Y * j.ang1Y + md.invMAngN1Z * j.ang1Z) + (md.invMAngN2X * j.ang2X + md.invMAngN2Y * j.ang2Y + md.invMAngN2Z * j.ang2Z);
+			if(md.massN != 0) {
+				md.massN = 1 / md.massN;
+			}
+		}
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) this.info.rows[_g++].impulse.impulseP = 0;
+	}
+	,solvePositionSplitImpulse: function() {
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = this._b1._pseudoVelX;
+		lv1Y = this._b1._pseudoVelY;
+		lv1Z = this._b1._pseudoVelZ;
+		lv2X = this._b2._pseudoVelX;
+		lv2Y = this._b2._pseudoVelY;
+		lv2Z = this._b2._pseudoVelZ;
+		av1X = this._b1._angPseudoVelX;
+		av1Y = this._b1._angPseudoVelY;
+		av1Z = this._b1._angPseudoVelZ;
+		av2X = this._b2._angPseudoVelX;
+		av2Y = this._b2._angPseudoVelY;
+		av2Z = this._b2._angPseudoVelZ;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var imp = row.impulse;
+			var j = row.jacobianN;
+			var rvn = 0;
+			rvn += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			rvn -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			rvn += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			rvn -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			var impulseP = (row.rhs - rvn) * md.massN * oimo_common_Setting.positionSplitImpulseBaumgarte;
+			var oldImpulseP = imp.impulseP;
+			imp.impulseP += impulseP;
+			if(imp.impulseP < 0) {
+				imp.impulseP = 0;
+			}
+			impulseP = imp.impulseP - oldImpulseP;
+			lv1X += md.invMLinN1X * impulseP;
+			lv1Y += md.invMLinN1Y * impulseP;
+			lv1Z += md.invMLinN1Z * impulseP;
+			lv2X += md.invMLinN2X * -impulseP;
+			lv2Y += md.invMLinN2Y * -impulseP;
+			lv2Z += md.invMLinN2Z * -impulseP;
+			av1X += md.invMAngN1X * impulseP;
+			av1Y += md.invMAngN1Y * impulseP;
+			av1Z += md.invMAngN1Z * impulseP;
+			av2X += md.invMAngN2X * -impulseP;
+			av2Y += md.invMAngN2Y * -impulseP;
+			av2Z += md.invMAngN2Z * -impulseP;
+		}
+		this._b1._pseudoVelX = lv1X;
+		this._b1._pseudoVelY = lv1Y;
+		this._b1._pseudoVelZ = lv1Z;
+		this._b2._pseudoVelX = lv2X;
+		this._b2._pseudoVelY = lv2Y;
+		this._b2._pseudoVelZ = lv2Z;
+		this._b1._angPseudoVelX = av1X;
+		this._b1._angPseudoVelY = av1Y;
+		this._b1._angPseudoVelZ = av1Z;
+		this._b2._angPseudoVelX = av2X;
+		this._b2._angPseudoVelY = av2Y;
+		this._b2._angPseudoVelZ = av2Z;
+	}
+	,solvePositionNgs: function(timeStep) {
+		this.constraint._syncManifold();
+		this.constraint._getPositionSolverInfo(this.info);
+		var invM1 = this._b1._invMass;
+		var invM2 = this._b2._invMass;
+		var invI100;
+		var invI101;
+		var invI102;
+		var invI110;
+		var invI111;
+		var invI112;
+		var invI120;
+		var invI121;
+		var invI122;
+		var invI200;
+		var invI201;
+		var invI202;
+		var invI210;
+		var invI211;
+		var invI212;
+		var invI220;
+		var invI221;
+		var invI222;
+		invI100 = this._b1._invInertia00;
+		invI101 = this._b1._invInertia01;
+		invI102 = this._b1._invInertia02;
+		invI110 = this._b1._invInertia10;
+		invI111 = this._b1._invInertia11;
+		invI112 = this._b1._invInertia12;
+		invI120 = this._b1._invInertia20;
+		invI121 = this._b1._invInertia21;
+		invI122 = this._b1._invInertia22;
+		invI200 = this._b2._invInertia00;
+		invI201 = this._b2._invInertia01;
+		invI202 = this._b2._invInertia02;
+		invI210 = this._b2._invInertia10;
+		invI211 = this._b2._invInertia11;
+		invI212 = this._b2._invInertia12;
+		invI220 = this._b2._invInertia20;
+		invI221 = this._b2._invInertia21;
+		invI222 = this._b2._invInertia22;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var md = this.massData[i];
+			var j = this.info.rows[i].jacobianN;
+			md.invMLinN1X = j.lin1X * invM1;
+			md.invMLinN1Y = j.lin1Y * invM1;
+			md.invMLinN1Z = j.lin1Z * invM1;
+			md.invMLinN2X = j.lin2X * invM2;
+			md.invMLinN2Y = j.lin2Y * invM2;
+			md.invMLinN2Z = j.lin2Z * invM2;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = invI100 * j.ang1X + invI101 * j.ang1Y + invI102 * j.ang1Z;
+			__tmp__Y = invI110 * j.ang1X + invI111 * j.ang1Y + invI112 * j.ang1Z;
+			__tmp__Z = invI120 * j.ang1X + invI121 * j.ang1Y + invI122 * j.ang1Z;
+			md.invMAngN1X = __tmp__X;
+			md.invMAngN1Y = __tmp__Y;
+			md.invMAngN1Z = __tmp__Z;
+			var __tmp__X1;
+			var __tmp__Y1;
+			var __tmp__Z1;
+			__tmp__X1 = invI200 * j.ang2X + invI201 * j.ang2Y + invI202 * j.ang2Z;
+			__tmp__Y1 = invI210 * j.ang2X + invI211 * j.ang2Y + invI212 * j.ang2Z;
+			__tmp__Z1 = invI220 * j.ang2X + invI221 * j.ang2Y + invI222 * j.ang2Z;
+			md.invMAngN2X = __tmp__X1;
+			md.invMAngN2Y = __tmp__Y1;
+			md.invMAngN2Z = __tmp__Z1;
+			md.massN = invM1 + invM2 + (md.invMAngN1X * j.ang1X + md.invMAngN1Y * j.ang1Y + md.invMAngN1Z * j.ang1Z) + (md.invMAngN2X * j.ang2X + md.invMAngN2Y * j.ang2Y + md.invMAngN2Z * j.ang2Z);
+			if(md.massN != 0) {
+				md.massN = 1 / md.massN;
+			}
+		}
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = 0;
+		lv1Y = 0;
+		lv1Z = 0;
+		lv2X = 0;
+		lv2Y = 0;
+		lv2Z = 0;
+		av1X = 0;
+		av1Y = 0;
+		av1Z = 0;
+		av2X = 0;
+		av2Y = 0;
+		av2Z = 0;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var imp = row.impulse;
+			var j = row.jacobianN;
+			var rvn = 0;
+			rvn += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			rvn -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			rvn += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			rvn -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			var impulseP = (row.rhs - rvn) * md.massN * oimo_common_Setting.positionNgsBaumgarte;
+			var oldImpulseP = imp.impulseP;
+			imp.impulseP += impulseP;
+			if(imp.impulseP < 0) {
+				imp.impulseP = 0;
+			}
+			impulseP = imp.impulseP - oldImpulseP;
+			lv1X += md.invMLinN1X * impulseP;
+			lv1Y += md.invMLinN1Y * impulseP;
+			lv1Z += md.invMLinN1Z * impulseP;
+			lv2X += md.invMLinN2X * -impulseP;
+			lv2Y += md.invMLinN2Y * -impulseP;
+			lv2Z += md.invMLinN2Z * -impulseP;
+			av1X += md.invMAngN1X * impulseP;
+			av1Y += md.invMAngN1Y * impulseP;
+			av1Z += md.invMAngN1Z * impulseP;
+			av2X += md.invMAngN2X * -impulseP;
+			av2Y += md.invMAngN2Y * -impulseP;
+			av2Z += md.invMAngN2Z * -impulseP;
+		}
+		var _this = this._b1;
+		_this._transform._positionX += lv1X;
+		_this._transform._positionY += lv1Y;
+		_this._transform._positionZ += lv1Z;
+		var _this = this._b2;
+		_this._transform._positionX += lv2X;
+		_this._transform._positionY += lv2Y;
+		_this._transform._positionZ += lv2Z;
+		var _this = this._b1;
+		var theta = Math.sqrt(av1X * av1X + av1Y * av1Y + av1Z * av1Z);
+		var halfTheta = theta * 0.5;
+		var rotationToSinAxisFactor;
+		var cosHalfTheta;
+		if(halfTheta < 0.5) {
+			var ht2 = halfTheta * halfTheta;
+			rotationToSinAxisFactor = 0.5 * (1 - ht2 * 0.16666666666666666 + ht2 * ht2 * 0.0083333333333333332);
+			cosHalfTheta = 1 - ht2 * 0.5 + ht2 * ht2 * 0.041666666666666664;
+		} else {
+			rotationToSinAxisFactor = Math.sin(halfTheta) / theta;
+			cosHalfTheta = Math.cos(halfTheta);
+		}
+		var sinAxisX;
+		var sinAxisY;
+		var sinAxisZ;
+		sinAxisX = av1X * rotationToSinAxisFactor;
+		sinAxisY = av1Y * rotationToSinAxisFactor;
+		sinAxisZ = av1Z * rotationToSinAxisFactor;
+		var dqX;
+		var dqY;
+		var dqZ;
+		var dqW;
+		dqX = sinAxisX;
+		dqY = sinAxisY;
+		dqZ = sinAxisZ;
+		dqW = cosHalfTheta;
+		var qX;
+		var qY;
+		var qZ;
+		var qW;
+		var e00 = _this._transform._rotation00;
+		var e11 = _this._transform._rotation11;
+		var e22 = _this._transform._rotation22;
+		var t = e00 + e11 + e22;
+		var s;
+		if(t > 0) {
+			s = Math.sqrt(t + 1);
+			qW = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation21 - _this._transform._rotation12) * s;
+			qY = (_this._transform._rotation02 - _this._transform._rotation20) * s;
+			qZ = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+		} else if(e00 > e11) {
+			if(e00 > e22) {
+				s = Math.sqrt(e00 - e11 - e22 + 1);
+				qX = 0.5 * s;
+				s = 0.5 / s;
+				qY = (_this._transform._rotation01 + _this._transform._rotation10) * s;
+				qZ = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+				qW = (_this._transform._rotation21 - _this._transform._rotation12) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				qZ = 0.5 * s;
+				s = 0.5 / s;
+				qX = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+				qY = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+				qW = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+			}
+		} else if(e11 > e22) {
+			s = Math.sqrt(e11 - e22 - e00 + 1);
+			qY = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation01 + _this._transform._rotation10) * s;
+			qZ = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+			qW = (_this._transform._rotation02 - _this._transform._rotation20) * s;
+		} else {
+			s = Math.sqrt(e22 - e00 - e11 + 1);
+			qZ = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+			qY = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+			qW = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+		}
+		qX = dqW * qX + dqX * qW + dqY * qZ - dqZ * qY;
+		qY = dqW * qY - dqX * qZ + dqY * qW + dqZ * qX;
+		qZ = dqW * qZ + dqX * qY - dqY * qX + dqZ * qW;
+		qW = dqW * qW - dqX * qX - dqY * qY - dqZ * qZ;
+		var l = qX * qX + qY * qY + qZ * qZ + qW * qW;
+		if(l > 1e-32) {
+			l = 1 / Math.sqrt(l);
+		}
+		qX *= l;
+		qY *= l;
+		qZ *= l;
+		qW *= l;
+		var x = qX;
+		var y = qY;
+		var z = qZ;
+		var w = qW;
+		var x2 = 2 * x;
+		var y2 = 2 * y;
+		var z2 = 2 * z;
+		var xx = x * x2;
+		var yy = y * y2;
+		var zz = z * z2;
+		var xy = x * y2;
+		var yz = y * z2;
+		var xz = x * z2;
+		var wx = w * x2;
+		var wy = w * y2;
+		var wz = w * z2;
+		_this._transform._rotation00 = 1 - yy - zz;
+		_this._transform._rotation01 = xy - wz;
+		_this._transform._rotation02 = xz + wy;
+		_this._transform._rotation10 = xy + wz;
+		_this._transform._rotation11 = 1 - xx - zz;
+		_this._transform._rotation12 = yz - wx;
+		_this._transform._rotation20 = xz - wy;
+		_this._transform._rotation21 = yz + wx;
+		_this._transform._rotation22 = 1 - xx - yy;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
+		__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
+		__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
+		__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
+		__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
+		__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
+		__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
+		__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
+		__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
+		__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
+		__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
+		__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
+		__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
+		__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
+		__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
+		__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
+		__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		_this._invInertia00 *= _this._rotFactor.x;
+		_this._invInertia01 *= _this._rotFactor.x;
+		_this._invInertia02 *= _this._rotFactor.x;
+		_this._invInertia10 *= _this._rotFactor.y;
+		_this._invInertia11 *= _this._rotFactor.y;
+		_this._invInertia12 *= _this._rotFactor.y;
+		_this._invInertia20 *= _this._rotFactor.z;
+		_this._invInertia21 *= _this._rotFactor.z;
+		_this._invInertia22 *= _this._rotFactor.z;
+		var _this = this._b2;
+		var theta = Math.sqrt(av2X * av2X + av2Y * av2Y + av2Z * av2Z);
+		var halfTheta = theta * 0.5;
+		var rotationToSinAxisFactor;
+		var cosHalfTheta;
+		if(halfTheta < 0.5) {
+			var ht2 = halfTheta * halfTheta;
+			rotationToSinAxisFactor = 0.5 * (1 - ht2 * 0.16666666666666666 + ht2 * ht2 * 0.0083333333333333332);
+			cosHalfTheta = 1 - ht2 * 0.5 + ht2 * ht2 * 0.041666666666666664;
+		} else {
+			rotationToSinAxisFactor = Math.sin(halfTheta) / theta;
+			cosHalfTheta = Math.cos(halfTheta);
+		}
+		var sinAxisX;
+		var sinAxisY;
+		var sinAxisZ;
+		sinAxisX = av2X * rotationToSinAxisFactor;
+		sinAxisY = av2Y * rotationToSinAxisFactor;
+		sinAxisZ = av2Z * rotationToSinAxisFactor;
+		var dqX;
+		var dqY;
+		var dqZ;
+		var dqW;
+		dqX = sinAxisX;
+		dqY = sinAxisY;
+		dqZ = sinAxisZ;
+		dqW = cosHalfTheta;
+		var qX;
+		var qY;
+		var qZ;
+		var qW;
+		var e00 = _this._transform._rotation00;
+		var e11 = _this._transform._rotation11;
+		var e22 = _this._transform._rotation22;
+		var t = e00 + e11 + e22;
+		var s;
+		if(t > 0) {
+			s = Math.sqrt(t + 1);
+			qW = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation21 - _this._transform._rotation12) * s;
+			qY = (_this._transform._rotation02 - _this._transform._rotation20) * s;
+			qZ = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+		} else if(e00 > e11) {
+			if(e00 > e22) {
+				s = Math.sqrt(e00 - e11 - e22 + 1);
+				qX = 0.5 * s;
+				s = 0.5 / s;
+				qY = (_this._transform._rotation01 + _this._transform._rotation10) * s;
+				qZ = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+				qW = (_this._transform._rotation21 - _this._transform._rotation12) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				qZ = 0.5 * s;
+				s = 0.5 / s;
+				qX = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+				qY = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+				qW = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+			}
+		} else if(e11 > e22) {
+			s = Math.sqrt(e11 - e22 - e00 + 1);
+			qY = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation01 + _this._transform._rotation10) * s;
+			qZ = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+			qW = (_this._transform._rotation02 - _this._transform._rotation20) * s;
+		} else {
+			s = Math.sqrt(e22 - e00 - e11 + 1);
+			qZ = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+			qY = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+			qW = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+		}
+		qX = dqW * qX + dqX * qW + dqY * qZ - dqZ * qY;
+		qY = dqW * qY - dqX * qZ + dqY * qW + dqZ * qX;
+		qZ = dqW * qZ + dqX * qY - dqY * qX + dqZ * qW;
+		qW = dqW * qW - dqX * qX - dqY * qY - dqZ * qZ;
+		var l = qX * qX + qY * qY + qZ * qZ + qW * qW;
+		if(l > 1e-32) {
+			l = 1 / Math.sqrt(l);
+		}
+		qX *= l;
+		qY *= l;
+		qZ *= l;
+		qW *= l;
+		var x = qX;
+		var y = qY;
+		var z = qZ;
+		var w = qW;
+		var x2 = 2 * x;
+		var y2 = 2 * y;
+		var z2 = 2 * z;
+		var xx = x * x2;
+		var yy = y * y2;
+		var zz = z * z2;
+		var xy = x * y2;
+		var yz = y * z2;
+		var xz = x * z2;
+		var wx = w * x2;
+		var wy = w * y2;
+		var wz = w * z2;
+		_this._transform._rotation00 = 1 - yy - zz;
+		_this._transform._rotation01 = xy - wz;
+		_this._transform._rotation02 = xz + wy;
+		_this._transform._rotation10 = xy + wz;
+		_this._transform._rotation11 = 1 - xx - zz;
+		_this._transform._rotation12 = yz - wx;
+		_this._transform._rotation20 = xz - wy;
+		_this._transform._rotation21 = yz + wx;
+		_this._transform._rotation22 = 1 - xx - yy;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
+		__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
+		__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
+		__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
+		__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
+		__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
+		__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
+		__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
+		__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
+		__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
+		__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
+		__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
+		__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
+		__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
+		__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
+		__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
+		__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		_this._invInertia00 *= _this._rotFactor.x;
+		_this._invInertia01 *= _this._rotFactor.x;
+		_this._invInertia02 *= _this._rotFactor.x;
+		_this._invInertia10 *= _this._rotFactor.y;
+		_this._invInertia11 *= _this._rotFactor.y;
+		_this._invInertia12 *= _this._rotFactor.y;
+		_this._invInertia20 *= _this._rotFactor.z;
+		_this._invInertia21 *= _this._rotFactor.z;
+		_this._invInertia22 *= _this._rotFactor.z;
+	}
+	,postSolve: function() {
+		var lin1X;
+		var lin1Y;
+		var lin1Z;
+		var ang1X;
+		var ang1Y;
+		var ang1Z;
+		var ang2X;
+		var ang2Y;
+		var ang2Z;
+		lin1X = 0;
+		lin1Y = 0;
+		lin1Z = 0;
+		ang1X = 0;
+		ang1Y = 0;
+		ang1Z = 0;
+		ang2X = 0;
+		ang2Y = 0;
+		ang2Z = 0;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var row = this.info.rows[_g++];
+			var imp = row.impulse;
+			var jn = row.jacobianN;
+			var jt = row.jacobianT;
+			var jb = row.jacobianB;
+			var impN = imp.impulseN;
+			var impT = imp.impulseT;
+			var impB = imp.impulseB;
+			var impulseLX;
+			var impulseLY;
+			var impulseLZ;
+			impulseLX = 0;
+			impulseLY = 0;
+			impulseLZ = 0;
+			impulseLX += jt.lin1X * impT;
+			impulseLY += jt.lin1Y * impT;
+			impulseLZ += jt.lin1Z * impT;
+			impulseLX += jb.lin1X * impB;
+			impulseLY += jb.lin1Y * impB;
+			impulseLZ += jb.lin1Z * impB;
+			imp.impulseLX = impulseLX;
+			imp.impulseLY = impulseLY;
+			imp.impulseLZ = impulseLZ;
+			lin1X += jn.lin1X * impN;
+			lin1Y += jn.lin1Y * impN;
+			lin1Z += jn.lin1Z * impN;
+			ang1X += jn.ang1X * impN;
+			ang1Y += jn.ang1Y * impN;
+			ang1Z += jn.ang1Z * impN;
+			ang2X += jn.ang2X * impN;
+			ang2Y += jn.ang2Y * impN;
+			ang2Z += jn.ang2Z * impN;
+			lin1X += jt.lin1X * impT;
+			lin1Y += jt.lin1Y * impT;
+			lin1Z += jt.lin1Z * impT;
+			ang1X += jt.ang1X * impT;
+			ang1Y += jt.ang1Y * impT;
+			ang1Z += jt.ang1Z * impT;
+			ang2X += jt.ang2X * impT;
+			ang2Y += jt.ang2Y * impT;
+			ang2Z += jt.ang2Z * impT;
+			lin1X += jb.lin1X * impB;
+			lin1Y += jb.lin1Y * impB;
+			lin1Z += jb.lin1Z * impB;
+			ang1X += jb.ang1X * impB;
+			ang1Y += jb.ang1Y * impB;
+			ang1Z += jb.ang1Z * impB;
+			ang2X += jb.ang2X * impB;
+			ang2Y += jb.ang2Y * impB;
+			ang2Z += jb.ang2Z * impB;
+		}
+		this._b1._linearContactImpulseX += lin1X;
+		this._b1._linearContactImpulseY += lin1Y;
+		this._b1._linearContactImpulseZ += lin1Z;
+		this._b1._angularContactImpulseX += ang1X;
+		this._b1._angularContactImpulseY += ang1Y;
+		this._b1._angularContactImpulseZ += ang1Z;
+		this._b2._linearContactImpulseX -= lin1X;
+		this._b2._linearContactImpulseY -= lin1Y;
+		this._b2._linearContactImpulseZ -= lin1Z;
+		this._b2._angularContactImpulseX -= ang2X;
+		this._b2._angularContactImpulseY -= ang2Y;
+		this._b2._angularContactImpulseZ -= ang2Z;
+		this.constraint._syncManifold();
+	}
+	,__class__: oimo_dynamics_constraint_solver_pgs_PgsContactConstraintSolver
+});
+var oimo_dynamics_constraint_solver_pgs_PgsJointConstraintSolver = function(joint) {
+	oimo_dynamics_constraint_ConstraintSolver.call(this);
+	this.joint = joint;
+	this.info = new oimo_dynamics_constraint_info_joint_JointSolverInfo();
+	this.massData = new Array(oimo_common_Setting.maxJacobianRows);
+	var _g = 0;
+	var _g1 = this.massData.length;
+	while(_g < _g1) this.massData[_g++] = new oimo_dynamics_constraint_solver_common_JointSolverMassDataRow();
+};
+$hxClasses["oimo.dynamics.constraint.solver.pgs.PgsJointConstraintSolver"] = oimo_dynamics_constraint_solver_pgs_PgsJointConstraintSolver;
+oimo_dynamics_constraint_solver_pgs_PgsJointConstraintSolver.__name__ = "oimo.dynamics.constraint.solver.pgs.PgsJointConstraintSolver";
+oimo_dynamics_constraint_solver_pgs_PgsJointConstraintSolver.__super__ = oimo_dynamics_constraint_ConstraintSolver;
+oimo_dynamics_constraint_solver_pgs_PgsJointConstraintSolver.prototype = $extend(oimo_dynamics_constraint_ConstraintSolver.prototype,{
+	preSolveVelocity: function(timeStep) {
+		this.joint._syncAnchors();
+		this.joint._getVelocitySolverInfo(timeStep,this.info);
+		this._b1 = this.info.b1;
+		this._b2 = this.info.b2;
+		var invM1 = this._b1._invMass;
+		var invM2 = this._b2._invMass;
+		var invI100;
+		var invI101;
+		var invI102;
+		var invI110;
+		var invI111;
+		var invI112;
+		var invI120;
+		var invI121;
+		var invI122;
+		var invI200;
+		var invI201;
+		var invI202;
+		var invI210;
+		var invI211;
+		var invI212;
+		var invI220;
+		var invI221;
+		var invI222;
+		invI100 = this._b1._invInertia00;
+		invI101 = this._b1._invInertia01;
+		invI102 = this._b1._invInertia02;
+		invI110 = this._b1._invInertia10;
+		invI111 = this._b1._invInertia11;
+		invI112 = this._b1._invInertia12;
+		invI120 = this._b1._invInertia20;
+		invI121 = this._b1._invInertia21;
+		invI122 = this._b1._invInertia22;
+		invI200 = this._b2._invInertia00;
+		invI201 = this._b2._invInertia01;
+		invI202 = this._b2._invInertia02;
+		invI210 = this._b2._invInertia10;
+		invI211 = this._b2._invInertia11;
+		invI212 = this._b2._invInertia12;
+		invI220 = this._b2._invInertia20;
+		invI221 = this._b2._invInertia21;
+		invI222 = this._b2._invInertia22;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var j = row.jacobian;
+			j.updateSparsity();
+			if((j.flag & 1) != 0) {
+				md.invMLin1X = j.lin1X * invM1;
+				md.invMLin1Y = j.lin1Y * invM1;
+				md.invMLin1Z = j.lin1Z * invM1;
+				md.invMLin2X = j.lin2X * invM2;
+				md.invMLin2Y = j.lin2Y * invM2;
+				md.invMLin2Z = j.lin2Z * invM2;
+			} else {
+				md.invMLin1X = 0;
+				md.invMLin1Y = 0;
+				md.invMLin1Z = 0;
+				md.invMLin2X = 0;
+				md.invMLin2Y = 0;
+				md.invMLin2Z = 0;
+			}
+			if((j.flag & 2) != 0) {
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = invI100 * j.ang1X + invI101 * j.ang1Y + invI102 * j.ang1Z;
+				__tmp__Y = invI110 * j.ang1X + invI111 * j.ang1Y + invI112 * j.ang1Z;
+				__tmp__Z = invI120 * j.ang1X + invI121 * j.ang1Y + invI122 * j.ang1Z;
+				md.invMAng1X = __tmp__X;
+				md.invMAng1Y = __tmp__Y;
+				md.invMAng1Z = __tmp__Z;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = invI200 * j.ang2X + invI201 * j.ang2Y + invI202 * j.ang2Z;
+				__tmp__Y1 = invI210 * j.ang2X + invI211 * j.ang2Y + invI212 * j.ang2Z;
+				__tmp__Z1 = invI220 * j.ang2X + invI221 * j.ang2Y + invI222 * j.ang2Z;
+				md.invMAng2X = __tmp__X1;
+				md.invMAng2Y = __tmp__Y1;
+				md.invMAng2Z = __tmp__Z1;
+			} else {
+				md.invMAng1X = 0;
+				md.invMAng1Y = 0;
+				md.invMAng1Z = 0;
+				md.invMAng2X = 0;
+				md.invMAng2Y = 0;
+				md.invMAng2Z = 0;
+			}
+			md.massWithoutCfm = md.invMLin1X * j.lin1X + md.invMLin1Y * j.lin1Y + md.invMLin1Z * j.lin1Z + (md.invMLin2X * j.lin2X + md.invMLin2Y * j.lin2Y + md.invMLin2Z * j.lin2Z) + (md.invMAng1X * j.ang1X + md.invMAng1Y * j.ang1Y + md.invMAng1Z * j.ang1Z) + (md.invMAng2X * j.ang2X + md.invMAng2Y * j.ang2Y + md.invMAng2Z * j.ang2Z);
+			md.mass = md.massWithoutCfm + row.cfm;
+			if(md.massWithoutCfm != 0) {
+				md.massWithoutCfm = 1 / md.massWithoutCfm;
+			}
+			if(md.mass != 0) {
+				md.mass = 1 / md.mass;
+			}
+		}
+	}
+	,warmStart: function(timeStep) {
+		var factor = this.joint._positionCorrectionAlgorithm == oimo_dynamics_constraint_PositionCorrectionAlgorithm.BAUMGARTE ? oimo_common_Setting.jointWarmStartingFactorForBaungarte : oimo_common_Setting.jointWarmStartingFactor;
+		factor *= timeStep.dtRatio;
+		if(factor <= 0) {
+			var _g = 0;
+			var _g1 = this.info.numRows;
+			while(_g < _g1) {
+				var _this = this.info.rows[_g++].impulse;
+				_this.impulse = 0;
+				_this.impulseM = 0;
+				_this.impulseP = 0;
+			}
+			return;
+		}
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = this._b1._velX;
+		lv1Y = this._b1._velY;
+		lv1Z = this._b1._velZ;
+		lv2X = this._b2._velX;
+		lv2Y = this._b2._velY;
+		lv2Z = this._b2._velZ;
+		av1X = this._b1._angVelX;
+		av1Y = this._b1._angVelY;
+		av1Z = this._b1._angVelZ;
+		av2X = this._b2._angVelX;
+		av2Y = this._b2._angVelY;
+		av2Z = this._b2._angVelZ;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var md = this.massData[i];
+			var imp = this.info.rows[i].impulse;
+			imp.impulse *= factor;
+			imp.impulseM *= factor;
+			var impulse = imp.impulse + imp.impulseM;
+			lv1X += md.invMLin1X * impulse;
+			lv1Y += md.invMLin1Y * impulse;
+			lv1Z += md.invMLin1Z * impulse;
+			lv2X += md.invMLin2X * -impulse;
+			lv2Y += md.invMLin2Y * -impulse;
+			lv2Z += md.invMLin2Z * -impulse;
+			av1X += md.invMAng1X * impulse;
+			av1Y += md.invMAng1Y * impulse;
+			av1Z += md.invMAng1Z * impulse;
+			av2X += md.invMAng2X * -impulse;
+			av2Y += md.invMAng2Y * -impulse;
+			av2Z += md.invMAng2Z * -impulse;
+		}
+		this._b1._velX = lv1X;
+		this._b1._velY = lv1Y;
+		this._b1._velZ = lv1Z;
+		this._b2._velX = lv2X;
+		this._b2._velY = lv2Y;
+		this._b2._velZ = lv2Z;
+		this._b1._angVelX = av1X;
+		this._b1._angVelY = av1Y;
+		this._b1._angVelZ = av1Z;
+		this._b2._angVelX = av2X;
+		this._b2._angVelY = av2Y;
+		this._b2._angVelZ = av2Z;
+	}
+	,solveVelocity: function() {
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = this._b1._velX;
+		lv1Y = this._b1._velY;
+		lv1Z = this._b1._velZ;
+		lv2X = this._b2._velX;
+		lv2Y = this._b2._velY;
+		lv2Z = this._b2._velZ;
+		av1X = this._b1._angVelX;
+		av1Y = this._b1._angVelY;
+		av1Z = this._b1._angVelZ;
+		av2X = this._b2._angVelX;
+		av2Y = this._b2._angVelY;
+		av2Z = this._b2._angVelZ;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var imp = row.impulse;
+			var j = row.jacobian;
+			if(row.motorMaxImpulse == 0) {
+				continue;
+			}
+			var rv = 0;
+			rv += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			rv -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			rv += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			rv -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			var impulseM = (-row.motorSpeed - rv) * md.massWithoutCfm;
+			var oldImpulseM = imp.impulseM;
+			imp.impulseM += impulseM;
+			if(imp.impulseM < -row.motorMaxImpulse) {
+				imp.impulseM = -row.motorMaxImpulse;
+			} else if(imp.impulseM > row.motorMaxImpulse) {
+				imp.impulseM = row.motorMaxImpulse;
+			}
+			impulseM = imp.impulseM - oldImpulseM;
+			if((j.flag & 1) != 0) {
+				lv1X += md.invMLin1X * impulseM;
+				lv1Y += md.invMLin1Y * impulseM;
+				lv1Z += md.invMLin1Z * impulseM;
+				lv2X += md.invMLin2X * -impulseM;
+				lv2Y += md.invMLin2Y * -impulseM;
+				lv2Z += md.invMLin2Z * -impulseM;
+			}
+			if((j.flag & 2) != 0) {
+				av1X += md.invMAng1X * impulseM;
+				av1Y += md.invMAng1Y * impulseM;
+				av1Z += md.invMAng1Z * impulseM;
+				av2X += md.invMAng2X * -impulseM;
+				av2Y += md.invMAng2Y * -impulseM;
+				av2Z += md.invMAng2Z * -impulseM;
+			}
+		}
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var imp = row.impulse;
+			var j = row.jacobian;
+			var rv = 0;
+			rv += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			rv -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			rv += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			rv -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			var impulse = (row.rhs - rv - imp.impulse * row.cfm) * md.mass;
+			var oldImpulse = imp.impulse;
+			imp.impulse += impulse;
+			if(imp.impulse < row.minImpulse) {
+				imp.impulse = row.minImpulse;
+			} else if(imp.impulse > row.maxImpulse) {
+				imp.impulse = row.maxImpulse;
+			}
+			impulse = imp.impulse - oldImpulse;
+			if((j.flag & 1) != 0) {
+				lv1X += md.invMLin1X * impulse;
+				lv1Y += md.invMLin1Y * impulse;
+				lv1Z += md.invMLin1Z * impulse;
+				lv2X += md.invMLin2X * -impulse;
+				lv2Y += md.invMLin2Y * -impulse;
+				lv2Z += md.invMLin2Z * -impulse;
+			}
+			if((j.flag & 2) != 0) {
+				av1X += md.invMAng1X * impulse;
+				av1Y += md.invMAng1Y * impulse;
+				av1Z += md.invMAng1Z * impulse;
+				av2X += md.invMAng2X * -impulse;
+				av2Y += md.invMAng2Y * -impulse;
+				av2Z += md.invMAng2Z * -impulse;
+			}
+		}
+		this._b1._velX = lv1X;
+		this._b1._velY = lv1Y;
+		this._b1._velZ = lv1Z;
+		this._b2._velX = lv2X;
+		this._b2._velY = lv2Y;
+		this._b2._velZ = lv2Z;
+		this._b1._angVelX = av1X;
+		this._b1._angVelY = av1Y;
+		this._b1._angVelZ = av1Z;
+		this._b2._angVelX = av2X;
+		this._b2._angVelY = av2Y;
+		this._b2._angVelZ = av2Z;
+	}
+	,postSolveVelocity: function(timeStep) {
+		var linX;
+		var linY;
+		var linZ;
+		var angX;
+		var angY;
+		var angZ;
+		linX = 0;
+		linY = 0;
+		linZ = 0;
+		angX = 0;
+		angY = 0;
+		angZ = 0;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var row = this.info.rows[_g++];
+			var imp = row.impulse;
+			var j = row.jacobian;
+			if((j.flag & 1) != 0) {
+				linX += j.lin1X * imp.impulse;
+				linY += j.lin1Y * imp.impulse;
+				linZ += j.lin1Z * imp.impulse;
+			} else if((j.flag & 2) != 0) {
+				angX += j.ang1X * imp.impulse;
+				angY += j.ang1Y * imp.impulse;
+				angZ += j.ang1Z * imp.impulse;
+			}
+		}
+		this.joint._appliedForceX = linX * timeStep.invDt;
+		this.joint._appliedForceY = linY * timeStep.invDt;
+		this.joint._appliedForceZ = linZ * timeStep.invDt;
+		this.joint._appliedTorqueX = angX * timeStep.invDt;
+		this.joint._appliedTorqueY = angY * timeStep.invDt;
+		this.joint._appliedTorqueZ = angZ * timeStep.invDt;
+	}
+	,preSolvePosition: function(timeStep) {
+		this.joint._syncAnchors();
+		this.joint._getPositionSolverInfo(this.info);
+		this._b1 = this.info.b1;
+		this._b2 = this.info.b2;
+		var invM1 = this._b1._invMass;
+		var invM2 = this._b2._invMass;
+		var invI100;
+		var invI101;
+		var invI102;
+		var invI110;
+		var invI111;
+		var invI112;
+		var invI120;
+		var invI121;
+		var invI122;
+		var invI200;
+		var invI201;
+		var invI202;
+		var invI210;
+		var invI211;
+		var invI212;
+		var invI220;
+		var invI221;
+		var invI222;
+		invI100 = this._b1._invInertia00;
+		invI101 = this._b1._invInertia01;
+		invI102 = this._b1._invInertia02;
+		invI110 = this._b1._invInertia10;
+		invI111 = this._b1._invInertia11;
+		invI112 = this._b1._invInertia12;
+		invI120 = this._b1._invInertia20;
+		invI121 = this._b1._invInertia21;
+		invI122 = this._b1._invInertia22;
+		invI200 = this._b2._invInertia00;
+		invI201 = this._b2._invInertia01;
+		invI202 = this._b2._invInertia02;
+		invI210 = this._b2._invInertia10;
+		invI211 = this._b2._invInertia11;
+		invI212 = this._b2._invInertia12;
+		invI220 = this._b2._invInertia20;
+		invI221 = this._b2._invInertia21;
+		invI222 = this._b2._invInertia22;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var md = this.massData[i];
+			var j = this.info.rows[i].jacobian;
+			md.invMLin1X = j.lin1X * invM1;
+			md.invMLin1Y = j.lin1Y * invM1;
+			md.invMLin1Z = j.lin1Z * invM1;
+			md.invMLin2X = j.lin2X * invM2;
+			md.invMLin2Y = j.lin2Y * invM2;
+			md.invMLin2Z = j.lin2Z * invM2;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = invI100 * j.ang1X + invI101 * j.ang1Y + invI102 * j.ang1Z;
+			__tmp__Y = invI110 * j.ang1X + invI111 * j.ang1Y + invI112 * j.ang1Z;
+			__tmp__Z = invI120 * j.ang1X + invI121 * j.ang1Y + invI122 * j.ang1Z;
+			md.invMAng1X = __tmp__X;
+			md.invMAng1Y = __tmp__Y;
+			md.invMAng1Z = __tmp__Z;
+			var __tmp__X1;
+			var __tmp__Y1;
+			var __tmp__Z1;
+			__tmp__X1 = invI200 * j.ang2X + invI201 * j.ang2Y + invI202 * j.ang2Z;
+			__tmp__Y1 = invI210 * j.ang2X + invI211 * j.ang2Y + invI212 * j.ang2Z;
+			__tmp__Z1 = invI220 * j.ang2X + invI221 * j.ang2Y + invI222 * j.ang2Z;
+			md.invMAng2X = __tmp__X1;
+			md.invMAng2Y = __tmp__Y1;
+			md.invMAng2Z = __tmp__Z1;
+			md.mass = md.invMLin1X * j.lin1X + md.invMLin1Y * j.lin1Y + md.invMLin1Z * j.lin1Z + (md.invMLin2X * j.lin2X + md.invMLin2Y * j.lin2Y + md.invMLin2Z * j.lin2Z) + (md.invMAng1X * j.ang1X + md.invMAng1Y * j.ang1Y + md.invMAng1Z * j.ang1Z) + (md.invMAng2X * j.ang2X + md.invMAng2Y * j.ang2Y + md.invMAng2Z * j.ang2Z);
+			if(md.mass != 0) {
+				md.mass = 1 / md.mass;
+			}
+		}
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) this.info.rows[_g++].impulse.impulseP = 0;
+	}
+	,solvePositionSplitImpulse: function() {
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = this._b1._pseudoVelX;
+		lv1Y = this._b1._pseudoVelY;
+		lv1Z = this._b1._pseudoVelZ;
+		lv2X = this._b2._pseudoVelX;
+		lv2Y = this._b2._pseudoVelY;
+		lv2Z = this._b2._pseudoVelZ;
+		av1X = this._b1._angPseudoVelX;
+		av1Y = this._b1._angPseudoVelY;
+		av1Z = this._b1._angPseudoVelZ;
+		av2X = this._b2._angPseudoVelX;
+		av2Y = this._b2._angPseudoVelY;
+		av2Z = this._b2._angPseudoVelZ;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var imp = row.impulse;
+			var j = row.jacobian;
+			var rv = 0;
+			rv += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			rv -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			rv += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			rv -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			var impulseP = (row.rhs * oimo_common_Setting.positionSplitImpulseBaumgarte - rv) * md.mass;
+			var oldImpulseP = imp.impulseP;
+			imp.impulseP += impulseP;
+			if(imp.impulseP < row.minImpulse) {
+				imp.impulseP = row.minImpulse;
+			} else if(imp.impulseP > row.maxImpulse) {
+				imp.impulseP = row.maxImpulse;
+			}
+			impulseP = imp.impulseP - oldImpulseP;
+			lv1X += md.invMLin1X * impulseP;
+			lv1Y += md.invMLin1Y * impulseP;
+			lv1Z += md.invMLin1Z * impulseP;
+			lv2X += md.invMLin2X * -impulseP;
+			lv2Y += md.invMLin2Y * -impulseP;
+			lv2Z += md.invMLin2Z * -impulseP;
+			av1X += md.invMAng1X * impulseP;
+			av1Y += md.invMAng1Y * impulseP;
+			av1Z += md.invMAng1Z * impulseP;
+			av2X += md.invMAng2X * -impulseP;
+			av2Y += md.invMAng2Y * -impulseP;
+			av2Z += md.invMAng2Z * -impulseP;
+		}
+		this._b1._pseudoVelX = lv1X;
+		this._b1._pseudoVelY = lv1Y;
+		this._b1._pseudoVelZ = lv1Z;
+		this._b2._pseudoVelX = lv2X;
+		this._b2._pseudoVelY = lv2Y;
+		this._b2._pseudoVelZ = lv2Z;
+		this._b1._angPseudoVelX = av1X;
+		this._b1._angPseudoVelY = av1Y;
+		this._b1._angPseudoVelZ = av1Z;
+		this._b2._angPseudoVelX = av2X;
+		this._b2._angPseudoVelY = av2Y;
+		this._b2._angPseudoVelZ = av2Z;
+	}
+	,solvePositionNgs: function(timeStep) {
+		this.joint._syncAnchors();
+		this.joint._getPositionSolverInfo(this.info);
+		this._b1 = this.info.b1;
+		this._b2 = this.info.b2;
+		var invM1 = this._b1._invMass;
+		var invM2 = this._b2._invMass;
+		var invI100;
+		var invI101;
+		var invI102;
+		var invI110;
+		var invI111;
+		var invI112;
+		var invI120;
+		var invI121;
+		var invI122;
+		var invI200;
+		var invI201;
+		var invI202;
+		var invI210;
+		var invI211;
+		var invI212;
+		var invI220;
+		var invI221;
+		var invI222;
+		invI100 = this._b1._invInertia00;
+		invI101 = this._b1._invInertia01;
+		invI102 = this._b1._invInertia02;
+		invI110 = this._b1._invInertia10;
+		invI111 = this._b1._invInertia11;
+		invI112 = this._b1._invInertia12;
+		invI120 = this._b1._invInertia20;
+		invI121 = this._b1._invInertia21;
+		invI122 = this._b1._invInertia22;
+		invI200 = this._b2._invInertia00;
+		invI201 = this._b2._invInertia01;
+		invI202 = this._b2._invInertia02;
+		invI210 = this._b2._invInertia10;
+		invI211 = this._b2._invInertia11;
+		invI212 = this._b2._invInertia12;
+		invI220 = this._b2._invInertia20;
+		invI221 = this._b2._invInertia21;
+		invI222 = this._b2._invInertia22;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var md = this.massData[i];
+			var j = this.info.rows[i].jacobian;
+			md.invMLin1X = j.lin1X * invM1;
+			md.invMLin1Y = j.lin1Y * invM1;
+			md.invMLin1Z = j.lin1Z * invM1;
+			md.invMLin2X = j.lin2X * invM2;
+			md.invMLin2Y = j.lin2Y * invM2;
+			md.invMLin2Z = j.lin2Z * invM2;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = invI100 * j.ang1X + invI101 * j.ang1Y + invI102 * j.ang1Z;
+			__tmp__Y = invI110 * j.ang1X + invI111 * j.ang1Y + invI112 * j.ang1Z;
+			__tmp__Z = invI120 * j.ang1X + invI121 * j.ang1Y + invI122 * j.ang1Z;
+			md.invMAng1X = __tmp__X;
+			md.invMAng1Y = __tmp__Y;
+			md.invMAng1Z = __tmp__Z;
+			var __tmp__X1;
+			var __tmp__Y1;
+			var __tmp__Z1;
+			__tmp__X1 = invI200 * j.ang2X + invI201 * j.ang2Y + invI202 * j.ang2Z;
+			__tmp__Y1 = invI210 * j.ang2X + invI211 * j.ang2Y + invI212 * j.ang2Z;
+			__tmp__Z1 = invI220 * j.ang2X + invI221 * j.ang2Y + invI222 * j.ang2Z;
+			md.invMAng2X = __tmp__X1;
+			md.invMAng2Y = __tmp__Y1;
+			md.invMAng2Z = __tmp__Z1;
+			md.mass = md.invMLin1X * j.lin1X + md.invMLin1Y * j.lin1Y + md.invMLin1Z * j.lin1Z + (md.invMLin2X * j.lin2X + md.invMLin2Y * j.lin2Y + md.invMLin2Z * j.lin2Z) + (md.invMAng1X * j.ang1X + md.invMAng1Y * j.ang1Y + md.invMAng1Z * j.ang1Z) + (md.invMAng2X * j.ang2X + md.invMAng2Y * j.ang2Y + md.invMAng2Z * j.ang2Z);
+			if(md.mass != 0) {
+				md.mass = 1 / md.mass;
+			}
+		}
+		var lv1X;
+		var lv1Y;
+		var lv1Z;
+		var lv2X;
+		var lv2Y;
+		var lv2Z;
+		var av1X;
+		var av1Y;
+		var av1Z;
+		var av2X;
+		var av2Y;
+		var av2Z;
+		lv1X = 0;
+		lv1Y = 0;
+		lv1Z = 0;
+		lv2X = 0;
+		lv2Y = 0;
+		lv2Z = 0;
+		av1X = 0;
+		av1Y = 0;
+		av1Z = 0;
+		av2X = 0;
+		av2Y = 0;
+		av2Z = 0;
+		var _g = 0;
+		var _g1 = this.info.numRows;
+		while(_g < _g1) {
+			var i = _g++;
+			var row = this.info.rows[i];
+			var md = this.massData[i];
+			var imp = row.impulse;
+			var j = row.jacobian;
+			var rv = 0;
+			rv += lv1X * j.lin1X + lv1Y * j.lin1Y + lv1Z * j.lin1Z;
+			rv -= lv2X * j.lin2X + lv2Y * j.lin2Y + lv2Z * j.lin2Z;
+			rv += av1X * j.ang1X + av1Y * j.ang1Y + av1Z * j.ang1Z;
+			rv -= av2X * j.ang2X + av2Y * j.ang2Y + av2Z * j.ang2Z;
+			var impulseP = (row.rhs * oimo_common_Setting.positionNgsBaumgarte - rv) * md.mass;
+			var oldImpulseP = imp.impulseP;
+			imp.impulseP += impulseP;
+			if(imp.impulseP < row.minImpulse) {
+				imp.impulseP = row.minImpulse;
+			} else if(imp.impulseP > row.maxImpulse) {
+				imp.impulseP = row.maxImpulse;
+			}
+			impulseP = imp.impulseP - oldImpulseP;
+			lv1X += md.invMLin1X * impulseP;
+			lv1Y += md.invMLin1Y * impulseP;
+			lv1Z += md.invMLin1Z * impulseP;
+			lv2X += md.invMLin2X * -impulseP;
+			lv2Y += md.invMLin2Y * -impulseP;
+			lv2Z += md.invMLin2Z * -impulseP;
+			av1X += md.invMAng1X * impulseP;
+			av1Y += md.invMAng1Y * impulseP;
+			av1Z += md.invMAng1Z * impulseP;
+			av2X += md.invMAng2X * -impulseP;
+			av2Y += md.invMAng2Y * -impulseP;
+			av2Z += md.invMAng2Z * -impulseP;
+		}
+		var _this = this._b1;
+		_this._transform._positionX += lv1X;
+		_this._transform._positionY += lv1Y;
+		_this._transform._positionZ += lv1Z;
+		var _this = this._b2;
+		_this._transform._positionX += lv2X;
+		_this._transform._positionY += lv2Y;
+		_this._transform._positionZ += lv2Z;
+		var _this = this._b1;
+		var theta = Math.sqrt(av1X * av1X + av1Y * av1Y + av1Z * av1Z);
+		var halfTheta = theta * 0.5;
+		var rotationToSinAxisFactor;
+		var cosHalfTheta;
+		if(halfTheta < 0.5) {
+			var ht2 = halfTheta * halfTheta;
+			rotationToSinAxisFactor = 0.5 * (1 - ht2 * 0.16666666666666666 + ht2 * ht2 * 0.0083333333333333332);
+			cosHalfTheta = 1 - ht2 * 0.5 + ht2 * ht2 * 0.041666666666666664;
+		} else {
+			rotationToSinAxisFactor = Math.sin(halfTheta) / theta;
+			cosHalfTheta = Math.cos(halfTheta);
+		}
+		var sinAxisX;
+		var sinAxisY;
+		var sinAxisZ;
+		sinAxisX = av1X * rotationToSinAxisFactor;
+		sinAxisY = av1Y * rotationToSinAxisFactor;
+		sinAxisZ = av1Z * rotationToSinAxisFactor;
+		var dqX;
+		var dqY;
+		var dqZ;
+		var dqW;
+		dqX = sinAxisX;
+		dqY = sinAxisY;
+		dqZ = sinAxisZ;
+		dqW = cosHalfTheta;
+		var qX;
+		var qY;
+		var qZ;
+		var qW;
+		var e00 = _this._transform._rotation00;
+		var e11 = _this._transform._rotation11;
+		var e22 = _this._transform._rotation22;
+		var t = e00 + e11 + e22;
+		var s;
+		if(t > 0) {
+			s = Math.sqrt(t + 1);
+			qW = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation21 - _this._transform._rotation12) * s;
+			qY = (_this._transform._rotation02 - _this._transform._rotation20) * s;
+			qZ = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+		} else if(e00 > e11) {
+			if(e00 > e22) {
+				s = Math.sqrt(e00 - e11 - e22 + 1);
+				qX = 0.5 * s;
+				s = 0.5 / s;
+				qY = (_this._transform._rotation01 + _this._transform._rotation10) * s;
+				qZ = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+				qW = (_this._transform._rotation21 - _this._transform._rotation12) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				qZ = 0.5 * s;
+				s = 0.5 / s;
+				qX = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+				qY = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+				qW = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+			}
+		} else if(e11 > e22) {
+			s = Math.sqrt(e11 - e22 - e00 + 1);
+			qY = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation01 + _this._transform._rotation10) * s;
+			qZ = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+			qW = (_this._transform._rotation02 - _this._transform._rotation20) * s;
+		} else {
+			s = Math.sqrt(e22 - e00 - e11 + 1);
+			qZ = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+			qY = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+			qW = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+		}
+		qX = dqW * qX + dqX * qW + dqY * qZ - dqZ * qY;
+		qY = dqW * qY - dqX * qZ + dqY * qW + dqZ * qX;
+		qZ = dqW * qZ + dqX * qY - dqY * qX + dqZ * qW;
+		qW = dqW * qW - dqX * qX - dqY * qY - dqZ * qZ;
+		var l = qX * qX + qY * qY + qZ * qZ + qW * qW;
+		if(l > 1e-32) {
+			l = 1 / Math.sqrt(l);
+		}
+		qX *= l;
+		qY *= l;
+		qZ *= l;
+		qW *= l;
+		var x = qX;
+		var y = qY;
+		var z = qZ;
+		var w = qW;
+		var x2 = 2 * x;
+		var y2 = 2 * y;
+		var z2 = 2 * z;
+		var xx = x * x2;
+		var yy = y * y2;
+		var zz = z * z2;
+		var xy = x * y2;
+		var yz = y * z2;
+		var xz = x * z2;
+		var wx = w * x2;
+		var wy = w * y2;
+		var wz = w * z2;
+		_this._transform._rotation00 = 1 - yy - zz;
+		_this._transform._rotation01 = xy - wz;
+		_this._transform._rotation02 = xz + wy;
+		_this._transform._rotation10 = xy + wz;
+		_this._transform._rotation11 = 1 - xx - zz;
+		_this._transform._rotation12 = yz - wx;
+		_this._transform._rotation20 = xz - wy;
+		_this._transform._rotation21 = yz + wx;
+		_this._transform._rotation22 = 1 - xx - yy;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
+		__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
+		__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
+		__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
+		__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
+		__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
+		__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
+		__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
+		__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
+		__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
+		__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
+		__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
+		__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
+		__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
+		__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
+		__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
+		__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		_this._invInertia00 *= _this._rotFactor.x;
+		_this._invInertia01 *= _this._rotFactor.x;
+		_this._invInertia02 *= _this._rotFactor.x;
+		_this._invInertia10 *= _this._rotFactor.y;
+		_this._invInertia11 *= _this._rotFactor.y;
+		_this._invInertia12 *= _this._rotFactor.y;
+		_this._invInertia20 *= _this._rotFactor.z;
+		_this._invInertia21 *= _this._rotFactor.z;
+		_this._invInertia22 *= _this._rotFactor.z;
+		var _this = this._b2;
+		var theta = Math.sqrt(av2X * av2X + av2Y * av2Y + av2Z * av2Z);
+		var halfTheta = theta * 0.5;
+		var rotationToSinAxisFactor;
+		var cosHalfTheta;
+		if(halfTheta < 0.5) {
+			var ht2 = halfTheta * halfTheta;
+			rotationToSinAxisFactor = 0.5 * (1 - ht2 * 0.16666666666666666 + ht2 * ht2 * 0.0083333333333333332);
+			cosHalfTheta = 1 - ht2 * 0.5 + ht2 * ht2 * 0.041666666666666664;
+		} else {
+			rotationToSinAxisFactor = Math.sin(halfTheta) / theta;
+			cosHalfTheta = Math.cos(halfTheta);
+		}
+		var sinAxisX;
+		var sinAxisY;
+		var sinAxisZ;
+		sinAxisX = av2X * rotationToSinAxisFactor;
+		sinAxisY = av2Y * rotationToSinAxisFactor;
+		sinAxisZ = av2Z * rotationToSinAxisFactor;
+		var dqX;
+		var dqY;
+		var dqZ;
+		var dqW;
+		dqX = sinAxisX;
+		dqY = sinAxisY;
+		dqZ = sinAxisZ;
+		dqW = cosHalfTheta;
+		var qX;
+		var qY;
+		var qZ;
+		var qW;
+		var e00 = _this._transform._rotation00;
+		var e11 = _this._transform._rotation11;
+		var e22 = _this._transform._rotation22;
+		var t = e00 + e11 + e22;
+		var s;
+		if(t > 0) {
+			s = Math.sqrt(t + 1);
+			qW = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation21 - _this._transform._rotation12) * s;
+			qY = (_this._transform._rotation02 - _this._transform._rotation20) * s;
+			qZ = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+		} else if(e00 > e11) {
+			if(e00 > e22) {
+				s = Math.sqrt(e00 - e11 - e22 + 1);
+				qX = 0.5 * s;
+				s = 0.5 / s;
+				qY = (_this._transform._rotation01 + _this._transform._rotation10) * s;
+				qZ = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+				qW = (_this._transform._rotation21 - _this._transform._rotation12) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				qZ = 0.5 * s;
+				s = 0.5 / s;
+				qX = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+				qY = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+				qW = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+			}
+		} else if(e11 > e22) {
+			s = Math.sqrt(e11 - e22 - e00 + 1);
+			qY = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation01 + _this._transform._rotation10) * s;
+			qZ = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+			qW = (_this._transform._rotation02 - _this._transform._rotation20) * s;
+		} else {
+			s = Math.sqrt(e22 - e00 - e11 + 1);
+			qZ = 0.5 * s;
+			s = 0.5 / s;
+			qX = (_this._transform._rotation02 + _this._transform._rotation20) * s;
+			qY = (_this._transform._rotation12 + _this._transform._rotation21) * s;
+			qW = (_this._transform._rotation10 - _this._transform._rotation01) * s;
+		}
+		qX = dqW * qX + dqX * qW + dqY * qZ - dqZ * qY;
+		qY = dqW * qY - dqX * qZ + dqY * qW + dqZ * qX;
+		qZ = dqW * qZ + dqX * qY - dqY * qX + dqZ * qW;
+		qW = dqW * qW - dqX * qX - dqY * qY - dqZ * qZ;
+		var l = qX * qX + qY * qY + qZ * qZ + qW * qW;
+		if(l > 1e-32) {
+			l = 1 / Math.sqrt(l);
+		}
+		qX *= l;
+		qY *= l;
+		qZ *= l;
+		qW *= l;
+		var x = qX;
+		var y = qY;
+		var z = qZ;
+		var w = qW;
+		var x2 = 2 * x;
+		var y2 = 2 * y;
+		var z2 = 2 * z;
+		var xx = x * x2;
+		var yy = y * y2;
+		var zz = z * z2;
+		var xy = x * y2;
+		var yz = y * z2;
+		var xz = x * z2;
+		var wx = w * x2;
+		var wy = w * y2;
+		var wz = w * z2;
+		_this._transform._rotation00 = 1 - yy - zz;
+		_this._transform._rotation01 = xy - wz;
+		_this._transform._rotation02 = xz + wy;
+		_this._transform._rotation10 = xy + wz;
+		_this._transform._rotation11 = 1 - xx - zz;
+		_this._transform._rotation12 = yz - wx;
+		_this._transform._rotation20 = xz - wy;
+		_this._transform._rotation21 = yz + wx;
+		_this._transform._rotation22 = 1 - xx - yy;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
+		__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
+		__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
+		__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
+		__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
+		__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
+		__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
+		__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
+		__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
+		__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
+		__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
+		__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
+		__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
+		__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
+		__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
+		__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
+		__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		_this._invInertia00 *= _this._rotFactor.x;
+		_this._invInertia01 *= _this._rotFactor.x;
+		_this._invInertia02 *= _this._rotFactor.x;
+		_this._invInertia10 *= _this._rotFactor.y;
+		_this._invInertia11 *= _this._rotFactor.y;
+		_this._invInertia12 *= _this._rotFactor.y;
+		_this._invInertia20 *= _this._rotFactor.z;
+		_this._invInertia21 *= _this._rotFactor.z;
+		_this._invInertia22 *= _this._rotFactor.z;
+	}
+	,postSolve: function() {
+		this.joint._syncAnchors();
+		this.joint._checkDestruction();
+	}
+	,__class__: oimo_dynamics_constraint_solver_pgs_PgsJointConstraintSolver
+});
+var oimo_dynamics_rigidbody_RigidBody = function(config) {
+	this._next = null;
+	this._prev = null;
+	this._shapeList = null;
+	this._shapeListLast = null;
+	this._numShapes = 0;
+	this._contactLinkList = null;
+	this._contactLinkListLast = null;
+	this._numContactLinks = 0;
+	this._jointLinkList = null;
+	this._jointLinkListLast = null;
+	this._numJointLinks = 0;
+	var v = config.linearVelocity;
+	this._velX = v.x;
+	this._velY = v.y;
+	this._velZ = v.z;
+	var v = config.angularVelocity;
+	this._angVelX = v.x;
+	this._angVelY = v.y;
+	this._angVelZ = v.z;
+	this._pseudoVelX = 0;
+	this._pseudoVelY = 0;
+	this._pseudoVelZ = 0;
+	this._angPseudoVelX = 0;
+	this._angPseudoVelY = 0;
+	this._angPseudoVelZ = 0;
+	this._ptransform = new oimo_common_Transform();
+	this._transform = new oimo_common_Transform();
+	var v = config.position;
+	this._ptransform._positionX = v.x;
+	this._ptransform._positionY = v.y;
+	this._ptransform._positionZ = v.z;
+	var m = config.rotation;
+	this._ptransform._rotation00 = m.e00;
+	this._ptransform._rotation01 = m.e01;
+	this._ptransform._rotation02 = m.e02;
+	this._ptransform._rotation10 = m.e10;
+	this._ptransform._rotation11 = m.e11;
+	this._ptransform._rotation12 = m.e12;
+	this._ptransform._rotation20 = m.e20;
+	this._ptransform._rotation21 = m.e21;
+	this._ptransform._rotation22 = m.e22;
+	var dst = this._transform;
+	var src = this._ptransform;
+	dst._positionX = src._positionX;
+	dst._positionY = src._positionY;
+	dst._positionZ = src._positionZ;
+	dst._rotation00 = src._rotation00;
+	dst._rotation01 = src._rotation01;
+	dst._rotation02 = src._rotation02;
+	dst._rotation10 = src._rotation10;
+	dst._rotation11 = src._rotation11;
+	dst._rotation12 = src._rotation12;
+	dst._rotation20 = src._rotation20;
+	dst._rotation21 = src._rotation21;
+	dst._rotation22 = src._rotation22;
+	this._type = config.type;
+	this._sleepTime = 0;
+	this._sleeping = false;
+	this._autoSleep = config.autoSleep;
+	this._sleepingVelocityThreshold = config.sleepingVelocityThreshold;
+	this._sleepingAngularVelocityThreshold = config.sleepingAngularVelocityThreshold;
+	this._sleepingTimeThreshold = config.sleepingTimeThreshold;
+	this._mass = 0;
+	this._invMass = 0;
+	this._localInertia00 = 0;
+	this._localInertia01 = 0;
+	this._localInertia02 = 0;
+	this._localInertia10 = 0;
+	this._localInertia11 = 0;
+	this._localInertia12 = 0;
+	this._localInertia20 = 0;
+	this._localInertia21 = 0;
+	this._localInertia22 = 0;
+	this._invLocalInertia00 = 0;
+	this._invLocalInertia01 = 0;
+	this._invLocalInertia02 = 0;
+	this._invLocalInertia10 = 0;
+	this._invLocalInertia11 = 0;
+	this._invLocalInertia12 = 0;
+	this._invLocalInertia20 = 0;
+	this._invLocalInertia21 = 0;
+	this._invLocalInertia22 = 0;
+	this._invLocalInertiaWithoutRotFactor00 = 0;
+	this._invLocalInertiaWithoutRotFactor01 = 0;
+	this._invLocalInertiaWithoutRotFactor02 = 0;
+	this._invLocalInertiaWithoutRotFactor10 = 0;
+	this._invLocalInertiaWithoutRotFactor11 = 0;
+	this._invLocalInertiaWithoutRotFactor12 = 0;
+	this._invLocalInertiaWithoutRotFactor20 = 0;
+	this._invLocalInertiaWithoutRotFactor21 = 0;
+	this._invLocalInertiaWithoutRotFactor22 = 0;
+	this._invInertia00 = 0;
+	this._invInertia01 = 0;
+	this._invInertia02 = 0;
+	this._invInertia10 = 0;
+	this._invInertia11 = 0;
+	this._invInertia12 = 0;
+	this._invInertia20 = 0;
+	this._invInertia21 = 0;
+	this._invInertia22 = 0;
+	this._linearDamping = config.linearDamping;
+	this._angularDamping = config.angularDamping;
+	this._forceX = 0;
+	this._forceY = 0;
+	this._forceZ = 0;
+	this._torqueX = 0;
+	this._torqueY = 0;
+	this._torqueZ = 0;
+	this._linearContactImpulseX = 0;
+	this._linearContactImpulseY = 0;
+	this._linearContactImpulseZ = 0;
+	this._angularContactImpulseX = 0;
+	this._angularContactImpulseY = 0;
+	this._angularContactImpulseZ = 0;
+	this._rotFactor = new oimo_common_Vec3(1,1,1);
+	this._addedToIsland = false;
+	this._gravityScale = 1;
+	this._world = null;
+};
+$hxClasses["oimo.dynamics.rigidbody.RigidBody"] = oimo_dynamics_rigidbody_RigidBody;
+oimo_dynamics_rigidbody_RigidBody.__name__ = "oimo.dynamics.rigidbody.RigidBody";
+oimo_dynamics_rigidbody_RigidBody.prototype = {
+	_integrate: function(dt) {
+		switch(this._type) {
+		case 1:
+			this._velX = 0;
+			this._velY = 0;
+			this._velZ = 0;
+			this._angVelX = 0;
+			this._angVelY = 0;
+			this._angVelZ = 0;
+			this._pseudoVelX = 0;
+			this._pseudoVelY = 0;
+			this._pseudoVelZ = 0;
+			this._angPseudoVelX = 0;
+			this._angPseudoVelY = 0;
+			this._angPseudoVelZ = 0;
+			break;
+		case 0:case 2:
+			var translationX;
+			var translationY;
+			var translationZ;
+			var rotationX;
+			var rotationY;
+			var rotationZ;
+			translationX = this._velX * dt;
+			translationY = this._velY * dt;
+			translationZ = this._velZ * dt;
+			rotationX = this._angVelX * dt;
+			rotationY = this._angVelY * dt;
+			rotationZ = this._angVelZ * dt;
+			var translationLengthSq = translationX * translationX + translationY * translationY + translationZ * translationZ;
+			var rotationLengthSq = rotationX * rotationX + rotationY * rotationY + rotationZ * rotationZ;
+			if(translationLengthSq == 0 && rotationLengthSq == 0) {
+				return;
+			}
+			if(translationLengthSq > oimo_common_Setting.maxTranslationPerStep * oimo_common_Setting.maxTranslationPerStep) {
+				var l = oimo_common_Setting.maxTranslationPerStep / Math.sqrt(translationLengthSq);
+				this._velX *= l;
+				this._velY *= l;
+				this._velZ *= l;
+				translationX *= l;
+				translationY *= l;
+				translationZ *= l;
+			}
+			if(rotationLengthSq > oimo_common_Setting.maxRotationPerStep * oimo_common_Setting.maxRotationPerStep) {
+				var l = oimo_common_Setting.maxRotationPerStep / Math.sqrt(rotationLengthSq);
+				this._angVelX *= l;
+				this._angVelY *= l;
+				this._angVelZ *= l;
+				rotationX *= l;
+				rotationY *= l;
+				rotationZ *= l;
+			}
+			this._transform._positionX += translationX;
+			this._transform._positionY += translationY;
+			this._transform._positionZ += translationZ;
+			var theta = Math.sqrt(rotationX * rotationX + rotationY * rotationY + rotationZ * rotationZ);
+			var halfTheta = theta * 0.5;
+			var rotationToSinAxisFactor;
+			var cosHalfTheta;
+			if(halfTheta < 0.5) {
+				var ht2 = halfTheta * halfTheta;
+				rotationToSinAxisFactor = 0.5 * (1 - ht2 * 0.16666666666666666 + ht2 * ht2 * 0.0083333333333333332);
+				cosHalfTheta = 1 - ht2 * 0.5 + ht2 * ht2 * 0.041666666666666664;
+			} else {
+				rotationToSinAxisFactor = Math.sin(halfTheta) / theta;
+				cosHalfTheta = Math.cos(halfTheta);
+			}
+			var sinAxisX;
+			var sinAxisY;
+			var sinAxisZ;
+			sinAxisX = rotationX * rotationToSinAxisFactor;
+			sinAxisY = rotationY * rotationToSinAxisFactor;
+			sinAxisZ = rotationZ * rotationToSinAxisFactor;
+			var dqX;
+			var dqY;
+			var dqZ;
+			var dqW;
+			dqX = sinAxisX;
+			dqY = sinAxisY;
+			dqZ = sinAxisZ;
+			dqW = cosHalfTheta;
+			var qX;
+			var qY;
+			var qZ;
+			var qW;
+			var e00 = this._transform._rotation00;
+			var e11 = this._transform._rotation11;
+			var e22 = this._transform._rotation22;
+			var t = e00 + e11 + e22;
+			var s;
+			if(t > 0) {
+				s = Math.sqrt(t + 1);
+				qW = 0.5 * s;
+				s = 0.5 / s;
+				qX = (this._transform._rotation21 - this._transform._rotation12) * s;
+				qY = (this._transform._rotation02 - this._transform._rotation20) * s;
+				qZ = (this._transform._rotation10 - this._transform._rotation01) * s;
+			} else if(e00 > e11) {
+				if(e00 > e22) {
+					s = Math.sqrt(e00 - e11 - e22 + 1);
+					qX = 0.5 * s;
+					s = 0.5 / s;
+					qY = (this._transform._rotation01 + this._transform._rotation10) * s;
+					qZ = (this._transform._rotation02 + this._transform._rotation20) * s;
+					qW = (this._transform._rotation21 - this._transform._rotation12) * s;
+				} else {
+					s = Math.sqrt(e22 - e00 - e11 + 1);
+					qZ = 0.5 * s;
+					s = 0.5 / s;
+					qX = (this._transform._rotation02 + this._transform._rotation20) * s;
+					qY = (this._transform._rotation12 + this._transform._rotation21) * s;
+					qW = (this._transform._rotation10 - this._transform._rotation01) * s;
+				}
+			} else if(e11 > e22) {
+				s = Math.sqrt(e11 - e22 - e00 + 1);
+				qY = 0.5 * s;
+				s = 0.5 / s;
+				qX = (this._transform._rotation01 + this._transform._rotation10) * s;
+				qZ = (this._transform._rotation12 + this._transform._rotation21) * s;
+				qW = (this._transform._rotation02 - this._transform._rotation20) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				qZ = 0.5 * s;
+				s = 0.5 / s;
+				qX = (this._transform._rotation02 + this._transform._rotation20) * s;
+				qY = (this._transform._rotation12 + this._transform._rotation21) * s;
+				qW = (this._transform._rotation10 - this._transform._rotation01) * s;
+			}
+			qX = dqW * qX + dqX * qW + dqY * qZ - dqZ * qY;
+			qY = dqW * qY - dqX * qZ + dqY * qW + dqZ * qX;
+			qZ = dqW * qZ + dqX * qY - dqY * qX + dqZ * qW;
+			qW = dqW * qW - dqX * qX - dqY * qY - dqZ * qZ;
+			var l = qX * qX + qY * qY + qZ * qZ + qW * qW;
+			if(l > 1e-32) {
+				l = 1 / Math.sqrt(l);
+			}
+			qX *= l;
+			qY *= l;
+			qZ *= l;
+			qW *= l;
+			var x = qX;
+			var y = qY;
+			var z = qZ;
+			var w = qW;
+			var x2 = 2 * x;
+			var y2 = 2 * y;
+			var z2 = 2 * z;
+			var xx = x * x2;
+			var yy = y * y2;
+			var zz = z * z2;
+			var xy = x * y2;
+			var yz = y * z2;
+			var xz = x * z2;
+			var wx = w * x2;
+			var wy = w * y2;
+			var wz = w * z2;
+			this._transform._rotation00 = 1 - yy - zz;
+			this._transform._rotation01 = xy - wz;
+			this._transform._rotation02 = xz + wy;
+			this._transform._rotation10 = xy + wz;
+			this._transform._rotation11 = 1 - xx - zz;
+			this._transform._rotation12 = yz - wx;
+			this._transform._rotation20 = xz - wy;
+			this._transform._rotation21 = yz + wx;
+			this._transform._rotation22 = 1 - xx - yy;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = this._transform._rotation00 * this._invLocalInertia00 + this._transform._rotation01 * this._invLocalInertia10 + this._transform._rotation02 * this._invLocalInertia20;
+			__tmp__01 = this._transform._rotation00 * this._invLocalInertia01 + this._transform._rotation01 * this._invLocalInertia11 + this._transform._rotation02 * this._invLocalInertia21;
+			__tmp__02 = this._transform._rotation00 * this._invLocalInertia02 + this._transform._rotation01 * this._invLocalInertia12 + this._transform._rotation02 * this._invLocalInertia22;
+			__tmp__10 = this._transform._rotation10 * this._invLocalInertia00 + this._transform._rotation11 * this._invLocalInertia10 + this._transform._rotation12 * this._invLocalInertia20;
+			__tmp__11 = this._transform._rotation10 * this._invLocalInertia01 + this._transform._rotation11 * this._invLocalInertia11 + this._transform._rotation12 * this._invLocalInertia21;
+			__tmp__12 = this._transform._rotation10 * this._invLocalInertia02 + this._transform._rotation11 * this._invLocalInertia12 + this._transform._rotation12 * this._invLocalInertia22;
+			__tmp__20 = this._transform._rotation20 * this._invLocalInertia00 + this._transform._rotation21 * this._invLocalInertia10 + this._transform._rotation22 * this._invLocalInertia20;
+			__tmp__21 = this._transform._rotation20 * this._invLocalInertia01 + this._transform._rotation21 * this._invLocalInertia11 + this._transform._rotation22 * this._invLocalInertia21;
+			__tmp__22 = this._transform._rotation20 * this._invLocalInertia02 + this._transform._rotation21 * this._invLocalInertia12 + this._transform._rotation22 * this._invLocalInertia22;
+			this._invInertia00 = __tmp__00;
+			this._invInertia01 = __tmp__01;
+			this._invInertia02 = __tmp__02;
+			this._invInertia10 = __tmp__10;
+			this._invInertia11 = __tmp__11;
+			this._invInertia12 = __tmp__12;
+			this._invInertia20 = __tmp__20;
+			this._invInertia21 = __tmp__21;
+			this._invInertia22 = __tmp__22;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = this._invInertia00 * this._transform._rotation00 + this._invInertia01 * this._transform._rotation01 + this._invInertia02 * this._transform._rotation02;
+			__tmp__01 = this._invInertia00 * this._transform._rotation10 + this._invInertia01 * this._transform._rotation11 + this._invInertia02 * this._transform._rotation12;
+			__tmp__02 = this._invInertia00 * this._transform._rotation20 + this._invInertia01 * this._transform._rotation21 + this._invInertia02 * this._transform._rotation22;
+			__tmp__10 = this._invInertia10 * this._transform._rotation00 + this._invInertia11 * this._transform._rotation01 + this._invInertia12 * this._transform._rotation02;
+			__tmp__11 = this._invInertia10 * this._transform._rotation10 + this._invInertia11 * this._transform._rotation11 + this._invInertia12 * this._transform._rotation12;
+			__tmp__12 = this._invInertia10 * this._transform._rotation20 + this._invInertia11 * this._transform._rotation21 + this._invInertia12 * this._transform._rotation22;
+			__tmp__20 = this._invInertia20 * this._transform._rotation00 + this._invInertia21 * this._transform._rotation01 + this._invInertia22 * this._transform._rotation02;
+			__tmp__21 = this._invInertia20 * this._transform._rotation10 + this._invInertia21 * this._transform._rotation11 + this._invInertia22 * this._transform._rotation12;
+			__tmp__22 = this._invInertia20 * this._transform._rotation20 + this._invInertia21 * this._transform._rotation21 + this._invInertia22 * this._transform._rotation22;
+			this._invInertia00 = __tmp__00;
+			this._invInertia01 = __tmp__01;
+			this._invInertia02 = __tmp__02;
+			this._invInertia10 = __tmp__10;
+			this._invInertia11 = __tmp__11;
+			this._invInertia12 = __tmp__12;
+			this._invInertia20 = __tmp__20;
+			this._invInertia21 = __tmp__21;
+			this._invInertia22 = __tmp__22;
+			this._invInertia00 *= this._rotFactor.x;
+			this._invInertia01 *= this._rotFactor.x;
+			this._invInertia02 *= this._rotFactor.x;
+			this._invInertia10 *= this._rotFactor.y;
+			this._invInertia11 *= this._rotFactor.y;
+			this._invInertia12 *= this._rotFactor.y;
+			this._invInertia20 *= this._rotFactor.z;
+			this._invInertia21 *= this._rotFactor.z;
+			this._invInertia22 *= this._rotFactor.z;
+			break;
+		}
+	}
+	,_integratePseudoVelocity: function() {
+		if(this._pseudoVelX * this._pseudoVelX + this._pseudoVelY * this._pseudoVelY + this._pseudoVelZ * this._pseudoVelZ == 0 && this._angPseudoVelX * this._angPseudoVelX + this._angPseudoVelY * this._angPseudoVelY + this._angPseudoVelZ * this._angPseudoVelZ == 0) {
+			return;
+		}
+		switch(this._type) {
+		case 1:
+			this._pseudoVelX = 0;
+			this._pseudoVelY = 0;
+			this._pseudoVelZ = 0;
+			this._angPseudoVelX = 0;
+			this._angPseudoVelY = 0;
+			this._angPseudoVelZ = 0;
+			break;
+		case 0:case 2:
+			var translationX;
+			var translationY;
+			var translationZ;
+			var rotationX;
+			var rotationY;
+			var rotationZ;
+			translationX = this._pseudoVelX;
+			translationY = this._pseudoVelY;
+			translationZ = this._pseudoVelZ;
+			rotationX = this._angPseudoVelX;
+			rotationY = this._angPseudoVelY;
+			rotationZ = this._angPseudoVelZ;
+			this._pseudoVelX = 0;
+			this._pseudoVelY = 0;
+			this._pseudoVelZ = 0;
+			this._angPseudoVelX = 0;
+			this._angPseudoVelY = 0;
+			this._angPseudoVelZ = 0;
+			this._transform._positionX += translationX;
+			this._transform._positionY += translationY;
+			this._transform._positionZ += translationZ;
+			var theta = Math.sqrt(rotationX * rotationX + rotationY * rotationY + rotationZ * rotationZ);
+			var halfTheta = theta * 0.5;
+			var rotationToSinAxisFactor;
+			var cosHalfTheta;
+			if(halfTheta < 0.5) {
+				var ht2 = halfTheta * halfTheta;
+				rotationToSinAxisFactor = 0.5 * (1 - ht2 * 0.16666666666666666 + ht2 * ht2 * 0.0083333333333333332);
+				cosHalfTheta = 1 - ht2 * 0.5 + ht2 * ht2 * 0.041666666666666664;
+			} else {
+				rotationToSinAxisFactor = Math.sin(halfTheta) / theta;
+				cosHalfTheta = Math.cos(halfTheta);
+			}
+			var sinAxisX;
+			var sinAxisY;
+			var sinAxisZ;
+			sinAxisX = rotationX * rotationToSinAxisFactor;
+			sinAxisY = rotationY * rotationToSinAxisFactor;
+			sinAxisZ = rotationZ * rotationToSinAxisFactor;
+			var dqX;
+			var dqY;
+			var dqZ;
+			var dqW;
+			dqX = sinAxisX;
+			dqY = sinAxisY;
+			dqZ = sinAxisZ;
+			dqW = cosHalfTheta;
+			var qX;
+			var qY;
+			var qZ;
+			var qW;
+			var e00 = this._transform._rotation00;
+			var e11 = this._transform._rotation11;
+			var e22 = this._transform._rotation22;
+			var t = e00 + e11 + e22;
+			var s;
+			if(t > 0) {
+				s = Math.sqrt(t + 1);
+				qW = 0.5 * s;
+				s = 0.5 / s;
+				qX = (this._transform._rotation21 - this._transform._rotation12) * s;
+				qY = (this._transform._rotation02 - this._transform._rotation20) * s;
+				qZ = (this._transform._rotation10 - this._transform._rotation01) * s;
+			} else if(e00 > e11) {
+				if(e00 > e22) {
+					s = Math.sqrt(e00 - e11 - e22 + 1);
+					qX = 0.5 * s;
+					s = 0.5 / s;
+					qY = (this._transform._rotation01 + this._transform._rotation10) * s;
+					qZ = (this._transform._rotation02 + this._transform._rotation20) * s;
+					qW = (this._transform._rotation21 - this._transform._rotation12) * s;
+				} else {
+					s = Math.sqrt(e22 - e00 - e11 + 1);
+					qZ = 0.5 * s;
+					s = 0.5 / s;
+					qX = (this._transform._rotation02 + this._transform._rotation20) * s;
+					qY = (this._transform._rotation12 + this._transform._rotation21) * s;
+					qW = (this._transform._rotation10 - this._transform._rotation01) * s;
+				}
+			} else if(e11 > e22) {
+				s = Math.sqrt(e11 - e22 - e00 + 1);
+				qY = 0.5 * s;
+				s = 0.5 / s;
+				qX = (this._transform._rotation01 + this._transform._rotation10) * s;
+				qZ = (this._transform._rotation12 + this._transform._rotation21) * s;
+				qW = (this._transform._rotation02 - this._transform._rotation20) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				qZ = 0.5 * s;
+				s = 0.5 / s;
+				qX = (this._transform._rotation02 + this._transform._rotation20) * s;
+				qY = (this._transform._rotation12 + this._transform._rotation21) * s;
+				qW = (this._transform._rotation10 - this._transform._rotation01) * s;
+			}
+			qX = dqW * qX + dqX * qW + dqY * qZ - dqZ * qY;
+			qY = dqW * qY - dqX * qZ + dqY * qW + dqZ * qX;
+			qZ = dqW * qZ + dqX * qY - dqY * qX + dqZ * qW;
+			qW = dqW * qW - dqX * qX - dqY * qY - dqZ * qZ;
+			var l = qX * qX + qY * qY + qZ * qZ + qW * qW;
+			if(l > 1e-32) {
+				l = 1 / Math.sqrt(l);
+			}
+			qX *= l;
+			qY *= l;
+			qZ *= l;
+			qW *= l;
+			var x = qX;
+			var y = qY;
+			var z = qZ;
+			var w = qW;
+			var x2 = 2 * x;
+			var y2 = 2 * y;
+			var z2 = 2 * z;
+			var xx = x * x2;
+			var yy = y * y2;
+			var zz = z * z2;
+			var xy = x * y2;
+			var yz = y * z2;
+			var xz = x * z2;
+			var wx = w * x2;
+			var wy = w * y2;
+			var wz = w * z2;
+			this._transform._rotation00 = 1 - yy - zz;
+			this._transform._rotation01 = xy - wz;
+			this._transform._rotation02 = xz + wy;
+			this._transform._rotation10 = xy + wz;
+			this._transform._rotation11 = 1 - xx - zz;
+			this._transform._rotation12 = yz - wx;
+			this._transform._rotation20 = xz - wy;
+			this._transform._rotation21 = yz + wx;
+			this._transform._rotation22 = 1 - xx - yy;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = this._transform._rotation00 * this._invLocalInertia00 + this._transform._rotation01 * this._invLocalInertia10 + this._transform._rotation02 * this._invLocalInertia20;
+			__tmp__01 = this._transform._rotation00 * this._invLocalInertia01 + this._transform._rotation01 * this._invLocalInertia11 + this._transform._rotation02 * this._invLocalInertia21;
+			__tmp__02 = this._transform._rotation00 * this._invLocalInertia02 + this._transform._rotation01 * this._invLocalInertia12 + this._transform._rotation02 * this._invLocalInertia22;
+			__tmp__10 = this._transform._rotation10 * this._invLocalInertia00 + this._transform._rotation11 * this._invLocalInertia10 + this._transform._rotation12 * this._invLocalInertia20;
+			__tmp__11 = this._transform._rotation10 * this._invLocalInertia01 + this._transform._rotation11 * this._invLocalInertia11 + this._transform._rotation12 * this._invLocalInertia21;
+			__tmp__12 = this._transform._rotation10 * this._invLocalInertia02 + this._transform._rotation11 * this._invLocalInertia12 + this._transform._rotation12 * this._invLocalInertia22;
+			__tmp__20 = this._transform._rotation20 * this._invLocalInertia00 + this._transform._rotation21 * this._invLocalInertia10 + this._transform._rotation22 * this._invLocalInertia20;
+			__tmp__21 = this._transform._rotation20 * this._invLocalInertia01 + this._transform._rotation21 * this._invLocalInertia11 + this._transform._rotation22 * this._invLocalInertia21;
+			__tmp__22 = this._transform._rotation20 * this._invLocalInertia02 + this._transform._rotation21 * this._invLocalInertia12 + this._transform._rotation22 * this._invLocalInertia22;
+			this._invInertia00 = __tmp__00;
+			this._invInertia01 = __tmp__01;
+			this._invInertia02 = __tmp__02;
+			this._invInertia10 = __tmp__10;
+			this._invInertia11 = __tmp__11;
+			this._invInertia12 = __tmp__12;
+			this._invInertia20 = __tmp__20;
+			this._invInertia21 = __tmp__21;
+			this._invInertia22 = __tmp__22;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = this._invInertia00 * this._transform._rotation00 + this._invInertia01 * this._transform._rotation01 + this._invInertia02 * this._transform._rotation02;
+			__tmp__01 = this._invInertia00 * this._transform._rotation10 + this._invInertia01 * this._transform._rotation11 + this._invInertia02 * this._transform._rotation12;
+			__tmp__02 = this._invInertia00 * this._transform._rotation20 + this._invInertia01 * this._transform._rotation21 + this._invInertia02 * this._transform._rotation22;
+			__tmp__10 = this._invInertia10 * this._transform._rotation00 + this._invInertia11 * this._transform._rotation01 + this._invInertia12 * this._transform._rotation02;
+			__tmp__11 = this._invInertia10 * this._transform._rotation10 + this._invInertia11 * this._transform._rotation11 + this._invInertia12 * this._transform._rotation12;
+			__tmp__12 = this._invInertia10 * this._transform._rotation20 + this._invInertia11 * this._transform._rotation21 + this._invInertia12 * this._transform._rotation22;
+			__tmp__20 = this._invInertia20 * this._transform._rotation00 + this._invInertia21 * this._transform._rotation01 + this._invInertia22 * this._transform._rotation02;
+			__tmp__21 = this._invInertia20 * this._transform._rotation10 + this._invInertia21 * this._transform._rotation11 + this._invInertia22 * this._transform._rotation12;
+			__tmp__22 = this._invInertia20 * this._transform._rotation20 + this._invInertia21 * this._transform._rotation21 + this._invInertia22 * this._transform._rotation22;
+			this._invInertia00 = __tmp__00;
+			this._invInertia01 = __tmp__01;
+			this._invInertia02 = __tmp__02;
+			this._invInertia10 = __tmp__10;
+			this._invInertia11 = __tmp__11;
+			this._invInertia12 = __tmp__12;
+			this._invInertia20 = __tmp__20;
+			this._invInertia21 = __tmp__21;
+			this._invInertia22 = __tmp__22;
+			this._invInertia00 *= this._rotFactor.x;
+			this._invInertia01 *= this._rotFactor.x;
+			this._invInertia02 *= this._rotFactor.x;
+			this._invInertia10 *= this._rotFactor.y;
+			this._invInertia11 *= this._rotFactor.y;
+			this._invInertia12 *= this._rotFactor.y;
+			this._invInertia20 *= this._rotFactor.z;
+			this._invInertia21 *= this._rotFactor.z;
+			this._invInertia22 *= this._rotFactor.z;
+			break;
+		}
+	}
+	,updateMass: function() {
+		var totalInertia00;
+		var totalInertia01;
+		var totalInertia02;
+		var totalInertia10;
+		var totalInertia11;
+		var totalInertia12;
+		var totalInertia20;
+		var totalInertia21;
+		var totalInertia22;
+		totalInertia00 = 0;
+		totalInertia01 = 0;
+		totalInertia02 = 0;
+		totalInertia10 = 0;
+		totalInertia11 = 0;
+		totalInertia12 = 0;
+		totalInertia20 = 0;
+		totalInertia21 = 0;
+		totalInertia22 = 0;
+		var totalMass = 0;
+		var s = this._shapeList;
+		while(s != null) {
+			var n = s._next;
+			var g = s._geom;
+			g._updateMass();
+			var mass = s._density * g._volume;
+			var inertia00;
+			var inertia01;
+			var inertia02;
+			var inertia10;
+			var inertia11;
+			var inertia12;
+			var inertia20;
+			var inertia21;
+			var inertia22;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = s._localTransform._rotation00 * g._inertiaCoeff00 + s._localTransform._rotation01 * g._inertiaCoeff10 + s._localTransform._rotation02 * g._inertiaCoeff20;
+			__tmp__01 = s._localTransform._rotation00 * g._inertiaCoeff01 + s._localTransform._rotation01 * g._inertiaCoeff11 + s._localTransform._rotation02 * g._inertiaCoeff21;
+			__tmp__02 = s._localTransform._rotation00 * g._inertiaCoeff02 + s._localTransform._rotation01 * g._inertiaCoeff12 + s._localTransform._rotation02 * g._inertiaCoeff22;
+			__tmp__10 = s._localTransform._rotation10 * g._inertiaCoeff00 + s._localTransform._rotation11 * g._inertiaCoeff10 + s._localTransform._rotation12 * g._inertiaCoeff20;
+			__tmp__11 = s._localTransform._rotation10 * g._inertiaCoeff01 + s._localTransform._rotation11 * g._inertiaCoeff11 + s._localTransform._rotation12 * g._inertiaCoeff21;
+			__tmp__12 = s._localTransform._rotation10 * g._inertiaCoeff02 + s._localTransform._rotation11 * g._inertiaCoeff12 + s._localTransform._rotation12 * g._inertiaCoeff22;
+			__tmp__20 = s._localTransform._rotation20 * g._inertiaCoeff00 + s._localTransform._rotation21 * g._inertiaCoeff10 + s._localTransform._rotation22 * g._inertiaCoeff20;
+			__tmp__21 = s._localTransform._rotation20 * g._inertiaCoeff01 + s._localTransform._rotation21 * g._inertiaCoeff11 + s._localTransform._rotation22 * g._inertiaCoeff21;
+			__tmp__22 = s._localTransform._rotation20 * g._inertiaCoeff02 + s._localTransform._rotation21 * g._inertiaCoeff12 + s._localTransform._rotation22 * g._inertiaCoeff22;
+			inertia00 = __tmp__00;
+			inertia01 = __tmp__01;
+			inertia02 = __tmp__02;
+			inertia10 = __tmp__10;
+			inertia11 = __tmp__11;
+			inertia12 = __tmp__12;
+			inertia20 = __tmp__20;
+			inertia21 = __tmp__21;
+			inertia22 = __tmp__22;
+			var __tmp__001;
+			var __tmp__011;
+			var __tmp__021;
+			var __tmp__101;
+			var __tmp__111;
+			var __tmp__121;
+			var __tmp__201;
+			var __tmp__211;
+			var __tmp__221;
+			__tmp__001 = inertia00 * s._localTransform._rotation00 + inertia01 * s._localTransform._rotation01 + inertia02 * s._localTransform._rotation02;
+			__tmp__011 = inertia00 * s._localTransform._rotation10 + inertia01 * s._localTransform._rotation11 + inertia02 * s._localTransform._rotation12;
+			__tmp__021 = inertia00 * s._localTransform._rotation20 + inertia01 * s._localTransform._rotation21 + inertia02 * s._localTransform._rotation22;
+			__tmp__101 = inertia10 * s._localTransform._rotation00 + inertia11 * s._localTransform._rotation01 + inertia12 * s._localTransform._rotation02;
+			__tmp__111 = inertia10 * s._localTransform._rotation10 + inertia11 * s._localTransform._rotation11 + inertia12 * s._localTransform._rotation12;
+			__tmp__121 = inertia10 * s._localTransform._rotation20 + inertia11 * s._localTransform._rotation21 + inertia12 * s._localTransform._rotation22;
+			__tmp__201 = inertia20 * s._localTransform._rotation00 + inertia21 * s._localTransform._rotation01 + inertia22 * s._localTransform._rotation02;
+			__tmp__211 = inertia20 * s._localTransform._rotation10 + inertia21 * s._localTransform._rotation11 + inertia22 * s._localTransform._rotation12;
+			__tmp__221 = inertia20 * s._localTransform._rotation20 + inertia21 * s._localTransform._rotation21 + inertia22 * s._localTransform._rotation22;
+			inertia00 = __tmp__001;
+			inertia01 = __tmp__011;
+			inertia02 = __tmp__021;
+			inertia10 = __tmp__101;
+			inertia11 = __tmp__111;
+			inertia12 = __tmp__121;
+			inertia20 = __tmp__201;
+			inertia21 = __tmp__211;
+			inertia22 = __tmp__221;
+			inertia00 *= mass;
+			inertia01 *= mass;
+			inertia02 *= mass;
+			inertia10 *= mass;
+			inertia11 *= mass;
+			inertia12 *= mass;
+			inertia20 *= mass;
+			inertia21 *= mass;
+			inertia22 *= mass;
+			var cogInertia00;
+			var cogInertia01;
+			var cogInertia02;
+			var cogInertia10;
+			var cogInertia11;
+			var cogInertia12;
+			var cogInertia20;
+			var cogInertia21;
+			var cogInertia22;
+			var xx = s._localTransform._positionX * s._localTransform._positionX;
+			var yy = s._localTransform._positionY * s._localTransform._positionY;
+			var zz = s._localTransform._positionZ * s._localTransform._positionZ;
+			var xy = -s._localTransform._positionX * s._localTransform._positionY;
+			var yz = -s._localTransform._positionY * s._localTransform._positionZ;
+			var zx = -s._localTransform._positionZ * s._localTransform._positionX;
+			cogInertia00 = yy + zz;
+			cogInertia01 = xy;
+			cogInertia02 = zx;
+			cogInertia10 = xy;
+			cogInertia11 = xx + zz;
+			cogInertia12 = yz;
+			cogInertia20 = zx;
+			cogInertia21 = yz;
+			cogInertia22 = xx + yy;
+			inertia00 += cogInertia00 * mass;
+			inertia01 += cogInertia01 * mass;
+			inertia02 += cogInertia02 * mass;
+			inertia10 += cogInertia10 * mass;
+			inertia11 += cogInertia11 * mass;
+			inertia12 += cogInertia12 * mass;
+			inertia20 += cogInertia20 * mass;
+			inertia21 += cogInertia21 * mass;
+			inertia22 += cogInertia22 * mass;
+			totalMass += mass;
+			totalInertia00 += inertia00;
+			totalInertia01 += inertia01;
+			totalInertia02 += inertia02;
+			totalInertia10 += inertia10;
+			totalInertia11 += inertia11;
+			totalInertia12 += inertia12;
+			totalInertia20 += inertia20;
+			totalInertia21 += inertia21;
+			totalInertia22 += inertia22;
+			s = n;
+		}
+		this._mass = totalMass;
+		this._localInertia00 = totalInertia00;
+		this._localInertia01 = totalInertia01;
+		this._localInertia02 = totalInertia02;
+		this._localInertia10 = totalInertia10;
+		this._localInertia11 = totalInertia11;
+		this._localInertia12 = totalInertia12;
+		this._localInertia20 = totalInertia20;
+		this._localInertia21 = totalInertia21;
+		this._localInertia22 = totalInertia22;
+		if(this._mass > 0 && this._localInertia00 * (this._localInertia11 * this._localInertia22 - this._localInertia12 * this._localInertia21) - this._localInertia01 * (this._localInertia10 * this._localInertia22 - this._localInertia12 * this._localInertia20) + this._localInertia02 * (this._localInertia10 * this._localInertia21 - this._localInertia11 * this._localInertia20) > 0 && this._type == 0) {
+			this._invMass = 1 / this._mass;
+			var d00 = this._localInertia11 * this._localInertia22 - this._localInertia12 * this._localInertia21;
+			var d01 = this._localInertia10 * this._localInertia22 - this._localInertia12 * this._localInertia20;
+			var d02 = this._localInertia10 * this._localInertia21 - this._localInertia11 * this._localInertia20;
+			var d = this._localInertia00 * d00 - this._localInertia01 * d01 + this._localInertia02 * d02;
+			if(d < -1e-32 || d > 1e-32) {
+				d = 1 / d;
+			}
+			this._invLocalInertia00 = d00 * d;
+			this._invLocalInertia01 = -(this._localInertia01 * this._localInertia22 - this._localInertia02 * this._localInertia21) * d;
+			this._invLocalInertia02 = (this._localInertia01 * this._localInertia12 - this._localInertia02 * this._localInertia11) * d;
+			this._invLocalInertia10 = -d01 * d;
+			this._invLocalInertia11 = (this._localInertia00 * this._localInertia22 - this._localInertia02 * this._localInertia20) * d;
+			this._invLocalInertia12 = -(this._localInertia00 * this._localInertia12 - this._localInertia02 * this._localInertia10) * d;
+			this._invLocalInertia20 = d02 * d;
+			this._invLocalInertia21 = -(this._localInertia00 * this._localInertia21 - this._localInertia01 * this._localInertia20) * d;
+			this._invLocalInertia22 = (this._localInertia00 * this._localInertia11 - this._localInertia01 * this._localInertia10) * d;
+			this._invLocalInertiaWithoutRotFactor00 = this._invLocalInertia00;
+			this._invLocalInertiaWithoutRotFactor01 = this._invLocalInertia01;
+			this._invLocalInertiaWithoutRotFactor02 = this._invLocalInertia02;
+			this._invLocalInertiaWithoutRotFactor10 = this._invLocalInertia10;
+			this._invLocalInertiaWithoutRotFactor11 = this._invLocalInertia11;
+			this._invLocalInertiaWithoutRotFactor12 = this._invLocalInertia12;
+			this._invLocalInertiaWithoutRotFactor20 = this._invLocalInertia20;
+			this._invLocalInertiaWithoutRotFactor21 = this._invLocalInertia21;
+			this._invLocalInertiaWithoutRotFactor22 = this._invLocalInertia22;
+			this._invLocalInertia00 = this._invLocalInertiaWithoutRotFactor00 * this._rotFactor.x;
+			this._invLocalInertia01 = this._invLocalInertiaWithoutRotFactor01 * this._rotFactor.x;
+			this._invLocalInertia02 = this._invLocalInertiaWithoutRotFactor02 * this._rotFactor.x;
+			this._invLocalInertia10 = this._invLocalInertiaWithoutRotFactor10 * this._rotFactor.y;
+			this._invLocalInertia11 = this._invLocalInertiaWithoutRotFactor11 * this._rotFactor.y;
+			this._invLocalInertia12 = this._invLocalInertiaWithoutRotFactor12 * this._rotFactor.y;
+			this._invLocalInertia20 = this._invLocalInertiaWithoutRotFactor20 * this._rotFactor.z;
+			this._invLocalInertia21 = this._invLocalInertiaWithoutRotFactor21 * this._rotFactor.z;
+			this._invLocalInertia22 = this._invLocalInertiaWithoutRotFactor22 * this._rotFactor.z;
+		} else {
+			this._invMass = 0;
+			this._invLocalInertia00 = 0;
+			this._invLocalInertia01 = 0;
+			this._invLocalInertia02 = 0;
+			this._invLocalInertia10 = 0;
+			this._invLocalInertia11 = 0;
+			this._invLocalInertia12 = 0;
+			this._invLocalInertia20 = 0;
+			this._invLocalInertia21 = 0;
+			this._invLocalInertia22 = 0;
+			this._invLocalInertiaWithoutRotFactor00 = 0;
+			this._invLocalInertiaWithoutRotFactor01 = 0;
+			this._invLocalInertiaWithoutRotFactor02 = 0;
+			this._invLocalInertiaWithoutRotFactor10 = 0;
+			this._invLocalInertiaWithoutRotFactor11 = 0;
+			this._invLocalInertiaWithoutRotFactor12 = 0;
+			this._invLocalInertiaWithoutRotFactor20 = 0;
+			this._invLocalInertiaWithoutRotFactor21 = 0;
+			this._invLocalInertiaWithoutRotFactor22 = 0;
+			if(this._type == 0) {
+				this._invMass = 1e-9;
+				this._invLocalInertiaWithoutRotFactor00 = 1e-9;
+				this._invLocalInertiaWithoutRotFactor01 = 0;
+				this._invLocalInertiaWithoutRotFactor02 = 0;
+				this._invLocalInertiaWithoutRotFactor10 = 0;
+				this._invLocalInertiaWithoutRotFactor11 = 1e-9;
+				this._invLocalInertiaWithoutRotFactor12 = 0;
+				this._invLocalInertiaWithoutRotFactor20 = 0;
+				this._invLocalInertiaWithoutRotFactor21 = 0;
+				this._invLocalInertiaWithoutRotFactor22 = 1e-9;
+				this._invLocalInertia00 = this._invLocalInertiaWithoutRotFactor00 * this._rotFactor.x;
+				this._invLocalInertia01 = this._invLocalInertiaWithoutRotFactor01 * this._rotFactor.x;
+				this._invLocalInertia02 = this._invLocalInertiaWithoutRotFactor02 * this._rotFactor.x;
+				this._invLocalInertia10 = this._invLocalInertiaWithoutRotFactor10 * this._rotFactor.y;
+				this._invLocalInertia11 = this._invLocalInertiaWithoutRotFactor11 * this._rotFactor.y;
+				this._invLocalInertia12 = this._invLocalInertiaWithoutRotFactor12 * this._rotFactor.y;
+				this._invLocalInertia20 = this._invLocalInertiaWithoutRotFactor20 * this._rotFactor.z;
+				this._invLocalInertia21 = this._invLocalInertiaWithoutRotFactor21 * this._rotFactor.z;
+				this._invLocalInertia22 = this._invLocalInertiaWithoutRotFactor22 * this._rotFactor.z;
+			}
+		}
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = this._transform._rotation00 * this._invLocalInertia00 + this._transform._rotation01 * this._invLocalInertia10 + this._transform._rotation02 * this._invLocalInertia20;
+		__tmp__01 = this._transform._rotation00 * this._invLocalInertia01 + this._transform._rotation01 * this._invLocalInertia11 + this._transform._rotation02 * this._invLocalInertia21;
+		__tmp__02 = this._transform._rotation00 * this._invLocalInertia02 + this._transform._rotation01 * this._invLocalInertia12 + this._transform._rotation02 * this._invLocalInertia22;
+		__tmp__10 = this._transform._rotation10 * this._invLocalInertia00 + this._transform._rotation11 * this._invLocalInertia10 + this._transform._rotation12 * this._invLocalInertia20;
+		__tmp__11 = this._transform._rotation10 * this._invLocalInertia01 + this._transform._rotation11 * this._invLocalInertia11 + this._transform._rotation12 * this._invLocalInertia21;
+		__tmp__12 = this._transform._rotation10 * this._invLocalInertia02 + this._transform._rotation11 * this._invLocalInertia12 + this._transform._rotation12 * this._invLocalInertia22;
+		__tmp__20 = this._transform._rotation20 * this._invLocalInertia00 + this._transform._rotation21 * this._invLocalInertia10 + this._transform._rotation22 * this._invLocalInertia20;
+		__tmp__21 = this._transform._rotation20 * this._invLocalInertia01 + this._transform._rotation21 * this._invLocalInertia11 + this._transform._rotation22 * this._invLocalInertia21;
+		__tmp__22 = this._transform._rotation20 * this._invLocalInertia02 + this._transform._rotation21 * this._invLocalInertia12 + this._transform._rotation22 * this._invLocalInertia22;
+		this._invInertia00 = __tmp__00;
+		this._invInertia01 = __tmp__01;
+		this._invInertia02 = __tmp__02;
+		this._invInertia10 = __tmp__10;
+		this._invInertia11 = __tmp__11;
+		this._invInertia12 = __tmp__12;
+		this._invInertia20 = __tmp__20;
+		this._invInertia21 = __tmp__21;
+		this._invInertia22 = __tmp__22;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = this._invInertia00 * this._transform._rotation00 + this._invInertia01 * this._transform._rotation01 + this._invInertia02 * this._transform._rotation02;
+		__tmp__01 = this._invInertia00 * this._transform._rotation10 + this._invInertia01 * this._transform._rotation11 + this._invInertia02 * this._transform._rotation12;
+		__tmp__02 = this._invInertia00 * this._transform._rotation20 + this._invInertia01 * this._transform._rotation21 + this._invInertia02 * this._transform._rotation22;
+		__tmp__10 = this._invInertia10 * this._transform._rotation00 + this._invInertia11 * this._transform._rotation01 + this._invInertia12 * this._transform._rotation02;
+		__tmp__11 = this._invInertia10 * this._transform._rotation10 + this._invInertia11 * this._transform._rotation11 + this._invInertia12 * this._transform._rotation12;
+		__tmp__12 = this._invInertia10 * this._transform._rotation20 + this._invInertia11 * this._transform._rotation21 + this._invInertia12 * this._transform._rotation22;
+		__tmp__20 = this._invInertia20 * this._transform._rotation00 + this._invInertia21 * this._transform._rotation01 + this._invInertia22 * this._transform._rotation02;
+		__tmp__21 = this._invInertia20 * this._transform._rotation10 + this._invInertia21 * this._transform._rotation11 + this._invInertia22 * this._transform._rotation12;
+		__tmp__22 = this._invInertia20 * this._transform._rotation20 + this._invInertia21 * this._transform._rotation21 + this._invInertia22 * this._transform._rotation22;
+		this._invInertia00 = __tmp__00;
+		this._invInertia01 = __tmp__01;
+		this._invInertia02 = __tmp__02;
+		this._invInertia10 = __tmp__10;
+		this._invInertia11 = __tmp__11;
+		this._invInertia12 = __tmp__12;
+		this._invInertia20 = __tmp__20;
+		this._invInertia21 = __tmp__21;
+		this._invInertia22 = __tmp__22;
+		this._invInertia00 *= this._rotFactor.x;
+		this._invInertia01 *= this._rotFactor.x;
+		this._invInertia02 *= this._rotFactor.x;
+		this._invInertia10 *= this._rotFactor.y;
+		this._invInertia11 *= this._rotFactor.y;
+		this._invInertia12 *= this._rotFactor.y;
+		this._invInertia20 *= this._rotFactor.z;
+		this._invInertia21 *= this._rotFactor.z;
+		this._invInertia22 *= this._rotFactor.z;
+		this._sleeping = false;
+		this._sleepTime = 0;
+	}
+	,applyForce: function(force,positionInWorld) {
+		var iforceX;
+		var iforceY;
+		var iforceZ;
+		iforceX = force.x;
+		iforceY = force.y;
+		iforceZ = force.z;
+		this._forceX += iforceX;
+		this._forceY += iforceY;
+		this._forceZ += iforceZ;
+		var itorqueX;
+		var itorqueY;
+		var itorqueZ;
+		var posX;
+		var posY;
+		var posZ;
+		posX = positionInWorld.x;
+		posY = positionInWorld.y;
+		posZ = positionInWorld.z;
+		posX -= this._transform._positionX;
+		posY -= this._transform._positionY;
+		posZ -= this._transform._positionZ;
+		itorqueX = posY * iforceZ - posZ * iforceY;
+		itorqueY = posZ * iforceX - posX * iforceZ;
+		itorqueZ = posX * iforceY - posY * iforceX;
+		this._torqueX += itorqueX;
+		this._torqueY += itorqueY;
+		this._torqueZ += itorqueZ;
+		this._sleeping = false;
+		this._sleepTime = 0;
+	}
+	,applyForceToCenter: function(force) {
+		var iforceX;
+		var iforceY;
+		var iforceZ;
+		iforceX = force.x;
+		iforceY = force.y;
+		iforceZ = force.z;
+		this._forceX += iforceX;
+		this._forceY += iforceY;
+		this._forceZ += iforceZ;
+		this._sleeping = false;
+		this._sleepTime = 0;
+	}
+	,applyTorque: function(torque) {
+		var itorqueX;
+		var itorqueY;
+		var itorqueZ;
+		itorqueX = torque.x;
+		itorqueY = torque.y;
+		itorqueZ = torque.z;
+		this._torqueX += itorqueX;
+		this._torqueY += itorqueY;
+		this._torqueZ += itorqueZ;
+		this._sleeping = false;
+		this._sleepTime = 0;
+	}
+	,addShape: function(shape) {
+		if(this._shapeList == null) {
+			this._shapeList = shape;
+			this._shapeListLast = shape;
+		} else {
+			this._shapeListLast._next = shape;
+			shape._prev = this._shapeListLast;
+			this._shapeListLast = shape;
+		}
+		this._numShapes++;
+		shape._rigidBody = this;
+		if(this._world != null) {
+			var _this = this._world;
+			shape._proxy = _this._broadPhase.createProxy(shape,shape._aabb);
+			shape._id = _this._shapeIdCount++;
+			_this._numShapes++;
+		}
+		this.updateMass();
+		var s = this._shapeList;
+		while(s != null) {
+			var n = s._next;
+			var tf1 = this._ptransform;
+			var tf2 = this._transform;
+			var dst = s._ptransform;
+			var src1 = s._localTransform;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+			__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+			__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+			__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+			__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+			__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+			__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+			__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+			__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+			dst._rotation00 = __tmp__00;
+			dst._rotation01 = __tmp__01;
+			dst._rotation02 = __tmp__02;
+			dst._rotation10 = __tmp__10;
+			dst._rotation11 = __tmp__11;
+			dst._rotation12 = __tmp__12;
+			dst._rotation20 = __tmp__20;
+			dst._rotation21 = __tmp__21;
+			dst._rotation22 = __tmp__22;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+			__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+			__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+			dst._positionX = __tmp__X;
+			dst._positionY = __tmp__Y;
+			dst._positionZ = __tmp__Z;
+			dst._positionX += tf1._positionX;
+			dst._positionY += tf1._positionY;
+			dst._positionZ += tf1._positionZ;
+			var dst1 = s._transform;
+			var src11 = s._localTransform;
+			var __tmp__001;
+			var __tmp__011;
+			var __tmp__021;
+			var __tmp__101;
+			var __tmp__111;
+			var __tmp__121;
+			var __tmp__201;
+			var __tmp__211;
+			var __tmp__221;
+			__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+			__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+			__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+			__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+			__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+			__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+			__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+			__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+			__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+			dst1._rotation00 = __tmp__001;
+			dst1._rotation01 = __tmp__011;
+			dst1._rotation02 = __tmp__021;
+			dst1._rotation10 = __tmp__101;
+			dst1._rotation11 = __tmp__111;
+			dst1._rotation12 = __tmp__121;
+			dst1._rotation20 = __tmp__201;
+			dst1._rotation21 = __tmp__211;
+			dst1._rotation22 = __tmp__221;
+			var __tmp__X1;
+			var __tmp__Y1;
+			var __tmp__Z1;
+			__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+			__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+			__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+			dst1._positionX = __tmp__X1;
+			dst1._positionY = __tmp__Y1;
+			dst1._positionZ = __tmp__Z1;
+			dst1._positionX += tf2._positionX;
+			dst1._positionY += tf2._positionY;
+			dst1._positionZ += tf2._positionZ;
+			var minX;
+			var minY;
+			var minZ;
+			var maxX;
+			var maxY;
+			var maxZ;
+			s._geom._computeAabb(s._aabb,s._ptransform);
+			minX = s._aabb._minX;
+			minY = s._aabb._minY;
+			minZ = s._aabb._minZ;
+			maxX = s._aabb._maxX;
+			maxY = s._aabb._maxY;
+			maxZ = s._aabb._maxZ;
+			s._geom._computeAabb(s._aabb,s._transform);
+			s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+			s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+			s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+			s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+			s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+			s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+			if(s._proxy != null) {
+				var dX;
+				var dY;
+				var dZ;
+				dX = s._transform._positionX - s._ptransform._positionX;
+				dY = s._transform._positionY - s._ptransform._positionY;
+				dZ = s._transform._positionZ - s._ptransform._positionZ;
+				var v = s.displacement;
+				v.x = dX;
+				v.y = dY;
+				v.z = dZ;
+				s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+			}
+			s = n;
+		}
+	}
+	,__class__: oimo_dynamics_rigidbody_RigidBody
+};
+var oimo_dynamics_rigidbody_RigidBodyConfig = function() {
+	this.position = new oimo_common_Vec3();
+	this.rotation = new oimo_common_Mat3();
+	this.linearVelocity = new oimo_common_Vec3();
+	this.angularVelocity = new oimo_common_Vec3();
+	this.type = 0;
+	this.linearDamping = 0;
+	this.angularDamping = 0;
+	this.autoSleep = true;
+	this.sleepingVelocityThreshold = oimo_common_Setting.sleepingVelocityThreshold;
+	this.sleepingAngularVelocityThreshold = oimo_common_Setting.sleepingAngularVelocityThreshold;
+	this.sleepingTimeThreshold = oimo_common_Setting.sleepingTimeThreshold;
+};
+$hxClasses["oimo.dynamics.rigidbody.RigidBodyConfig"] = oimo_dynamics_rigidbody_RigidBodyConfig;
+oimo_dynamics_rigidbody_RigidBodyConfig.__name__ = "oimo.dynamics.rigidbody.RigidBodyConfig";
+oimo_dynamics_rigidbody_RigidBodyConfig.prototype = {
+	__class__: oimo_dynamics_rigidbody_RigidBodyConfig
+};
+var oimo_dynamics_rigidbody_RigidBodyType = function() { };
+$hxClasses["oimo.dynamics.rigidbody.RigidBodyType"] = oimo_dynamics_rigidbody_RigidBodyType;
+oimo_dynamics_rigidbody_RigidBodyType.__name__ = "oimo.dynamics.rigidbody.RigidBodyType";
+var oimo_dynamics_rigidbody_Shape = function(config) {
+	this._id = -1;
+	this._localTransform = new oimo_common_Transform();
+	this._ptransform = new oimo_common_Transform();
+	this._transform = new oimo_common_Transform();
+	var v = config.position;
+	this._localTransform._positionX = v.x;
+	this._localTransform._positionY = v.y;
+	this._localTransform._positionZ = v.z;
+	var m = config.rotation;
+	this._localTransform._rotation00 = m.e00;
+	this._localTransform._rotation01 = m.e01;
+	this._localTransform._rotation02 = m.e02;
+	this._localTransform._rotation10 = m.e10;
+	this._localTransform._rotation11 = m.e11;
+	this._localTransform._rotation12 = m.e12;
+	this._localTransform._rotation20 = m.e20;
+	this._localTransform._rotation21 = m.e21;
+	this._localTransform._rotation22 = m.e22;
+	var dst = this._ptransform;
+	var src = this._localTransform;
+	dst._positionX = src._positionX;
+	dst._positionY = src._positionY;
+	dst._positionZ = src._positionZ;
+	dst._rotation00 = src._rotation00;
+	dst._rotation01 = src._rotation01;
+	dst._rotation02 = src._rotation02;
+	dst._rotation10 = src._rotation10;
+	dst._rotation11 = src._rotation11;
+	dst._rotation12 = src._rotation12;
+	dst._rotation20 = src._rotation20;
+	dst._rotation21 = src._rotation21;
+	dst._rotation22 = src._rotation22;
+	var dst = this._transform;
+	var src = this._localTransform;
+	dst._positionX = src._positionX;
+	dst._positionY = src._positionY;
+	dst._positionZ = src._positionZ;
+	dst._rotation00 = src._rotation00;
+	dst._rotation01 = src._rotation01;
+	dst._rotation02 = src._rotation02;
+	dst._rotation10 = src._rotation10;
+	dst._rotation11 = src._rotation11;
+	dst._rotation12 = src._rotation12;
+	dst._rotation20 = src._rotation20;
+	dst._rotation21 = src._rotation21;
+	dst._rotation22 = src._rotation22;
+	this._restitution = config.restitution;
+	this._friction = config.friction;
+	this._density = config.density;
+	this._geom = config.geometry;
+	this._collisionGroup = config.collisionGroup;
+	this._collisionMask = config.collisionMask;
+	this._contactCallback = config.contactCallback;
+	this._aabb = new oimo_collision_geometry_Aabb();
+	this._proxy = null;
+	this.displacement = new oimo_common_Vec3();
+};
+$hxClasses["oimo.dynamics.rigidbody.Shape"] = oimo_dynamics_rigidbody_Shape;
+oimo_dynamics_rigidbody_Shape.__name__ = "oimo.dynamics.rigidbody.Shape";
+oimo_dynamics_rigidbody_Shape.prototype = {
+	__class__: oimo_dynamics_rigidbody_Shape
+};
+var oimo_dynamics_rigidbody_ShapeConfig = function() {
+	this.position = new oimo_common_Vec3();
+	this.rotation = new oimo_common_Mat3();
+	this.friction = oimo_common_Setting.defaultFriction;
+	this.restitution = oimo_common_Setting.defaultRestitution;
+	this.density = oimo_common_Setting.defaultDensity;
+	this.collisionGroup = oimo_common_Setting.defaultCollisionGroup;
+	this.collisionMask = oimo_common_Setting.defaultCollisionMask;
+	this.geometry = null;
+	this.contactCallback = null;
+};
+$hxClasses["oimo.dynamics.rigidbody.ShapeConfig"] = oimo_dynamics_rigidbody_ShapeConfig;
+oimo_dynamics_rigidbody_ShapeConfig.__name__ = "oimo.dynamics.rigidbody.ShapeConfig";
+oimo_dynamics_rigidbody_ShapeConfig.prototype = {
+	__class__: oimo_dynamics_rigidbody_ShapeConfig
+};
 var physics_CarConfig = function() { };
 $hxClasses["physics.CarConfig"] = physics_CarConfig;
 physics_CarConfig.__name__ = "physics.CarConfig";
@@ -51701,8 +67641,6 @@ var physics_CarPhysics = function(startX,startY,startZ,initialConfig) {
 		startX = 0.0;
 	}
 	this.scratchWheelWorld = new h3d_VectorImpl(0.,0.,0.);
-	this.scratchRight = new h3d_VectorImpl(0.,0.,0.);
-	this.scratchFwd = new h3d_VectorImpl(0.,0.,0.);
 	this.scratchGroundNormal = new h3d_VectorImpl(0,0,1);
 	this.wheelGroundZ = [0.0,0.0,0.0,0.0];
 	this.wheelSpinVelocity = [0.0,0.0,0.0,0.0];
@@ -51754,43 +67692,1755 @@ var physics_CarPhysics = function(startX,startY,startZ,initialConfig) {
 	this.prevSuspLength[2] = rest;
 	this.suspLength[3] = rest;
 	this.prevSuspLength[3] = rest;
+	this.initOimoPhysics(startX,startY,startZ);
 };
 $hxClasses["physics.CarPhysics"] = physics_CarPhysics;
 physics_CarPhysics.__name__ = "physics.CarPhysics";
 physics_CarPhysics.prototype = {
-	update: function(dt,input,waypoints,groundProvider) {
+	set_yaw: function(v) {
+		this.yaw = v;
+		if(this.chassisBody != null) {
+			oimo_common_Mat3.numCreations++;
+			var x = this.pitch;
+			var y = this.roll;
+			var z = -v;
+			if(z == null) {
+				z = 0;
+			}
+			if(y == null) {
+				y = 0;
+			}
+			if(x == null) {
+				x = 0;
+			}
+			var eulerAngles_x = x;
+			var eulerAngles_y = y;
+			var eulerAngles_z = z;
+			oimo_common_Vec3.numCreations++;
+			var sx = Math.sin(eulerAngles_x);
+			var sy = Math.sin(eulerAngles_y);
+			var sz = Math.sin(eulerAngles_z);
+			var cx = Math.cos(eulerAngles_x);
+			var cy = Math.cos(eulerAngles_y);
+			var cz = Math.cos(eulerAngles_z);
+			var t01 = -cy * sz;
+			var t10 = cx * sz + cz * sx * sy;
+			var t12 = -cy * sx;
+			var t20 = sx * sz - cx * cz * sy;
+			var t21 = cz * sx + cx * sy * sz;
+			var _this = this.chassisBody;
+			var q_x = 0;
+			var q_y = 0;
+			var q_z = 0;
+			var q_w = 1;
+			oimo_common_Quat.numCreations++;
+			var e00 = cy * cz;
+			var e11 = cx * cz - sx * sy * sz;
+			var e22 = cx * cy;
+			var t = e00 + e11 + e22;
+			var s;
+			if(t > 0) {
+				s = Math.sqrt(t + 1);
+				q_w = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (t21 - t12) * s;
+				q_y = (sy - t20) * s;
+				q_z = (t10 - t01) * s;
+			} else if(e00 > e11) {
+				if(e00 > e22) {
+					s = Math.sqrt(e00 - e11 - e22 + 1);
+					q_x = 0.5 * s;
+					s = 0.5 / s;
+					q_y = (t01 + t10) * s;
+					q_z = (sy + t20) * s;
+					q_w = (t21 - t12) * s;
+				} else {
+					s = Math.sqrt(e22 - e00 - e11 + 1);
+					q_z = 0.5 * s;
+					s = 0.5 / s;
+					q_x = (sy + t20) * s;
+					q_y = (t12 + t21) * s;
+					q_w = (t10 - t01) * s;
+				}
+			} else if(e11 > e22) {
+				s = Math.sqrt(e11 - e22 - e00 + 1);
+				q_y = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (t01 + t10) * s;
+				q_z = (t12 + t21) * s;
+				q_w = (sy - t20) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				q_z = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (sy + t20) * s;
+				q_y = (t12 + t21) * s;
+				q_w = (t10 - t01) * s;
+			}
+			var qX;
+			var qY;
+			var qZ;
+			var qW;
+			qX = q_x;
+			qY = q_y;
+			qZ = q_z;
+			qW = q_w;
+			var x = qX;
+			var y = qY;
+			var z = qZ;
+			var w = qW;
+			var x2 = 2 * x;
+			var y2 = 2 * y;
+			var z2 = 2 * z;
+			var xx = x * x2;
+			var yy = y * y2;
+			var zz = z * z2;
+			var xy = x * y2;
+			var yz = y * z2;
+			var xz = x * z2;
+			var wx = w * x2;
+			var wy = w * y2;
+			var wz = w * z2;
+			_this._transform._rotation00 = 1 - yy - zz;
+			_this._transform._rotation01 = xy - wz;
+			_this._transform._rotation02 = xz + wy;
+			_this._transform._rotation10 = xy + wz;
+			_this._transform._rotation11 = 1 - xx - zz;
+			_this._transform._rotation12 = yz - wx;
+			_this._transform._rotation20 = xz - wy;
+			_this._transform._rotation21 = yz + wx;
+			_this._transform._rotation22 = 1 - xx - yy;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
+			__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
+			__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
+			__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
+			__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
+			__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
+			__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
+			__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
+			__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
+			_this._invInertia00 = __tmp__00;
+			_this._invInertia01 = __tmp__01;
+			_this._invInertia02 = __tmp__02;
+			_this._invInertia10 = __tmp__10;
+			_this._invInertia11 = __tmp__11;
+			_this._invInertia12 = __tmp__12;
+			_this._invInertia20 = __tmp__20;
+			_this._invInertia21 = __tmp__21;
+			_this._invInertia22 = __tmp__22;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
+			__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
+			__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
+			__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
+			__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
+			__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
+			__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
+			__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
+			__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
+			_this._invInertia00 = __tmp__00;
+			_this._invInertia01 = __tmp__01;
+			_this._invInertia02 = __tmp__02;
+			_this._invInertia10 = __tmp__10;
+			_this._invInertia11 = __tmp__11;
+			_this._invInertia12 = __tmp__12;
+			_this._invInertia20 = __tmp__20;
+			_this._invInertia21 = __tmp__21;
+			_this._invInertia22 = __tmp__22;
+			_this._invInertia00 *= _this._rotFactor.x;
+			_this._invInertia01 *= _this._rotFactor.x;
+			_this._invInertia02 *= _this._rotFactor.x;
+			_this._invInertia10 *= _this._rotFactor.y;
+			_this._invInertia11 *= _this._rotFactor.y;
+			_this._invInertia12 *= _this._rotFactor.y;
+			_this._invInertia20 *= _this._rotFactor.z;
+			_this._invInertia21 *= _this._rotFactor.z;
+			_this._invInertia22 *= _this._rotFactor.z;
+			var dst = _this._ptransform;
+			var src = _this._transform;
+			dst._positionX = src._positionX;
+			dst._positionY = src._positionY;
+			dst._positionZ = src._positionZ;
+			dst._rotation00 = src._rotation00;
+			dst._rotation01 = src._rotation01;
+			dst._rotation02 = src._rotation02;
+			dst._rotation10 = src._rotation10;
+			dst._rotation11 = src._rotation11;
+			dst._rotation12 = src._rotation12;
+			dst._rotation20 = src._rotation20;
+			dst._rotation21 = src._rotation21;
+			dst._rotation22 = src._rotation22;
+			var s = _this._shapeList;
+			while(s != null) {
+				var n = s._next;
+				var tf1 = _this._ptransform;
+				var tf2 = _this._transform;
+				var dst = s._ptransform;
+				var src1 = s._localTransform;
+				var __tmp__00;
+				var __tmp__01;
+				var __tmp__02;
+				var __tmp__10;
+				var __tmp__11;
+				var __tmp__12;
+				var __tmp__20;
+				var __tmp__21;
+				var __tmp__22;
+				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+				dst._rotation00 = __tmp__00;
+				dst._rotation01 = __tmp__01;
+				dst._rotation02 = __tmp__02;
+				dst._rotation10 = __tmp__10;
+				dst._rotation11 = __tmp__11;
+				dst._rotation12 = __tmp__12;
+				dst._rotation20 = __tmp__20;
+				dst._rotation21 = __tmp__21;
+				dst._rotation22 = __tmp__22;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+				dst._positionX = __tmp__X;
+				dst._positionY = __tmp__Y;
+				dst._positionZ = __tmp__Z;
+				dst._positionX += tf1._positionX;
+				dst._positionY += tf1._positionY;
+				dst._positionZ += tf1._positionZ;
+				var dst1 = s._transform;
+				var src11 = s._localTransform;
+				var __tmp__001;
+				var __tmp__011;
+				var __tmp__021;
+				var __tmp__101;
+				var __tmp__111;
+				var __tmp__121;
+				var __tmp__201;
+				var __tmp__211;
+				var __tmp__221;
+				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+				dst1._rotation00 = __tmp__001;
+				dst1._rotation01 = __tmp__011;
+				dst1._rotation02 = __tmp__021;
+				dst1._rotation10 = __tmp__101;
+				dst1._rotation11 = __tmp__111;
+				dst1._rotation12 = __tmp__121;
+				dst1._rotation20 = __tmp__201;
+				dst1._rotation21 = __tmp__211;
+				dst1._rotation22 = __tmp__221;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+				dst1._positionX = __tmp__X1;
+				dst1._positionY = __tmp__Y1;
+				dst1._positionZ = __tmp__Z1;
+				dst1._positionX += tf2._positionX;
+				dst1._positionY += tf2._positionY;
+				dst1._positionZ += tf2._positionZ;
+				var minX;
+				var minY;
+				var minZ;
+				var maxX;
+				var maxY;
+				var maxZ;
+				s._geom._computeAabb(s._aabb,s._ptransform);
+				minX = s._aabb._minX;
+				minY = s._aabb._minY;
+				minZ = s._aabb._minZ;
+				maxX = s._aabb._maxX;
+				maxY = s._aabb._maxY;
+				maxZ = s._aabb._maxZ;
+				s._geom._computeAabb(s._aabb,s._transform);
+				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+				if(s._proxy != null) {
+					var dX;
+					var dY;
+					var dZ;
+					dX = s._transform._positionX - s._ptransform._positionX;
+					dY = s._transform._positionY - s._ptransform._positionY;
+					dZ = s._transform._positionZ - s._ptransform._positionZ;
+					var v1 = s.displacement;
+					v1.x = dX;
+					v1.y = dY;
+					v1.z = dZ;
+					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+				}
+				s = n;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+		}
+		return v;
+	}
+	,set_forwardSpeed: function(v) {
+		this.forwardSpeed = v;
+		if(this.chassisBody != null) {
+			var cosY = Math.cos(this.yaw);
+			var sinY = Math.sin(this.yaw);
+			var curVel_z = 0;
+			oimo_common_Vec3.numCreations++;
+			curVel_z = this.chassisBody._velZ;
+			var _this = this.chassisBody;
+			var x = -sinY * v;
+			var y = cosY * v;
+			var z = curVel_z;
+			if(z == null) {
+				z = 0;
+			}
+			if(y == null) {
+				y = 0;
+			}
+			if(x == null) {
+				x = 0;
+			}
+			oimo_common_Vec3.numCreations++;
+			if(_this._type == 1) {
+				_this._velX = 0;
+				_this._velY = 0;
+				_this._velZ = 0;
+			} else {
+				_this._velX = x;
+				_this._velY = y;
+				_this._velZ = z;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+		}
+		return v;
+	}
+	,initOimoPhysics: function(startX,startY,startZ) {
+		this.physicsWorld = new oimo_dynamics_World();
+		oimo_common_Vec3.numCreations++;
+		var _this = this.physicsWorld._gravity;
+		_this.x = 0;
+		_this.y = 0;
+		_this.z = -9.81;
+		var rbConfig = new oimo_dynamics_rigidbody_RigidBodyConfig();
+		rbConfig.type = oimo_dynamics_rigidbody_RigidBodyType.DYNAMIC;
+		rbConfig.position = new oimo_common_Vec3(startX,startY,startZ + 0.35);
+		this.chassisBody = new oimo_dynamics_rigidbody_RigidBody(rbConfig);
+		var shapeConfig = new oimo_dynamics_rigidbody_ShapeConfig();
+		shapeConfig.geometry = new oimo_collision_geometry_BoxGeometry(new oimo_common_Vec3(0.92,1.4,0.22));
+		shapeConfig.density = this.config.mass / 2.26688;
+		shapeConfig.friction = 0.25;
+		shapeConfig.restitution = 0.35;
+		this.chassisBody.addShape(new oimo_dynamics_rigidbody_Shape(shapeConfig));
+		oimo_common_Mat3.numCreations++;
+		var z = -this.yaw;
+		if(z == null) {
+			z = 0;
+		}
+		var eulerAngles_x = 0;
+		var eulerAngles_y = 0;
+		var eulerAngles_z = z;
+		oimo_common_Vec3.numCreations++;
+		var sx = Math.sin(eulerAngles_x);
+		var sy = Math.sin(eulerAngles_y);
+		var sz = Math.sin(eulerAngles_z);
+		var cx = Math.cos(eulerAngles_x);
+		var cy = Math.cos(eulerAngles_y);
+		var cz = Math.cos(eulerAngles_z);
+		var t01 = -cy * sz;
+		var t10 = cx * sz + cz * sx * sy;
+		var t12 = -cy * sx;
+		var t20 = sx * sz - cx * cz * sy;
+		var t21 = cz * sx + cx * sy * sz;
+		var _this = this.chassisBody;
+		var q_x = 0;
+		var q_y = 0;
+		var q_z = 0;
+		var q_w = 1;
+		oimo_common_Quat.numCreations++;
+		var e00 = cy * cz;
+		var e11 = cx * cz - sx * sy * sz;
+		var e22 = cx * cy;
+		var t = e00 + e11 + e22;
+		var s;
+		if(t > 0) {
+			s = Math.sqrt(t + 1);
+			q_w = 0.5 * s;
+			s = 0.5 / s;
+			q_x = (t21 - t12) * s;
+			q_y = (sy - t20) * s;
+			q_z = (t10 - t01) * s;
+		} else if(e00 > e11) {
+			if(e00 > e22) {
+				s = Math.sqrt(e00 - e11 - e22 + 1);
+				q_x = 0.5 * s;
+				s = 0.5 / s;
+				q_y = (t01 + t10) * s;
+				q_z = (sy + t20) * s;
+				q_w = (t21 - t12) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				q_z = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (sy + t20) * s;
+				q_y = (t12 + t21) * s;
+				q_w = (t10 - t01) * s;
+			}
+		} else if(e11 > e22) {
+			s = Math.sqrt(e11 - e22 - e00 + 1);
+			q_y = 0.5 * s;
+			s = 0.5 / s;
+			q_x = (t01 + t10) * s;
+			q_z = (t12 + t21) * s;
+			q_w = (sy - t20) * s;
+		} else {
+			s = Math.sqrt(e22 - e00 - e11 + 1);
+			q_z = 0.5 * s;
+			s = 0.5 / s;
+			q_x = (sy + t20) * s;
+			q_y = (t12 + t21) * s;
+			q_w = (t10 - t01) * s;
+		}
+		var qX;
+		var qY;
+		var qZ;
+		var qW;
+		qX = q_x;
+		qY = q_y;
+		qZ = q_z;
+		qW = q_w;
+		var x = qX;
+		var y = qY;
+		var z = qZ;
+		var w = qW;
+		var x2 = 2 * x;
+		var y2 = 2 * y;
+		var z2 = 2 * z;
+		var xx = x * x2;
+		var yy = y * y2;
+		var zz = z * z2;
+		var xy = x * y2;
+		var yz = y * z2;
+		var xz = x * z2;
+		var wx = w * x2;
+		var wy = w * y2;
+		var wz = w * z2;
+		_this._transform._rotation00 = 1 - yy - zz;
+		_this._transform._rotation01 = xy - wz;
+		_this._transform._rotation02 = xz + wy;
+		_this._transform._rotation10 = xy + wz;
+		_this._transform._rotation11 = 1 - xx - zz;
+		_this._transform._rotation12 = yz - wx;
+		_this._transform._rotation20 = xz - wy;
+		_this._transform._rotation21 = yz + wx;
+		_this._transform._rotation22 = 1 - xx - yy;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
+		__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
+		__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
+		__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
+		__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
+		__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
+		__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
+		__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
+		__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		var __tmp__00;
+		var __tmp__01;
+		var __tmp__02;
+		var __tmp__10;
+		var __tmp__11;
+		var __tmp__12;
+		var __tmp__20;
+		var __tmp__21;
+		var __tmp__22;
+		__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
+		__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
+		__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
+		__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
+		__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
+		__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
+		__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
+		__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
+		__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
+		_this._invInertia00 = __tmp__00;
+		_this._invInertia01 = __tmp__01;
+		_this._invInertia02 = __tmp__02;
+		_this._invInertia10 = __tmp__10;
+		_this._invInertia11 = __tmp__11;
+		_this._invInertia12 = __tmp__12;
+		_this._invInertia20 = __tmp__20;
+		_this._invInertia21 = __tmp__21;
+		_this._invInertia22 = __tmp__22;
+		_this._invInertia00 *= _this._rotFactor.x;
+		_this._invInertia01 *= _this._rotFactor.x;
+		_this._invInertia02 *= _this._rotFactor.x;
+		_this._invInertia10 *= _this._rotFactor.y;
+		_this._invInertia11 *= _this._rotFactor.y;
+		_this._invInertia12 *= _this._rotFactor.y;
+		_this._invInertia20 *= _this._rotFactor.z;
+		_this._invInertia21 *= _this._rotFactor.z;
+		_this._invInertia22 *= _this._rotFactor.z;
+		var dst = _this._ptransform;
+		var src = _this._transform;
+		dst._positionX = src._positionX;
+		dst._positionY = src._positionY;
+		dst._positionZ = src._positionZ;
+		dst._rotation00 = src._rotation00;
+		dst._rotation01 = src._rotation01;
+		dst._rotation02 = src._rotation02;
+		dst._rotation10 = src._rotation10;
+		dst._rotation11 = src._rotation11;
+		dst._rotation12 = src._rotation12;
+		dst._rotation20 = src._rotation20;
+		dst._rotation21 = src._rotation21;
+		dst._rotation22 = src._rotation22;
+		var s = _this._shapeList;
+		while(s != null) {
+			var n = s._next;
+			var tf1 = _this._ptransform;
+			var tf2 = _this._transform;
+			var dst = s._ptransform;
+			var src1 = s._localTransform;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+			__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+			__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+			__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+			__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+			__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+			__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+			__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+			__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+			dst._rotation00 = __tmp__00;
+			dst._rotation01 = __tmp__01;
+			dst._rotation02 = __tmp__02;
+			dst._rotation10 = __tmp__10;
+			dst._rotation11 = __tmp__11;
+			dst._rotation12 = __tmp__12;
+			dst._rotation20 = __tmp__20;
+			dst._rotation21 = __tmp__21;
+			dst._rotation22 = __tmp__22;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+			__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+			__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+			dst._positionX = __tmp__X;
+			dst._positionY = __tmp__Y;
+			dst._positionZ = __tmp__Z;
+			dst._positionX += tf1._positionX;
+			dst._positionY += tf1._positionY;
+			dst._positionZ += tf1._positionZ;
+			var dst1 = s._transform;
+			var src11 = s._localTransform;
+			var __tmp__001;
+			var __tmp__011;
+			var __tmp__021;
+			var __tmp__101;
+			var __tmp__111;
+			var __tmp__121;
+			var __tmp__201;
+			var __tmp__211;
+			var __tmp__221;
+			__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+			__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+			__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+			__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+			__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+			__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+			__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+			__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+			__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+			dst1._rotation00 = __tmp__001;
+			dst1._rotation01 = __tmp__011;
+			dst1._rotation02 = __tmp__021;
+			dst1._rotation10 = __tmp__101;
+			dst1._rotation11 = __tmp__111;
+			dst1._rotation12 = __tmp__121;
+			dst1._rotation20 = __tmp__201;
+			dst1._rotation21 = __tmp__211;
+			dst1._rotation22 = __tmp__221;
+			var __tmp__X1;
+			var __tmp__Y1;
+			var __tmp__Z1;
+			__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+			__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+			__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+			dst1._positionX = __tmp__X1;
+			dst1._positionY = __tmp__Y1;
+			dst1._positionZ = __tmp__Z1;
+			dst1._positionX += tf2._positionX;
+			dst1._positionY += tf2._positionY;
+			dst1._positionZ += tf2._positionZ;
+			var minX;
+			var minY;
+			var minZ;
+			var maxX;
+			var maxY;
+			var maxZ;
+			s._geom._computeAabb(s._aabb,s._ptransform);
+			minX = s._aabb._minX;
+			minY = s._aabb._minY;
+			minZ = s._aabb._minZ;
+			maxX = s._aabb._maxX;
+			maxY = s._aabb._maxY;
+			maxZ = s._aabb._maxZ;
+			s._geom._computeAabb(s._aabb,s._transform);
+			s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+			s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+			s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+			s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+			s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+			s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+			if(s._proxy != null) {
+				var dX;
+				var dY;
+				var dZ;
+				dX = s._transform._positionX - s._ptransform._positionX;
+				dY = s._transform._positionY - s._ptransform._positionY;
+				dZ = s._transform._positionZ - s._ptransform._positionZ;
+				var v = s.displacement;
+				v.x = dX;
+				v.y = dY;
+				v.z = dZ;
+				s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+			}
+			s = n;
+		}
+		_this._sleeping = false;
+		_this._sleepTime = 0;
+		this.physicsWorld.addRigidBody(this.chassisBody);
+	}
+	,resetState: function(startX,startY,startZ,newYaw) {
+		if(newYaw == null) {
+			newYaw = 1.5707963;
+		}
+		var _this = this.pos;
+		var x = startX;
+		var y = startY;
+		var z = startZ;
+		if(startZ == null) {
+			z = 0.;
+		}
+		if(startY == null) {
+			y = 0.;
+		}
+		if(startX == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = z;
+		this.set_yaw(newYaw);
+		this.pitch = 0.0;
+		this.roll = 0.0;
+		this.set_forwardSpeed(0.0);
+		this.lateralVelocity = 0.0;
+		this.verticalVelocity = 0.0;
+		this.isDrifting = false;
+		this.driftDirection = 0.0;
+		this.driftAngle = 0.0;
+		this.currentGear = 1;
+		this.engineRPM = this.config.drivetrain.idleRPM;
+		this.boostFuel = 1.0;
+		this.isBoosting = false;
+		if(this.chassisBody != null) {
+			var _this = this.chassisBody;
+			var x = startX;
+			var y = startY;
+			var z = startZ + 0.35;
+			if(z == null) {
+				z = 0;
+			}
+			if(startY == null) {
+				y = 0;
+			}
+			if(startX == null) {
+				x = 0;
+			}
+			oimo_common_Vec3.numCreations++;
+			_this._transform._positionX = x;
+			_this._transform._positionY = y;
+			_this._transform._positionZ = z;
+			var dst = _this._ptransform;
+			var src = _this._transform;
+			dst._positionX = src._positionX;
+			dst._positionY = src._positionY;
+			dst._positionZ = src._positionZ;
+			dst._rotation00 = src._rotation00;
+			dst._rotation01 = src._rotation01;
+			dst._rotation02 = src._rotation02;
+			dst._rotation10 = src._rotation10;
+			dst._rotation11 = src._rotation11;
+			dst._rotation12 = src._rotation12;
+			dst._rotation20 = src._rotation20;
+			dst._rotation21 = src._rotation21;
+			dst._rotation22 = src._rotation22;
+			var s = _this._shapeList;
+			while(s != null) {
+				var n = s._next;
+				var tf1 = _this._ptransform;
+				var tf2 = _this._transform;
+				var dst = s._ptransform;
+				var src1 = s._localTransform;
+				var __tmp__00;
+				var __tmp__01;
+				var __tmp__02;
+				var __tmp__10;
+				var __tmp__11;
+				var __tmp__12;
+				var __tmp__20;
+				var __tmp__21;
+				var __tmp__22;
+				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+				dst._rotation00 = __tmp__00;
+				dst._rotation01 = __tmp__01;
+				dst._rotation02 = __tmp__02;
+				dst._rotation10 = __tmp__10;
+				dst._rotation11 = __tmp__11;
+				dst._rotation12 = __tmp__12;
+				dst._rotation20 = __tmp__20;
+				dst._rotation21 = __tmp__21;
+				dst._rotation22 = __tmp__22;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+				dst._positionX = __tmp__X;
+				dst._positionY = __tmp__Y;
+				dst._positionZ = __tmp__Z;
+				dst._positionX += tf1._positionX;
+				dst._positionY += tf1._positionY;
+				dst._positionZ += tf1._positionZ;
+				var dst1 = s._transform;
+				var src11 = s._localTransform;
+				var __tmp__001;
+				var __tmp__011;
+				var __tmp__021;
+				var __tmp__101;
+				var __tmp__111;
+				var __tmp__121;
+				var __tmp__201;
+				var __tmp__211;
+				var __tmp__221;
+				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+				dst1._rotation00 = __tmp__001;
+				dst1._rotation01 = __tmp__011;
+				dst1._rotation02 = __tmp__021;
+				dst1._rotation10 = __tmp__101;
+				dst1._rotation11 = __tmp__111;
+				dst1._rotation12 = __tmp__121;
+				dst1._rotation20 = __tmp__201;
+				dst1._rotation21 = __tmp__211;
+				dst1._rotation22 = __tmp__221;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+				dst1._positionX = __tmp__X1;
+				dst1._positionY = __tmp__Y1;
+				dst1._positionZ = __tmp__Z1;
+				dst1._positionX += tf2._positionX;
+				dst1._positionY += tf2._positionY;
+				dst1._positionZ += tf2._positionZ;
+				var minX;
+				var minY;
+				var minZ;
+				var maxX;
+				var maxY;
+				var maxZ;
+				s._geom._computeAabb(s._aabb,s._ptransform);
+				minX = s._aabb._minX;
+				minY = s._aabb._minY;
+				minZ = s._aabb._minZ;
+				maxX = s._aabb._maxX;
+				maxY = s._aabb._maxY;
+				maxZ = s._aabb._maxZ;
+				s._geom._computeAabb(s._aabb,s._transform);
+				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+				if(s._proxy != null) {
+					var dX;
+					var dY;
+					var dZ;
+					dX = s._transform._positionX - s._ptransform._positionX;
+					dY = s._transform._positionY - s._ptransform._positionY;
+					dZ = s._transform._positionZ - s._ptransform._positionZ;
+					var v = s.displacement;
+					v.x = dX;
+					v.y = dY;
+					v.z = dZ;
+					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+				}
+				s = n;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			oimo_common_Mat3.numCreations++;
+			var z = -newYaw;
+			if(z == null) {
+				z = 0;
+			}
+			var eulerAngles_x = 0;
+			var eulerAngles_y = 0;
+			var eulerAngles_z = z;
+			oimo_common_Vec3.numCreations++;
+			var sx = Math.sin(eulerAngles_x);
+			var sy = Math.sin(eulerAngles_y);
+			var sz = Math.sin(eulerAngles_z);
+			var cx = Math.cos(eulerAngles_x);
+			var cy = Math.cos(eulerAngles_y);
+			var cz = Math.cos(eulerAngles_z);
+			var t01 = -cy * sz;
+			var t10 = cx * sz + cz * sx * sy;
+			var t12 = -cy * sx;
+			var t20 = sx * sz - cx * cz * sy;
+			var t21 = cz * sx + cx * sy * sz;
+			var _this = this.chassisBody;
+			var q_x = 0;
+			var q_y = 0;
+			var q_z = 0;
+			var q_w = 1;
+			oimo_common_Quat.numCreations++;
+			var e00 = cy * cz;
+			var e11 = cx * cz - sx * sy * sz;
+			var e22 = cx * cy;
+			var t = e00 + e11 + e22;
+			var s;
+			if(t > 0) {
+				s = Math.sqrt(t + 1);
+				q_w = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (t21 - t12) * s;
+				q_y = (sy - t20) * s;
+				q_z = (t10 - t01) * s;
+			} else if(e00 > e11) {
+				if(e00 > e22) {
+					s = Math.sqrt(e00 - e11 - e22 + 1);
+					q_x = 0.5 * s;
+					s = 0.5 / s;
+					q_y = (t01 + t10) * s;
+					q_z = (sy + t20) * s;
+					q_w = (t21 - t12) * s;
+				} else {
+					s = Math.sqrt(e22 - e00 - e11 + 1);
+					q_z = 0.5 * s;
+					s = 0.5 / s;
+					q_x = (sy + t20) * s;
+					q_y = (t12 + t21) * s;
+					q_w = (t10 - t01) * s;
+				}
+			} else if(e11 > e22) {
+				s = Math.sqrt(e11 - e22 - e00 + 1);
+				q_y = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (t01 + t10) * s;
+				q_z = (t12 + t21) * s;
+				q_w = (sy - t20) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				q_z = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (sy + t20) * s;
+				q_y = (t12 + t21) * s;
+				q_w = (t10 - t01) * s;
+			}
+			var qX;
+			var qY;
+			var qZ;
+			var qW;
+			qX = q_x;
+			qY = q_y;
+			qZ = q_z;
+			qW = q_w;
+			var x = qX;
+			var y = qY;
+			var z = qZ;
+			var w = qW;
+			var x2 = 2 * x;
+			var y2 = 2 * y;
+			var z2 = 2 * z;
+			var xx = x * x2;
+			var yy = y * y2;
+			var zz = z * z2;
+			var xy = x * y2;
+			var yz = y * z2;
+			var xz = x * z2;
+			var wx = w * x2;
+			var wy = w * y2;
+			var wz = w * z2;
+			_this._transform._rotation00 = 1 - yy - zz;
+			_this._transform._rotation01 = xy - wz;
+			_this._transform._rotation02 = xz + wy;
+			_this._transform._rotation10 = xy + wz;
+			_this._transform._rotation11 = 1 - xx - zz;
+			_this._transform._rotation12 = yz - wx;
+			_this._transform._rotation20 = xz - wy;
+			_this._transform._rotation21 = yz + wx;
+			_this._transform._rotation22 = 1 - xx - yy;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
+			__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
+			__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
+			__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
+			__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
+			__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
+			__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
+			__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
+			__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
+			_this._invInertia00 = __tmp__00;
+			_this._invInertia01 = __tmp__01;
+			_this._invInertia02 = __tmp__02;
+			_this._invInertia10 = __tmp__10;
+			_this._invInertia11 = __tmp__11;
+			_this._invInertia12 = __tmp__12;
+			_this._invInertia20 = __tmp__20;
+			_this._invInertia21 = __tmp__21;
+			_this._invInertia22 = __tmp__22;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
+			__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
+			__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
+			__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
+			__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
+			__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
+			__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
+			__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
+			__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
+			_this._invInertia00 = __tmp__00;
+			_this._invInertia01 = __tmp__01;
+			_this._invInertia02 = __tmp__02;
+			_this._invInertia10 = __tmp__10;
+			_this._invInertia11 = __tmp__11;
+			_this._invInertia12 = __tmp__12;
+			_this._invInertia20 = __tmp__20;
+			_this._invInertia21 = __tmp__21;
+			_this._invInertia22 = __tmp__22;
+			_this._invInertia00 *= _this._rotFactor.x;
+			_this._invInertia01 *= _this._rotFactor.x;
+			_this._invInertia02 *= _this._rotFactor.x;
+			_this._invInertia10 *= _this._rotFactor.y;
+			_this._invInertia11 *= _this._rotFactor.y;
+			_this._invInertia12 *= _this._rotFactor.y;
+			_this._invInertia20 *= _this._rotFactor.z;
+			_this._invInertia21 *= _this._rotFactor.z;
+			_this._invInertia22 *= _this._rotFactor.z;
+			var dst = _this._ptransform;
+			var src = _this._transform;
+			dst._positionX = src._positionX;
+			dst._positionY = src._positionY;
+			dst._positionZ = src._positionZ;
+			dst._rotation00 = src._rotation00;
+			dst._rotation01 = src._rotation01;
+			dst._rotation02 = src._rotation02;
+			dst._rotation10 = src._rotation10;
+			dst._rotation11 = src._rotation11;
+			dst._rotation12 = src._rotation12;
+			dst._rotation20 = src._rotation20;
+			dst._rotation21 = src._rotation21;
+			dst._rotation22 = src._rotation22;
+			var s = _this._shapeList;
+			while(s != null) {
+				var n = s._next;
+				var tf1 = _this._ptransform;
+				var tf2 = _this._transform;
+				var dst = s._ptransform;
+				var src1 = s._localTransform;
+				var __tmp__00;
+				var __tmp__01;
+				var __tmp__02;
+				var __tmp__10;
+				var __tmp__11;
+				var __tmp__12;
+				var __tmp__20;
+				var __tmp__21;
+				var __tmp__22;
+				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+				dst._rotation00 = __tmp__00;
+				dst._rotation01 = __tmp__01;
+				dst._rotation02 = __tmp__02;
+				dst._rotation10 = __tmp__10;
+				dst._rotation11 = __tmp__11;
+				dst._rotation12 = __tmp__12;
+				dst._rotation20 = __tmp__20;
+				dst._rotation21 = __tmp__21;
+				dst._rotation22 = __tmp__22;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+				dst._positionX = __tmp__X;
+				dst._positionY = __tmp__Y;
+				dst._positionZ = __tmp__Z;
+				dst._positionX += tf1._positionX;
+				dst._positionY += tf1._positionY;
+				dst._positionZ += tf1._positionZ;
+				var dst1 = s._transform;
+				var src11 = s._localTransform;
+				var __tmp__001;
+				var __tmp__011;
+				var __tmp__021;
+				var __tmp__101;
+				var __tmp__111;
+				var __tmp__121;
+				var __tmp__201;
+				var __tmp__211;
+				var __tmp__221;
+				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+				dst1._rotation00 = __tmp__001;
+				dst1._rotation01 = __tmp__011;
+				dst1._rotation02 = __tmp__021;
+				dst1._rotation10 = __tmp__101;
+				dst1._rotation11 = __tmp__111;
+				dst1._rotation12 = __tmp__121;
+				dst1._rotation20 = __tmp__201;
+				dst1._rotation21 = __tmp__211;
+				dst1._rotation22 = __tmp__221;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+				dst1._positionX = __tmp__X1;
+				dst1._positionY = __tmp__Y1;
+				dst1._positionZ = __tmp__Z1;
+				dst1._positionX += tf2._positionX;
+				dst1._positionY += tf2._positionY;
+				dst1._positionZ += tf2._positionZ;
+				var minX;
+				var minY;
+				var minZ;
+				var maxX;
+				var maxY;
+				var maxZ;
+				s._geom._computeAabb(s._aabb,s._ptransform);
+				minX = s._aabb._minX;
+				minY = s._aabb._minY;
+				minZ = s._aabb._minZ;
+				maxX = s._aabb._maxX;
+				maxY = s._aabb._maxY;
+				maxZ = s._aabb._maxZ;
+				s._geom._computeAabb(s._aabb,s._transform);
+				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+				if(s._proxy != null) {
+					var dX;
+					var dY;
+					var dZ;
+					dX = s._transform._positionX - s._ptransform._positionX;
+					dY = s._transform._positionY - s._ptransform._positionY;
+					dZ = s._transform._positionZ - s._ptransform._positionZ;
+					var v = s.displacement;
+					v.x = dX;
+					v.y = dY;
+					v.z = dZ;
+					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+				}
+				s = n;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			var _this = this.chassisBody;
+			oimo_common_Vec3.numCreations++;
+			if(_this._type == 1) {
+				_this._velX = 0;
+				_this._velY = 0;
+				_this._velZ = 0;
+			} else {
+				_this._velX = 0;
+				_this._velY = 0;
+				_this._velZ = 0;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			var _this = this.chassisBody;
+			oimo_common_Vec3.numCreations++;
+			if(_this._type == 1) {
+				_this._angVelX = 0;
+				_this._angVelY = 0;
+				_this._angVelZ = 0;
+			} else {
+				_this._angVelX = 0;
+				_this._angVelY = 0;
+				_this._angVelZ = 0;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+		}
+	}
+	,update: function(dt,input,waypoints,groundProvider) {
 		if(dt <= 0.0) {
 			return;
 		}
 		var clampedDt = Math.min(dt,0.05);
-		var cosYaw = Math.cos(this.yaw);
-		var sinYaw = Math.sin(this.yaw);
-		var fwdX = -sinYaw;
-		var _this = this.scratchFwd;
-		var x = fwdX;
-		var y = cosYaw;
-		if(cosYaw == null) {
-			y = 0.;
+		var _this = this.chassisBody;
+		var cbPos_x = 0;
+		var cbPos_y = 0;
+		var cbPos_z = 0;
+		oimo_common_Vec3.numCreations++;
+		cbPos_x = _this._transform._positionX;
+		cbPos_y = _this._transform._positionY;
+		cbPos_z = _this._transform._positionZ;
+		var dx = this.pos.x - cbPos_x;
+		var dy = this.pos.y - cbPos_y;
+		var dz = this.pos.z + 0.35 - cbPos_z;
+		if(dx * dx + dy * dy + dz * dz > 2.0) {
+			var _this = this.chassisBody;
+			var x = this.pos.x;
+			var y = this.pos.y;
+			var z = this.pos.z + 0.35;
+			if(z == null) {
+				z = 0;
+			}
+			if(y == null) {
+				y = 0;
+			}
+			if(x == null) {
+				x = 0;
+			}
+			oimo_common_Vec3.numCreations++;
+			_this._transform._positionX = x;
+			_this._transform._positionY = y;
+			_this._transform._positionZ = z;
+			var dst = _this._ptransform;
+			var src = _this._transform;
+			dst._positionX = src._positionX;
+			dst._positionY = src._positionY;
+			dst._positionZ = src._positionZ;
+			dst._rotation00 = src._rotation00;
+			dst._rotation01 = src._rotation01;
+			dst._rotation02 = src._rotation02;
+			dst._rotation10 = src._rotation10;
+			dst._rotation11 = src._rotation11;
+			dst._rotation12 = src._rotation12;
+			dst._rotation20 = src._rotation20;
+			dst._rotation21 = src._rotation21;
+			dst._rotation22 = src._rotation22;
+			var s = _this._shapeList;
+			while(s != null) {
+				var n = s._next;
+				var tf1 = _this._ptransform;
+				var tf2 = _this._transform;
+				var dst = s._ptransform;
+				var src1 = s._localTransform;
+				var __tmp__00;
+				var __tmp__01;
+				var __tmp__02;
+				var __tmp__10;
+				var __tmp__11;
+				var __tmp__12;
+				var __tmp__20;
+				var __tmp__21;
+				var __tmp__22;
+				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+				dst._rotation00 = __tmp__00;
+				dst._rotation01 = __tmp__01;
+				dst._rotation02 = __tmp__02;
+				dst._rotation10 = __tmp__10;
+				dst._rotation11 = __tmp__11;
+				dst._rotation12 = __tmp__12;
+				dst._rotation20 = __tmp__20;
+				dst._rotation21 = __tmp__21;
+				dst._rotation22 = __tmp__22;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+				dst._positionX = __tmp__X;
+				dst._positionY = __tmp__Y;
+				dst._positionZ = __tmp__Z;
+				dst._positionX += tf1._positionX;
+				dst._positionY += tf1._positionY;
+				dst._positionZ += tf1._positionZ;
+				var dst1 = s._transform;
+				var src11 = s._localTransform;
+				var __tmp__001;
+				var __tmp__011;
+				var __tmp__021;
+				var __tmp__101;
+				var __tmp__111;
+				var __tmp__121;
+				var __tmp__201;
+				var __tmp__211;
+				var __tmp__221;
+				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+				dst1._rotation00 = __tmp__001;
+				dst1._rotation01 = __tmp__011;
+				dst1._rotation02 = __tmp__021;
+				dst1._rotation10 = __tmp__101;
+				dst1._rotation11 = __tmp__111;
+				dst1._rotation12 = __tmp__121;
+				dst1._rotation20 = __tmp__201;
+				dst1._rotation21 = __tmp__211;
+				dst1._rotation22 = __tmp__221;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+				dst1._positionX = __tmp__X1;
+				dst1._positionY = __tmp__Y1;
+				dst1._positionZ = __tmp__Z1;
+				dst1._positionX += tf2._positionX;
+				dst1._positionY += tf2._positionY;
+				dst1._positionZ += tf2._positionZ;
+				var minX;
+				var minY;
+				var minZ;
+				var maxX;
+				var maxY;
+				var maxZ;
+				s._geom._computeAabb(s._aabb,s._ptransform);
+				minX = s._aabb._minX;
+				minY = s._aabb._minY;
+				minZ = s._aabb._minZ;
+				maxX = s._aabb._maxX;
+				maxY = s._aabb._maxY;
+				maxZ = s._aabb._maxZ;
+				s._geom._computeAabb(s._aabb,s._transform);
+				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+				if(s._proxy != null) {
+					var dX;
+					var dY;
+					var dZ;
+					dX = s._transform._positionX - s._ptransform._positionX;
+					dY = s._transform._positionY - s._ptransform._positionY;
+					dZ = s._transform._positionZ - s._ptransform._positionZ;
+					var v = s.displacement;
+					v.x = dX;
+					v.y = dY;
+					v.z = dZ;
+					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+				}
+				s = n;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			oimo_common_Mat3.numCreations++;
+			var x = this.pitch;
+			var y = this.roll;
+			var z = -this.yaw;
+			if(z == null) {
+				z = 0;
+			}
+			if(y == null) {
+				y = 0;
+			}
+			if(x == null) {
+				x = 0;
+			}
+			var eulerAngles_x = x;
+			var eulerAngles_y = y;
+			var eulerAngles_z = z;
+			oimo_common_Vec3.numCreations++;
+			var sx = Math.sin(eulerAngles_x);
+			var sy = Math.sin(eulerAngles_y);
+			var sz = Math.sin(eulerAngles_z);
+			var cx = Math.cos(eulerAngles_x);
+			var cy = Math.cos(eulerAngles_y);
+			var cz = Math.cos(eulerAngles_z);
+			var t01 = -cy * sz;
+			var t10 = cx * sz + cz * sx * sy;
+			var t12 = -cy * sx;
+			var t20 = sx * sz - cx * cz * sy;
+			var t21 = cz * sx + cx * sy * sz;
+			var _this = this.chassisBody;
+			var q_x = 0;
+			var q_y = 0;
+			var q_z = 0;
+			var q_w = 1;
+			oimo_common_Quat.numCreations++;
+			var e00 = cy * cz;
+			var e11 = cx * cz - sx * sy * sz;
+			var e22 = cx * cy;
+			var t = e00 + e11 + e22;
+			var s;
+			if(t > 0) {
+				s = Math.sqrt(t + 1);
+				q_w = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (t21 - t12) * s;
+				q_y = (sy - t20) * s;
+				q_z = (t10 - t01) * s;
+			} else if(e00 > e11) {
+				if(e00 > e22) {
+					s = Math.sqrt(e00 - e11 - e22 + 1);
+					q_x = 0.5 * s;
+					s = 0.5 / s;
+					q_y = (t01 + t10) * s;
+					q_z = (sy + t20) * s;
+					q_w = (t21 - t12) * s;
+				} else {
+					s = Math.sqrt(e22 - e00 - e11 + 1);
+					q_z = 0.5 * s;
+					s = 0.5 / s;
+					q_x = (sy + t20) * s;
+					q_y = (t12 + t21) * s;
+					q_w = (t10 - t01) * s;
+				}
+			} else if(e11 > e22) {
+				s = Math.sqrt(e11 - e22 - e00 + 1);
+				q_y = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (t01 + t10) * s;
+				q_z = (t12 + t21) * s;
+				q_w = (sy - t20) * s;
+			} else {
+				s = Math.sqrt(e22 - e00 - e11 + 1);
+				q_z = 0.5 * s;
+				s = 0.5 / s;
+				q_x = (sy + t20) * s;
+				q_y = (t12 + t21) * s;
+				q_w = (t10 - t01) * s;
+			}
+			var qX;
+			var qY;
+			var qZ;
+			var qW;
+			qX = q_x;
+			qY = q_y;
+			qZ = q_z;
+			qW = q_w;
+			var x = qX;
+			var y = qY;
+			var z = qZ;
+			var w = qW;
+			var x2 = 2 * x;
+			var y2 = 2 * y;
+			var z2 = 2 * z;
+			var xx = x * x2;
+			var yy = y * y2;
+			var zz = z * z2;
+			var xy = x * y2;
+			var yz = y * z2;
+			var xz = x * z2;
+			var wx = w * x2;
+			var wy = w * y2;
+			var wz = w * z2;
+			_this._transform._rotation00 = 1 - yy - zz;
+			_this._transform._rotation01 = xy - wz;
+			_this._transform._rotation02 = xz + wy;
+			_this._transform._rotation10 = xy + wz;
+			_this._transform._rotation11 = 1 - xx - zz;
+			_this._transform._rotation12 = yz - wx;
+			_this._transform._rotation20 = xz - wy;
+			_this._transform._rotation21 = yz + wx;
+			_this._transform._rotation22 = 1 - xx - yy;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
+			__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
+			__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
+			__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
+			__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
+			__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
+			__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
+			__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
+			__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
+			_this._invInertia00 = __tmp__00;
+			_this._invInertia01 = __tmp__01;
+			_this._invInertia02 = __tmp__02;
+			_this._invInertia10 = __tmp__10;
+			_this._invInertia11 = __tmp__11;
+			_this._invInertia12 = __tmp__12;
+			_this._invInertia20 = __tmp__20;
+			_this._invInertia21 = __tmp__21;
+			_this._invInertia22 = __tmp__22;
+			var __tmp__00;
+			var __tmp__01;
+			var __tmp__02;
+			var __tmp__10;
+			var __tmp__11;
+			var __tmp__12;
+			var __tmp__20;
+			var __tmp__21;
+			var __tmp__22;
+			__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
+			__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
+			__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
+			__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
+			__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
+			__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
+			__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
+			__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
+			__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
+			_this._invInertia00 = __tmp__00;
+			_this._invInertia01 = __tmp__01;
+			_this._invInertia02 = __tmp__02;
+			_this._invInertia10 = __tmp__10;
+			_this._invInertia11 = __tmp__11;
+			_this._invInertia12 = __tmp__12;
+			_this._invInertia20 = __tmp__20;
+			_this._invInertia21 = __tmp__21;
+			_this._invInertia22 = __tmp__22;
+			_this._invInertia00 *= _this._rotFactor.x;
+			_this._invInertia01 *= _this._rotFactor.x;
+			_this._invInertia02 *= _this._rotFactor.x;
+			_this._invInertia10 *= _this._rotFactor.y;
+			_this._invInertia11 *= _this._rotFactor.y;
+			_this._invInertia12 *= _this._rotFactor.y;
+			_this._invInertia20 *= _this._rotFactor.z;
+			_this._invInertia21 *= _this._rotFactor.z;
+			_this._invInertia22 *= _this._rotFactor.z;
+			var dst = _this._ptransform;
+			var src = _this._transform;
+			dst._positionX = src._positionX;
+			dst._positionY = src._positionY;
+			dst._positionZ = src._positionZ;
+			dst._rotation00 = src._rotation00;
+			dst._rotation01 = src._rotation01;
+			dst._rotation02 = src._rotation02;
+			dst._rotation10 = src._rotation10;
+			dst._rotation11 = src._rotation11;
+			dst._rotation12 = src._rotation12;
+			dst._rotation20 = src._rotation20;
+			dst._rotation21 = src._rotation21;
+			dst._rotation22 = src._rotation22;
+			var s = _this._shapeList;
+			while(s != null) {
+				var n = s._next;
+				var tf1 = _this._ptransform;
+				var tf2 = _this._transform;
+				var dst = s._ptransform;
+				var src1 = s._localTransform;
+				var __tmp__00;
+				var __tmp__01;
+				var __tmp__02;
+				var __tmp__10;
+				var __tmp__11;
+				var __tmp__12;
+				var __tmp__20;
+				var __tmp__21;
+				var __tmp__22;
+				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+				dst._rotation00 = __tmp__00;
+				dst._rotation01 = __tmp__01;
+				dst._rotation02 = __tmp__02;
+				dst._rotation10 = __tmp__10;
+				dst._rotation11 = __tmp__11;
+				dst._rotation12 = __tmp__12;
+				dst._rotation20 = __tmp__20;
+				dst._rotation21 = __tmp__21;
+				dst._rotation22 = __tmp__22;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+				dst._positionX = __tmp__X;
+				dst._positionY = __tmp__Y;
+				dst._positionZ = __tmp__Z;
+				dst._positionX += tf1._positionX;
+				dst._positionY += tf1._positionY;
+				dst._positionZ += tf1._positionZ;
+				var dst1 = s._transform;
+				var src11 = s._localTransform;
+				var __tmp__001;
+				var __tmp__011;
+				var __tmp__021;
+				var __tmp__101;
+				var __tmp__111;
+				var __tmp__121;
+				var __tmp__201;
+				var __tmp__211;
+				var __tmp__221;
+				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+				dst1._rotation00 = __tmp__001;
+				dst1._rotation01 = __tmp__011;
+				dst1._rotation02 = __tmp__021;
+				dst1._rotation10 = __tmp__101;
+				dst1._rotation11 = __tmp__111;
+				dst1._rotation12 = __tmp__121;
+				dst1._rotation20 = __tmp__201;
+				dst1._rotation21 = __tmp__211;
+				dst1._rotation22 = __tmp__221;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+				dst1._positionX = __tmp__X1;
+				dst1._positionY = __tmp__Y1;
+				dst1._positionZ = __tmp__Z1;
+				dst1._positionX += tf2._positionX;
+				dst1._positionY += tf2._positionY;
+				dst1._positionZ += tf2._positionZ;
+				var minX;
+				var minY;
+				var minZ;
+				var maxX;
+				var maxY;
+				var maxZ;
+				s._geom._computeAabb(s._aabb,s._ptransform);
+				minX = s._aabb._minX;
+				minY = s._aabb._minY;
+				minZ = s._aabb._minZ;
+				maxX = s._aabb._maxX;
+				maxY = s._aabb._maxY;
+				maxZ = s._aabb._maxZ;
+				s._geom._computeAabb(s._aabb,s._transform);
+				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+				if(s._proxy != null) {
+					var dX;
+					var dY;
+					var dZ;
+					dX = s._transform._positionX - s._ptransform._positionX;
+					dY = s._transform._positionY - s._ptransform._positionY;
+					dZ = s._transform._positionZ - s._ptransform._positionZ;
+					var v = s.displacement;
+					v.x = dX;
+					v.y = dY;
+					v.z = dZ;
+					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+				}
+				s = n;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			var _this = this.chassisBody;
+			var x = -Math.sin(this.yaw) * this.forwardSpeed;
+			var y = Math.cos(this.yaw) * this.forwardSpeed;
+			if(y == null) {
+				y = 0;
+			}
+			if(x == null) {
+				x = 0;
+			}
+			oimo_common_Vec3.numCreations++;
+			if(_this._type == 1) {
+				_this._velX = 0;
+				_this._velY = 0;
+				_this._velZ = 0;
+			} else {
+				_this._velX = x;
+				_this._velY = y;
+				_this._velZ = 0;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			var _this = this.chassisBody;
+			oimo_common_Vec3.numCreations++;
+			if(_this._type == 1) {
+				_this._angVelX = 0;
+				_this._angVelY = 0;
+				_this._angVelZ = 0;
+			} else {
+				_this._angVelX = 0;
+				_this._angVelY = 0;
+				_this._angVelZ = 0;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
 		}
-		if(fwdX == null) {
-			x = 0.;
-		}
-		_this.x = x;
-		_this.y = y;
-		_this.z = 0;
-		var _this = this.scratchRight;
-		var x = cosYaw;
-		var y = sinYaw;
-		if(sinYaw == null) {
-			y = 0.;
-		}
-		if(cosYaw == null) {
-			x = 0.;
-		}
-		_this.x = x;
-		_this.y = y;
-		_this.z = 0;
-		this.updateSuspension(clampedDt,fwdX,cosYaw,cosYaw,sinYaw,waypoints,groundProvider);
+		var _this = this.chassisBody;
+		var m = new oimo_common_Mat3();
+		m.e00 = _this._transform._rotation00;
+		m.e01 = _this._transform._rotation01;
+		m.e02 = _this._transform._rotation02;
+		m.e10 = _this._transform._rotation10;
+		m.e11 = _this._transform._rotation11;
+		m.e12 = _this._transform._rotation12;
+		m.e20 = _this._transform._rotation20;
+		m.e21 = _this._transform._rotation21;
+		m.e22 = _this._transform._rotation22;
+		var _this = this.chassisBody;
+		var v = new oimo_common_Vec3();
+		v.x = _this._transform._positionX;
+		v.y = _this._transform._positionY;
+		v.z = _this._transform._positionZ;
+		var _this = this.chassisBody;
+		var v1 = new oimo_common_Vec3();
+		v1.x = _this._velX;
+		v1.y = _this._velY;
+		v1.z = _this._velZ;
+		var fwdX = m.e10;
+		var fwdY = m.e11;
+		var fwdZ = m.e12;
+		var rightX = m.e00;
+		var rightY = m.e01;
+		var rightZ = m.e02;
+		this.set_forwardSpeed(v1.x * fwdX + v1.y * fwdY + v1.z * fwdZ);
+		this.lateralVelocity = v1.x * rightX + v1.y * rightY + v1.z * rightZ;
+		this.verticalVelocity = v1.z;
+		this.updateSuspension(clampedDt,v,m,v1,fwdX,fwdY,rightX,rightY,waypoints,groundProvider);
 		if(input.boost && this.boostFuel > 0.0) {
 			this.boostFuel = Math.max(0.0,this.boostFuel - 0.25 * clampedDt);
 			this.isBoosting = this.boostFuel > 0.0;
@@ -51801,31 +69451,293 @@ physics_CarPhysics.prototype = {
 			}
 		}
 		this.updateDrivetrain(clampedDt,input);
-		this.updateLongitudinal(clampedDt,input);
-		this.updateLateralAndDrift(clampedDt,input,fwdX,cosYaw,cosYaw,sinYaw);
-		this.pos.x += (fwdX * this.forwardSpeed + cosYaw * this.lateralVelocity) * clampedDt;
-		this.pos.y += (cosYaw * this.forwardSpeed + sinYaw * this.lateralVelocity) * clampedDt;
+		var netLongForce = this.computeLongitudinalForce(clampedDt,input);
+		this.chassisBody.applyForceToCenter(new oimo_common_Vec3(fwdX * netLongForce,fwdY * netLongForce,fwdZ * netLongForce));
+		this.updateLateralAndDrift(clampedDt,input,fwdX,fwdY,rightX,rightY);
+		this.chassisBody.applyForceToCenter(new oimo_common_Vec3(0,0,-(0.6125 * this.forwardSpeed * this.forwardSpeed * this.config.aero.downforceCoeff)));
+		this.physicsWorld.step(clampedDt);
+		var _this = this.chassisBody;
+		var v = new oimo_common_Vec3();
+		v.x = _this._transform._positionX;
+		v.y = _this._transform._positionY;
+		v.z = _this._transform._positionZ;
+		var _this = this.chassisBody;
+		var m = new oimo_common_Mat3();
+		m.e00 = _this._transform._rotation00;
+		m.e01 = _this._transform._rotation01;
+		m.e02 = _this._transform._rotation02;
+		m.e10 = _this._transform._rotation10;
+		m.e11 = _this._transform._rotation11;
+		m.e12 = _this._transform._rotation12;
+		m.e20 = _this._transform._rotation20;
+		m.e21 = _this._transform._rotation21;
+		m.e22 = _this._transform._rotation22;
+		var _this = this.chassisBody;
+		var v1 = new oimo_common_Vec3();
+		v1.x = _this._velX;
+		v1.y = _this._velY;
+		v1.z = _this._velZ;
+		this.pos.x = v.x;
+		this.pos.y = v.y;
+		this.pos.z = v.z - 0.35;
+		fwdX = m.e10;
+		fwdY = m.e11;
+		fwdZ = m.e12;
+		rightX = m.e00;
+		rightY = m.e01;
+		rightZ = m.e02;
+		this.set_forwardSpeed(v1.x * fwdX + v1.y * fwdY + v1.z * fwdZ);
+		this.lateralVelocity = v1.x * rightX + v1.y * rightY + v1.z * rightZ;
+		this.verticalVelocity = v1.z;
+		var sy = m.e02;
+		var euler;
+		if(sy <= -1) {
+			var xSubZ = Math.atan2(m.e21,m.e11);
+			euler = new oimo_common_Vec3(xSubZ * 0.5,-1.570796326794895,-xSubZ * 0.5);
+		} else if(sy >= 1) {
+			var xAddZ = Math.atan2(m.e21,m.e11);
+			euler = new oimo_common_Vec3(xAddZ * 0.5,1.570796326794895,xAddZ * 0.5);
+		} else {
+			euler = new oimo_common_Vec3(Math.atan2(-m.e12,m.e22),Math.asin(sy),Math.atan2(-m.e01,m.e00));
+		}
+		this.pitch = euler.x;
+		this.roll = euler.y;
+		this.set_yaw(-euler.z);
 		if(groundProvider != null) {
 			var bRes = groundProvider.enforceBoundaries(this.pos,this.forwardSpeed,this.lateralVelocity);
 			if(bRes.hitWall) {
-				this.forwardSpeed *= bRes.speedMult;
+				this.set_forwardSpeed(this.forwardSpeed * bRes.speedMult);
 				this.lateralVelocity *= bRes.latMult;
+				var _this = this.chassisBody;
+				var x = fwdX * this.forwardSpeed + rightX * this.lateralVelocity;
+				var y = fwdY * this.forwardSpeed + rightY * this.lateralVelocity;
+				var z = this.verticalVelocity * 0.5;
+				if(z == null) {
+					z = 0;
+				}
+				if(y == null) {
+					y = 0;
+				}
+				if(x == null) {
+					x = 0;
+				}
+				oimo_common_Vec3.numCreations++;
+				if(_this._type == 1) {
+					_this._velX = 0;
+					_this._velY = 0;
+					_this._velZ = 0;
+				} else {
+					_this._velX = x;
+					_this._velY = y;
+					_this._velZ = z;
+				}
+				_this._sleeping = false;
+				_this._sleepTime = 0;
+			}
+			var groundZ = groundProvider.getGroundElevation(this.pos.x,this.pos.y);
+			if(this.pos.z < groundZ) {
+				this.pos.z = groundZ;
+				var _this = this.chassisBody;
+				var x = this.pos.x;
+				var y = this.pos.y;
+				var z = groundZ + 0.35;
+				if(z == null) {
+					z = 0;
+				}
+				if(y == null) {
+					y = 0;
+				}
+				if(x == null) {
+					x = 0;
+				}
+				oimo_common_Vec3.numCreations++;
+				_this._transform._positionX = x;
+				_this._transform._positionY = y;
+				_this._transform._positionZ = z;
+				var dst = _this._ptransform;
+				var src = _this._transform;
+				dst._positionX = src._positionX;
+				dst._positionY = src._positionY;
+				dst._positionZ = src._positionZ;
+				dst._rotation00 = src._rotation00;
+				dst._rotation01 = src._rotation01;
+				dst._rotation02 = src._rotation02;
+				dst._rotation10 = src._rotation10;
+				dst._rotation11 = src._rotation11;
+				dst._rotation12 = src._rotation12;
+				dst._rotation20 = src._rotation20;
+				dst._rotation21 = src._rotation21;
+				dst._rotation22 = src._rotation22;
+				var s = _this._shapeList;
+				while(s != null) {
+					var n = s._next;
+					var tf1 = _this._ptransform;
+					var tf2 = _this._transform;
+					var dst = s._ptransform;
+					var src1 = s._localTransform;
+					var __tmp__00;
+					var __tmp__01;
+					var __tmp__02;
+					var __tmp__10;
+					var __tmp__11;
+					var __tmp__12;
+					var __tmp__20;
+					var __tmp__21;
+					var __tmp__22;
+					__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+					__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+					__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+					__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+					__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+					__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+					__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+					__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+					__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+					dst._rotation00 = __tmp__00;
+					dst._rotation01 = __tmp__01;
+					dst._rotation02 = __tmp__02;
+					dst._rotation10 = __tmp__10;
+					dst._rotation11 = __tmp__11;
+					dst._rotation12 = __tmp__12;
+					dst._rotation20 = __tmp__20;
+					dst._rotation21 = __tmp__21;
+					dst._rotation22 = __tmp__22;
+					var __tmp__X;
+					var __tmp__Y;
+					var __tmp__Z;
+					__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+					__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+					__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+					dst._positionX = __tmp__X;
+					dst._positionY = __tmp__Y;
+					dst._positionZ = __tmp__Z;
+					dst._positionX += tf1._positionX;
+					dst._positionY += tf1._positionY;
+					dst._positionZ += tf1._positionZ;
+					var dst1 = s._transform;
+					var src11 = s._localTransform;
+					var __tmp__001;
+					var __tmp__011;
+					var __tmp__021;
+					var __tmp__101;
+					var __tmp__111;
+					var __tmp__121;
+					var __tmp__201;
+					var __tmp__211;
+					var __tmp__221;
+					__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+					__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+					__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+					__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+					__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+					__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+					__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+					__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+					__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+					dst1._rotation00 = __tmp__001;
+					dst1._rotation01 = __tmp__011;
+					dst1._rotation02 = __tmp__021;
+					dst1._rotation10 = __tmp__101;
+					dst1._rotation11 = __tmp__111;
+					dst1._rotation12 = __tmp__121;
+					dst1._rotation20 = __tmp__201;
+					dst1._rotation21 = __tmp__211;
+					dst1._rotation22 = __tmp__221;
+					var __tmp__X1;
+					var __tmp__Y1;
+					var __tmp__Z1;
+					__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+					__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+					__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+					dst1._positionX = __tmp__X1;
+					dst1._positionY = __tmp__Y1;
+					dst1._positionZ = __tmp__Z1;
+					dst1._positionX += tf2._positionX;
+					dst1._positionY += tf2._positionY;
+					dst1._positionZ += tf2._positionZ;
+					var minX;
+					var minY;
+					var minZ;
+					var maxX;
+					var maxY;
+					var maxZ;
+					s._geom._computeAabb(s._aabb,s._ptransform);
+					minX = s._aabb._minX;
+					minY = s._aabb._minY;
+					minZ = s._aabb._minZ;
+					maxX = s._aabb._maxX;
+					maxY = s._aabb._maxY;
+					maxZ = s._aabb._maxZ;
+					s._geom._computeAabb(s._aabb,s._transform);
+					s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+					s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+					s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+					s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+					s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+					s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+					if(s._proxy != null) {
+						var dX;
+						var dY;
+						var dZ;
+						dX = s._transform._positionX - s._ptransform._positionX;
+						dY = s._transform._positionY - s._ptransform._positionY;
+						dZ = s._transform._positionZ - s._ptransform._positionZ;
+						var v = s.displacement;
+						v.x = dX;
+						v.y = dY;
+						v.z = dZ;
+						s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
+					}
+					s = n;
+				}
+				_this._sleeping = false;
+				_this._sleepTime = 0;
+				if(this.verticalVelocity < 0.0) {
+					var _this = this.chassisBody;
+					var curV_x = 0;
+					var curV_y = 0;
+					oimo_common_Vec3.numCreations++;
+					curV_x = _this._velX;
+					curV_y = _this._velY;
+					var _this = this.chassisBody;
+					var x = curV_x;
+					var y = curV_y;
+					if(y == null) {
+						y = 0;
+					}
+					if(x == null) {
+						x = 0;
+					}
+					oimo_common_Vec3.numCreations++;
+					if(_this._type == 1) {
+						_this._velX = 0;
+						_this._velY = 0;
+						_this._velZ = 0;
+					} else {
+						_this._velX = x;
+						_this._velY = y;
+						_this._velZ = 0.0;
+					}
+					_this._sleeping = false;
+					_this._sleepTime = 0;
+					this.verticalVelocity = 0.0;
+				}
 			}
 		}
-		this.updateChassisAttitude(clampedDt,input);
 	}
-	,updateSuspension: function(dt,fwdX,fwdY,rightX,rightY,waypoints,groundProvider) {
+	,updateSuspension: function(dt,bPos,bRot,bLinVel,fwdX,fwdY,rightX,rightY,waypoints,groundProvider) {
 		var susp = this.config.suspension;
 		var restLen = susp.restLength;
+		var k = susp.springRate;
+		var c = susp.damping;
 		var arbK = susp.antiRollStiffness;
-		var groundContacts = 0;
 		var _g = 0;
 		while(_g < 4) {
 			var i = _g++;
 			var offset = physics_CarPhysics.WHEEL_OFFSETS[i];
-			var attachX = this.pos.x + (rightX * offset.x + fwdX * offset.y);
-			var attachY = this.pos.y + (rightY * offset.x + fwdY * offset.y);
-			var attachZ = this.pos.z;
+			var attachX = bPos.x + (rightX * offset.x + fwdX * offset.y);
+			var attachY = bPos.y + (rightY * offset.x + fwdY * offset.y);
+			var attachZ = bPos.z - 0.15;
 			var _this = this.scratchWheelWorld;
 			var x = attachX;
 			var y = attachY;
@@ -51878,33 +69790,26 @@ physics_CarPhysics.prototype = {
 			_this1.x = x1;
 			_this1.y = y1;
 			_this1.z = z1;
-			var currentLen = attachZ - groundZ + offset.x * Math.sin(this.roll) * this.config.suspension.bodyRollScale;
+			var currentLen = attachZ - groundZ;
 			this.prevSuspLength[i] = this.suspLength[i];
 			if(currentLen <= restLen) {
 				this.wheelOnGround[i] = true;
-				++groundContacts;
 				this.suspLength[i] = Math.max(susp.minTravel,Math.min(restLen,currentLen));
 				this.suspCompression[i] = Math.max(0.0,(restLen - this.suspLength[i]) / (restLen - susp.minTravel));
+				var springForce = k * (restLen - this.suspLength[i]) - c * ((this.prevSuspLength[i] - this.suspLength[i]) / dt);
+				if(springForce < 0.0) {
+					springForce = 0.0;
+				}
+				var wheelForce = new oimo_common_Vec3(nx * springForce,ny * springForce,nz * springForce);
+				var wheelWorldPos = new oimo_common_Vec3(attachX,attachY,attachZ);
+				this.chassisBody.applyForce(wheelForce,wheelWorldPos);
 			} else {
 				this.wheelOnGround[i] = false;
 				this.suspLength[i] = Math.min(susp.maxTravel,currentLen);
 				this.suspCompression[i] = 0.0;
 			}
 		}
-		this.roll -= ((restLen - this.suspLength[0] - (restLen - this.suspLength[1])) * arbK + (restLen - this.suspLength[2] - (restLen - this.suspLength[3])) * arbK) / this.config.mass * 0.0004 * dt;
-		if(groundContacts > 0) {
-			var targetZ = 0.0;
-			if(groundProvider != null) {
-				targetZ = groundProvider.getGroundElevation(this.pos.x,this.pos.y);
-			} else if(waypoints != null && waypoints.length > 0) {
-				targetZ = physics_SplineMath.getClosestSegment(this.pos,waypoints).z;
-			}
-			this.pos.z += (targetZ - this.pos.z) * Math.min(1.0,16.0 * dt);
-			this.verticalVelocity = 0.0;
-		} else {
-			this.verticalVelocity -= 9.81 * dt;
-			this.pos.z += this.verticalVelocity * dt;
-		}
+		this.chassisBody.applyTorque(new oimo_common_Vec3(0,-(((restLen - this.suspLength[0] - (restLen - this.suspLength[1])) * arbK + (restLen - this.suspLength[2] - (restLen - this.suspLength[3])) * arbK) * 0.5) * 0.1,0));
 	}
 	,updateDrivetrain: function(dt,input) {
 		var dtCfg = this.config.drivetrain;
@@ -51951,7 +69856,7 @@ physics_CarPhysics.prototype = {
 		this.wheelSpinVelocity[2] += (rearAvgSpin - this.wheelSpinVelocity[2]) * lsdLock * Math.min(1.0,15.0 * dt);
 		this.wheelSpinVelocity[3] += (rearAvgSpin - this.wheelSpinVelocity[3]) * lsdLock * Math.min(1.0,15.0 * dt);
 	}
-	,updateLongitudinal: function(dt,input) {
+	,computeLongitudinalForce: function(dt,input) {
 		var mu = this.config.tires.groundFriction;
 		var accelRate = (this.isBoosting ? this.config.boostAcceleration : this.config.baseAcceleration) * mu;
 		var throttleEff = this.isShifting ? input.throttle * 0.25 : input.throttle;
@@ -51962,25 +69867,21 @@ physics_CarPhysics.prototype = {
 			this.wheelSpinVelocity[3] += burnoutRatio * 140.0 * dt;
 			accelRate *= Math.max(0.65,1.0 - burnoutRatio * 0.35);
 		}
+		var netForce = 0.0;
 		if(throttleEff > 0.0) {
 			if(this.forwardSpeed < (this.isBoosting ? this.config.boostTopSpeed : this.config.baseTopSpeed)) {
-				this.forwardSpeed += accelRate * throttleEff * dt;
+				netForce = accelRate * throttleEff * this.config.mass;
 			}
 		} else if(input.brake > 0.0) {
 			if(this.forwardSpeed > 0.5) {
-				this.forwardSpeed = Math.max(0.0,this.forwardSpeed - this.config.brakeDecel * mu * input.brake * dt);
+				netForce = -this.config.brakeDecel * mu * input.brake * this.config.mass;
 			} else {
-				this.forwardSpeed = Math.max(-this.config.reverseTopSpeed,this.forwardSpeed - this.config.baseAcceleration * 0.5 * mu * input.brake * dt);
+				netForce = -(this.config.baseAcceleration * 0.5) * mu * input.brake * this.config.mass;
 			}
 		} else {
-			var sign = this.forwardSpeed > 0 ? 1.0 : -1.0;
-			var decel = (this.config.tires.rollingResistance * mu + this.forwardSpeed * this.forwardSpeed * this.config.aero.dragCoeff) * dt;
-			if(Math.abs(this.forwardSpeed) <= decel) {
-				this.forwardSpeed = 0.0;
-			} else {
-				this.forwardSpeed -= sign * decel;
-			}
+			netForce = -(this.forwardSpeed > 0 ? 1.0 : this.forwardSpeed < 0 ? -1.0 : 0.0) * ((this.config.tires.rollingResistance * mu + this.forwardSpeed * this.forwardSpeed * this.config.aero.dragCoeff) * this.config.mass);
 		}
+		return netForce;
 	}
 	,updateLateralAndDrift: function(dt,input,fwdX,fwdY,rightX,rightY) {
 		var driftCfg = this.config.drift;
@@ -51989,26 +69890,23 @@ physics_CarPhysics.prototype = {
 		var speedRatio = Math.min(1.0,speedAbs / this.config.baseTopSpeed);
 		var bias = tireCfg.tireSlipBias;
 		var frontGripMult = (1.0 - bias * 0.40) * tireCfg.groundFriction;
+		var rearGripMult = (1.0 + bias * 0.40) * tireCfg.groundFriction;
 		if(input.handbrake) {
+			rearGripMult *= 0.20 + (bias + 1.0) * 0.08;
 			if(speedAbs > 0.5) {
-				var hbDecel = 14.0 * tireCfg.groundFriction * dt;
-				if(this.forwardSpeed > 0) {
-					this.forwardSpeed = Math.max(0.0,this.forwardSpeed - hbDecel);
-				} else {
-					this.forwardSpeed = Math.min(0.0,this.forwardSpeed + hbDecel);
-				}
+				var hbForce = 14.0 * tireCfg.groundFriction * this.config.mass * (this.forwardSpeed > 0 ? -1.0 : 1.0);
+				this.chassisBody.applyForceToCenter(new oimo_common_Vec3(fwdX * hbForce,fwdY * hbForce,0));
 			}
 			if(speedAbs > 2.0) {
-				var yawSteer = input.steer != 0.0 ? input.steer : this.lateralVelocity < 0 ? -0.8 : 0.8;
-				this.yaw += yawSteer * 3.2 * dt;
-				this.lateralVelocity += yawSteer * 20.0 * dt;
+				this.chassisBody.applyTorque(new oimo_common_Vec3(0,0,(input.steer != 0.0 ? input.steer : this.lateralVelocity < 0 ? -0.8 : 0.8) * 3.2 * this.config.yawInertia * 4.0));
 			}
 		}
 		if(Math.abs(input.steer) > 0.25 && input.throttle > 0.75 && speedAbs > 4.0) {
 			var spinKick = input.throttle * tireCfg.wheelspinAmount;
 			this.wheelSpinVelocity[2] += spinKick * 60.0 * dt;
 			this.wheelSpinVelocity[3] += spinKick * 60.0 * dt;
-			this.yaw += input.steer * 1.8 * tireCfg.wheelspinAmount * dt;
+			rearGripMult *= Math.max(0.25,1.0 - tireCfg.wheelspinAmount * 0.35);
+			this.chassisBody.applyTorque(new oimo_common_Vec3(0,0,input.steer * 1.8 * tireCfg.wheelspinAmount * this.config.yawInertia * 3.0));
 		}
 		var carSlipAngle = Math.atan2(Math.abs(this.lateralVelocity),Math.max(1.0,speedAbs));
 		var triggerAngle = driftCfg.driftTriggerAngle;
@@ -52023,27 +69921,59 @@ physics_CarPhysics.prototype = {
 		}
 		if(this.isDrifting) {
 			this.driftAngle += (this.driftDirection * 0.65 - this.driftAngle) * 5.5 * dt;
-			this.yaw += (this.driftDirection * driftCfg.driftYawRate + input.steer * (input.steer * this.driftDirection < 0 ? driftCfg.counterSteerTorque : 1.5)) * dt;
-			this.lateralVelocity = (this.lateralVelocity += this.driftDirection * (16.0 * (1.0 - bias * 0.25)) * dt) * Math.pow(0.88,dt * 60.0);
-			this.lateralVelocity *= 1.0 - Math.min(1.0,driftCfg.forwardBiasRate * dt) * 0.45;
+			var latForce = -this.lateralVelocity * tireCfg.baseLateralStiffness * (driftCfg.lateralStiffnessScale * rearGripMult) * this.config.mass * 0.15;
+			this.chassisBody.applyForceToCenter(new oimo_common_Vec3(rightX * latForce,rightY * latForce,0));
+			var curAngVel_z = 0;
+			oimo_common_Vec3.numCreations++;
+			curAngVel_z = this.chassisBody._angVelZ;
+			this.chassisBody.applyTorque(new oimo_common_Vec3(0,0,(this.driftDirection * driftCfg.driftYawRate * 0.35 + input.steer * (input.steer * this.driftDirection < 0 ? driftCfg.counterSteerTorque : 1.5) * 0.35 - curAngVel_z) * this.config.yawInertia * 12.0));
+			var biasFactor = Math.min(1.0,driftCfg.forwardBiasRate * dt);
+			var _this = this.chassisBody;
+			var linV_x = 0;
+			var linV_y = 0;
+			var linV_z = 0;
+			oimo_common_Vec3.numCreations++;
+			linV_x = _this._velX;
+			linV_y = _this._velY;
+			linV_z = _this._velZ;
+			var currentHorizSpeed = Math.sqrt(linV_x * linV_x + linV_y * linV_y);
+			var _this = this.chassisBody;
+			var x = linV_x + (fwdX * currentHorizSpeed - linV_x) * biasFactor * 0.45;
+			var y = linV_y + (fwdY * currentHorizSpeed - linV_y) * biasFactor * 0.45;
+			var z = linV_z;
+			if(z == null) {
+				z = 0;
+			}
+			if(y == null) {
+				y = 0;
+			}
+			if(x == null) {
+				x = 0;
+			}
+			oimo_common_Vec3.numCreations++;
+			if(_this._type == 1) {
+				_this._velX = 0;
+				_this._velY = 0;
+				_this._velZ = 0;
+			} else {
+				_this._velX = x;
+				_this._velY = y;
+				_this._velZ = z;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
 		} else {
 			this.driftAngle += (0.0 - this.driftAngle) * 10.0 * dt;
-			this.lateralVelocity *= Math.pow(Math.max(0.1,0.50 / frontGripMult),dt * 60.0);
+			var latForce = -this.lateralVelocity * tireCfg.baseLateralStiffness * frontGripMult * this.config.mass * 0.25;
+			this.chassisBody.applyForceToCenter(new oimo_common_Vec3(rightX * latForce,rightY * latForce,0));
 			if(speedAbs > 0.2) {
-				this.yaw += input.steer * (2.2 * Math.min(1.0,speedRatio + 0.35) * frontGripMult) * (this.forwardSpeed >= 0 ? 1.0 : -1.0) * dt;
+				var targetYawRate = input.steer * (2.2 * Math.min(1.0,speedRatio + 0.35) * frontGripMult) * (this.forwardSpeed >= 0 ? 1.0 : -1.0) * 0.65;
+				var curAngVel_z = 0;
+				oimo_common_Vec3.numCreations++;
+				curAngVel_z = this.chassisBody._angVelZ;
+				this.chassisBody.applyTorque(new oimo_common_Vec3(0,0,(targetYawRate - curAngVel_z) * this.config.yawInertia * 10.0));
 			}
 		}
-	}
-	,updateChassisAttitude: function(dt,input) {
-		var targetRoll = -input.steer * Math.min(1.0,Math.abs(this.forwardSpeed) / this.config.baseTopSpeed) * 0.14 * this.config.suspension.bodyRollScale;
-		if(this.isDrifting) {
-			targetRoll *= 1.7;
-		}
-		var terrainPitch = Math.atan2((this.wheelGroundZ[0] + this.wheelGroundZ[1]) * 0.5 - (this.wheelGroundZ[2] + this.wheelGroundZ[3]) * 0.5,2.7);
-		var maxRoll = 0.25 * Math.min(1.5,Math.max(0.5,this.config.suspension.bodyRollScale));
-		targetRoll = Math.max(-maxRoll,Math.min(maxRoll,targetRoll));
-		this.roll += (targetRoll + Math.atan2((this.wheelGroundZ[1] + this.wheelGroundZ[3]) * 0.5 - (this.wheelGroundZ[0] + this.wheelGroundZ[2]) * 0.5,1.96) - this.roll) * 8.0 * dt;
-		this.pitch += ((input.throttle - input.brake) * 0.06 + terrainPitch - this.pitch) * 8.0 * dt;
 	}
 	,__class__: physics_CarPhysics
 };
@@ -52157,19 +70087,19 @@ save_SaveSystem.load = function() {
 			}
 			if(data.version == null || data.version < 4 || isLegacy) {
 				data.version = 4;
-				data.buildNumber = 6;
+				data.buildNumber = 7;
 				save_SaveSystem.save(data);
 			}
 			return data;
 		}
 	} catch( _g ) {
 	}
-	return { version : 4, buildNumber : 6, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, steerSensitivity : 1.0, graphics : save_SaveSystem.getDefaultGraphics(), touchSettings : save_SaveSystem.getDefaultTouchSettings()};
+	return { version : 4, buildNumber : 7, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, steerSensitivity : 1.0, graphics : save_SaveSystem.getDefaultGraphics(), touchSettings : save_SaveSystem.getDefaultTouchSettings()};
 };
 save_SaveSystem.save = function(data) {
 	try {
 		data.version = 4;
-		data.buildNumber = 6;
+		data.buildNumber = 7;
 		if(data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
 			data.steerSensitivity = 1.0;
 		}
@@ -54144,7 +72074,7 @@ var ui_views_credits_CreditsView = function(parent) {
 	this.techDetailsText.set_textColor(10531526);
 	this.techDetailsText.set_text("Built with Haxe, Heaps.io (Hardware-Accelerated WebGL) & Modern Shaders\n" + "Typography: Stack Sans Headline & Material Symbols Sharp\n" + "Homage & Inspiration: Need for Speed: Most Wanted (2005) & Burnout Revenge (2005)\n\n" + "Thank you for playing!");
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
+	this.versionText.set_text("v" + "0.4.1" + " (Build " + "0007" + ")");
 	this.versionText.set_textColor(15057019);
 	this.versionText.set_textAlign(h2d_Align.Center);
 	this.backBtnText = new h2d_Text(ui_FontManager.titleFont,this);
@@ -54687,7 +72617,7 @@ var ui_views_mainmenu_MainMenuView = function(parent) {
 	this.titleText.set_text("MAIN MENU");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
+	this.versionText.set_text("v" + "0.4.1" + " (Build " + "0007" + ")");
 	this.versionText.set_textColor(9413043);
 	var labels = ["START HIGHWAY RACE","OPEN SANDBOX MAP","RESUME SAVED RACE","OPTIONS","CREDITS","EXIT TO SPLASH"];
 	var iconTypes = [ui_IconType.Play,ui_IconType.Sandbox,ui_IconType.Resume,ui_IconType.Settings,ui_IconType.Credits,ui_IconType.Exit];
@@ -55779,7 +73709,7 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.titleText.set_text("CONFIGURATION & HARDWARE");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
+	this.versionText.set_text("v" + "0.4.1" + " (Build " + "0007" + ")");
 	this.versionText.set_textColor(9413043);
 	var tabNames = ["GRAPHICS","AUDIO","KEYBOARD","GAMEPAD","TOUCH"];
 	var tabIconTypes = [ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Touch];
@@ -56093,7 +74023,7 @@ var ui_views_splash_SplashView = function(parent) {
 	this.promptText.set_text("PRESS ANY BUTTON OR CLICK TO ENTER");
 	this.promptText.set_textColor(16777215);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
+	this.versionText.set_text("v" + "0.4.1" + " (Build " + "0007" + ")");
 	this.versionText.set_textColor(9413043);
 	this.screenHit = new h2d_Interactive(3000,3000,this);
 	this.screenHit.onClick = function(_) {
@@ -56257,11 +74187,32 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 			sMult = -0.3;
 			lMult = 0.5;
 		}
-		pos.z = this.getGroundElevation(pos.x,pos.y);
 		return { hitWall : hit, speedMult : sMult, latMult : lMult};
+	}
+	,registerPhysicsColliders: function(world) {
+		if(world == null) {
+			return;
+		}
+		this.createStaticWall(world,-197.,0.0,10.0,2.,200.0,20.);
+		this.createStaticWall(world,197.,0.0,10.0,2.,200.0,20.);
+		this.createStaticWall(world,0.0,-197.,10.0,200.0,2.,20.);
+		this.createStaticWall(world,0.0,197.,10.0,200.0,2.,20.);
+	}
+	,createStaticWall: function(world,x,y,z,hx,hy,hz) {
+		var rbConfig = new oimo_dynamics_rigidbody_RigidBodyConfig();
+		rbConfig.type = oimo_dynamics_rigidbody_RigidBodyType.STATIC;
+		rbConfig.position = new oimo_common_Vec3(x,y,z);
+		var body = new oimo_dynamics_rigidbody_RigidBody(rbConfig);
+		var shapeConfig = new oimo_dynamics_rigidbody_ShapeConfig();
+		shapeConfig.geometry = new oimo_collision_geometry_BoxGeometry(new oimo_common_Vec3(hx,hy,hz));
+		shapeConfig.restitution = 0.4;
+		shapeConfig.friction = 0.3;
+		body.addShape(new oimo_dynamics_rigidbody_Shape(shapeConfig));
+		world.addRigidBody(body);
 	}
 	,buildTerrainMesh: function() {
 		var pts = [];
+		var uvs = [];
 		var idxBuf = new Array(0);
 		var _g = 0;
 		while(_g < 65) {
@@ -56283,6 +74234,7 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 					x1 = 0.;
 				}
 				pts.push(new h3d_VectorImpl(x1,y1,z1));
+				uvs.push(new h3d_prim_UV((x + 200.0) * 0.16,(y + 200.0) * 0.16));
 			}
 		}
 		var _g = 0;
@@ -56295,26 +74247,55 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 				var i1 = i0 + 1;
 				var i2 = (iy + 1) * 65 + ix;
 				idxBuf.push(i0);
-				idxBuf.push(i2);
-				idxBuf.push(i1);
 				idxBuf.push(i1);
 				idxBuf.push(i2);
+				idxBuf.push(i1);
 				idxBuf.push(i2 + 1);
+				idxBuf.push(i2);
 			}
 		}
 		var poly = new h3d_prim_Polygon(pts,idxBuf);
+		poly.uvs = uvs;
 		poly.addNormals();
 		this.terrainMesh = new h3d_scene_Mesh(poly,null,this);
+		this.terrainMesh.material.passes.set_culling(h3d_mat_Face.None);
 		var _this = this.terrainMesh.material.mshader.color__;
-		_this.x = 0.13333333333333333;
-		_this.y = 0.17254901960784313;
-		_this.z = 0.15686274509803921;
+		_this.x = 1.;
+		_this.y = 1.;
+		_this.z = 1.;
 		_this.w = 0.;
+		try {
+			var pixels = hxd_Pixels.alloc(256,256,hxd_PixelFormat.ARGB);
+			var _g = 0;
+			while(_g < 256) {
+				var py = _g++;
+				var _g1 = 0;
+				while(_g1 < 256) {
+					var px = _g1++;
+					var col = -14537688;
+					if(px == 0 || px == 255 || py == 0 || py == 255 || px % 32 == 0 || py % 32 == 0) {
+						col = -12693432;
+					} else if(px % 8 == 0 || py % 8 == 0) {
+						col = -14010830;
+					}
+					if(px % 32 == 0 && py % 32 == 0) {
+						col = -16718337;
+					}
+					pixels.setPixel(px,py,col);
+				}
+			}
+			var tex = h3d_mat_Texture.fromPixels(pixels);
+			tex.set_wrap(h3d_mat_Wrap.Repeat);
+			this.terrainMesh.material.set_texture(tex);
+		} catch( _g ) {
+		}
 	}
 	,buildSkidpad: function() {
 		var pts = [];
+		var uvs = [];
 		var idxBuf = new Array(0);
 		pts.push(new h3d_VectorImpl(0,0,0.05));
+		uvs.push(new h3d_prim_UV(0.5,0.5));
 		var _g = 0;
 		while(_g < 32) {
 			var angle = _g++ / 32 * (Math.PI * 2.0);
@@ -56329,6 +74310,7 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 				x = 0.;
 			}
 			pts.push(new h3d_VectorImpl(x,y,0.05));
+			uvs.push(new h3d_prim_UV(0.5 + Math.cos(angle) * 0.5,0.5 + Math.sin(angle) * 0.5));
 		}
 		var _g = 0;
 		while(_g < 32) {
@@ -56338,8 +74320,10 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 			idxBuf.push(1 + (i + 1) % 32);
 		}
 		var poly = new h3d_prim_Polygon(pts,idxBuf);
+		poly.uvs = uvs;
 		poly.addNormals();
 		this.skidpadMesh = new h3d_scene_Mesh(poly,null,this);
+		this.skidpadMesh.material.passes.set_culling(h3d_mat_Face.None);
 		var _this = this.skidpadMesh.material.mshader.color__;
 		_this.x = 0.16470588235294117;
 		_this.y = 0.1803921568627451;
@@ -58268,6 +76252,57 @@ hxsl_ShaderList.ALLOW_DUPLICATES = true;
 hxsl_ShaderInstance.UID = 0;
 hxsl_SharedShader.UNROLL_LOOPS = false;
 hxsl_SharedShader.SHADER_RESOLVE = new haxe_ds_StringMap();
+oimo_common_Vec3.numCreations = 0;
+oimo_common_Setting.defaultFriction = 0.2;
+oimo_common_Setting.defaultRestitution = 0.2;
+oimo_common_Setting.defaultDensity = 1;
+oimo_common_Setting.defaultCollisionGroup = 1;
+oimo_common_Setting.defaultCollisionMask = 1;
+oimo_common_Setting.maxTranslationPerStep = 20;
+oimo_common_Setting.maxRotationPerStep = 3.14159265358979;
+oimo_common_Setting.bvhProxyPadding = 0.1;
+oimo_common_Setting.bvhIncrementalCollisionThreshold = 0.45;
+oimo_common_Setting.defaultGJKMargin = 0.05;
+oimo_common_Setting.enableGJKCaching = true;
+oimo_common_Setting.maxEPAVertices = 128;
+oimo_common_Setting.contactEnableBounceThreshold = 0.5;
+oimo_common_Setting.velocityBaumgarte = 0.2;
+oimo_common_Setting.positionSplitImpulseBaumgarte = 0.4;
+oimo_common_Setting.positionNgsBaumgarte = 1.0;
+oimo_common_Setting.contactUseAlternativePositionCorrectionAlgorithmDepthThreshold = 0.05;
+oimo_common_Setting.defaultContactPositionCorrectionAlgorithm = 0;
+oimo_common_Setting.alternativeContactPositionCorrectionAlgorithm = 1;
+oimo_common_Setting.contactPersistenceThreshold = 0.05;
+oimo_common_Setting.maxManifoldPoints = 4;
+oimo_common_Setting.defaultJointConstraintSolverType = 0;
+oimo_common_Setting.defaultJointPositionCorrectionAlgorithm = 0;
+oimo_common_Setting.jointWarmStartingFactorForBaungarte = 0.8;
+oimo_common_Setting.jointWarmStartingFactor = 0.95;
+oimo_common_Setting.maxJacobianRows = 6;
+oimo_common_Setting.directMlcpSolverEps = 1e-9;
+oimo_common_Setting.islandInitialRigidBodyArraySize = 128;
+oimo_common_Setting.islandInitialConstraintArraySize = 128;
+oimo_common_Setting.sleepingVelocityThreshold = 0.2;
+oimo_common_Setting.sleepingAngularVelocityThreshold = 0.5;
+oimo_common_Setting.sleepingTimeThreshold = 1.0;
+oimo_common_Setting.disableSleeping = false;
+oimo_common_Setting.linearSlop = 0.005;
+oimo_collision_narrowphase_detector_gjkepa_GjkEpa.instance = new oimo_collision_narrowphase_detector_gjkepa_GjkEpa();
+oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.SUCCEEDED = 0;
+oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_FAILED_TO_INIT = 257;
+oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_FAILED_TO_ADD_VERTEX = 258;
+oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_DID_NOT_CONVERGE = 259;
+oimo_common_Mat3.numCreations = 0;
+oimo_common_Quat.numCreations = 0;
+oimo_dynamics_common_Performance.broadPhaseCollisionTime = 0;
+oimo_dynamics_common_Performance.narrowPhaseCollisionTime = 0;
+oimo_dynamics_common_Performance.dynamicsTime = 0;
+oimo_dynamics_common_Performance.totalTime = 0;
+oimo_dynamics_constraint_PositionCorrectionAlgorithm.BAUMGARTE = 0;
+oimo_dynamics_constraint_PositionCorrectionAlgorithm.SPLIT_IMPULSE = 1;
+oimo_dynamics_constraint_PositionCorrectionAlgorithm.NGS = 2;
+oimo_dynamics_rigidbody_RigidBodyType.DYNAMIC = 0;
+oimo_dynamics_rigidbody_RigidBodyType.STATIC = 1;
 physics_CarPhysics.WHEEL_OFFSETS = [{ x : -0.98, y : 1.35},{ x : 0.98, y : 1.35},{ x : -0.98, y : -1.35},{ x : 0.98, y : -1.35}];
 ui_UIIcons.cache = new haxe_ds_StringMap();
 ui_views_mainmenu_MainMenuView.ACTIONS = [ui_components_MenuAction.StartGame,ui_components_MenuAction.StartSandbox,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];

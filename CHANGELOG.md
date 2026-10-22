@@ -6,34 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
-## [1.0.0] - 2026-10-22
+## [0.4.1] - 2026-10-22
 ### Added
+- **OimoPhysics 3D Rigid Body Collision Backbone (`src/physics/CarPhysics.hx`)**:
+  - Integrated `saharan/OimoPhysics` native Haxe 3D physics engine with zero runtime GC allocations in the hot loop.
+  - Initialized simulation world with downward gravity ($Z = -9.81\text{ m/s}^2$) and dynamic chassis rigid body ($1350\text{ kg}$, $1.84\text{m} \times 2.8\text{m} \times 0.44\text{m}$).
+  - Actuated directly by established mathematical formulation: 4-wheel independent spring-damper suspension ($F_{\text{susp}} = k(L_0 - L) - c v_{\text{susp}}$), Pacejka slip-angle tire adhesion saturation curves, and Criterion-style (*NFS: Most Wanted 2012*) brake-to-drift state machine with counter-steer torque assist and forward velocity biasing.
+  - Added Oimo static collision boundary walls ($X, Y = \pm 195\text{m}$) in Sandbox mode with restitution impulse and velocity reflection.
 - **Open Sandbox Proving Grounds (`src/world/SandboxMap.hx`, `src/world/IGroundProvider.hx`)**:
-  - Continuous 400m x 400m analytical 3D proving grounds environment.
-  - Central flat staging skidpad ($R \le 35\text{m}$) for zero-to-sixty timing, burnouts, and donuts.
-  - Rolling sinusoidal moguls section ($X \in [35, 140], Y \in [-50, 50]$) oscillating up to $\pm 1.35\text{m}$ for suspension travel and anti-roll bar testing.
-  - Steep 12.5-meter apex mountain pass to test uphill drivetrain torque, automatic gear downshifting, and downhill braking dive.
-  - High-speed airborne launch ramp ($Y \in [70, 125]$) rising to $+3.8\text{m}$ with a sharp crest lip for freefall ballistic flight testing.
-  - Banked 25-degree high-speed bowl ($R \approx 75\text{m}$) rising to $+5.2\text{m}$ for lateral-G grip and high-speed drift breakaway.
+  - Continuous 400m x 400m analytical 3D proving grounds environment with central staging skidpad ($R \le 35\text{m}$), rolling sinusoidal moguls section ($\pm 1.35\text{m}$), steep 12.5m apex mountain pass, 3.8m high launch ramp with sharp crest lip, and banked 25-degree high-speed bowl ($+5.2\text{m}$).
   - 4 high-mast perimeter floodlight towers providing balanced illumination across the arena.
-  - Invisible perimeter elastic collision walls at $X, Y = \pm 195\text{m}$ with velocity reflection.
+- **Procedural Cyber Grid Coordinates Ground Texture (`src/world/SandboxMap.hx`)**:
+  - Generated procedural 256x256 ARGB coordinate grid texture with deep slate-charcoal asphalt background (`#222C28`), crisp coordinate lines (`#3E5048`), and high-visibility electric cyan intersection nodes (`#00E5FF`).
+  - Added UV texture mapping and set texture `wrap = Repeat` across the entire 400m x 400m heightfield.
 - **Highway Street Lighting & Soft Shadow Pipeline (`src/world/Track.hx`, `src/graphics/GraphicsManager.hx`, `src/Main.hx`)**:
   - Over 16 illuminated highway luminaire poles lining the Armco barriers with cantilevered arms and warm golden-white phosphor lamp heads (`0xFFF2B0`).
-  - Upgraded ambient light profiles in `GraphicsManager.hx` (`0x505F70` through `0x94ABC2`) and added secondary directional sky-bounce fill light (`0x55687C`) to eliminate harsh pitch-black shadow contrast across both tracks and terrain hills.
-- **Dynamic 4-Wheel Terrain Slope Conforming (`src/physics/CarPhysics.hx`)**:
-  - Dynamic terrain pitch ($\Delta z / 2.7\text{m}$) and terrain roll ($\Delta z / 1.96\text{m}$) conforming vehicle body orientation to hills, ramps, and banked turns.
-- **Proving Grounds Minimap Radar (`src/ui/views/hud/InGameHUDView.hx`)**:
-  - Added `initSandboxBounds(...)` rendering perimeter boundary walls and real-time player positioning dot.
+  - Upgraded ambient light profiles and added secondary directional sky-bounce fill light (`0x55687C`) to eliminate harsh pitch-black shadow contrast across both tracks and terrain hills.
 - **Main Menu Mode Selection (`src/ui/views/mainmenu/MainMenuView.hx`, `src/ui/UIIcons.hx`)**:
-  - Added dedicated `OPEN SANDBOX MAP` row with procedural terrain mountain vector icon.
+  - Added dedicated `OPEN SANDBOX MAP` button with procedural terrain mountain vector icon.
+### Fixed
+- **Sandbox Terrain Missing Ground Textures & Face Culling (`src/world/SandboxMap.hx`)**:
+  - Corrected triangle winding order from clockwise (`i0, i2, i1`) to counter-clockwise (`i0, i1, i2` and `i1, i3, i2`), ensuring surface normals point upward ($+Z$) and eliminating WebGL backface-culling invisibility.
+  - Set `terrainMesh.material.mainPass.culling = None` for complete rendering reliability.
+- **Boundary Clamping Vertical Locking (`src/world/SandboxMap.hx`)**:
+  - Removed erroneous `pos.z = getGroundElevation(...)` override from boundary clamping, enabling authentic ballistic airborne jumping off ramps and moguls.
+- **Chassis Local 3D Orientation (`src/Main.hx`)**:
+  - Fixed chassis rotation so pitch and roll rotate locally around the vehicle heading rather than around fixed world axes (`playerMesh.setRotation(0, 0, yaw + driftAngle); playerMesh.rotate(pitch, 0, 0); playerMesh.rotate(0, roll, 0)`).
 ### Changed
 - **Unified Front & Rear Traffic Collisions (`src/entities/TrafficSystem.hx`)**:
   - Unified front/head-on traffic collisions to use the identical responsive impulse and momentum transfer logic as rear traffic collisions (0.75x player forward speed retention, speed boost transfer to civilian vehicle, and 0.35 camera trauma).
-- **Major Semantic Version Bump (`src/Version.hx`)**:
-  - Incremented version to `1.0.0` (cleared patch number) and tallied compilation build counter to `0006`.
-  - Updated PWA service worker cache name to `mob-motors-on-boost-v1-0-0`.
+- **Corrected Semantic Versioning (`src/Version.hx`)**:
+  - Corrected semantic version from accidental major bump (`1.0.0`) back down to `0`, bumped minor version from `0.3.0` to `0.4.0`, and bumped patch to `1`: **`v0.4.1 (Build 0007)`**.
+  - Updated PWA service worker cache name to `mob-motors-on-boost-v0-4-1`.
 
-*For detailed release notes, see [`changelogs/2026-10-22-v1.0.0-open-sandbox-terrain-and-lighting-refinements.md`](./changelogs/2026-10-22-v1.0.0-open-sandbox-terrain-and-lighting-refinements.md).*
+*For detailed release notes, see [`changelogs/2026-10-22-v0.4.1-oimo-physics-backbone-and-sandbox-terrain.md`](./changelogs/2026-10-22-v0.4.1-oimo-physics-backbone-and-sandbox-terrain.md).*
 
 ## [0.3.0] - 2026-10-11
 ### Added

@@ -37,3 +37,4 @@ interface IGroundProvider {
      */
     public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float };
 }
+

@@ -1,9 +1,11 @@
 -cp src
 -lib heaps
 -lib format
+-lib oimo
 -main Main
 -js web/game.js
 -dce full
 -D webgl
 -D analyzer-optimize
 -D resourcesPath=res
+-w -WDeprecated

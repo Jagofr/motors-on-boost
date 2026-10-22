@@ -470,6 +470,7 @@ class Main extends hxd.App {
 
         track = new Track(s3d);
         sandboxMap = new world.SandboxMap(s3d);
+        sandboxMap.registerPhysicsColliders(carPhysics.physicsWorld);
         sandboxMap.visible = false;
 
         traffic = new TrafficSystem(track.waypoints, s3d);
@@ -515,36 +516,24 @@ class Main extends hxd.App {
      * Repositions the player vehicle to the sandbox central staging tarmac.
      */
     function resetCarToSandboxCenter() {
-        carPhysics.pos.set(0.0, 0.0, 0.05);
-        carPhysics.yaw = 1.5707963;
-        carPhysics.forwardSpeed = 0.0;
-        carPhysics.lateralVelocity = 0.0;
-        carPhysics.isDrifting = false;
-        carPhysics.boostFuel = 1.0;
-        carPhysics.isBoosting = false;
+        carPhysics.resetState(0.0, 0.0, 0.05, 1.5707963);
 
         playerMesh.x = 0.0;
         playerMesh.y = 0.0;
         playerMesh.z = 0.05;
-        playerMesh.setRotation(0, 0, 0);
+        playerMesh.setRotation(0, 0, 1.5707963);
     }
 
     /**
      * Repositions the player vehicle to the race track starting grid line.
      */
     function resetCarToStartLine() {
-        carPhysics.pos.set(0.0, 0.0, 0.0);
-        carPhysics.yaw = 1.5707963;
-        carPhysics.forwardSpeed = 0.0;
-        carPhysics.lateralVelocity = 0.0;
-        carPhysics.isDrifting = false;
-        carPhysics.boostFuel = 1.0;
-        carPhysics.isBoosting = false;
+        carPhysics.resetState(0.0, 0.0, 0.0, 1.5707963);
 
         playerMesh.x = 0.0;
         playerMesh.y = 0.0;
         playerMesh.z = Track.ROAD_LIFT;
-        playerMesh.setRotation(0, 0, 0);
+        playerMesh.setRotation(0, 0, 1.5707963);
     }
 
     /**
@@ -840,7 +829,9 @@ class Main extends hxd.App {
                 playerMesh.x = carPhysics.pos.x;
                 playerMesh.y = carPhysics.pos.y;
                 playerMesh.z = carPhysics.pos.z + (currentMapMode == Circuit ? Track.ROAD_LIFT : 0.05);
-                playerMesh.setRotation(carPhysics.pitch, carPhysics.roll, carPhysics.yaw + carPhysics.driftAngle);
+                playerMesh.setRotation(0, 0, carPhysics.yaw + carPhysics.driftAngle);
+                playerMesh.rotate(carPhysics.pitch, 0, 0);
+                playerMesh.rotate(0, carPhysics.roll, 0);
 
                 // Four-wheel steering and longitudinal spin animation
                 wheelSpinAngle += (carPhysics.forwardSpeed * dt) / 0.36;

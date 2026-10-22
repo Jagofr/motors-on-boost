@@ -4,9 +4,11 @@
 -lib format
 -lib json2object
 -lib utest
+-lib oimo
 -main TestMain
 -js bin/test.js
 -D js-es=6
 -D resourcesPath=res
 -w -WDeprecatedEnumAbstract
+-w -WDeprecated
 --cmd node tests/node-runner.js
