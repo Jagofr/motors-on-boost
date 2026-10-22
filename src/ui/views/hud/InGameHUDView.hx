@@ -157,6 +157,22 @@ class InGameHUDView extends Object {
     }
 
     /**
+     * Initializes rectangular perimeter boundary for the open sandbox proving grounds minimap.
+     *
+     * @param halfSpan Bounding perimeter half-width in meters (default: 195.0m).
+     */
+    public function initSandboxBounds(halfSpan:Float = 195.0) {
+        var pts = [
+            new Vector(-halfSpan, -halfSpan, 0),
+            new Vector( halfSpan, -halfSpan, 0),
+            new Vector( halfSpan,  halfSpan, 0),
+            new Vector(-halfSpan,  halfSpan, 0),
+            new Vector(-halfSpan, -halfSpan, 0)
+        ];
+        initWaypoints(pts);
+    }
+
+    /**
      * Evaluates live telemetry values, formats typography displays, and redraws vector gauge overlays.
      *
      * @param dt Delta time in seconds.

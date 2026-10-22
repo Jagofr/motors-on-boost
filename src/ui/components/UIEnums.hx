@@ -4,8 +4,11 @@ package ui.components;
  * Dispatched user actions emitted from menu selections.
  */
 enum MenuAction {
-    /** Start a fresh new circuit race from the starting line. */
+    /** Start a fresh new circuit race on the highway track from the starting line. */
     StartGame;
+
+    /** Launch into the open sandbox proving grounds to test physics, terrain hills, and ramps. */
+    StartSandbox;
 
     /** Resume an active in-progress race run restored from persistent storage. */
     ResumeGame;

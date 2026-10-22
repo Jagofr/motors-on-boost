@@ -51,5 +51,30 @@ class TestTrack extends Test {
         Assert.floatEquals(0.0, proj.centerPoint.x, 0.1);
         Assert.isTrue(proj.distSq < 1.0);
     }
+
+    public function testTrackStreetLightsAndGroundProvider() {
+        var track = new Track(null);
+        Assert.isTrue(track.streetLights.length >= 16);
+
+        // Ground elevation at origin
+        var z = track.getGroundElevation(0, 0);
+        Assert.floatEquals(Track.ROAD_LIFT, z, 0.01);
+
+        // Normal vector at origin
+        var n = new Vector();
+        track.getGroundNormal(0, 0, n);
+        Assert.isTrue(n.z > 0.9);
+
+        // Boundary enforcement inside track
+        var insidePos = new Vector(0, 10, 0);
+        var resInside = track.enforceBoundaries(insidePos, 20.0, 0.0);
+        Assert.isFalse(resInside.hitWall);
+
+        // Boundary enforcement outside track (breached Armco rail at lateral > 10m)
+        var outsidePos = new Vector(15.0, 10, 0);
+        var resOutside = track.enforceBoundaries(outsidePos, 20.0, 0.0);
+        Assert.isTrue(resOutside.hitWall);
+        Assert.floatEquals(0.94, resOutside.speedMult, 0.001);
+    }
 }
 

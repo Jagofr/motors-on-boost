@@ -10,6 +10,7 @@ import tests.physics.TestCarPhysics;
 import tests.save.TestSaveSystem;
 import tests.input.TestInputController;
 import tests.world.TestTrack;
+import tests.world.TestSandboxMap;
 import tests.entities.TestTrafficSystem;
 import tests.camera.TestChaseCamera;
 import tests.ui.TestGraphicsOptions;
@@ -88,6 +89,7 @@ class TestMain {
             { mod: "save", name: "TestSaveSystem", testCase: new TestSaveSystem() },
             { mod: "input", name: "TestInputController", testCase: new TestInputController() },
             { mod: "world", name: "TestTrack", testCase: new TestTrack() },
+            { mod: "world", name: "TestSandboxMap", testCase: new TestSandboxMap() },
             { mod: "entities", name: "TestTrafficSystem", testCase: new TestTrafficSystem() },
             { mod: "camera", name: "TestChaseCamera", testCase: new TestChaseCamera() },
             { mod: "ui", name: "TestGraphicsOptions", testCase: new TestGraphicsOptions() },

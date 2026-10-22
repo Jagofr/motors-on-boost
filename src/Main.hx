@@ -56,6 +56,17 @@ enum AppState {
 }
 
 /**
+ * World driving environment and map mode.
+ */
+enum MapMode {
+    /** High-speed urban highway circuit with multi-agent traffic. */
+    Circuit;
+
+    /** Open sandbox proving grounds with terrain hills, moguls, ramps, and banked bowl. */
+    Sandbox;
+}
+
+/**
  * Main application entry point for M.O.B. (Motors on Boost).
  * Manages boot splash sequencing, WebP texture decoding, 3D scene initialization,
  * car physics updates, third-person spring-arm camera tracking, and UI lifecycle.
@@ -63,6 +74,7 @@ enum AppState {
 class Main extends hxd.App {
     public var appState:AppState = IntroSequence;
     public var introState:IntroState = Studio;
+    public var currentMapMode:MapMode = Circuit;
 
     // Core Engine & Display Constants
     public static inline var VIRTUAL_BASE_WIDTH:Int = 1280;
@@ -111,6 +123,7 @@ class Main extends hxd.App {
     public var saveData:GameSaveData;
 
     public var track:Track;
+    public var sandboxMap:world.SandboxMap;
     public var traffic:TrafficSystem;
     public var playerMesh:CarMesh;
     public var carPhysics:CarPhysics;
@@ -118,6 +131,7 @@ class Main extends hxd.App {
     public var input:InputController;
     public var chaseCam:ChaseCamera;
     var dirLight:DirLight;
+    var fillLight:DirLight;
     var skybox:Skybox;
     var postRenderer:PostProcessRenderer;
     var wheelSpinAngle:Float = 0.0;
@@ -436,6 +450,13 @@ class Main extends hxd.App {
         dirLight.setPosition(350.0, -250.0, 140.0);
         dirLight.color.setColor(0xFFF2D9);
 
+        // Soft secondary fill light from opposite quadrant to soften shadows across tracks and hills
+        var fillDir = new Vector(0.55, -0.78, 0.45);
+        fillDir.normalize();
+        fillLight = new DirLight(fillDir, s3d);
+        fillLight.color.setColor(0x55687C);
+        fillLight.enableSpecular = false;
+
         gfx = new GraphicsManager(s3d, s2d, dirLight, saveData.graphics, postRenderer);
 
         var terrainPrim = new Cube(800.0, 800.0, 0.4, true);
@@ -448,17 +469,64 @@ class Main extends hxd.App {
         terrainGround.z = -2.5;
 
         track = new Track(s3d);
+        sandboxMap = new world.SandboxMap(s3d);
+        sandboxMap.visible = false;
+
         traffic = new TrafficSystem(track.waypoints, s3d);
         playerMesh = new CarMesh(s3d);
 
         ui = new UIManager(input, saveData.graphics, saveData.hasActiveRun, s2d);
         ui.visible = false;
         ui.onMenuAction = handleMenuAction;
-        ui.inGameHUD.initWaypoints(track.waypoints);
 
+        loadMap(Circuit);
         resetCarToStartLine();
 
         isLoadingComplete = true;
+    }
+
+    /**
+     * Toggles visibility and environment systems between Highway Circuit and Open Sandbox Proving Grounds.
+     *
+     * @param mode Target MapMode to activate.
+     */
+    public function loadMap(mode:MapMode) {
+        currentMapMode = mode;
+        if (mode == Circuit) {
+            if (track != null) track.visible = true;
+            if (terrainGround != null) terrainGround.visible = true;
+            if (sandboxMap != null) sandboxMap.visible = false;
+            if (traffic != null) traffic.visible = true;
+            if (ui != null && ui.inGameHUD != null && track != null) {
+                ui.inGameHUD.initWaypoints(track.waypoints);
+            }
+        } else {
+            if (track != null) track.visible = false;
+            if (terrainGround != null) terrainGround.visible = false;
+            if (sandboxMap != null) sandboxMap.visible = true;
+            if (traffic != null) traffic.visible = false;
+            if (ui != null && ui.inGameHUD != null) {
+                ui.inGameHUD.initSandboxBounds(world.SandboxMap.WALL_LIMIT);
+            }
+        }
+    }
+
+    /**
+     * Repositions the player vehicle to the sandbox central staging tarmac.
+     */
+    function resetCarToSandboxCenter() {
+        carPhysics.pos.set(0.0, 0.0, 0.05);
+        carPhysics.yaw = 1.5707963;
+        carPhysics.forwardSpeed = 0.0;
+        carPhysics.lateralVelocity = 0.0;
+        carPhysics.isDrifting = false;
+        carPhysics.boostFuel = 1.0;
+        carPhysics.isBoosting = false;
+
+        playerMesh.x = 0.0;
+        playerMesh.y = 0.0;
+        playerMesh.z = 0.05;
+        playerMesh.setRotation(0, 0, 0);
     }
 
     /**
@@ -501,7 +569,7 @@ class Main extends hxd.App {
     }
 
     /**
-     * Dispatches user menu selections (Start, Resume, Options, Credits, Quit).
+     * Dispatches user menu selections (Start Highway, Start Sandbox, Resume, Options, Credits, Quit).
      *
      * @param action Selected MenuAction enum variant.
      */
@@ -510,7 +578,15 @@ class Main extends hxd.App {
 
         switch (action) {
             case StartGame:
+                loadMap(Circuit);
                 resetCarToStartLine();
+                raceTimer = 0.0;
+                currentLap = 1;
+                ui.showInGame();
+
+            case StartSandbox:
+                loadMap(Sandbox);
+                resetCarToSandboxCenter();
                 raceTimer = 0.0;
                 currentLap = 1;
                 ui.showInGame();
@@ -742,7 +818,12 @@ class Main extends hxd.App {
                 }
 
                 var wasDrifting = carPhysics.isDrifting;
-                carPhysics.update(dt, input, track != null ? track.waypoints : null);
+                if (currentMapMode == Circuit) {
+                    carPhysics.update(dt, input, track != null ? track.waypoints : null, track);
+                    if (traffic != null) traffic.update(dt, carPhysics, chaseCam);
+                } else {
+                    carPhysics.update(dt, input, null, sandboxMap);
+                }
 
                 if (!wasDrifting && carPhysics.isDrifting) chaseCam.addTrauma(0.35);
                 if (input.boost && carPhysics.forwardSpeed > 20.0) chaseCam.addTrauma(0.12 * dt * 60.0);
@@ -756,11 +837,9 @@ class Main extends hxd.App {
                 if (input.boost && kmh > 70) blurIntensity = Math.min(0.08, blurIntensity + 0.025);
                 if (postRenderer != null) postRenderer.blurShader.blurIntensity = blurIntensity;
 
-                traffic.update(dt, carPhysics, chaseCam);
-
                 playerMesh.x = carPhysics.pos.x;
                 playerMesh.y = carPhysics.pos.y;
-                playerMesh.z = carPhysics.pos.z + Track.ROAD_LIFT;
+                playerMesh.z = carPhysics.pos.z + (currentMapMode == Circuit ? Track.ROAD_LIFT : 0.05);
                 playerMesh.setRotation(carPhysics.pitch, carPhysics.roll, carPhysics.yaw + carPhysics.driftAngle);
 
                 // Four-wheel steering and longitudinal spin animation

@@ -20,10 +20,10 @@ class CardBackplate {
         var cardW = UITheme.MAIN_CARD_WIDTH;
         var cardH = UITheme.MAIN_CARD_HEIGHT;
         var cardX = (sw - cardW) * 0.5;
-        var cardY = sh * 0.28;
+        var cardY = sh * 0.25;
         g.drawRoundedRect(cardX, cardY, cardW, cardH, UITheme.MAIN_CARD_RADIUS);
 
-        var activeY = sh * 0.32 + (selectedIdx * UITheme.MAIN_ROW_STRIDE);
+        var activeY = sh * 0.31 + (selectedIdx * UITheme.MAIN_ROW_STRIDE);
         g.beginFill(UITheme.COLOR_ACCENT_CYAN, UITheme.ALPHA_SLOT_FILL);
         g.lineStyle(1.5, UITheme.COLOR_ACCENT_CYAN, UITheme.ALPHA_SLOT_BORDER);
         g.drawRoundedRect(cardX + 24, activeY - 4, cardW - 48, 44, 8);

@@ -139,6 +139,12 @@ var AppState = $hxEnums["AppState"] = { __ename__:true,__constructs__:null
 };
 AppState.__constructs__ = [AppState.IntroSequence,AppState.InGameUI];
 AppState.__empty_constructs__ = [AppState.IntroSequence,AppState.InGameUI];
+var MapMode = $hxEnums["MapMode"] = { __ename__:true,__constructs__:null
+	,Circuit: {_hx_name:"Circuit",_hx_index:0,__enum__:"MapMode",toString:$estr}
+	,Sandbox: {_hx_name:"Sandbox",_hx_index:1,__enum__:"MapMode",toString:$estr}
+};
+MapMode.__constructs__ = [MapMode.Circuit,MapMode.Sandbox];
+MapMode.__empty_constructs__ = [MapMode.Circuit,MapMode.Sandbox];
 var h3d_IDrawable = function() { };
 $hxClasses["h3d.IDrawable"] = h3d_IDrawable;
 h3d_IDrawable.__name__ = "h3d.IDrawable";
@@ -253,6 +259,7 @@ var Main = function() {
 	this.isFadingOut = false;
 	this.introAlpha = 0.0;
 	this.introTimer = 0.0;
+	this.currentMapMode = MapMode.Circuit;
 	this.introState = IntroState.Studio;
 	this.appState = AppState.IntroSequence;
 	hxd_App.call(this);
@@ -296,7 +303,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 			onLoaded(tile);
 		};
 		img.onerror = function(err) {
-			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 195, className : "Main", methodName : "loadWebpTile"});
+			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 209, className : "Main", methodName : "loadWebpTile"});
 		};
 		img.src = path;
 	}
@@ -325,7 +332,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.discBody.set_lineSpacing(5.0);
 		this.discBody.set_text("M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" + "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" + "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" + "are the intellectual property of their respective creators. All rights reserved.\n\n" + "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" + "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" + "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" + "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" + "Please play in a well-lit environment and take a 15-minute break for every hour of play.");
 		this.discVersion = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
-		this.discVersion.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
+		this.discVersion.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
 		this.discVersion.set_textColor(5927822);
 		this.discVersion.set_textAlign(h2d_Align.Center);
 		this.logoRow = new h2d_Object(this.screenDisclaimer);
@@ -490,6 +497,23 @@ Main.prototype = $extend(hxd_App.prototype,{
 		_this.x = 1.;
 		_this.y = 0.94901960784313721;
 		_this.z = 0.85098039215686272;
+		var fillDir = new h3d_VectorImpl(0.55,-0.78,0.45);
+		var _this = fillDir;
+		var k = _this.x * _this.x + _this.y * _this.y + _this.z * _this.z;
+		if(k < 1e-20) {
+			k = 0;
+		} else {
+			k = 1. / Math.sqrt(k);
+		}
+		_this.x *= k;
+		_this.y *= k;
+		_this.z *= k;
+		this.fillLight = new h3d_scene_fwd_DirLight(fillDir,this.s3d);
+		var _this = this.fillLight.get_color();
+		_this.x = 0.33333333333333331;
+		_this.y = 0.40784313725490196;
+		_this.z = 0.48627450980392156;
+		this.fillLight.set_enableSpecular(false);
 		this.gfx = new graphics_GraphicsManager(this.s3d,this.s2d,this.dirLight,this.saveData.graphics,this.postRenderer);
 		var terrainPrim = new h3d_prim_Cube(800.0,800.0,0.4,true);
 		terrainPrim.unindex();
@@ -519,14 +543,83 @@ Main.prototype = $extend(hxd_App.prototype,{
 			_this.flags |= 262144;
 		}
 		this.track = new world_Track(this.s3d);
+		this.sandboxMap = new world_SandboxMap(this.s3d);
+		this.sandboxMap.flags &= -3;
 		this.traffic = new entities_TrafficSystem(this.track.waypoints,this.s3d);
 		this.playerMesh = new entities_CarMesh(this.s3d);
 		this.ui = new ui_UIManager(this.input,this.saveData.graphics,this.saveData.hasActiveRun,this.s2d);
 		this.ui.set_visible(false);
 		this.ui.onMenuAction = $bind(this,this.handleMenuAction);
-		this.ui.builder.inGameHUDView.initWaypoints(this.track.waypoints);
+		this.loadMap(MapMode.Circuit);
 		this.resetCarToStartLine();
 		this.isLoadingComplete = true;
+	}
+	,loadMap: function(mode) {
+		this.currentMapMode = mode;
+		if(mode == MapMode.Circuit) {
+			if(this.track != null) {
+				this.track.flags |= 2;
+			}
+			if(this.terrainGround != null) {
+				this.terrainGround.flags |= 2;
+			}
+			if(this.sandboxMap != null) {
+				this.sandboxMap.flags &= -3;
+			}
+			if(this.traffic != null) {
+				this.traffic.flags |= 2;
+			}
+			if(this.ui != null && this.ui.builder.inGameHUDView != null && this.track != null) {
+				this.ui.builder.inGameHUDView.initWaypoints(this.track.waypoints);
+			}
+		} else {
+			if(this.track != null) {
+				this.track.flags &= -3;
+			}
+			if(this.terrainGround != null) {
+				this.terrainGround.flags &= -3;
+			}
+			if(this.sandboxMap != null) {
+				this.sandboxMap.flags |= 2;
+			}
+			if(this.traffic != null) {
+				this.traffic.flags &= -3;
+			}
+			if(this.ui != null && this.ui.builder.inGameHUDView != null) {
+				this.ui.builder.inGameHUDView.initSandboxBounds(195.0);
+			}
+		}
+	}
+	,resetCarToSandboxCenter: function() {
+		var _this = this.carPhysics.pos;
+		_this.x = 0.0;
+		_this.y = 0.0;
+		_this.z = 0.05;
+		this.carPhysics.yaw = 1.5707963;
+		this.carPhysics.forwardSpeed = 0.0;
+		this.carPhysics.lateralVelocity = 0.0;
+		this.carPhysics.isDrifting = false;
+		this.carPhysics.boostFuel = 1.0;
+		this.carPhysics.isBoosting = false;
+		var _this = this.playerMesh;
+		_this.x = 0.0;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.playerMesh;
+		_this.y = 0.0;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.playerMesh;
+		_this.z = 0.05;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		this.playerMesh.setRotation(0,0,0);
 	}
 	,resetCarToStartLine: function() {
 		var _this = this.carPhysics.pos;
@@ -574,12 +667,20 @@ Main.prototype = $extend(hxd_App.prototype,{
 		this.input.flushInputs();
 		switch(action._hx_index) {
 		case 0:
+			this.loadMap(MapMode.Circuit);
 			this.resetCarToStartLine();
 			this.raceTimer = 0.0;
 			this.currentLap = 1;
 			this.ui.showInGame();
 			break;
 		case 1:
+			this.loadMap(MapMode.Sandbox);
+			this.resetCarToSandboxCenter();
+			this.raceTimer = 0.0;
+			this.currentLap = 1;
+			this.ui.showInGame();
+			break;
+		case 2:
 			if(this.saveData.hasActiveRun) {
 				var _this = this.carPhysics.pos;
 				var x = this.saveData.playerState.posX;
@@ -602,12 +703,12 @@ Main.prototype = $extend(hxd_App.prototype,{
 			}
 			this.ui.showInGame();
 			break;
-		case 2:
-			break;
 		case 3:
-			this.ui.showCredits();
 			break;
 		case 4:
+			this.ui.showCredits();
+			break;
+		case 5:
 			this.saveCurrentRun();
 			this.ui.showMainMenu();
 			break;
@@ -803,7 +904,14 @@ Main.prototype = $extend(hxd_App.prototype,{
 				return;
 			}
 			var wasDrifting = this.carPhysics.isDrifting;
-			this.carPhysics.update(dt,this.input,this.track != null ? this.track.waypoints : null);
+			if(this.currentMapMode == MapMode.Circuit) {
+				this.carPhysics.update(dt,this.input,this.track != null ? this.track.waypoints : null,this.track);
+				if(this.traffic != null) {
+					this.traffic.update(dt,this.carPhysics,this.chaseCam);
+				}
+			} else {
+				this.carPhysics.update(dt,this.input,null,this.sandboxMap);
+			}
 			if(!wasDrifting && this.carPhysics.isDrifting) {
 				this.chaseCam.addTrauma(0.35);
 			}
@@ -821,7 +929,6 @@ Main.prototype = $extend(hxd_App.prototype,{
 			if(this.postRenderer != null) {
 				this.postRenderer.blurShader.blurIntensity__ = blurIntensity;
 			}
-			this.traffic.update(dt,this.carPhysics,this.chaseCam);
 			var _this = this.playerMesh;
 			_this.x = this.carPhysics.pos.x;
 			_this.flags |= 1;
@@ -835,7 +942,7 @@ Main.prototype = $extend(hxd_App.prototype,{
 				_this.flags |= 262144;
 			}
 			var _this = this.playerMesh;
-			_this.z = this.carPhysics.pos.z + 0.06;
+			_this.z = this.carPhysics.pos.z + (this.currentMapMode == MapMode.Circuit ? 0.06 : 0.05);
 			_this.flags |= 1;
 			if((_this.flags & 131072) != 0) {
 				_this.flags |= 262144;
@@ -3091,15 +3198,9 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 				playerPhysics.pos.y -= ny * overlap * 0.6;
 				tc.pos.x += nx * overlap * 0.4;
 				tc.pos.y += ny * overlap * 0.4;
-				if(tc.isOncoming || -Math.sin(playerPhysics.yaw) * nx + Math.cos(playerPhysics.yaw) * ny < 0.2) {
-					playerPhysics.forwardSpeed *= 0.4;
-					tc.currentSpeed *= 0.3;
-					chaseCam.addTrauma(0.65);
-				} else {
-					playerPhysics.forwardSpeed *= 0.75;
-					tc.currentSpeed = Math.max(tc.currentSpeed,Math.abs(playerPhysics.forwardSpeed) * 0.9);
-					chaseCam.addTrauma(0.35);
-				}
+				playerPhysics.forwardSpeed *= 0.75;
+				tc.currentSpeed = Math.max(tc.currentSpeed,Math.abs(playerPhysics.forwardSpeed) * 0.9);
+				chaseCam.addTrauma(0.35);
 			}
 		}
 		if(this.clampToTrack(playerPhysics.pos,9.7)) {
@@ -5125,61 +5226,61 @@ graphics_GraphicsManager.prototype = {
 		case "High":
 			var _this = this.light.get_color();
 			_this.x = 1.;
-			_this.y = 0.94117647058823528;
-			_this.z = 0.81568627450980391;
+			_this.y = 0.94901960784313721;
+			_this.z = 0.83921568627450982;
 			if(fwd != null) {
 				var _this = fwd.ambientLight;
-				_this.x = 0.29803921568627451;
-				_this.y = 0.36862745098039218;
-				_this.z = 0.44705882352941179;
+				_this.x = 0.49019607843137253;
+				_this.y = 0.58039215686274515;
+				_this.z = 0.66666666666666663;
 			}
 			break;
 		case "Low":
 			var _this = this.light.get_color();
-			_this.x = 0.8666666666666667;
-			_this.y = 0.81568627450980391;
-			_this.z = 0.69019607843137254;
+			_this.x = 0.91764705882352937;
+			_this.y = 0.85882352941176465;
+			_this.z = 0.72156862745098038;
 			if(fwd != null) {
 				var _this = fwd.ambientLight;
-				_this.x = 0.14117647058823529;
-				_this.y = 0.17647058823529413;
-				_this.z = 0.2196078431372549;
+				_this.x = 0.31372549019607843;
+				_this.y = 0.37254901960784315;
+				_this.z = 0.4392156862745098;
 			}
 			break;
 		case "Medium":
 			var _this = this.light.get_color();
 			_this.x = 1.;
-			_this.y = 0.90980392156862744;
-			_this.z = 0.76078431372549016;
+			_this.y = 0.92549019607843142;
+			_this.z = 0.78431372549019607;
 			if(fwd != null) {
 				var _this = fwd.ambientLight;
-				_this.x = 0.2196078431372549;
-				_this.y = 0.27843137254901962;
-				_this.z = 0.33725490196078434;
+				_this.x = 0.4;
+				_this.y = 0.47843137254901963;
+				_this.z = 0.55686274509803924;
 			}
 			break;
 		case "Ultra (RTX/Path)":
 			var _this = this.light.get_color();
 			_this.x = 1.;
-			_this.y = 0.97254901960784312;
-			_this.z = 0.90980392156862744;
+			_this.y = 0.97647058823529409;
+			_this.z = 0.93333333333333335;
 			if(fwd != null) {
 				var _this = fwd.ambientLight;
-				_this.x = 0.37254901960784315;
-				_this.y = 0.46274509803921571;
-				_this.z = 0.55686274509803924;
+				_this.x = 0.58039215686274515;
+				_this.y = 0.6705882352941176;
+				_this.z = 0.76078431372549016;
 			}
 			break;
 		default:
 			var _this = this.light.get_color();
 			_this.x = 1.;
-			_this.y = 0.90980392156862744;
-			_this.z = 0.76078431372549016;
+			_this.y = 0.92549019607843142;
+			_this.z = 0.78431372549019607;
 			if(fwd != null) {
 				var _this = fwd.ambientLight;
-				_this.x = 0.2196078431372549;
-				_this.y = 0.27843137254901962;
-				_this.z = 0.33725490196078434;
+				_this.x = 0.4;
+				_this.y = 0.47843137254901963;
+				_this.z = 0.55686274509803924;
 			}
 		}
 	}
@@ -51602,6 +51703,8 @@ var physics_CarPhysics = function(startX,startY,startZ,initialConfig) {
 	this.scratchWheelWorld = new h3d_VectorImpl(0.,0.,0.);
 	this.scratchRight = new h3d_VectorImpl(0.,0.,0.);
 	this.scratchFwd = new h3d_VectorImpl(0.,0.,0.);
+	this.scratchGroundNormal = new h3d_VectorImpl(0,0,1);
+	this.wheelGroundZ = [0.0,0.0,0.0,0.0];
 	this.wheelSpinVelocity = [0.0,0.0,0.0,0.0];
 	this.wheelNormals = [new h3d_VectorImpl(0,0,1),new h3d_VectorImpl(0,0,1),new h3d_VectorImpl(0,0,1),new h3d_VectorImpl(0,0,1)];
 	this.wheelOnGround = [true,true,true,true];
@@ -51655,7 +51758,7 @@ var physics_CarPhysics = function(startX,startY,startZ,initialConfig) {
 $hxClasses["physics.CarPhysics"] = physics_CarPhysics;
 physics_CarPhysics.__name__ = "physics.CarPhysics";
 physics_CarPhysics.prototype = {
-	update: function(dt,input,waypoints) {
+	update: function(dt,input,waypoints,groundProvider) {
 		if(dt <= 0.0) {
 			return;
 		}
@@ -51687,7 +51790,7 @@ physics_CarPhysics.prototype = {
 		_this.x = x;
 		_this.y = y;
 		_this.z = 0;
-		this.updateSuspension(clampedDt,fwdX,cosYaw,cosYaw,sinYaw,waypoints);
+		this.updateSuspension(clampedDt,fwdX,cosYaw,cosYaw,sinYaw,waypoints,groundProvider);
 		if(input.boost && this.boostFuel > 0.0) {
 			this.boostFuel = Math.max(0.0,this.boostFuel - 0.25 * clampedDt);
 			this.isBoosting = this.boostFuel > 0.0;
@@ -51702,9 +51805,16 @@ physics_CarPhysics.prototype = {
 		this.updateLateralAndDrift(clampedDt,input,fwdX,cosYaw,cosYaw,sinYaw);
 		this.pos.x += (fwdX * this.forwardSpeed + cosYaw * this.lateralVelocity) * clampedDt;
 		this.pos.y += (cosYaw * this.forwardSpeed + sinYaw * this.lateralVelocity) * clampedDt;
+		if(groundProvider != null) {
+			var bRes = groundProvider.enforceBoundaries(this.pos,this.forwardSpeed,this.lateralVelocity);
+			if(bRes.hitWall) {
+				this.forwardSpeed *= bRes.speedMult;
+				this.lateralVelocity *= bRes.latMult;
+			}
+		}
 		this.updateChassisAttitude(clampedDt,input);
 	}
-	,updateSuspension: function(dt,fwdX,fwdY,rightX,rightY,waypoints) {
+	,updateSuspension: function(dt,fwdX,fwdY,rightX,rightY,waypoints,groundProvider) {
 		var susp = this.config.suspension;
 		var restLen = susp.restLength;
 		var arbK = susp.antiRollStiffness;
@@ -51736,7 +51846,13 @@ physics_CarPhysics.prototype = {
 			var nx = 0.0;
 			var ny = 0.0;
 			var nz = 1.0;
-			if(waypoints != null && waypoints.length > 0) {
+			if(groundProvider != null) {
+				groundZ = groundProvider.getGroundElevation(attachX,attachY);
+				groundProvider.getGroundNormal(attachX,attachY,this.scratchGroundNormal);
+				nx = this.scratchGroundNormal.x;
+				ny = this.scratchGroundNormal.y;
+				nz = this.scratchGroundNormal.z;
+			} else if(waypoints != null && waypoints.length > 0) {
 				var proj = physics_SplineMath.getClosestSegment(this.scratchWheelWorld,waypoints);
 				groundZ = proj.z;
 				nx = -proj.segDirY * 0.04;
@@ -51745,6 +51861,7 @@ physics_CarPhysics.prototype = {
 			} else {
 				groundZ = 0.0;
 			}
+			this.wheelGroundZ[i] = groundZ;
 			var _this1 = this.wheelNormals[i];
 			var x1 = nx;
 			var y1 = ny;
@@ -51777,7 +51894,9 @@ physics_CarPhysics.prototype = {
 		this.roll -= ((restLen - this.suspLength[0] - (restLen - this.suspLength[1])) * arbK + (restLen - this.suspLength[2] - (restLen - this.suspLength[3])) * arbK) / this.config.mass * 0.0004 * dt;
 		if(groundContacts > 0) {
 			var targetZ = 0.0;
-			if(waypoints != null && waypoints.length > 0) {
+			if(groundProvider != null) {
+				targetZ = groundProvider.getGroundElevation(this.pos.x,this.pos.y);
+			} else if(waypoints != null && waypoints.length > 0) {
 				targetZ = physics_SplineMath.getClosestSegment(this.pos,waypoints).z;
 			}
 			this.pos.z += (targetZ - this.pos.z) * Math.min(1.0,16.0 * dt);
@@ -51920,10 +52039,11 @@ physics_CarPhysics.prototype = {
 		if(this.isDrifting) {
 			targetRoll *= 1.7;
 		}
+		var terrainPitch = Math.atan2((this.wheelGroundZ[0] + this.wheelGroundZ[1]) * 0.5 - (this.wheelGroundZ[2] + this.wheelGroundZ[3]) * 0.5,2.7);
 		var maxRoll = 0.25 * Math.min(1.5,Math.max(0.5,this.config.suspension.bodyRollScale));
 		targetRoll = Math.max(-maxRoll,Math.min(maxRoll,targetRoll));
-		this.roll += (targetRoll - this.roll) * 8.0 * dt;
-		this.pitch += ((input.throttle - input.brake) * 0.06 - this.pitch) * 8.0 * dt;
+		this.roll += (targetRoll + Math.atan2((this.wheelGroundZ[1] + this.wheelGroundZ[3]) * 0.5 - (this.wheelGroundZ[0] + this.wheelGroundZ[2]) * 0.5,1.96) - this.roll) * 8.0 * dt;
+		this.pitch += ((input.throttle - input.brake) * 0.06 + terrainPitch - this.pitch) * 8.0 * dt;
 	}
 	,__class__: physics_CarPhysics
 };
@@ -52037,19 +52157,19 @@ save_SaveSystem.load = function() {
 			}
 			if(data.version == null || data.version < 4 || isLegacy) {
 				data.version = 4;
-				data.buildNumber = 5;
+				data.buildNumber = 6;
 				save_SaveSystem.save(data);
 			}
 			return data;
 		}
 	} catch( _g ) {
 	}
-	return { version : 4, buildNumber : 5, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, steerSensitivity : 1.0, graphics : save_SaveSystem.getDefaultGraphics(), touchSettings : save_SaveSystem.getDefaultTouchSettings()};
+	return { version : 4, buildNumber : 6, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 1.5707963, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, steerSensitivity : 1.0, graphics : save_SaveSystem.getDefaultGraphics(), touchSettings : save_SaveSystem.getDefaultTouchSettings()};
 };
 save_SaveSystem.save = function(data) {
 	try {
 		data.version = 4;
-		data.buildNumber = 5;
+		data.buildNumber = 6;
 		if(data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
 			data.steerSensitivity = 1.0;
 		}
@@ -52561,10 +52681,11 @@ var ui_IconType = $hxEnums["ui.IconType"] = { __ename__:true,__constructs__:null
 	,Gamepad: {_hx_name:"Gamepad",_hx_index:10,__enum__:"ui.IconType",toString:$estr}
 	,Credits: {_hx_name:"Credits",_hx_index:11,__enum__:"ui.IconType",toString:$estr}
 	,Touch: {_hx_name:"Touch",_hx_index:12,__enum__:"ui.IconType",toString:$estr}
-	,Exit: {_hx_name:"Exit",_hx_index:13,__enum__:"ui.IconType",toString:$estr}
+	,Sandbox: {_hx_name:"Sandbox",_hx_index:13,__enum__:"ui.IconType",toString:$estr}
+	,Exit: {_hx_name:"Exit",_hx_index:14,__enum__:"ui.IconType",toString:$estr}
 };
-ui_IconType.__constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Exit];
-ui_IconType.__empty_constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Exit];
+ui_IconType.__constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Sandbox,ui_IconType.Exit];
+ui_IconType.__empty_constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Sandbox,ui_IconType.Exit];
 var ui_UIIcons = function() { };
 $hxClasses["ui.UIIcons"] = ui_UIIcons;
 ui_UIIcons.__name__ = "ui.UIIcons";
@@ -52783,6 +52904,29 @@ ui_UIIcons.get = function(type,size,color) {
 		break;
 	case 13:
 		g.endFill();
+		g.lineStyle(2.0,color,1.0);
+		var y = pad + w * 0.85;
+		g.flush();
+		g.addVertex(pad,y,g.curR,g.curG,g.curB,g.curA,pad * g.ma + y * g.mc + g.mx,pad * g.mb + y * g.md + g.my);
+		var x = pad + w * 0.35;
+		var y = pad + w * 0.25;
+		g.addVertex(x,y,g.curR,g.curG,g.curB,g.curA,x * g.ma + y * g.mc + g.mx,x * g.mb + y * g.md + g.my);
+		var x = pad + w * 0.65;
+		var y = pad + w * 0.60;
+		g.addVertex(x,y,g.curR,g.curG,g.curB,g.curA,x * g.ma + y * g.mc + g.mx,x * g.mb + y * g.md + g.my);
+		var x = pad + w * 0.85;
+		var y = pad + w * 0.38;
+		g.addVertex(x,y,g.curR,g.curG,g.curB,g.curA,x * g.ma + y * g.mc + g.mx,x * g.mb + y * g.md + g.my);
+		var x = pad + w;
+		var y = pad + w * 0.85;
+		g.addVertex(x,y,g.curR,g.curG,g.curB,g.curA,x * g.ma + y * g.mc + g.mx,x * g.mb + y * g.md + g.my);
+		var y = pad + w * 0.85;
+		g.addVertex(pad,y,g.curR,g.curG,g.curB,g.curA,pad * g.ma + y * g.mc + g.mx,pad * g.mb + y * g.md + g.my);
+		g.beginFill(color,0.4);
+		g.drawCircle(pad + w * 0.78,pad + w * 0.22,w * 0.08);
+		break;
+	case 14:
+		g.endFill();
 		g.drawRect(pad,pad,w * 0.55,w);
 		g.lineStyle(2.0,color,1.0);
 		var x = pad + w * 0.35;
@@ -52984,17 +53128,22 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 			}
 			break;
 		case 1:
+			if(this.onMenuAction != null) {
+				this.onMenuAction(ui_components_MenuAction.StartSandbox);
+			}
+			break;
+		case 2:
 			if(this.hasActiveSave && this.onMenuAction != null) {
 				this.onMenuAction(ui_components_MenuAction.ResumeGame);
 			}
 			break;
-		case 2:
+		case 3:
 			this.openOptions(false);
 			break;
-		case 3:
+		case 4:
 			this.showCredits();
 			break;
-		case 4:
+		case 5:
 			this.showSplash();
 			break;
 		}
@@ -53108,10 +53257,10 @@ $hxClasses["ui.components.CardBackplate"] = ui_components_CardBackplate;
 ui_components_CardBackplate.__name__ = "ui.components.CardBackplate";
 ui_components_CardBackplate.drawMainMenu = function(g,sw,sh,selectedIdx) {
 	var cardX = (sw - 540.0) * 0.5;
-	g.drawRoundedRect(cardX,sh * 0.28,540.0,360.0,14.0);
+	g.drawRoundedRect(cardX,sh * 0.25,540.0,390.0,14.0);
 	g.beginFill(58879,0.12);
 	g.lineStyle(1.5,58879,0.70);
-	g.drawRoundedRect(cardX + 24,sh * 0.32 + selectedIdx * 52.0 - 4,492.,44,8);
+	g.drawRoundedRect(cardX + 24,sh * 0.31 + selectedIdx * 48.0 - 4,492.,44,8);
 };
 ui_components_CardBackplate.drawPauseMenu = function(g,sw,sh,selectedIdx) {
 	var cardX = (sw - 500.0) * 0.5;
@@ -53937,13 +54086,14 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 });
 var ui_components_MenuAction = $hxEnums["ui.components.MenuAction"] = { __ename__:true,__constructs__:null
 	,StartGame: {_hx_name:"StartGame",_hx_index:0,__enum__:"ui.components.MenuAction",toString:$estr}
-	,ResumeGame: {_hx_name:"ResumeGame",_hx_index:1,__enum__:"ui.components.MenuAction",toString:$estr}
-	,OpenOptions: {_hx_name:"OpenOptions",_hx_index:2,__enum__:"ui.components.MenuAction",toString:$estr}
-	,OpenCredits: {_hx_name:"OpenCredits",_hx_index:3,__enum__:"ui.components.MenuAction",toString:$estr}
-	,QuitToTitle: {_hx_name:"QuitToTitle",_hx_index:4,__enum__:"ui.components.MenuAction",toString:$estr}
+	,StartSandbox: {_hx_name:"StartSandbox",_hx_index:1,__enum__:"ui.components.MenuAction",toString:$estr}
+	,ResumeGame: {_hx_name:"ResumeGame",_hx_index:2,__enum__:"ui.components.MenuAction",toString:$estr}
+	,OpenOptions: {_hx_name:"OpenOptions",_hx_index:3,__enum__:"ui.components.MenuAction",toString:$estr}
+	,OpenCredits: {_hx_name:"OpenCredits",_hx_index:4,__enum__:"ui.components.MenuAction",toString:$estr}
+	,QuitToTitle: {_hx_name:"QuitToTitle",_hx_index:5,__enum__:"ui.components.MenuAction",toString:$estr}
 };
-ui_components_MenuAction.__constructs__ = [ui_components_MenuAction.StartGame,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
-ui_components_MenuAction.__empty_constructs__ = [ui_components_MenuAction.StartGame,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
+ui_components_MenuAction.__constructs__ = [ui_components_MenuAction.StartGame,ui_components_MenuAction.StartSandbox,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
+ui_components_MenuAction.__empty_constructs__ = [ui_components_MenuAction.StartGame,ui_components_MenuAction.StartSandbox,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
 var ui_components_UIState = $hxEnums["ui.components.UIState"] = { __ename__:true,__constructs__:null
 	,Splash: {_hx_name:"Splash",_hx_index:0,__enum__:"ui.components.UIState",toString:$estr}
 	,MainMenu: {_hx_name:"MainMenu",_hx_index:1,__enum__:"ui.components.UIState",toString:$estr}
@@ -53994,7 +54144,7 @@ var ui_views_credits_CreditsView = function(parent) {
 	this.techDetailsText.set_textColor(10531526);
 	this.techDetailsText.set_text("Built with Haxe, Heaps.io (Hardware-Accelerated WebGL) & Modern Shaders\n" + "Typography: Stack Sans Headline & Material Symbols Sharp\n" + "Homage & Inspiration: Need for Speed: Most Wanted (2005) & Burnout Revenge (2005)\n\n" + "Thank you for playing!");
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
+	this.versionText.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
 	this.versionText.set_textColor(15057019);
 	this.versionText.set_textAlign(h2d_Align.Center);
 	this.backBtnText = new h2d_Text(ui_FontManager.titleFont,this);
@@ -54218,6 +54368,52 @@ ui_views_hud_InGameHUDView.prototype = $extend(h2d_Object.prototype,{
 			++_g;
 			this.minimapPoints.push({ x : (w.x - this.mapMinX) / rangeX, y : (w.y - this.mapMinY) / rangeY});
 		}
+	}
+	,initSandboxBounds: function(halfSpan) {
+		if(halfSpan == null) {
+			halfSpan = 195.0;
+		}
+		var x = -halfSpan;
+		var y = -halfSpan;
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		var x1 = halfSpan;
+		var y1 = -halfSpan;
+		if(y1 == null) {
+			y1 = 0.;
+		}
+		if(halfSpan == null) {
+			x1 = 0.;
+		}
+		var x2 = halfSpan;
+		var y2 = halfSpan;
+		if(halfSpan == null) {
+			y2 = 0.;
+		}
+		if(halfSpan == null) {
+			x2 = 0.;
+		}
+		var x3 = -halfSpan;
+		var y3 = halfSpan;
+		if(halfSpan == null) {
+			y3 = 0.;
+		}
+		if(x3 == null) {
+			x3 = 0.;
+		}
+		var x4 = -halfSpan;
+		var y4 = -halfSpan;
+		if(y4 == null) {
+			y4 = 0.;
+		}
+		if(x4 == null) {
+			x4 = 0.;
+		}
+		this.initWaypoints([new h3d_VectorImpl(x,y,0),new h3d_VectorImpl(x1,y1,0),new h3d_VectorImpl(x2,y2,0),new h3d_VectorImpl(x3,y3,0),new h3d_VectorImpl(x4,y4,0)]);
 	}
 	,updateTelemetry: function(dt,car,kmh,isBoosting,lapTimer,currentLap,totalLaps) {
 		if(!this.visible || car == null) {
@@ -54491,10 +54687,10 @@ var ui_views_mainmenu_MainMenuView = function(parent) {
 	this.titleText.set_text("MAIN MENU");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
+	this.versionText.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
 	this.versionText.set_textColor(9413043);
-	var labels = ["START NEW RACE","RESUME SAVED RACE","OPTIONS","CREDITS","EXIT TO SPLASH"];
-	var iconTypes = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Settings,ui_IconType.Credits,ui_IconType.Exit];
+	var labels = ["START HIGHWAY RACE","OPEN SANDBOX MAP","RESUME SAVED RACE","OPTIONS","CREDITS","EXIT TO SPLASH"];
+	var iconTypes = [ui_IconType.Play,ui_IconType.Sandbox,ui_IconType.Resume,ui_IconType.Settings,ui_IconType.Credits,ui_IconType.Exit];
 	var _g = 0;
 	var _g1 = labels.length;
 	while(_g < _g1) {
@@ -54512,7 +54708,7 @@ var ui_views_mainmenu_MainMenuView = function(parent) {
 		row.interactive.onClick = (function(i) {
 			return function(_) {
 				if(_gthis.visible) {
-					if(i[0] == 1 && !_gthis.hasActiveSave) {
+					if(i[0] == 2 && !_gthis.hasActiveSave) {
 						return;
 					}
 					audio_AudioManager.inst.playMenuBeep(520.0,0.08);
@@ -54529,7 +54725,7 @@ ui_views_mainmenu_MainMenuView.prototype = $extend(h2d_Object.prototype,{
 	activate: function(hasSave) {
 		this.set_visible(true);
 		this.hasActiveSave = hasSave;
-		this.selectedIndex = this.hasActiveSave ? 1 : 0;
+		this.selectedIndex = this.hasActiveSave ? 2 : 0;
 		this.updateStyles();
 	}
 	,setHasActiveSave: function(val) {
@@ -54547,7 +54743,7 @@ ui_views_mainmenu_MainMenuView.prototype = $extend(h2d_Object.prototype,{
 		this.updateStyles();
 	}
 	,confirmSelection: function() {
-		if(this.selectedIndex == 1 && !this.hasActiveSave) {
+		if(this.selectedIndex == 2 && !this.hasActiveSave) {
 			return;
 		}
 		audio_AudioManager.inst.playMenuBeep(520.0,0.08);
@@ -54558,7 +54754,7 @@ ui_views_mainmenu_MainMenuView.prototype = $extend(h2d_Object.prototype,{
 		var _g1 = this.rows.length;
 		while(_g < _g1) {
 			var i = _g++;
-			this.rows[i].setStyle(i == this.selectedIndex,!(i == 1 && !this.hasActiveSave),58879,12767712,5595246);
+			this.rows[i].setStyle(i == this.selectedIndex,!(i == 2 && !this.hasActiveSave),58879,12767712,5595246);
 		}
 	}
 	,layout: function(sw,sh) {
@@ -54569,14 +54765,14 @@ ui_views_mainmenu_MainMenuView.prototype = $extend(h2d_Object.prototype,{
 			_this.x = v;
 			var _this = this.titleText;
 			_this.posChanged = true;
-			_this.y = sh * 0.16;
+			_this.y = sh * 0.14;
 		}
 		var _g = 0;
 		var _g1 = this.rows.length;
 		while(_g < _g1) {
 			var i = _g++;
 			var row = this.rows[i];
-			var rowY = sh * 0.32 + i * 52.0;
+			var rowY = sh * 0.31 + i * 48.0;
 			var rowStartX = sw * 0.5 - 190;
 			var _this = row.iconBmp;
 			_this.posChanged = true;
@@ -54606,7 +54802,7 @@ ui_views_mainmenu_MainMenuView.prototype = $extend(h2d_Object.prototype,{
 			_this.x = v;
 			var _this = this.versionText;
 			_this.posChanged = true;
-			_this.y = sh * 0.88;
+			_this.y = sh * 0.90;
 		}
 	}
 	,__class__: ui_views_mainmenu_MainMenuView
@@ -55583,7 +55779,7 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.titleText.set_text("CONFIGURATION & HARDWARE");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
+	this.versionText.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
 	this.versionText.set_textColor(9413043);
 	var tabNames = ["GRAPHICS","AUDIO","KEYBOARD","GAMEPAD","TOUCH"];
 	var tabIconTypes = [ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Touch];
@@ -55897,7 +56093,7 @@ var ui_views_splash_SplashView = function(parent) {
 	this.promptText.set_text("PRESS ANY BUTTON OR CLICK TO ENTER");
 	this.promptText.set_textColor(16777215);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.3.0" + " (Build " + "0005" + ")");
+	this.versionText.set_text("v" + "1.0.0" + " (Build " + "0006" + ")");
 	this.versionText.set_textColor(9413043);
 	this.screenHit = new h2d_Interactive(3000,3000,this);
 	this.screenHit.onClick = function(_) {
@@ -55959,6 +56155,351 @@ ui_views_splash_SplashView.prototype = $extend(h2d_Object.prototype,{
 		}
 	}
 	,__class__: ui_views_splash_SplashView
+});
+var world_IGroundProvider = function() { };
+$hxClasses["world.IGroundProvider"] = world_IGroundProvider;
+world_IGroundProvider.__name__ = "world.IGroundProvider";
+world_IGroundProvider.__isInterface__ = true;
+world_IGroundProvider.prototype = {
+	__class__: world_IGroundProvider
+};
+var world_SandboxMap = function(parent) {
+	this.obstacles = [];
+	this.floodlights = [];
+	h3d_scene_Object.call(this,parent);
+	this.buildTerrainMesh();
+	this.buildSkidpad();
+	this.buildFloodlights();
+	this.buildObstacles();
+};
+$hxClasses["world.SandboxMap"] = world_SandboxMap;
+world_SandboxMap.__name__ = "world.SandboxMap";
+world_SandboxMap.__interfaces__ = [world_IGroundProvider];
+world_SandboxMap.__super__ = h3d_scene_Object;
+world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
+	getGroundElevation: function(x,y) {
+		if(x * x + y * y < 1296.) {
+			return 0.0;
+		}
+		var elev = 0.0;
+		if(x > 35.0 && x < 140.0 && y > -50.0 && y < 50.0) {
+			var envelope = Math.sin((x - 35.0) / 105.0 * Math.PI) * Math.sin((y + 50.0) / 100.0 * Math.PI);
+			elev = Math.sin(x * 0.38) * Math.cos(y * 0.24) * 1.35 * envelope;
+		}
+		var hillDx = x - (-95.0);
+		var hillDy = y - 95.0;
+		var hillDistSq = hillDx * hillDx + hillDy * hillDy;
+		if(hillDistSq < 3600.) {
+			elev += 12.5 * Math.exp(-hillDistSq / 1100.0);
+		}
+		if(x >= -22.0 && x <= 22.0 && y >= 70.0 && y <= 125.0) {
+			var xEdgeDist = Math.min(22.0 - Math.abs(x),4.0) / 4.0;
+			if(y <= 120.0) {
+				var rampFrac = (y - 70.0) / 50.0;
+				elev += Math.max(0.0,rampFrac * rampFrac * 3.8 * xEdgeDist);
+			} else {
+				elev += Math.max(0.0,(1.0 - (y - 120.0) / 5.0) * 3.8 * xEdgeDist);
+			}
+		}
+		var bowlDx = x - (-100.0);
+		var bowlDy = y - (-100.0);
+		var bowlDist = Math.sqrt(bowlDx * bowlDx + bowlDy * bowlDy);
+		if(bowlDist > 25.0 && bowlDist < 75.0) {
+			elev += Math.sin((bowlDist - 25.0) / 50.0 * (Math.PI * 0.5)) * 5.2;
+		}
+		return elev;
+	}
+	,getGroundNormal: function(x,y,outNormal) {
+		var zCenter = this.getGroundElevation(x,y);
+		var nx = -(this.getGroundElevation(x + 0.15,y) - zCenter) / 0.15;
+		var ny = -(this.getGroundElevation(x,y + 0.15) - zCenter) / 0.15;
+		var len = Math.sqrt(nx * nx + ny * ny + 1.);
+		var _this = outNormal;
+		var x = nx / len;
+		var y = ny / len;
+		var z = 1.0 / len;
+		if(z == null) {
+			z = 0.;
+		}
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = z;
+	}
+	,enforceBoundaries: function(pos,forwardSpeed,lateralVelocity) {
+		var hit = false;
+		var sMult = 1.0;
+		var lMult = 1.0;
+		if(pos.x < -195.) {
+			pos.x = -195.;
+			hit = true;
+			lMult = -0.4;
+			sMult = 0.7;
+		} else if(pos.x > 195.0) {
+			pos.x = 195.0;
+			hit = true;
+			lMult = -0.4;
+			sMult = 0.7;
+		}
+		if(pos.y < -195.) {
+			pos.y = -195.;
+			hit = true;
+			sMult = -0.3;
+			lMult = 0.5;
+		} else if(pos.y > 195.0) {
+			pos.y = 195.0;
+			hit = true;
+			sMult = -0.3;
+			lMult = 0.5;
+		}
+		pos.z = this.getGroundElevation(pos.x,pos.y);
+		return { hitWall : hit, speedMult : sMult, latMult : lMult};
+	}
+	,buildTerrainMesh: function() {
+		var pts = [];
+		var idxBuf = new Array(0);
+		var _g = 0;
+		while(_g < 65) {
+			var y = -200. + _g++ * 6.25;
+			var _g1 = 0;
+			while(_g1 < 65) {
+				var x = -200. + _g1++ * 6.25;
+				var z = this.getGroundElevation(x,y);
+				var x1 = x;
+				var y1 = y;
+				var z1 = z;
+				if(z == null) {
+					z1 = 0.;
+				}
+				if(y == null) {
+					y1 = 0.;
+				}
+				if(x == null) {
+					x1 = 0.;
+				}
+				pts.push(new h3d_VectorImpl(x1,y1,z1));
+			}
+		}
+		var _g = 0;
+		while(_g < 64) {
+			var iy = _g++;
+			var _g1 = 0;
+			while(_g1 < 64) {
+				var ix = _g1++;
+				var i0 = iy * 65 + ix;
+				var i1 = i0 + 1;
+				var i2 = (iy + 1) * 65 + ix;
+				idxBuf.push(i0);
+				idxBuf.push(i2);
+				idxBuf.push(i1);
+				idxBuf.push(i1);
+				idxBuf.push(i2);
+				idxBuf.push(i2 + 1);
+			}
+		}
+		var poly = new h3d_prim_Polygon(pts,idxBuf);
+		poly.addNormals();
+		this.terrainMesh = new h3d_scene_Mesh(poly,null,this);
+		var _this = this.terrainMesh.material.mshader.color__;
+		_this.x = 0.13333333333333333;
+		_this.y = 0.17254901960784313;
+		_this.z = 0.15686274509803921;
+		_this.w = 0.;
+	}
+	,buildSkidpad: function() {
+		var pts = [];
+		var idxBuf = new Array(0);
+		pts.push(new h3d_VectorImpl(0,0,0.05));
+		var _g = 0;
+		while(_g < 32) {
+			var angle = _g++ / 32 * (Math.PI * 2.0);
+			var px = Math.cos(angle) * 35.0;
+			var py = Math.sin(angle) * 35.0;
+			var x = px;
+			var y = py;
+			if(py == null) {
+				y = 0.;
+			}
+			if(px == null) {
+				x = 0.;
+			}
+			pts.push(new h3d_VectorImpl(x,y,0.05));
+		}
+		var _g = 0;
+		while(_g < 32) {
+			var i = _g++;
+			idxBuf.push(0);
+			idxBuf.push(1 + i);
+			idxBuf.push(1 + (i + 1) % 32);
+		}
+		var poly = new h3d_prim_Polygon(pts,idxBuf);
+		poly.addNormals();
+		this.skidpadMesh = new h3d_scene_Mesh(poly,null,this);
+		var _this = this.skidpadMesh.material.mshader.color__;
+		_this.x = 0.16470588235294117;
+		_this.y = 0.1803921568627451;
+		_this.z = 0.20784313725490197;
+		_this.w = 0.;
+	}
+	,buildFloodlights: function() {
+		var towerPositions = [{ x : -160.0, y : -160.0},{ x : 160.0, y : -160.0},{ x : -160.0, y : 160.0},{ x : 160.0, y : 160.0}];
+		var mastPrim = new h3d_prim_Cube(0.8,0.8,16.0,true);
+		mastPrim.unindex();
+		mastPrim.addNormals();
+		var bankPrim = new h3d_prim_Cube(3.2,1.2,1.4,true);
+		bankPrim.unindex();
+		bankPrim.addNormals();
+		var lumPrim = new h3d_prim_Cube(3.0,1.0,0.2,true);
+		lumPrim.unindex();
+		lumPrim.addNormals();
+		var _g = 0;
+		while(_g < towerPositions.length) {
+			var t = towerPositions[_g];
+			++_g;
+			var groundZ = this.getGroundElevation(t.x,t.y);
+			var mast = new h3d_scene_Mesh(mastPrim,null,this);
+			var _this = mast.material.mshader.color__;
+			_this.x = 0.23137254901960785;
+			_this.y = 0.25882352941176473;
+			_this.z = 0.29019607843137257;
+			_this.w = 0.;
+			mast.x = t.x;
+			mast.flags |= 1;
+			if((mast.flags & 131072) != 0) {
+				mast.flags |= 262144;
+			}
+			mast.y = t.y;
+			mast.flags |= 1;
+			if((mast.flags & 131072) != 0) {
+				mast.flags |= 262144;
+			}
+			mast.z = groundZ + 8.;
+			mast.flags |= 1;
+			if((mast.flags & 131072) != 0) {
+				mast.flags |= 262144;
+			}
+			this.floodlights.push(mast);
+			var head = new h3d_scene_Mesh(bankPrim,null,this);
+			var _this1 = head.material.mshader.color__;
+			_this1.x = 0.12549019607843137;
+			_this1.y = 0.14117647058823529;
+			_this1.z = 0.15686274509803921;
+			_this1.w = 0.;
+			head.x = t.x;
+			head.flags |= 1;
+			if((head.flags & 131072) != 0) {
+				head.flags |= 262144;
+			}
+			head.y = t.y;
+			head.flags |= 1;
+			if((head.flags & 131072) != 0) {
+				head.flags |= 262144;
+			}
+			head.z = groundZ + 16.0 - 0.5;
+			head.flags |= 1;
+			if((head.flags & 131072) != 0) {
+				head.flags |= 262144;
+			}
+			var angleToCenter = Math.atan2(-t.y,-t.x);
+			head.setRotation(0,0.35,angleToCenter);
+			this.floodlights.push(head);
+			var lum = new h3d_scene_Mesh(lumPrim,null,this);
+			var _this2 = lum.material.mshader.color__;
+			_this2.x = 1.;
+			_this2.y = 0.99215686274509807;
+			_this2.z = 0.90196078431372551;
+			_this2.w = 0.;
+			lum.x = t.x;
+			lum.flags |= 1;
+			if((lum.flags & 131072) != 0) {
+				lum.flags |= 262144;
+			}
+			lum.y = t.y;
+			lum.flags |= 1;
+			if((lum.flags & 131072) != 0) {
+				lum.flags |= 262144;
+			}
+			lum.z = groundZ + 16.0 - 0.7;
+			lum.flags |= 1;
+			if((lum.flags & 131072) != 0) {
+				lum.flags |= 262144;
+			}
+			lum.setRotation(0,0.35,angleToCenter);
+			this.floodlights.push(lum);
+		}
+	}
+	,buildObstacles: function() {
+		var pylonPrim = new h3d_prim_Cube(0.5,0.5,1.2,true);
+		pylonPrim.unindex();
+		pylonPrim.addNormals();
+		var _g = -4;
+		while(_g < 5) {
+			var i = _g++;
+			if(i == 0) {
+				continue;
+			}
+			var pylon = new h3d_scene_Mesh(pylonPrim,null,this);
+			var _this = pylon.material.mshader.color__;
+			_this.x = 1.;
+			_this.y = 0.41960784313725491;
+			_this.z = 0.;
+			_this.w = 0.;
+			pylon.x = 0.0;
+			pylon.flags |= 1;
+			if((pylon.flags & 131072) != 0) {
+				pylon.flags |= 262144;
+			}
+			pylon.y = i * 6.5;
+			pylon.flags |= 1;
+			if((pylon.flags & 131072) != 0) {
+				pylon.flags |= 262144;
+			}
+			pylon.z = 0.6;
+			pylon.flags |= 1;
+			if((pylon.flags & 131072) != 0) {
+				pylon.flags |= 262144;
+			}
+			this.obstacles.push(pylon);
+		}
+		var postPrim = new h3d_prim_Cube(0.3,0.3,3.0,true);
+		postPrim.unindex();
+		postPrim.addNormals();
+		var perimeterMarkers = [{ x : -195., y : -195.},{ x : 195.0, y : -195.},{ x : -195., y : 195.0},{ x : 195.0, y : 195.0},{ x : 0.0, y : -195.},{ x : 0.0, y : 195.0},{ x : -195., y : 0.0},{ x : 195.0, y : 0.0}];
+		var _g = 0;
+		while(_g < perimeterMarkers.length) {
+			var m = perimeterMarkers[_g];
+			++_g;
+			var mz = this.getGroundElevation(m.x,m.y);
+			var post = new h3d_scene_Mesh(postPrim,null,this);
+			var _this = post.material.mshader.color__;
+			_this.x = 0.;
+			_this.y = 0.89803921568627454;
+			_this.z = 1.;
+			_this.w = 0.;
+			post.x = m.x;
+			post.flags |= 1;
+			if((post.flags & 131072) != 0) {
+				post.flags |= 262144;
+			}
+			post.y = m.y;
+			post.flags |= 1;
+			if((post.flags & 131072) != 0) {
+				post.flags |= 262144;
+			}
+			post.z = mz + 1.5;
+			post.flags |= 1;
+			if((post.flags & 131072) != 0) {
+				post.flags |= 262144;
+			}
+			this.obstacles.push(post);
+		}
+	}
+	,__class__: world_SandboxMap
 });
 var world_SkyGradientShader = function() {
 	this.groundColor__ = new h3d_VectorImpl(0.,0.,0.);
@@ -56060,16 +56601,21 @@ world_Skybox.prototype = $extend(h3d_scene_Object.prototype,{
 	,__class__: world_Skybox
 });
 var world_Track = function(parent) {
+	this.scratchFromCenter = new h3d_VectorImpl(0.,0.,0.);
+	this.scratchQuery = new h3d_VectorImpl(0.,0.,0.);
+	this.streetLights = [];
 	this.waypoints = [];
 	h3d_scene_Object.call(this,parent);
 	this.buildCircuitWaypoints();
 	this.buildRoadBed();
 	this.buildRoadRibbon();
 	this.buildContinuousGuardrails();
+	this.buildStreetLights();
 	this.buildCityscape();
 };
 $hxClasses["world.Track"] = world_Track;
 world_Track.__name__ = "world.Track";
+world_Track.__interfaces__ = [world_IGroundProvider];
 world_Track.__super__ = h3d_scene_Object;
 world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 	buildCircuitWaypoints: function() {
@@ -56993,6 +57539,417 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 			}
 		}
 	}
+	,buildStreetLights: function() {
+		var count = this.waypoints.length;
+		var polePrim = new h3d_prim_Cube(0.24,0.24,6.2,true);
+		polePrim.unindex();
+		polePrim.addNormals();
+		var armPrim = new h3d_prim_Cube(0.18,2.4,0.18,true);
+		armPrim.unindex();
+		armPrim.addNormals();
+		var headPrim = new h3d_prim_Cube(0.55,0.85,0.22,true);
+		headPrim.unindex();
+		headPrim.addNormals();
+		var lumPrim = new h3d_prim_Cube(0.48,0.75,0.08,true);
+		lumPrim.unindex();
+		lumPrim.addNormals();
+		var totalLights = Math.floor(count / 12);
+		var _g = 0;
+		while(_g < totalLights) {
+			var i = _g++;
+			var idx = i * 12;
+			var curr = this.waypoints[idx];
+			var next = this.waypoints[(idx + 1) % count];
+			var prev = this.waypoints[(idx - 1 + count) % count];
+			var x = next.x - prev.x;
+			var y = next.y - prev.y;
+			var z = next.z - prev.z;
+			if(z == null) {
+				z = 0.;
+			}
+			if(y == null) {
+				y = 0.;
+			}
+			if(x == null) {
+				x = 0.;
+			}
+			var x1 = x;
+			var y1 = y;
+			var z1 = z;
+			if(z1 == null) {
+				z1 = 0.;
+			}
+			if(y1 == null) {
+				y1 = 0.;
+			}
+			if(x1 == null) {
+				x1 = 0.;
+			}
+			var _this_x = x1;
+			var _this_y = y1;
+			var _this_z = z1;
+			_this_z = 0;
+			var k = _this_x * _this_x + _this_y * _this_y + _this_z * _this_z;
+			if(k < 1e-20) {
+				k = 0;
+			} else {
+				k = 1. / Math.sqrt(k);
+			}
+			_this_x *= k;
+			_this_y *= k;
+			var x2 = -_this_y;
+			var y2 = _this_x;
+			if(y2 == null) {
+				y2 = 0.;
+			}
+			if(x2 == null) {
+				x2 = 0.;
+			}
+			var x3 = x2;
+			var y3 = y2;
+			if(y3 == null) {
+				y3 = 0.;
+			}
+			if(x3 == null) {
+				x3 = 0.;
+			}
+			var right_x = x3;
+			var right_y = y3;
+			var right_z = 0;
+			var sideSign = i % 2 == 0 ? 1.0 : -1.0;
+			var v = 10.85 * sideSign;
+			var x4 = right_x * v;
+			var y4 = right_y * v;
+			var z2 = right_z * v;
+			if(z2 == null) {
+				z2 = 0.;
+			}
+			if(y4 == null) {
+				y4 = 0.;
+			}
+			if(x4 == null) {
+				x4 = 0.;
+			}
+			var x5 = x4;
+			var y5 = y4;
+			var z3 = z2;
+			if(z3 == null) {
+				z3 = 0.;
+			}
+			if(y5 == null) {
+				y5 = 0.;
+			}
+			if(x5 == null) {
+				x5 = 0.;
+			}
+			var x6 = curr.x + x5;
+			var y6 = curr.y + y5;
+			var z4 = curr.z + z3;
+			if(z4 == null) {
+				z4 = 0.;
+			}
+			if(y6 == null) {
+				y6 = 0.;
+			}
+			if(x6 == null) {
+				x6 = 0.;
+			}
+			var x7 = x6;
+			var y7 = y6;
+			var z5 = z4;
+			if(z5 == null) {
+				z5 = 0.;
+			}
+			if(y7 == null) {
+				y7 = 0.;
+			}
+			if(x7 == null) {
+				x7 = 0.;
+			}
+			var polePos_x = x7;
+			var polePos_y = y7;
+			var polePos_z = z5;
+			var baseZ = curr.z + 0.06;
+			var pole = new h3d_scene_Mesh(polePrim,null,this);
+			var _this = pole.material.mshader.color__;
+			_this.x = 0.20784313725490197;
+			_this.y = 0.23137254901960785;
+			_this.z = 0.25882352941176473;
+			_this.w = 0.;
+			pole.x = polePos_x;
+			pole.flags |= 1;
+			if((pole.flags & 131072) != 0) {
+				pole.flags |= 262144;
+			}
+			pole.y = polePos_y;
+			pole.flags |= 1;
+			if((pole.flags & 131072) != 0) {
+				pole.flags |= 262144;
+			}
+			pole.z = baseZ + 3.1;
+			pole.flags |= 1;
+			if((pole.flags & 131072) != 0) {
+				pole.flags |= 262144;
+			}
+			this.streetLights.push(pole);
+			var v1 = -sideSign * 1.2;
+			var x8 = right_x * v1;
+			var y8 = right_y * v1;
+			var z6 = right_z * v1;
+			if(z6 == null) {
+				z6 = 0.;
+			}
+			if(y8 == null) {
+				y8 = 0.;
+			}
+			if(x8 == null) {
+				x8 = 0.;
+			}
+			var x9 = x8;
+			var y9 = y8;
+			var z7 = z6;
+			if(z7 == null) {
+				z7 = 0.;
+			}
+			if(y9 == null) {
+				y9 = 0.;
+			}
+			if(x9 == null) {
+				x9 = 0.;
+			}
+			var x10 = polePos_x + x9;
+			var y10 = polePos_y + y9;
+			var z8 = polePos_z + z7;
+			if(z8 == null) {
+				z8 = 0.;
+			}
+			if(y10 == null) {
+				y10 = 0.;
+			}
+			if(x10 == null) {
+				x10 = 0.;
+			}
+			var x11 = x10;
+			var y11 = y10;
+			if(y11 == null) {
+				y11 = 0.;
+			}
+			if(x11 == null) {
+				x11 = 0.;
+			}
+			var arm = new h3d_scene_Mesh(armPrim,null,this);
+			var _this1 = arm.material.mshader.color__;
+			_this1.x = 0.25882352941176473;
+			_this1.y = 0.29019607843137257;
+			_this1.z = 0.32941176470588235;
+			_this1.w = 0.;
+			arm.x = x11;
+			arm.flags |= 1;
+			if((arm.flags & 131072) != 0) {
+				arm.flags |= 262144;
+			}
+			arm.y = y11;
+			arm.flags |= 1;
+			if((arm.flags & 131072) != 0) {
+				arm.flags |= 262144;
+			}
+			arm.z = baseZ + 6.2 - 0.15;
+			arm.flags |= 1;
+			if((arm.flags & 131072) != 0) {
+				arm.flags |= 262144;
+			}
+			var angle = Math.atan2(right_y * -sideSign,right_x * -sideSign);
+			arm.setRotation(0,0,angle - 1.5707963);
+			this.streetLights.push(arm);
+			var v2 = -sideSign * 2.4;
+			var x12 = right_x * v2;
+			var y12 = right_y * v2;
+			var z9 = right_z * v2;
+			if(z9 == null) {
+				z9 = 0.;
+			}
+			if(y12 == null) {
+				y12 = 0.;
+			}
+			if(x12 == null) {
+				x12 = 0.;
+			}
+			var x13 = x12;
+			var y13 = y12;
+			var z10 = z9;
+			if(z10 == null) {
+				z10 = 0.;
+			}
+			if(y13 == null) {
+				y13 = 0.;
+			}
+			if(x13 == null) {
+				x13 = 0.;
+			}
+			var x14 = polePos_x + x13;
+			var y14 = polePos_y + y13;
+			var z11 = polePos_z + z10;
+			if(z11 == null) {
+				z11 = 0.;
+			}
+			if(y14 == null) {
+				y14 = 0.;
+			}
+			if(x14 == null) {
+				x14 = 0.;
+			}
+			var x15 = x14;
+			var y15 = y14;
+			if(y15 == null) {
+				y15 = 0.;
+			}
+			if(x15 == null) {
+				x15 = 0.;
+			}
+			var headPos_x = x15;
+			var headPos_y = y15;
+			var head = new h3d_scene_Mesh(headPrim,null,this);
+			var _this2 = head.material.mshader.color__;
+			_this2.x = 0.13333333333333333;
+			_this2.y = 0.14901960784313725;
+			_this2.z = 0.16862745098039217;
+			_this2.w = 0.;
+			head.x = headPos_x;
+			head.flags |= 1;
+			if((head.flags & 131072) != 0) {
+				head.flags |= 262144;
+			}
+			head.y = headPos_y;
+			head.flags |= 1;
+			if((head.flags & 131072) != 0) {
+				head.flags |= 262144;
+			}
+			head.z = baseZ + 6.2 - 0.22;
+			head.flags |= 1;
+			if((head.flags & 131072) != 0) {
+				head.flags |= 262144;
+			}
+			head.setRotation(0,0,angle - 1.5707963);
+			this.streetLights.push(head);
+			var lum = new h3d_scene_Mesh(lumPrim,null,this);
+			var _this3 = lum.material.mshader.color__;
+			_this3.x = 1.;
+			_this3.y = 0.94901960784313721;
+			_this3.z = 0.69019607843137254;
+			_this3.w = 0.;
+			lum.x = headPos_x;
+			lum.flags |= 1;
+			if((lum.flags & 131072) != 0) {
+				lum.flags |= 262144;
+			}
+			lum.y = headPos_y;
+			lum.flags |= 1;
+			if((lum.flags & 131072) != 0) {
+				lum.flags |= 262144;
+			}
+			lum.z = baseZ + 6.2 - 0.32;
+			lum.flags |= 1;
+			if((lum.flags & 131072) != 0) {
+				lum.flags |= 262144;
+			}
+			lum.setRotation(0,0,angle - 1.5707963);
+			this.streetLights.push(lum);
+		}
+	}
+	,getGroundElevation: function(x,y) {
+		var _this = this.scratchQuery;
+		var x1 = x;
+		var y1 = y;
+		if(y == null) {
+			y1 = 0.;
+		}
+		if(x == null) {
+			x1 = 0.;
+		}
+		_this.x = x1;
+		_this.y = y1;
+		_this.z = 0;
+		return physics_SplineMath.getClosestSegment(this.scratchQuery,this.waypoints).z + 0.06;
+	}
+	,getGroundNormal: function(x,y,outNormal) {
+		var _this = this.scratchQuery;
+		var x1 = x;
+		var y1 = y;
+		if(y == null) {
+			y1 = 0.;
+		}
+		if(x == null) {
+			x1 = 0.;
+		}
+		_this.x = x1;
+		_this.y = y1;
+		_this.z = 0;
+		var proj = physics_SplineMath.getClosestSegment(this.scratchQuery,this.waypoints);
+		var nx = -proj.segDirY * 0.04;
+		var ny = proj.segDirX * 0.04;
+		var nz = Math.sqrt(Math.max(0.01,1.0 - (nx * nx + ny * ny)));
+		var _this = outNormal;
+		var x = nx;
+		var y = ny;
+		var z = nz;
+		if(nz == null) {
+			z = 0.;
+		}
+		if(ny == null) {
+			y = 0.;
+		}
+		if(nx == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = z;
+	}
+	,enforceBoundaries: function(pos,forwardSpeed,lateralVelocity) {
+		var _this = this.scratchQuery;
+		var x = pos.x;
+		var y = pos.y;
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = 0;
+		var proj = physics_SplineMath.getClosestSegment(this.scratchQuery,this.waypoints);
+		pos.z = proj.z + 0.06;
+		var lateralDist = Math.sqrt(proj.distSq);
+		if(lateralDist > 9.7 && lateralDist > 0.001) {
+			var _this = this.scratchFromCenter;
+			var x = pos.x - proj.centerPoint.x;
+			var y = pos.y - proj.centerPoint.y;
+			if(y == null) {
+				y = 0.;
+			}
+			if(x == null) {
+				x = 0.;
+			}
+			_this.x = x;
+			_this.y = y;
+			_this.z = 0;
+			var _this = this.scratchFromCenter;
+			var k = _this.x * _this.x + _this.y * _this.y + _this.z * _this.z;
+			if(k < 1e-20) {
+				k = 0;
+			} else {
+				k = 1. / Math.sqrt(k);
+			}
+			_this.x *= k;
+			_this.y *= k;
+			_this.z *= k;
+			pos.x = proj.centerPoint.x + this.scratchFromCenter.x * 9.7;
+			pos.y = proj.centerPoint.y + this.scratchFromCenter.y * 9.7;
+			return { hitWall : true, speedMult : 0.94, latMult : 0.0};
+		}
+		return { hitWall : false, speedMult : 1.0, latMult : 1.0};
+	}
 	,__class__: world_Track
 });
 function $getIterator(o) { if( o instanceof Array ) return new haxe_iterators_ArrayIterator(o); else return o.iterator(); }
@@ -57313,7 +58270,7 @@ hxsl_SharedShader.UNROLL_LOOPS = false;
 hxsl_SharedShader.SHADER_RESOLVE = new haxe_ds_StringMap();
 physics_CarPhysics.WHEEL_OFFSETS = [{ x : -0.98, y : 1.35},{ x : 0.98, y : 1.35},{ x : -0.98, y : -1.35},{ x : 0.98, y : -1.35}];
 ui_UIIcons.cache = new haxe_ds_StringMap();
-ui_views_mainmenu_MainMenuView.ACTIONS = [ui_components_MenuAction.StartGame,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
+ui_views_mainmenu_MainMenuView.ACTIONS = [ui_components_MenuAction.StartGame,ui_components_MenuAction.StartSandbox,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
 ui_views_options_ControlsOptionsPanel.REMAP_ROW_WIDTH = 540.0;
 ui_views_options_ControlsOptionsPanel.REMAP_ROW_HEIGHT = 26.0;
 ui_views_options_ControlsOptionsPanel.REMAP_ROW_STRIDE = 27.0;

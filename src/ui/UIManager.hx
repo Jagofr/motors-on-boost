@@ -243,6 +243,7 @@ class UIManager extends Object {
     function triggerMainAction(act:MenuAction) {
         switch (act) {
             case StartGame: if (onMenuAction != null) onMenuAction(StartGame);
+            case StartSandbox: if (onMenuAction != null) onMenuAction(StartSandbox);
             case ResumeGame: if (hasActiveSave && onMenuAction != null) onMenuAction(ResumeGame);
             case OpenOptions: openOptions(false);
             case OpenCredits: showCredits();

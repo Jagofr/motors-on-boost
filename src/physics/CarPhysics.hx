@@ -152,6 +152,11 @@ class CarPhysics {
     /** Rotational angular velocity in rad/s for each wheel. */
     public var wheelSpinVelocity:Array<Float> = [0.0, 0.0, 0.0, 0.0];
 
+    /** Ground contact elevation in meters beneath each wheel. */
+    public var wheelGroundZ:Array<Float> = [0.0, 0.0, 0.0, 0.0];
+
+    var scratchGroundNormal:Vector = new Vector(0, 0, 1);
+
     // =========================================================================
     // EASILY TUNABLE DRIVING PHYSICS RUNTIME PROPERTIES
     // =========================================================================
@@ -248,8 +253,9 @@ class CarPhysics {
      * @param dt Delta time elapsed since last frame in seconds.
      * @param input Controller or touch input readings.
      * @param waypoints Optional track spline waypoints for raycast ground sampling.
+     * @param groundProvider Optional IGroundProvider implementing terrain elevation and boundaries.
      */
-    public function update(dt:Float, input:InputController, ?waypoints:Array<Vector>) {
+    public function update(dt:Float, input:InputController, ?waypoints:Array<Vector>, ?groundProvider:world.IGroundProvider) {
         if (dt <= 0.0) return;
         // Clamp large frame hitch dt to avoid physics explosion
         var clampedDt = Math.min(dt, 0.05);
@@ -266,7 +272,7 @@ class CarPhysics {
         scratchRight.set(rightX, rightY, 0);
 
         // 1. Raycast Suspension & Anti-Roll Bar Force Simulation
-        updateSuspension(clampedDt, fwdX, fwdY, rightX, rightY, waypoints);
+        updateSuspension(clampedDt, fwdX, fwdY, rightX, rightY, waypoints, groundProvider);
 
         // 2. Nitrous Oxide Fuel Depletion & Regeneration Simulation
         if (input.boost && boostFuel > 0.0) {
@@ -292,6 +298,14 @@ class CarPhysics {
         pos.x += (fwdX * forwardSpeed + rightX * lateralVelocity) * clampedDt;
         pos.y += (fwdY * forwardSpeed + rightY * lateralVelocity) * clampedDt;
 
+        if (groundProvider != null) {
+            var bRes = groundProvider.enforceBoundaries(pos, forwardSpeed, lateralVelocity);
+            if (bRes.hitWall) {
+                forwardSpeed *= bRes.speedMult;
+                lateralVelocity *= bRes.latMult;
+            }
+        }
+
         // 6. Dynamic Chassis Roll & Pitch Suspension Settling
         updateChassisAttitude(clampedDt, input);
     }
@@ -300,7 +314,7 @@ class CarPhysics {
      * Evaluates independent raycast spring-damper suspension for all 4 wheels.
      * Calculates contact normals and anti-roll bar forces across front and rear wheel pairs.
      */
-    function updateSuspension(dt:Float, fwdX:Float, fwdY:Float, rightX:Float, rightY:Float, waypoints:Array<Vector>) {
+    function updateSuspension(dt:Float, fwdX:Float, fwdY:Float, rightX:Float, rightY:Float, waypoints:Array<Vector>, ?groundProvider:world.IGroundProvider) {
         var susp = config.suspension;
         var restLen = susp.restLength;
         var k = susp.springRate;
@@ -325,7 +339,13 @@ class CarPhysics {
             var ny = 0.0;
             var nz = 1.0;
 
-            if (waypoints != null && waypoints.length > 0) {
+            if (groundProvider != null) {
+                groundZ = groundProvider.getGroundElevation(attachX, attachY);
+                groundProvider.getGroundNormal(attachX, attachY, scratchGroundNormal);
+                nx = scratchGroundNormal.x;
+                ny = scratchGroundNormal.y;
+                nz = scratchGroundNormal.z;
+            } else if (waypoints != null && waypoints.length > 0) {
                 var proj = SplineMath.getClosestSegment(scratchWheelWorld, waypoints);
                 groundZ = proj.z;
                 // Approximate track slope normal along segment
@@ -336,6 +356,7 @@ class CarPhysics {
                 groundZ = 0.0;
             }
 
+            wheelGroundZ[i] = groundZ;
             wheelNormals[i].set(nx, ny, nz);
 
             // Distance from wheel chassis mount to road contact plane
@@ -382,7 +403,9 @@ class CarPhysics {
         if (groundContacts > 0) {
             // Target equilibrium elevation: chassis rests at spring rest height above average ground contact
             var targetZ = 0.0;
-            if (waypoints != null && waypoints.length > 0) {
+            if (groundProvider != null) {
+                targetZ = groundProvider.getGroundElevation(pos.x, pos.y);
+            } else if (waypoints != null && waypoints.length > 0) {
                 var centerProj = SplineMath.getClosestSegment(pos, waypoints);
                 targetZ = centerProj.z;
             }
@@ -651,14 +674,23 @@ class CarPhysics {
         var targetRoll = -input.steer * speedRatio * 0.14 * config.suspension.bodyRollScale;
         if (isDrifting) targetRoll *= 1.7;
 
-        // Clamp roll ceiling on flat surface so car leans deeply without flipping over
+        // Dynamic terrain slope conforming: pitch and roll from 4-wheel contact elevation differences
+        var frontAvgZ = (wheelGroundZ[0] + wheelGroundZ[1]) * 0.5;
+        var rearAvgZ  = (wheelGroundZ[2] + wheelGroundZ[3]) * 0.5;
+        var terrainPitch = Math.atan2(frontAvgZ - rearAvgZ, 2.7);
+
+        var leftAvgZ  = (wheelGroundZ[0] + wheelGroundZ[2]) * 0.5;
+        var rightAvgZ = (wheelGroundZ[1] + wheelGroundZ[3]) * 0.5;
+        var terrainRoll = Math.atan2(rightAvgZ - leftAvgZ, 1.96);
+
+        // Clamp dynamic suspension lean
         var maxRoll = 0.25 * Math.min(1.5, Math.max(0.5, config.suspension.bodyRollScale));
         targetRoll = Math.max(-maxRoll, Math.min(maxRoll, targetRoll));
 
-        roll += (targetRoll - roll) * 8.0 * dt;
+        roll += (targetRoll + terrainRoll - roll) * 8.0 * dt;
 
-        // Pitch: Longitudinal acceleration squat and braking dive
+        // Pitch: Longitudinal acceleration squat, braking dive, and terrain slope pitch
         var targetPitch = (input.throttle - input.brake) * 0.06;
-        pitch += (targetPitch - pitch) * 8.0 * dt;
+        pitch += (targetPitch + terrainPitch - pitch) * 8.0 * dt;
     }
 }

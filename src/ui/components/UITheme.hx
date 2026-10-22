@@ -76,7 +76,7 @@ class UITheme {
     public static inline var MAIN_CARD_WIDTH:Float = 540.0;
 
     /** Main menu modal frame height in pixels. */
-    public static inline var MAIN_CARD_HEIGHT:Float = 360.0;
+    public static inline var MAIN_CARD_HEIGHT:Float = 390.0;
 
     /** Main menu modal frame corner radius in pixels. */
     public static inline var MAIN_CARD_RADIUS:Float = 14.0;
@@ -113,7 +113,7 @@ class UITheme {
     // =========================================================================
 
     /** Main menu option row vertical stride spacing. */
-    public static inline var MAIN_ROW_STRIDE:Float = 52.0;
+    public static inline var MAIN_ROW_STRIDE:Float = 48.0;
 
     /** Pause menu option row vertical stride spacing. */
     public static inline var PAUSE_ROW_STRIDE:Float = 54.0;

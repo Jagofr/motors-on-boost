@@ -15,7 +15,7 @@ import physics.SplineMath;
  * continuous galvanized Armco guardrails, vertical steel support stanchions,
  * and background urban skyscraper geometry.
  */
-class Track extends Object {
+class Track extends Object implements IGroundProvider {
     /** High-density discrete Catmull-Rom spline waypoints defining track centerline. */
     public var waypoints:Array<Vector> = [];
 
@@ -30,6 +30,12 @@ class Track extends Object {
 
     /** Continuous right-hand side steel barrier ribbon mesh. */
     public var rightRailMesh:Mesh;
+
+    /** Array of procedural highway street light meshes lining the circuit. */
+    public var streetLights:Array<Mesh> = [];
+
+    var scratchQuery:Vector = new Vector();
+    var scratchFromCenter:Vector = new Vector();
 
     /** Total roadway width in meters across all four lanes. */
     public static inline var ROAD_WIDTH:Float = 20.0;
@@ -57,6 +63,7 @@ class Track extends Object {
         buildRoadBed();
         buildRoadRibbon();
         buildContinuousGuardrails();
+        buildStreetLights();
         buildCityscape();
     }
 
@@ -297,5 +304,143 @@ class Track extends Object {
             bldg.y = b.y;
             bldg.z = b.h * 0.5 - 1.0;
         }
+    }
+
+    /**
+     * Builds illuminated highway street light poles along the circuit perimeter.
+     * Features vertical galvanized columns, cantilevered cross-arms, and warm luminaire heads
+     * that bathe the road surface in light to eliminate harsh shadow contrasts.
+     */
+    function buildStreetLights() {
+        var count = waypoints.length;
+        var poleHeight = 6.2;
+        var armReach = 2.4;
+
+        var polePrim = new Cube(0.24, 0.24, poleHeight, true);
+        polePrim.unindex();
+        polePrim.addNormals();
+
+        var armPrim = new Cube(0.18, armReach, 0.18, true);
+        armPrim.unindex();
+        armPrim.addNormals();
+
+        var headPrim = new Cube(0.55, 0.85, 0.22, true);
+        headPrim.unindex();
+        headPrim.addNormals();
+
+        var lumPrim = new Cube(0.48, 0.75, 0.08, true);
+        lumPrim.unindex();
+        lumPrim.addNormals();
+
+        var stride = 12; // Every 12 waypoints (~16 street lights around circuit)
+        var totalLights = Math.floor(count / stride);
+
+        for (i in 0...totalLights) {
+            var idx = i * stride;
+            var curr = waypoints[idx];
+            var next = waypoints[(idx + 1) % count];
+            var prev = waypoints[(idx - 1 + count) % count];
+
+            var fwd = next.sub(prev);
+            fwd.z = 0;
+            fwd.normalize();
+            var right = new Vector(-fwd.y, fwd.x, 0);
+
+            // Alternate placement: even on right shoulder (+HALF_WIDTH + 0.85m), odd on left (-HALF_WIDTH - 0.85m)
+            var isRightSide = (i % 2 == 0);
+            var sideSign = isRightSide ? 1.0 : -1.0;
+            var baseOffset = HALF_WIDTH + 0.85;
+
+            var polePos = curr.add(right.scaled(baseOffset * sideSign));
+            var baseZ = curr.z + ROAD_LIFT;
+
+            // 1. Vertical Steel Pole
+            var pole = new Mesh(polePrim, this);
+            pole.material.color.setColor(0x353B42);
+            pole.x = polePos.x;
+            pole.y = polePos.y;
+            pole.z = baseZ + (poleHeight * 0.5);
+            streetLights.push(pole);
+
+            // 2. Overhanging Horizontal Cantilever Arm extending toward roadway center
+            var armPos = polePos.add(right.scaled(-sideSign * (armReach * 0.5)));
+            var arm = new Mesh(armPrim, this);
+            arm.material.color.setColor(0x424A54);
+            arm.x = armPos.x;
+            arm.y = armPos.y;
+            arm.z = baseZ + poleHeight - 0.15;
+            var angle = Math.atan2(right.y * -sideSign, right.x * -sideSign);
+            arm.setRotation(0, 0, angle - 1.5707963);
+            streetLights.push(arm);
+
+            // 3. Luminaire Fixture Head Casing
+            var headPos = polePos.add(right.scaled(-sideSign * armReach));
+            var head = new Mesh(headPrim, this);
+            head.material.color.setColor(0x22262B);
+            head.x = headPos.x;
+            head.y = headPos.y;
+            head.z = baseZ + poleHeight - 0.22;
+            head.setRotation(0, 0, angle - 1.5707963);
+            streetLights.push(head);
+
+            // 4. Glowing Emissive Luminaire Lens (Warm high-efficiency street light phosphor)
+            var lum = new Mesh(lumPrim, this);
+            lum.material.color.setColor(0xFFF2B0);
+            lum.x = headPos.x;
+            lum.y = headPos.y;
+            lum.z = baseZ + poleHeight - 0.32;
+            lum.setRotation(0, 0, angle - 1.5707963);
+            streetLights.push(lum);
+        }
+    }
+
+    /**
+     * Computes the asphalt road elevation at the closest track centerline point.
+     *
+     * @param x World X coordinate in meters.
+     * @param y World Y coordinate in meters.
+     * @return Road surface elevation Z in meters.
+     */
+    public function getGroundElevation(x:Float, y:Float):Float {
+        scratchQuery.set(x, y, 0);
+        var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
+        return proj.z + ROAD_LIFT;
+    }
+
+    /**
+     * Computes road surface normal gradient at the closest track segment.
+     *
+     * @param x World X coordinate in meters.
+     * @param y World Y coordinate in meters.
+     * @param outNormal Scratch vector populated with unit-length normal vector.
+     */
+    public function getGroundNormal(x:Float, y:Float, outNormal:Vector):Void {
+        scratchQuery.set(x, y, 0);
+        var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
+        var nx = -proj.segDirY * 0.04;
+        var ny =  proj.segDirX * 0.04;
+        var nz = Math.sqrt(Math.max(0.01, 1.0 - (nx * nx + ny * ny)));
+        outNormal.set(nx, ny, nz);
+    }
+
+    /**
+     * Enforces continuous Armco guardrail containment boundaries.
+     * Clamps vehicle inside the legal asphalt corridor and applies scrape friction.
+     */
+    public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
+        scratchQuery.set(pos.x, pos.y, 0);
+        var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
+        pos.z = proj.z + ROAD_LIFT;
+
+        var lateralDist = Math.sqrt(proj.distSq);
+        var maxHalf = HALF_WIDTH - 0.3; // Armco barrier inner collision rail
+        if (lateralDist > maxHalf && lateralDist > 0.001) {
+            scratchFromCenter.set(pos.x - proj.centerPoint.x, pos.y - proj.centerPoint.y, 0);
+            scratchFromCenter.normalize();
+            pos.x = proj.centerPoint.x + scratchFromCenter.x * maxHalf;
+            pos.y = proj.centerPoint.y + scratchFromCenter.y * maxHalf;
+            return { hitWall: true, speedMult: 0.94, latMult: 0.0 };
+        }
+        return { hitWall: false, speedMult: 1.0, latMult: 1.0 };
     }
 }

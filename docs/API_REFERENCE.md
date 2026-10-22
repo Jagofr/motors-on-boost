@@ -1,6 +1,6 @@
 # M.O.B. // MOTORS ON BOOST — API & Function Reference Manual
 
-**Application Release:** `v0.3.0` (Build `0005`)  
+**Application Release:** `v1.0.0` (Build `0006`)  
 **Language Target:** Haxe 4.3.7 / Heaps.io 2.1.0 (WebGL 2.0 / JavaScript PWA)  
 **Author:** Gerard "Jamie" (Jagofr) Francis  
 **Publisher:** RvL // ROGUE  
@@ -21,7 +21,9 @@
    - [InputController](#inputcontroller)
    - [InputBindings](#inputbindings)
 5. [World, Environment & Celestial Rendering (`src/world/`)](#5-world-environment--celestial-rendering-srcworld)
+   - [IGroundProvider](#igroundprovider)
    - [Track](#track)
+   - [SandboxMap](#sandboxmap)
    - [Skybox & SkyGradientShader](#skybox--skygradientshader)
 6. [Autonomous Highway Traffic AI (`src/entities/`)](#6-autonomous-highway-traffic-ai-srcentities)
    - [TrafficSystem](#trafficsystem)
@@ -247,10 +249,22 @@
 
 ## 5. World, Environment & Celestial Rendering (`src/world/`)
 
+### `IGroundProvider`
+**Interface:** [`src/world/IGroundProvider.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/world/IGroundProvider.hx)  
+**Description:** Universal interface for 3D world maps and driving surfaces. Enables high-speed 4-wheel elevation raycasting, slope normal evaluation for chassis attitude, and perimeter boundary enforcement.
+
+#### Methods:
+- `getGroundElevation(x:Float, y:Float):Float` — Computes ground contact plane elevation Z in meters at coordinate (x, y).
+- `getGroundNormal(x:Float, y:Float, outNormal:Vector):Void` — Populates scratch vector with unit-length normal (nx, ny, nz).
+- `enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float }` — Clamps vehicle within legal bounds and returns impact velocity multipliers.
+
+---
+
 ### `Track`
 **Extends:** `h3d.scene.Object`  
-**Location:** [`src/world/Track.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/world/Track.hx)  
-**Description:** Procedural 4-lane highway circuit builder. Generates smooth Catmull-Rom roadbed ribbon meshes, asphalt surface with RoadLift offset, continuous galvanized Armco steel barrier guardrails, and background urban cityscape skyscraper geometry.
+**Implements:** `IGroundProvider`  
+**Location:** [`src/world/Track.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir\haxe-projs\Haxe\racing-game\src\world\Track.hx)  
+**Description:** Procedural 4-lane highway circuit builder. Generates smooth Catmull-Rom roadbed ribbon meshes, asphalt surface with RoadLift offset, continuous galvanized Armco steel barrier guardrails, illuminated highway street light poles with warm phosphor luminaires, and background urban cityscape skyscraper geometry.
 
 #### Constants:
 - `ROAD_WIDTH:Float = 20.0` — Total 4-lane asphalt width in meters.
@@ -260,12 +274,36 @@
 - `RAIL_HEIGHT:Float = 0.65` — Barrier guardrail height above roadway in meters.
 
 #### Methods:
-- `new(?parent:Object)` — Synthesizes waypoints, roadbed, asphalt ribbon, guardrails, and skyscrapers.
+- `new(?parent:Object)` — Synthesizes waypoints, roadbed, asphalt ribbon, guardrails, street lights, and skyscrapers.
 - `buildCircuitWaypoints():Void` — Interpolates 12 key control nodes via Catmull-Rom splines into high-density waypoint arrays.
 - `buildRoadBed():Void` — Generates wide gravel foundation sub-base ribbon geometry.
 - `buildRoadRibbon():Void` — Generates dark asphalt road surface ribbon geometry with normals and UV coordinates.
 - `buildContinuousGuardrails():Void` — Generates continuous left and right Armco steel barrier ribbons.
+- `buildStreetLights():Void` — Generates 16+ illuminated highway luminaire poles lining the Armco barriers.
 - `buildCityscape():Void` — Generates background skyscraper building geometry with varying elevations and silhouettes.
+- `getGroundElevation(x:Float, y:Float):Float` — Samples asphalt elevation at the closest spline segment.
+- `getGroundNormal(x:Float, y:Float, outNormal:Vector):Void` — Calculates surface slope normal.
+- `enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float)` — Clamps vehicle inside the guardrail corridor.
+
+---
+
+### `SandboxMap`
+**Extends:** `h3d.scene.Object`  
+**Implements:** `IGroundProvider`  
+**Location:** [`src/world/SandboxMap.hx`](file:///g:/My%20Drive/Organized\Backup\Documents\Github\project-working-dir\haxe-projs\Haxe\racing-game\src\world\SandboxMap.hx)  
+**Description:** Open 400m x 400m proving grounds terrain environment for comprehensive physics and suspension testing. Features continuous analytical heightfield evaluations, rolling moguls, steep 12.5m apex hill climb, high-speed launch ramp with sharp crest lip, banked 25° high-speed bowl, central flat staging tarmac, 4 high-mast perimeter floodlight towers, and invisible elastic boundary collision walls at +/-195 meters.
+
+#### Constants:
+- `HALF_SPAN:Float = 200.0` — Proving grounds boundary half-span in meters.
+- `WALL_LIMIT:Float = 195.0` — Invisible collision wall perimeter limit in meters.
+- `HILL_APEX_Z:Float = 12.5` — Apex mountain pass maximum elevation in meters.
+- `RAMP_CREST_Z:Float = 3.8` — Speed launch ramp crest elevation in meters.
+
+#### Methods:
+- `new(?parent:Object)` — Constructs terrain polygon mesh, center skidpad, floodlights, and agility obstacles.
+- `getGroundElevation(x:Float, y:Float):Float` — Continuous analytical terrain elevation function.
+- `getGroundNormal(x:Float, y:Float, outNormal:Vector):Void` — Finite-difference spatial normal gradient calculator.
+- `enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float)` — Clamps position within +/-195m walls and reflects velocity with bumper restitution.
 
 ---
 

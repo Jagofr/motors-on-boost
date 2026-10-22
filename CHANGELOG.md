@@ -6,6 +6,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.0.0] - 2026-10-22
+### Added
+- **Open Sandbox Proving Grounds (`src/world/SandboxMap.hx`, `src/world/IGroundProvider.hx`)**:
+  - Continuous 400m x 400m analytical 3D proving grounds environment.
+  - Central flat staging skidpad ($R \le 35\text{m}$) for zero-to-sixty timing, burnouts, and donuts.
+  - Rolling sinusoidal moguls section ($X \in [35, 140], Y \in [-50, 50]$) oscillating up to $\pm 1.35\text{m}$ for suspension travel and anti-roll bar testing.
+  - Steep 12.5-meter apex mountain pass to test uphill drivetrain torque, automatic gear downshifting, and downhill braking dive.
+  - High-speed airborne launch ramp ($Y \in [70, 125]$) rising to $+3.8\text{m}$ with a sharp crest lip for freefall ballistic flight testing.
+  - Banked 25-degree high-speed bowl ($R \approx 75\text{m}$) rising to $+5.2\text{m}$ for lateral-G grip and high-speed drift breakaway.
+  - 4 high-mast perimeter floodlight towers providing balanced illumination across the arena.
+  - Invisible perimeter elastic collision walls at $X, Y = \pm 195\text{m}$ with velocity reflection.
+- **Highway Street Lighting & Soft Shadow Pipeline (`src/world/Track.hx`, `src/graphics/GraphicsManager.hx`, `src/Main.hx`)**:
+  - Over 16 illuminated highway luminaire poles lining the Armco barriers with cantilevered arms and warm golden-white phosphor lamp heads (`0xFFF2B0`).
+  - Upgraded ambient light profiles in `GraphicsManager.hx` (`0x505F70` through `0x94ABC2`) and added secondary directional sky-bounce fill light (`0x55687C`) to eliminate harsh pitch-black shadow contrast across both tracks and terrain hills.
+- **Dynamic 4-Wheel Terrain Slope Conforming (`src/physics/CarPhysics.hx`)**:
+  - Dynamic terrain pitch ($\Delta z / 2.7\text{m}$) and terrain roll ($\Delta z / 1.96\text{m}$) conforming vehicle body orientation to hills, ramps, and banked turns.
+- **Proving Grounds Minimap Radar (`src/ui/views/hud/InGameHUDView.hx`)**:
+  - Added `initSandboxBounds(...)` rendering perimeter boundary walls and real-time player positioning dot.
+- **Main Menu Mode Selection (`src/ui/views/mainmenu/MainMenuView.hx`, `src/ui/UIIcons.hx`)**:
+  - Added dedicated `OPEN SANDBOX MAP` row with procedural terrain mountain vector icon.
+### Changed
+- **Unified Front & Rear Traffic Collisions (`src/entities/TrafficSystem.hx`)**:
+  - Unified front/head-on traffic collisions to use the identical responsive impulse and momentum transfer logic as rear traffic collisions (0.75x player forward speed retention, speed boost transfer to civilian vehicle, and 0.35 camera trauma).
+- **Major Semantic Version Bump (`src/Version.hx`)**:
+  - Incremented version to `1.0.0` (cleared patch number) and tallied compilation build counter to `0006`.
+  - Updated PWA service worker cache name to `mob-motors-on-boost-v1-0-0`.
+
+*For detailed release notes, see [`changelogs/2026-10-22-v1.0.0-open-sandbox-terrain-and-lighting-refinements.md`](./changelogs/2026-10-22-v1.0.0-open-sandbox-terrain-and-lighting-refinements.md).*
+
 ## [0.3.0] - 2026-10-11
 ### Added
 - **Dynamic Speed Chase Camera (`ChaseCamera.hx`)**:

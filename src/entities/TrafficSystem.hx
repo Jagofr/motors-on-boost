@@ -262,16 +262,12 @@ class TrafficSystem extends Object {
                 var pFwdY =  Math.cos(playerPhysics.yaw);
                 var dotApproach = pFwdX * nx + pFwdY * ny;
 
-                // High-penalty crash on head-on collision vs tactical rear-end pit bump
-                if (tc.isOncoming || dotApproach < 0.2) {
-                    playerPhysics.forwardSpeed *= 0.4;
-                    tc.currentSpeed *= 0.3;
-                    chaseCam.addTrauma(0.65);
-                } else {
-                    playerPhysics.forwardSpeed *= 0.75;
-                    tc.currentSpeed = Math.max(tc.currentSpeed, Math.abs(playerPhysics.forwardSpeed) * 0.9);
-                    chaseCam.addTrauma(0.35);
-                }
+                // Unified impulse collision response: Front and rear traffic impacts both use the
+                // responsive bump and momentum transfer logic (0.75x player speed retention,
+                // dynamic velocity transfer to traffic vehicle, and controlled 0.35 camera trauma).
+                playerPhysics.forwardSpeed *= 0.75;
+                tc.currentSpeed = Math.max(tc.currentSpeed, Math.abs(playerPhysics.forwardSpeed) * 0.9);
+                chaseCam.addTrauma(0.35);
             }
         }
 

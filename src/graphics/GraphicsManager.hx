@@ -115,26 +115,28 @@ class GraphicsManager {
 
     /**
      * Adjusts primary directional sunlight color temperature and ambient illumination intensity.
+     * In v1.0.0, ambient lighting across all quality tiers is boosted to create soft, realistic
+     * shadows and eliminate harsh pitch-black contrast across tracks and terrain hills.
      */
     public function applyLighting() {
         if (light == null) return;
         var fwd = (s3d != null && s3d.lightSystem != null) ? Std.downcast(s3d.lightSystem, h3d.scene.fwd.LightSystem) : null;
         switch (settings.lightingLevel) {
             case "Low":
-                light.color.setColor(0xDDD0B0);
-                if (fwd != null) fwd.ambientLight.setColor(0x242D38);
+                light.color.setColor(0xEADBB8);
+                if (fwd != null) fwd.ambientLight.setColor(0x505F70);
             case "Medium":
-                light.color.setColor(0xFFE8C2);
-                if (fwd != null) fwd.ambientLight.setColor(0x384756);
+                light.color.setColor(0xFFECC8);
+                if (fwd != null) fwd.ambientLight.setColor(0x667A8E);
             case "High":
-                light.color.setColor(0xFFF0D0);
-                if (fwd != null) fwd.ambientLight.setColor(0x4C5E72);
+                light.color.setColor(0xFFF2D6);
+                if (fwd != null) fwd.ambientLight.setColor(0x7D94AA);
             case "Ultra (RTX/Path)":
-                light.color.setColor(0xFFF8E8);
-                if (fwd != null) fwd.ambientLight.setColor(0x5F768E);
+                light.color.setColor(0xFFF9EE);
+                if (fwd != null) fwd.ambientLight.setColor(0x94ABC2);
             default:
-                light.color.setColor(0xFFE8C2);
-                if (fwd != null) fwd.ambientLight.setColor(0x384756);
+                light.color.setColor(0xFFECC8);
+                if (fwd != null) fwd.ambientLight.setColor(0x667A8E);
         }
     }
 

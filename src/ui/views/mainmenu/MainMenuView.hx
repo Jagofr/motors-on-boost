@@ -25,6 +25,7 @@ class MainMenuView extends Object {
     /** Dispatched actions corresponding to each menu row. */
     public static var ACTIONS:Array<MenuAction> = [
         StartGame,
+        StartSandbox,
         ResumeGame,
         OpenOptions,
         OpenCredits,
@@ -62,9 +63,10 @@ class MainMenuView extends Object {
         versionText.text = Version.DISPLAY;
         versionText.textColor = UITheme.COLOR_TEXT_MUTED;
 
-        var labels = ["START NEW RACE", "RESUME SAVED RACE", "OPTIONS", "CREDITS", "EXIT TO SPLASH"];
+        var labels = ["START HIGHWAY RACE", "OPEN SANDBOX MAP", "RESUME SAVED RACE", "OPTIONS", "CREDITS", "EXIT TO SPLASH"];
         var iconTypes = [
             UIIcons.IconType.Play,
+            UIIcons.IconType.Sandbox,
             UIIcons.IconType.Resume,
             UIIcons.IconType.Settings,
             UIIcons.IconType.Credits,
@@ -84,7 +86,7 @@ class MainMenuView extends Object {
 
             row.interactive.onClick = function(_) {
                 if (visible) {
-                    if (i == 1 && !hasActiveSave) return;
+                    if (i == 2 && !hasActiveSave) return;
                     AudioManager.inst.playMenuBeep(AUDIO_BEEP_CONFIRM_FREQ, 0.08);
                     triggerAction(ACTIONS[i]);
                 }
@@ -100,7 +102,7 @@ class MainMenuView extends Object {
     public function activate(hasSave:Bool) {
         visible = true;
         hasActiveSave = hasSave;
-        selectedIndex = hasActiveSave ? 1 : 0;
+        selectedIndex = hasActiveSave ? 2 : 0;
         updateStyles();
     }
 
@@ -140,7 +142,7 @@ class MainMenuView extends Object {
      * Confirms the currently focused selection.
      */
     public function confirmSelection() {
-        if (selectedIndex == 1 && !hasActiveSave) return;
+        if (selectedIndex == 2 && !hasActiveSave) return;
         AudioManager.inst.playMenuBeep(AUDIO_BEEP_CONFIRM_FREQ, 0.08);
         triggerAction(ACTIONS[selectedIndex]);
     }
@@ -151,7 +153,7 @@ class MainMenuView extends Object {
     public function updateStyles() {
         for (i in 0...rows.length) {
             var row = rows[i];
-            var isEnabled = !(i == 1 && !hasActiveSave);
+            var isEnabled = !(i == 2 && !hasActiveSave);
             row.setStyle(
                 i == selectedIndex,
                 isEnabled,
@@ -171,12 +173,12 @@ class MainMenuView extends Object {
     public function layout(sw:Float, sh:Float) {
         if (titleText != null) {
             titleText.x = (sw - titleText.textWidth) * 0.5;
-            titleText.y = sh * 0.16;
+            titleText.y = sh * 0.14;
         }
 
         for (i in 0...rows.length) {
             var row = rows[i];
-            var rowY = sh * 0.32 + (i * UITheme.MAIN_ROW_STRIDE);
+            var rowY = sh * 0.31 + (i * UITheme.MAIN_ROW_STRIDE);
             var rowStartX = sw * 0.5 - 190;
 
             row.iconBmp.x = rowStartX;
@@ -193,7 +195,7 @@ class MainMenuView extends Object {
 
         if (versionText != null) {
             versionText.x = (sw - versionText.textWidth) * 0.5;
-            versionText.y = sh * 0.88;
+            versionText.y = sh * 0.90;
         }
     }
 }

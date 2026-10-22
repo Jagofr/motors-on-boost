@@ -46,6 +46,9 @@ enum IconType {
     /** Mobile touch screen silhouette representing touch controls. */
     Touch;
 
+    /** Mountain topography profile representing open sandbox proving grounds. */
+    Sandbox;
+
     /** Exit doorway with directional arrow representing exit to title. */
     Exit;
 }
@@ -195,6 +198,19 @@ class UIIcons {
                 g.beginFill(color, 1.0);
                 g.drawCircle(s * 0.5, pad + w * 0.86, w * 0.05);
                 g.drawCircle(s * 0.5, pad + w * 0.45, w * 0.10);
+
+            case Sandbox:
+                // Mountain terrain peaks and undulating landscape contour
+                g.endFill();
+                g.lineStyle(2.0, color, 1.0);
+                g.moveTo(pad, pad + w * 0.85);
+                g.lineTo(pad + w * 0.35, pad + w * 0.25);
+                g.lineTo(pad + w * 0.65, pad + w * 0.60);
+                g.lineTo(pad + w * 0.85, pad + w * 0.38);
+                g.lineTo(pad + w, pad + w * 0.85);
+                g.lineTo(pad, pad + w * 0.85);
+                g.beginFill(color, 0.4);
+                g.drawCircle(pad + w * 0.78, pad + w * 0.22, w * 0.08);
 
             case Exit:
                 // Open doorway frame with outbound directional arrow
