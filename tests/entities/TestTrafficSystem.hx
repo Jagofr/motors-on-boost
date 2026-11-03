@@ -44,8 +44,9 @@ class TestTrafficSystem extends Test {
         rearTraffic.currentSpeed = 10.0;
         rearTraffic.pos.set(0, 2.0, 0);
         player.pos.set(0, 0, 0);
+        player.yaw = 0.0; // facing +Y
         player.forwardSpeed = 30.0;
-        player.yaw = 1.5707963; // facing +Y
+        player.syncToOimoBody();
 
         ts.update(0.016, player, cam);
         // Player speed reduced by 0.75x (30.0 * 0.75 = 22.5)
@@ -54,6 +55,10 @@ class TestTrafficSystem extends Test {
         // ChaseCamera softens incoming trauma by 50% (0.35 * 0.50 = 0.175)
         Assert.floatEquals(0.175, cam.trauma, 0.01);
 
+        // Verify Oimo rigid body synced with collision velocity & position
+        Assert.floatEquals(player.pos.y, player.chassisBody.getPosition().y, 0.01);
+        Assert.floatEquals(22.5, player.chassisBody.getLinearVelocity().y, 0.05);
+
         // Reset and test front collision (traffic oncoming, head-on approach)
         cam.trauma = 0.0;
         var frontTraffic = ts.trafficList[1];
@@ -61,8 +66,9 @@ class TestTrafficSystem extends Test {
         frontTraffic.currentSpeed = 15.0;
         frontTraffic.pos.set(0, 2.0, 0);
         player.pos.set(0, 0, 0);
+        player.yaw = 0.0;
         player.forwardSpeed = 40.0;
-        player.yaw = 1.5707963;
+        player.syncToOimoBody();
 
         ts.update(0.016, player, cam);
         // Front collision now also uses the identical 0.75x speed retention and 0.175 softened trauma

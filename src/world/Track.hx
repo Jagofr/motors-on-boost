@@ -34,6 +34,9 @@ class Track extends Object implements IGroundProvider {
     /** Array of procedural highway street light meshes lining the circuit. */
     public var streetLights:Array<Mesh> = [];
 
+    /** Array of registered OimoPhysics static foundation bodies. */
+    public var rigidBodies:Array<oimo.dynamics.rigidbody.RigidBody> = [];
+
     var scratchQuery:Vector = new Vector();
     var scratchFromCenter:Vector = new Vector();
 
@@ -357,6 +360,7 @@ class Track extends Object implements IGroundProvider {
             // 1. Vertical Steel Pole
             var pole = new Mesh(polePrim, this);
             pole.material.color.setColor(0x353B42);
+            pole.material.shadows = false;
             pole.x = polePos.x;
             pole.y = polePos.y;
             pole.z = baseZ + (poleHeight * 0.5);
@@ -366,6 +370,7 @@ class Track extends Object implements IGroundProvider {
             var armPos = polePos.add(right.scaled(-sideSign * (armReach * 0.5)));
             var arm = new Mesh(armPrim, this);
             arm.material.color.setColor(0x424A54);
+            arm.material.shadows = false;
             arm.x = armPos.x;
             arm.y = armPos.y;
             arm.z = baseZ + poleHeight - 0.15;
@@ -377,6 +382,7 @@ class Track extends Object implements IGroundProvider {
             var headPos = polePos.add(right.scaled(-sideSign * armReach));
             var head = new Mesh(headPrim, this);
             head.material.color.setColor(0x22262B);
+            head.material.shadows = false;
             head.x = headPos.x;
             head.y = headPos.y;
             head.z = baseZ + poleHeight - 0.22;
@@ -386,6 +392,7 @@ class Track extends Object implements IGroundProvider {
             // 4. Glowing Emissive Luminaire Lens (Warm high-efficiency street light phosphor)
             var lum = new Mesh(lumPrim, this);
             lum.material.color.setColor(0xFFF2B0);
+            lum.material.shadows = false;
             lum.x = headPos.x;
             lum.y = headPos.y;
             lum.z = baseZ + poleHeight - 0.32;
@@ -404,7 +411,15 @@ class Track extends Object implements IGroundProvider {
     public function getGroundElevation(x:Float, y:Float):Float {
         scratchQuery.set(x, y, 0);
         var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
-        return proj.z + ROAD_LIFT;
+        var dist = Math.sqrt(proj.distSq);
+        if (dist <= HALF_WIDTH) {
+            return proj.z + ROAD_LIFT;
+        } else if (dist <= HALF_WIDTH + 2.0) {
+            var t = (dist - HALF_WIDTH) / 2.0;
+            return (proj.z + ROAD_LIFT) * (1.0 - t) + (-2.5) * t;
+        } else {
+            return -2.5;
+        }
     }
 
     /**
@@ -417,10 +432,42 @@ class Track extends Object implements IGroundProvider {
     public function getGroundNormal(x:Float, y:Float, outNormal:Vector):Void {
         scratchQuery.set(x, y, 0);
         var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
-        var nx = -proj.segDirY * 0.04;
-        var ny =  proj.segDirX * 0.04;
-        var nz = Math.sqrt(Math.max(0.01, 1.0 - (nx * nx + ny * ny)));
-        outNormal.set(nx, ny, nz);
+        var dist = Math.sqrt(proj.distSq);
+        if (dist > HALF_WIDTH + 2.0) {
+            outNormal.set(0, 0, 1.0);
+            return;
+        }
+        var tx = proj.segDirX;
+        var ty = proj.segDirY;
+        var eps = 0.5;
+        var zAhead = getGroundElevation(x + tx * eps, y + ty * eps);
+        var zBehind = getGroundElevation(x - tx * eps, y - ty * eps);
+        var slopePitch = (zAhead - zBehind) / (2.0 * eps);
+        var nx = -tx * slopePitch;
+        var ny = -ty * slopePitch;
+        var nz = 1.0;
+        var len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        outNormal.set(nx / len, ny / len, nz / len);
+    }
+
+    /**
+     * Returns surface friction coefficient for the active track section.
+     *
+     * @param x World X coordinate in meters.
+     * @param y World Y coordinate in meters.
+     * @return Surface friction scalar.
+     */
+    public function getGroundFriction(x:Float, y:Float):Float {
+        scratchQuery.set(x, y, 0);
+        var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
+        var dist = Math.sqrt(proj.distSq);
+        if (dist <= HALF_WIDTH) {
+            return 1.0; // High-grip asphalt
+        } else if (dist <= HALF_WIDTH + 2.0) {
+            return 0.65; // Gravel shoulder
+        } else {
+            return 0.50; // Off-road dirt
+        }
     }
 
     /**
@@ -430,7 +477,6 @@ class Track extends Object implements IGroundProvider {
     public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
         scratchQuery.set(pos.x, pos.y, 0);
         var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
-        pos.z = proj.z + ROAD_LIFT;
 
         var lateralDist = Math.sqrt(proj.distSq);
         var maxHalf = HALF_WIDTH - 0.3; // Armco barrier inner collision rail
@@ -442,5 +488,41 @@ class Track extends Object implements IGroundProvider {
             return { hitWall: true, speedMult: 0.94, latMult: 0.0 };
         }
         return { hitWall: false, speedMult: 1.0, latMult: 1.0 };
+    }
+
+    /**
+     * Registers static foundation terrain colliders in the OimoPhysics world.
+     *
+     * @param world Target Oimo physics world.
+     */
+    public function registerPhysicsColliders(world:oimo.dynamics.World):Void {
+        if (world == null) return;
+        unregisterPhysicsColliders(world);
+
+        var rbConfig = new oimo.dynamics.rigidbody.RigidBodyConfig();
+        rbConfig.type = oimo.dynamics.rigidbody.RigidBodyType.STATIC;
+        rbConfig.position = new oimo.common.Vec3(110.0, 90.0, -7.5);
+        var body = new oimo.dynamics.rigidbody.RigidBody(rbConfig);
+
+        var shapeConfig = new oimo.dynamics.rigidbody.ShapeConfig();
+        shapeConfig.geometry = new oimo.collision.geometry.BoxGeometry(new oimo.common.Vec3(500.0, 500.0, 5.0));
+        shapeConfig.restitution = 0.2;
+        shapeConfig.friction = 0.5;
+        body.addShape(new oimo.dynamics.rigidbody.Shape(shapeConfig));
+        world.addRigidBody(body);
+        rigidBodies.push(body);
+    }
+
+    /**
+     * Unregisters and removes all foundation rigid bodies from the OimoPhysics world.
+     *
+     * @param world Target Oimo physics world.
+     */
+    public function unregisterPhysicsColliders(world:oimo.dynamics.World):Void {
+        if (world == null) return;
+        for (body in rigidBodies) {
+            world.removeRigidBody(body);
+        }
+        rigidBodies = [];
     }
 }

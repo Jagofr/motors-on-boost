@@ -33,6 +33,9 @@ class SandboxMap extends Object implements IGroundProvider {
     /** Array of slalom and agility obstacle meshes. */
     public var obstacles:Array<Mesh> = [];
 
+    /** Array of registered OimoPhysics boundary rigid bodies. */
+    public var rigidBodies:Array<oimo.dynamics.rigidbody.RigidBody> = [];
+
     /** Proving grounds half-span width in meters. */
     public static inline var HALF_SPAN:Float = 200.0;
 
@@ -142,6 +145,32 @@ class SandboxMap extends Object implements IGroundProvider {
     }
 
     /**
+     * Computes surface friction coefficient mu across proving ground sectors.
+     *
+     * @param x World X coordinate in meters.
+     * @param y World Y coordinate in meters.
+     * @return Surface friction scalar.
+     */
+    public function getGroundFriction(x:Float, y:Float):Float {
+        var distSq = x * x + y * y;
+        if (distSq < 36.0 * 36.0) {
+            return 1.05; // High-grip asphalt skidpad
+        }
+        if (x >= -22.0 && x <= 22.0 && y >= 70.0 && y <= 125.0) {
+            return 1.0; // Launch ramp surface
+        }
+        if (x > 35.0 && x < 140.0 && y > -50.0 && y < 50.0) {
+            return 0.85; // Rolling moguls
+        }
+        var hillDx = x - (-95.0);
+        var hillDy = y - 95.0;
+        if (hillDx * hillDx + hillDy * hillDy < 60.0 * 60.0) {
+            return 0.80; // Mountain hill climb
+        }
+        return 0.75; // Proving grounds dirt/snow baseline
+    }
+
+    /**
      * Enforces invisible boundary walls at +/-195 meters with elastic bumper restitution.
      */
     public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
@@ -183,6 +212,8 @@ class SandboxMap extends Object implements IGroundProvider {
      */
     public function registerPhysicsColliders(world:oimo.dynamics.World):Void {
         if (world == null) return;
+        unregisterPhysicsColliders(world);
+
         var wallThickness = 4.0;
         var wallHeight = 40.0;
 
@@ -194,6 +225,19 @@ class SandboxMap extends Object implements IGroundProvider {
         createStaticWall(world, 0.0, -WALL_LIMIT - (wallThickness * 0.5), 10.0, HALF_SPAN, wallThickness * 0.5, wallHeight * 0.5);
         // North wall (+Y)
         createStaticWall(world, 0.0,  WALL_LIMIT + (wallThickness * 0.5), 10.0, HALF_SPAN, wallThickness * 0.5, wallHeight * 0.5);
+    }
+
+    /**
+     * Unregisters and removes all boundary wall rigid bodies from the OimoPhysics world.
+     *
+     * @param world Target Oimo physics world.
+     */
+    public function unregisterPhysicsColliders(world:oimo.dynamics.World):Void {
+        if (world == null) return;
+        for (body in rigidBodies) {
+            world.removeRigidBody(body);
+        }
+        rigidBodies = [];
     }
 
     function createStaticWall(world:oimo.dynamics.World, x:Float, y:Float, z:Float, hx:Float, hy:Float, hz:Float) {
@@ -208,6 +252,7 @@ class SandboxMap extends Object implements IGroundProvider {
         shapeConfig.friction = 0.3;
         body.addShape(new oimo.dynamics.rigidbody.Shape(shapeConfig));
         world.addRigidBody(body);
+        rigidBodies.push(body);
     }
 
     /**
@@ -382,13 +427,13 @@ class SandboxMap extends Object implements IGroundProvider {
         pylonPrim.unindex();
         pylonPrim.addNormals();
 
-        // Slalom course along Y axis on tarmac
+        // Slalom course along X = -6.0m lane on tarmac (leaving X = 0.0m launch lane clear)
         for (i in -4...5) {
             if (i == 0) continue;
             var py = i * 6.5;
             var pylon = new Mesh(pylonPrim, this);
             pylon.material.color.setColor(0xFF6B00); // High-visibility safety orange
-            pylon.x = 0.0;
+            pylon.x = -6.0;
             pylon.y = py;
             pylon.z = 0.6;
             obstacles.push(pylon);

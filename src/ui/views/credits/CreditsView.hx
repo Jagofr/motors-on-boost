@@ -105,7 +105,6 @@ class CreditsView extends Object {
         versionText = new Text(FontManager.regularFont, this);
         versionText.text = Version.DISPLAY;
         versionText.textColor = COLOR_PUBLISHER;
-        versionText.textAlign = Center;
 
         backBtnText = new Text(FontManager.titleFont, this);
         backBtnText.text = "> BACK TO MAIN MENU <";
@@ -133,7 +132,7 @@ class CreditsView extends Object {
     public function layout(sw:Float, sh:Float) {
         if (titleText != null) {
             titleText.x = (sw - titleText.textWidth) * 0.5;
-            titleText.y = sh * 0.15;
+            titleText.y = sh * 0.13;
         }
         if (leadTitleText != null) {
             leadTitleText.x = (sw - leadTitleText.textWidth) * 0.5;
@@ -166,16 +165,18 @@ class CreditsView extends Object {
             aiNameText.y = sh * 0.52;
         }
         if (techDetailsText != null) {
-            techDetailsText.x = (sw - techDetailsText.textWidth) * 0.5;
-            techDetailsText.y = sh * 0.58;
+            var boxW = Math.min(MAX_TECH_DETAILS_WIDTH, sw - 64.0);
+            techDetailsText.maxWidth = boxW;
+            techDetailsText.x = (sw - boxW) * 0.5;
+            techDetailsText.y = sh * 0.56;
         }
         if (versionText != null) {
             versionText.x = (sw - versionText.textWidth) * 0.5;
-            versionText.y = sh * 0.70;
+            versionText.y = sh * 0.74;
         }
         if (backBtnText != null) {
             backBtnText.x = (sw - backBtnText.textWidth) * 0.5;
-            backBtnText.y = sh * 0.77;
+            backBtnText.y = sh * 0.80;
             backInteractive.x = backBtnText.x - 20;
             backInteractive.y = backBtnText.y - 4;
             backInteractive.width = backBtnText.textWidth + 40;

@@ -1,6 +1,6 @@
 # M.O.B. // MOTORS ON BOOST — API & Function Reference Manual
 
-**Application Release:** `v1.0.0` (Build `0006`)  
+**Application Release:** `v0.4.4` (Build `0010`)  
 **Language Target:** Haxe 4.3.7 / Heaps.io 2.1.0 (WebGL 2.0 / JavaScript PWA)  
 **Author:** Gerard "Jamie" (Jagofr) Francis  
 **Publisher:** RvL // ROGUE  
@@ -110,14 +110,17 @@
 #### Methods:
 - `init():Void` — Initializes Heaps engine, loads embedded assets, configures `AutoZoom(1280, 720)`, builds intro screens, and binds `window.app`.
 - `loadWebpTile(path:String, onLoaded:Tile->Void):Void` — Asynchronously decodes WebP images via an offscreen HTML5 canvas buffer pipeline into RGBA byte arrays and uploads them to GPU textures.
-- `buildIntroScreens():Void` — Instantiates intro containers, background plates, studio/engine splashes, and trademark disclaimer text.
+- `scaleAndCenterSplash(bmp:Bitmap, sw:Float, sh:Float, naturalW:Int, naturalH:Int):Void` — Scales and centers intro splash bitmaps using `Math.max(sw / naturalW, sh / naturalH)` cover scaling so Studio and Engine boot screens fill 100% of the viewport edge-to-edge without letterboxing.
+- `buildIntroScreens():Void` — Instantiates intro containers, background plates, studio/engine splashes, and framed trademark disclaimer text.
 - `setIntroScreen(target:IntroState):Void` — Switches active intro stage and triggers background resource loading when reaching `Disclaimer`.
 - `updateIntro(dt:Float):Void` — Advances intro screen timers, evaluates skip inputs for studio/engine logos, and enforces minimum disclaimer duration.
 - `finishIntroSequence():Void` — Disposes intro containers, transitions to `InGameUI`, starts the 1.2s cross-fade curtain, and presents the main splash menu.
 - `startBackgroundLoading():Void` — Asynchronously loads saved settings, audio subsystems, 3D meshes, traffic fleet, and UI while the disclaimer is displayed.
+- `loadMap(mode:MapMode):Void` — Switches the active 3D environment (`Circuit` vs. `Sandbox`), toggling visibility and updating `currentMapMode`.
 - `resetCarToStartLine():Void` — Resets car coordinates to `(0, 0, 0)`, yaw to `PI/2`, velocity to 0, boost fuel to 100%, and resets wheel orientations.
-- `saveCurrentRun():Void` — Commits player coordinates, yaw, velocity, audio levels, steering sensitivity, and graphics settings to `LocalStorage` schema v4.
-- `handleMenuAction(action:MenuAction):Void` — Dispatches menu selections (`StartGame`, `ResumeGame`, `OpenOptions`, `OpenCredits`, `QuitToTitle`).
+- `resetCarToSandboxCenter():Void` — Resets car to the center of the Sandbox Proving Grounds `(0, 0, z + 0.50)` with `yaw = PI/2`.
+- `saveCurrentRun():Void` — Commits player coordinates, yaw, velocity, active `mapMode`, audio levels, steering sensitivity, and graphics settings to `LocalStorage` schema v4.
+- `handleMenuAction(action:MenuAction):Void` — Dispatches menu selections (`OpenMapSelect`, `StartGame`, `StartSandbox`, `RestartRace`, `ResumeGame`, `OpenOptions`, `OpenCredits`, `QuitToTitle`). `RestartRace` reloads and resets the currently active `currentMapMode` (`Circuit` or `Sandbox`).
 - `layoutIntro():Void` — Responsive layout calculator for intro headers, body text, partner logos, and version indicators.
 - `onResize():Void` — Synchronizes 2D UI resolution scaling, applies 3D offscreen render scaling, updates curtain bounds, and invokes UI relayout.
 - `update(dt:Float):Void` — Master frame loop executing physics integration, traffic AI, chase camera updates, wheel spin/steer rotations, radial blur scaling, and HUD telemetry refresh.
@@ -179,9 +182,10 @@
 - `wheelSlipAngles:Array<Float>`, `wheelSpinVelocity:Array<Float>` — Wheel kinematics.
 
 #### Methods:
-- `new(startX:Float, startY:Float, startZ:Float, ?initialConfig:VehicleConfigData)` — Constructs simulator, allocates OimoPhysics rigid body, and initializes spring resting lengths.
+- `new(startX:Float, startY:Float, startZ:Float, ?initialConfig:VehicleConfigData)` — Constructs simulator, allocates OimoPhysics rigid body (`BoxGeometry(0.94, 2.15, 0.22)` aligned with `CarMesh`), and initializes spring resting lengths.
 - `setConfig(newConfig:VehicleConfigData):Void` — Replaces active physics configuration at runtime.
-- `resetState(startX:Float, startY:Float, startZ:Float, newYaw:Float = 1.5707963):Void` — Resets vehicle transform, velocities, transmission, and Oimo rigid body.
+- `resetState(startX:Float, startY:Float, startZ:Float, newYaw:Float = 0.0):Void` — Resets vehicle transform, velocities, transmission, and Oimo rigid body (default `yaw = 0.0` facing `+Y` forward).
+- `syncToOimoBody():Void` — Synchronizes `pos`, `yaw`, `forwardSpeed`, `lateralVelocity`, and `verticalVelocity` directly into the underlying Oimo `chassisBody` after external traffic or boundary impacts.
 - `update(dt:Float, input:InputController, ?waypoints:Array<Vector>, ?groundProvider:world.IGroundProvider):Void` — Master physics integration step executing suspension raycasts, drivetrain shifts, acceleration/braking, lateral slip, and stepping Oimo rigid body dynamics.
 - `updateLateralAndDrift(dt:Float, input:InputController, fwdX:Float, fwdY:Float, rightX:Float, rightY:Float):Void` — Evaluates slip angles, Pacejka-like grip curves, handbrake rear traction breakaway, drift counter-steer assist, and forward velocity momentum biasing.
 - `updateChassisAttitude(dt:Float, input:InputController):Void` — Calculates centrifugal body roll lean (clamped on flat surfaces) and acceleration squat / braking dive pitch.
@@ -434,8 +438,8 @@
 ## 10. User Interface & Touch Controls Layer (`src/ui/`)
 
 ### `UIManager & UIBuilder`
-**Location:** [`src/ui/UIManager.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/UIManager.hx) & [`src/ui/UIBuilder.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/UIBuilder.hx)  
-**Description:** Master UI hierarchy and component factory. Manages transitions between `Splash`, `MainMenu`, `InGameHUD`, `PauseMenu`, `OptionsMenu`, and `CreditsScreen`. `UIBuilder` generates frosted glass card backplates, styled buttons, toggle rows, and volume block meters.
+**Location:** [`src/ui/UIManager.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/UIManager.hx), [`src/ui/UIBuilder.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/UIBuilder.hx), [`src/ui/views/mapselect/MapSelectView.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/views/mapselect/MapSelectView.hx), & [`src/ui/components/CardBackplate.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/components/CardBackplate.hx)  
+**Description:** Master UI hierarchy and component factory. Manages transitions between `Splash`, `MainMenu`, `MapSelect`, `InGameHUD`, `PauseMenu`, `OptionsMenu`, and `CreditsScreen`. `MainMenuView` consolidates singleplayer map entry under `"PLAY SINGLEPLAYER"` (`MenuAction.OpenMapSelect`), which opens `MapSelectView` (`Highway Circuit` vs. `Sandbox Proving Grounds`). `PauseMenuView` dispatches `MenuAction.RestartRace` via `"RESTART MAP"` to restart whichever map the player selected. `CardBackplate` renders chamfered cyber panels (`drawChamferedBox`), corner brackets, and procedural map preview schematics.
 
 ---
 
@@ -473,12 +477,14 @@
 #### Features:
 - **Headless Shims**: Stubs WebGL texture allocations via `h3d.mat.Texture.fromColor` and Web Audio contexts for Node.js execution.
 - **Modular Filtering**: Accepts CLI arguments (`process.argv`) or environment variables (`process.env.TEST_FILTER`) to filter execution by module name (e.g. `camera`, `physics`, `ui`) or specific test class name.
-- **`utest` Runner**: Configures `utest.Runner` with `PrintReport`, executing 201 assertions across 12 test fixtures with a 100% pass rate in <0.06s.
+- **`utest` Runner**: Configures `utest.Runner` with `PrintReport`, executing 289 assertions across 14 test fixtures with a 100% pass rate in <0.06s.
 
 ### Dual-Tier Test Suite Summary
 1. **Headless Unit Tests (`test.hxml` / `node tests/node-runner.js`)**:
-   - `TestChaseCamera`, `TestCarPhysics`, `TestCarConfig`, `TestSplineMath`, `TestInputController`, `TestTouchControls`, `TestGraphicsOptions`, `TestSaveSystem`, `TestTrack`, `TestTrafficSystem`, `TestVersion`, `TestAudioManager`.
+   - `TestChaseCamera`, `TestCarPhysics`, `TestCarConfig`, `TestSplineMath`, `TestInputController`, `TestTouchControls`, `TestGraphicsOptions`, `TestMapSelectAndRestart`, `TestSaveSystem`, `TestTrack`, `TestSandboxMap`, `TestTrafficSystem`, `TestVersion`, `TestAudioManager` (289/289 assertions passing).
 2. **Automated Browser Visual Suite (`tests/run-browser-tests.js` / `web/test-suite.html`)**:
    - Spawns headless Microsoft Edge via CDP on dynamic debugging ports.
    - Verifies trademark disclosure boot resolution, decoupled 3D render scaling, graphics dependency graying out, global steering sensitivity persistence, dedicated touch tab customization, and simulated in-game track driving with nitrous depletion/recharge (15/15 scenarios passed).
+3. **Playwright E2E & Visual Screenshot Verification Suite (`aitests/run-playwright-tests.js` / `aitests/specs/mob-ui-and-maps.spec.js`)**:
+   - Runs against `https://mob.24-7.ro/` or local static server (`aitests/server.js` on port `7725`) after the VSCode build & deploy task, capturing 18 verification screenshots into `aitests/screenshots/` covering full-viewport boot intro screens, styled UI views, Singleplayer Map Selection flow, Map-Aware Restart, steering direction (`+X` Right / `-X` Left), left/right alloy wheel rim rendering, and traffic/ground OimoPhysics collision sync.
 

@@ -135,10 +135,10 @@ class ChaseCamera {
         accelPullBack += (targetPullBack - accelPullBack) * Math.min(1.0, 5.0 * clampedDt);
 
         // 3. Spring-Damped Follow Distance & Dynamic Camera Orientation
-        // Blend effective yaw with drift angle for natural slide framing
+        // Blend effective yaw with drift angle for natural slide framing (yaw = 0 faces +Y Forward, yaw > 0 turns Right toward +X)
         var effectiveYaw = carPhysics.yaw + (carPhysics.driftAngle * 0.35);
-        var fwdX = -Math.sin(effectiveYaw);
-        var fwdY =  Math.cos(effectiveYaw);
+        var fwdX = Math.sin(effectiveYaw);
+        var fwdY = Math.cos(effectiveYaw);
 
         // Slight physical lagging back: base distance plus only +0.85m at maximum speed
         var dist = BASE_DISTANCE + (speedRatio * 0.85) + accelPullBack;
@@ -155,8 +155,8 @@ class ChaseCamera {
 
         // Velocity feedforward prevents the camera from physically lagging too far back at high speeds (200+ km/h)
         // while preserving natural spring feel during turns and direction changes
-        var fwdVelX = -Math.sin(carPhysics.yaw) * carPhysics.forwardSpeed;
-        var fwdVelY =  Math.cos(carPhysics.yaw) * carPhysics.forwardSpeed;
+        var fwdVelX = Math.sin(carPhysics.yaw) * carPhysics.forwardSpeed;
+        var fwdVelY = Math.cos(carPhysics.yaw) * carPhysics.forwardSpeed;
         currentPos.x += fwdVelX * clampedDt * 0.65;
         currentPos.y += fwdVelY * clampedDt * 0.65;
 

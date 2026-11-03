@@ -15,6 +15,7 @@ import tests.entities.TestTrafficSystem;
 import tests.camera.TestChaseCamera;
 import tests.ui.TestGraphicsOptions;
 import tests.ui.TestTouchControls;
+import tests.ui.TestMapSelectAndRestart;
 import tests.audio.TestAudioManager;
 
 /**
@@ -94,6 +95,7 @@ class TestMain {
             { mod: "camera", name: "TestChaseCamera", testCase: new TestChaseCamera() },
             { mod: "ui", name: "TestGraphicsOptions", testCase: new TestGraphicsOptions() },
             { mod: "ui", name: "TestTouchControls", testCase: new TestTouchControls() },
+            { mod: "ui", name: "TestMapSelectAndRestart", testCase: new TestMapSelectAndRestart() },
             { mod: "audio", name: "TestAudioManager", testCase: new TestAudioManager() }
         ];
 

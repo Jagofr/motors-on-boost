@@ -43,6 +43,12 @@ class TrafficCar {
     /** True if driving against player direction in the oncoming oncoming traffic lane. */
     public var isOncoming:Bool = false;
 
+    /** Assigned highway lane offset from track centerline in meters (+4.8 = oncoming, -4.8 = same direction). */
+    public var laneOffset:Float = 0.0;
+
+    /** Dynamic smoothed lane offset reacting to obstacles, passing, and avoidance. */
+    public var currentLaneOffset:Float = 0.0;
+
     /**
      * Instantiates a new autonomous traffic vehicle agent.
      *
@@ -57,6 +63,26 @@ class TrafficCar {
         this.isOncoming = oncoming;
         this.cruiseSpeed = speed;
         this.currentSpeed = speed;
+        this.laneOffset = oncoming ? 4.8 : -4.8;
+        this.currentLaneOffset = this.laneOffset;
+    }
+
+    /**
+     * Populates out vector with civilian traffic vehicle unit forward heading vector.
+     */
+    public function getForwardVector(?out:Vector):Vector {
+        if (out == null) out = new Vector();
+        out.set(Math.cos(yaw), Math.sin(yaw), 0);
+        return out;
+    }
+
+    /**
+     * Populates out vector with civilian traffic vehicle unit rightward vector.
+     */
+    public function getRightVector(?out:Vector):Vector {
+        if (out == null) out = new Vector();
+        out.set(Math.sin(yaw), -Math.cos(yaw), 0);
+        return out;
     }
 }
 
@@ -136,8 +162,10 @@ class TrafficSystem extends Object {
             var right = new Vector(-fwd.y, fwd.x, 0);
 
             // Left-hand traffic offset rule: Same-direction = left (-4.8m), Oncoming = right (+4.8m)
-            var laneOffset = oncoming ? 4.8 : -4.8;
-            tc.pos.set(wp.x + right.x * laneOffset, wp.y + right.y * laneOffset, wp.z);
+            var offset = oncoming ? 4.8 : -4.8;
+            tc.laneOffset = offset;
+            tc.currentLaneOffset = offset;
+            tc.pos.set(wp.x + right.x * offset, wp.y + right.y * offset, wp.z);
             tc.yaw = Math.atan2(fwd.y, fwd.x) + (oncoming ? Math.PI : 0.0);
 
             trafficList.push(tc);
@@ -187,24 +215,97 @@ class TrafficSystem extends Object {
             if (tc.currentSpeed < 0) tc.currentSpeed = 0;
         }
 
-        // 2. Traffic Movement along Assigned Waypoints & Meshes Synchronization
+        // 2. Traffic Movement along Assigned Lanes with Obstacle & Player Avoidance
         for (tc in trafficList) {
             var targetIdx = tc.isOncoming ? (tc.waypointIdx - 1 + numWaypoints) % numWaypoints : (tc.waypointIdx + 1) % numWaypoints;
             var targetWp = trackWaypoints[targetIdx];
-            var dir = targetWp.sub(tc.pos);
-            dir.z = 0;
+            var nextWp = tc.isOncoming ? trackWaypoints[(targetIdx - 1 + numWaypoints) % numWaypoints] : trackWaypoints[(targetIdx + 1) % numWaypoints];
+            var fwd = nextWp.sub(targetWp);
+            fwd.z = 0;
+            fwd.normalize();
+            var right = new Vector(-fwd.y, fwd.x, 0);
+
+            var desiredOffset = tc.laneOffset;
+
+            // Avoid player vehicle (detect oncoming or trailing player within sensor cone)
+            var dxP = playerPhysics.pos.x - tc.pos.x;
+            var dyP = playerPhysics.pos.y - tc.pos.y;
+            var distP = Math.sqrt(dxP * dxP + dyP * dyP);
+            if (distP < 32.0 && distP > 0.001) {
+                var fwdX = Math.cos(tc.yaw);
+                var fwdY = Math.sin(tc.yaw);
+                var dotP = (dxP * fwdX + dyP * fwdY) / distP;
+                if (dotP > 0.25) { // Player is ahead of traffic car
+                    var rX = -fwdY;
+                    var rY = fwdX;
+                    var sideDot = (dxP * rX + dyP * rY);
+                    // Veers away from player toward opposite shoulder
+                    if (sideDot > 0.0) {
+                        desiredOffset -= 2.5;
+                    } else {
+                        desiredOffset += 2.5;
+                    }
+                    if (distP < 18.0) {
+                        tc.currentSpeed = Math.max(4.0, tc.currentSpeed - 14.0 * dt);
+                    }
+                }
+            }
+
+            // Avoid other traffic vehicles
+            for (other in trafficList) {
+                if (other == tc) continue;
+                var dxO = other.pos.x - tc.pos.x;
+                var dyO = other.pos.y - tc.pos.y;
+                var distO = Math.sqrt(dxO * dxO + dyO * dyO);
+                if (distO < 16.0 && distO > 0.001) {
+                    var fwdX = Math.cos(tc.yaw);
+                    var fwdY = Math.sin(tc.yaw);
+                    var dotO = (dxO * fwdX + dyO * fwdY) / distO;
+                    if (dotO > 0.5) {
+                        if (other.isOncoming != tc.isOncoming) {
+                            // Oncoming conflict: steer toward respective outer shoulder
+                            desiredOffset += (tc.isOncoming ? 2.0 : -2.0);
+                        } else {
+                            tc.currentSpeed = Math.min(tc.currentSpeed, other.currentSpeed * 0.85);
+                        }
+                    }
+                }
+            }
+
+            var maxOffset = ACTIVE_HALF_WIDTH - 2.0;
+            desiredOffset = Math.max(-maxOffset, Math.min(maxOffset, desiredOffset));
+            tc.currentLaneOffset += (desiredOffset - tc.currentLaneOffset) * Math.min(1.0, 4.0 * dt);
+
+            var targetX = targetWp.x + right.x * tc.currentLaneOffset;
+            var targetY = targetWp.y + right.y * tc.currentLaneOffset;
+            var targetZ = targetWp.z + world.Track.ROAD_LIFT;
+
+            var toTargetX = targetX - tc.pos.x;
+            var toTargetY = targetY - tc.pos.y;
+            var distToTarget = Math.sqrt(toTargetX * toTargetX + toTargetY * toTargetY);
 
             // Advance target waypoint index upon proximity arrival
-            if (dir.length() < 8.0) tc.waypointIdx = targetIdx;
+            if (distToTarget < 9.0) tc.waypointIdx = targetIdx;
 
-            dir.normalize();
-            tc.pos.x += dir.x * tc.currentSpeed * dt;
-            tc.pos.y += dir.y * tc.currentSpeed * dt;
-            tc.yaw = Math.atan2(dir.y, dir.x);
+            if (distToTarget > 0.001) {
+                toTargetX /= distToTarget;
+                toTargetY /= distToTarget;
+            }
+
+            var targetYaw = Math.atan2(toTargetY, toTargetX);
+            var yawDiff = targetYaw - tc.yaw;
+            while (yawDiff > Math.PI) yawDiff -= 2.0 * Math.PI;
+            while (yawDiff < -Math.PI) yawDiff += 2.0 * Math.PI;
+            tc.yaw += yawDiff * Math.min(1.0, 6.0 * dt);
+
+            var moveDist = tc.currentSpeed * dt;
+            tc.pos.x += Math.cos(tc.yaw) * moveDist;
+            tc.pos.y += Math.sin(tc.yaw) * moveDist;
+            tc.pos.z = targetZ;
 
             clampToTrack(tc.pos, ACTIVE_HALF_WIDTH - 0.5);
 
-            // Synchronize visual 3D mesh transform
+            // Synchronize visual 3D mesh transform (TrafficCarMesh faces +Y at rotZ = 0, and Heaps +Z rotation is CCW)
             tc.carMesh.x = tc.pos.x;
             tc.carMesh.y = tc.pos.y;
             tc.carMesh.z = tc.pos.z;
@@ -241,6 +342,7 @@ class TrafficSystem extends Object {
         }
 
         // 4. Solid Player-to-Traffic Vehicular Impacts
+        var playerSyncNeeded = false;
         for (tc in trafficList) {
             var dx = tc.pos.x - playerPhysics.pos.x;
             var dy = tc.pos.y - playerPhysics.pos.y;
@@ -258,8 +360,8 @@ class TrafficSystem extends Object {
                 tc.pos.x += nx * overlap * 0.4;
                 tc.pos.y += ny * overlap * 0.4;
 
-                var pFwdX = -Math.sin(playerPhysics.yaw);
-                var pFwdY =  Math.cos(playerPhysics.yaw);
+                var pFwdX = Math.sin(playerPhysics.yaw);
+                var pFwdY = Math.cos(playerPhysics.yaw);
                 var dotApproach = pFwdX * nx + pFwdY * ny;
 
                 // Unified impulse collision response: Front and rear traffic impacts both use the
@@ -268,15 +370,12 @@ class TrafficSystem extends Object {
                 playerPhysics.forwardSpeed *= 0.75;
                 tc.currentSpeed = Math.max(tc.currentSpeed, Math.abs(playerPhysics.forwardSpeed) * 0.9);
                 chaseCam.addTrauma(0.35);
+                playerSyncNeeded = true;
             }
         }
 
-        // 5. Guardrail Outer Boundary Clamping
-        var wallHit = clampToTrack(playerPhysics.pos, ACTIVE_HALF_WIDTH);
-        if (wallHit) {
-            playerPhysics.forwardSpeed = Math.min(playerPhysics.forwardSpeed * WALL_STICKINESS, MAX_SPEED_CAP);
-            playerPhysics.lateralVelocity = 0.0;
-            chaseCam.addTrauma(0.12);
+        if (playerSyncNeeded) {
+            playerPhysics.syncToOimoBody();
         }
 
         if (Math.abs(playerPhysics.forwardSpeed) > MAX_SPEED_CAP) {
@@ -294,7 +393,7 @@ class TrafficSystem extends Object {
      */
     function clampToTrack(point:Vector, maxHalfWidth:Float):Bool {
         var proj = SplineMath.getClosestSegment(point, trackWaypoints);
-        point.z = proj.z;
+        point.z = proj.z + world.Track.ROAD_LIFT;
 
         var lateralDist = Math.sqrt(proj.distSq);
         if (lateralDist > maxHalfWidth && lateralDist > 0.001) {

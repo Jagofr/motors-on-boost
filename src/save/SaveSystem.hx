@@ -21,6 +21,9 @@ typedef PlayerSaveState = {
 
     /** Longitudinal velocity in meters per second. */
     var forwardSpeed:Float;
+
+    /** Active map mode at time of save ("Circuit" or "Sandbox"). */
+    var ?mapMode:String;
 }
 
 /**
@@ -286,7 +289,7 @@ class SaveSystem {
             version: SAVE_VERSION,
             buildNumber: Version.BUILD,
             hasActiveRun: false,
-            playerState: { posX: 0.0, posY: 0.0, posZ: 0.0, yaw: 1.5707963, forwardSpeed: 0.0 },
+            playerState: { posX: 0.0, posY: 0.0, posZ: 0.0, yaw: 0.0, forwardSpeed: 0.0 },
             masterVol: 0.8,
             musicVol: 0.7,
             sfxVol: 0.9,

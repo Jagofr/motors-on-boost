@@ -124,19 +124,19 @@ class GraphicsManager {
         switch (settings.lightingLevel) {
             case "Low":
                 light.color.setColor(0xEADBB8);
-                if (fwd != null) fwd.ambientLight.setColor(0x505F70);
+                if (fwd != null) fwd.ambientLight.setColor(0x708294);
             case "Medium":
                 light.color.setColor(0xFFECC8);
-                if (fwd != null) fwd.ambientLight.setColor(0x667A8E);
+                if (fwd != null) fwd.ambientLight.setColor(0x869BB0);
             case "High":
                 light.color.setColor(0xFFF2D6);
-                if (fwd != null) fwd.ambientLight.setColor(0x7D94AA);
+                if (fwd != null) fwd.ambientLight.setColor(0x9EB4C8);
             case "Ultra (RTX/Path)":
                 light.color.setColor(0xFFF9EE);
-                if (fwd != null) fwd.ambientLight.setColor(0x94ABC2);
+                if (fwd != null) fwd.ambientLight.setColor(0xB2C8DC);
             default:
                 light.color.setColor(0xFFECC8);
-                if (fwd != null) fwd.ambientLight.setColor(0x667A8E);
+                if (fwd != null) fwd.ambientLight.setColor(0x869BB0);
         }
     }
 

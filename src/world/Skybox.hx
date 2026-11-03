@@ -21,20 +21,26 @@ class SkyGradientShader extends Shader {
         /** Foundation color below horizon level. */
         @param var groundColor : Vec3;
 
+        @input var input : {
+            var position : Vec3;
+        };
+        @var var skyDir : Vec3;
         var pixelColor : Vec4;
-        var transformedPosition : Vec3;
+
+        function vertex() {
+            skyDir = normalize(input.position);
+        }
 
         function fragment() {
-            var dir = normalize(transformedPosition);
-            var h = dir.z; // Vertical elevation (+Z is sky in our coordinate system)
+            var h = skyDir.z; // Vertical elevation (+Z is sky in our coordinate system)
             var col : Vec3;
             if (h > 0.0) {
                 // Sky gradient: smooth power curve from atmospheric horizon to deep zenith
-                var t = pow(h, 0.55);
+                var t = pow(h, 0.45);
                 col = mix(horizonColor, topColor, t);
             } else {
                 // Ground transition: rapid falloff below horizon
-                var t = clamp(-h * 4.0, 0.0, 1.0);
+                var t = clamp(-h * 5.0, 0.0, 1.0);
                 col = mix(horizonColor, groundColor, t);
             }
             pixelColor = vec4(col, 1.0);
@@ -80,6 +86,8 @@ class Skybox extends Object {
         // Disable backface culling on main pass so interior of sphere is fully visible
         skyMesh.material.mainPass.culling = None;
         skyMesh.material.shadows = false;
+        skyMesh.material.mainPass.depthWrite = false;
+        skyMesh.material.mainPass.depthTest = LessEqual;
 
         skyShader = new SkyGradientShader();
         skyMesh.material.mainPass.addShader(skyShader);

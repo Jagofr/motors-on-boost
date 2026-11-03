@@ -13,6 +13,7 @@ import ui.UIBuilder;
  * Manages UI state machine, dispatches controller/touch navigation inputs to modular views,
  * and delegates visual element assembly and layout to `UIBuilder`.
  */
+@:keep
 class UIManager extends Object {
     /** Currently active UI state machine mode. */
     public var currentState:UIState = Splash;
@@ -60,10 +61,17 @@ class UIManager extends Object {
         // Wire subview callbacks
         builder.splashView.onEnter = function() showMainMenu();
         builder.mainMenuView.onActionSelected = function(act) triggerMainAction(act);
+        builder.mainMenuView.onSelectionChanged = function() layout();
+        builder.mapSelectView.onMapSelected = function(act) {
+            if (onMenuAction != null) onMenuAction(act);
+        };
+        builder.mapSelectView.onBack = function() showMainMenu();
+        builder.mapSelectView.onSelectionChanged = function() layout();
         builder.pauseMenuView.onResume = function() if (onMenuAction != null) onMenuAction(ResumeGame);
-        builder.pauseMenuView.onRestart = function() if (onMenuAction != null) onMenuAction(StartGame);
+        builder.pauseMenuView.onRestart = function() if (onMenuAction != null) onMenuAction(RestartRace);
         builder.pauseMenuView.onOptions = function() openOptions(true);
         builder.pauseMenuView.onQuitToTitle = function() if (onMenuAction != null) onMenuAction(QuitToTitle);
+        builder.pauseMenuView.onSelectionChanged = function() layout();
         builder.optionsView.onBack = function() {
             if (isOpenedFromPause) showPause();
             else showMainMenu();
@@ -104,6 +112,7 @@ class UIManager extends Object {
         builder.cardBg.visible = false;
         builder.splashView.activate();
         builder.mainMenuView.visible = false;
+        builder.mapSelectView.visible = false;
         builder.pauseMenuView.visible = false;
         builder.optionsView.visible = false;
         builder.creditsView.visible = false;
@@ -125,6 +134,7 @@ class UIManager extends Object {
         builder.cardBg.visible = true;
         builder.splashView.visible = false;
         builder.mainMenuView.activate(hasActiveSave);
+        builder.mapSelectView.visible = false;
         builder.pauseMenuView.visible = false;
         builder.optionsView.visible = false;
         builder.creditsView.visible = false;
@@ -132,6 +142,30 @@ class UIManager extends Object {
         builder.touchControlsHUD.visible = false;
 
         builder.helpText.text = "[Up / Down / D-Pad] Select    [A / Enter] Confirm";
+        builder.helpText.visible = true;
+
+        layout();
+    }
+
+    /**
+     * Activates the singleplayer map selection screen before starting a game session.
+     */
+    public function showMapSelect() {
+        inputRef.flushInputs();
+        currentState = MapSelect;
+
+        builder.modalDimmer.visible = true;
+        builder.cardBg.visible = true;
+        builder.splashView.visible = false;
+        builder.mainMenuView.visible = false;
+        builder.mapSelectView.activate();
+        builder.pauseMenuView.visible = false;
+        builder.optionsView.visible = false;
+        builder.creditsView.visible = false;
+        builder.inGameHUDView.visible = false;
+        builder.touchControlsHUD.visible = false;
+
+        builder.helpText.text = "[Left / Right / Up / Down] Select Map    [A / Enter] Launch    [B / Esc] Back";
         builder.helpText.visible = true;
 
         layout();
@@ -148,6 +182,7 @@ class UIManager extends Object {
         builder.cardBg.visible = false;
         builder.splashView.visible = false;
         builder.mainMenuView.visible = false;
+        builder.mapSelectView.visible = false;
         builder.pauseMenuView.visible = false;
         builder.optionsView.visible = false;
         builder.creditsView.visible = false;
@@ -171,6 +206,7 @@ class UIManager extends Object {
         builder.cardBg.visible = true;
         builder.splashView.visible = false;
         builder.mainMenuView.visible = false;
+        builder.mapSelectView.visible = false;
         builder.pauseMenuView.activate();
         builder.optionsView.visible = false;
         builder.creditsView.visible = false;
@@ -198,6 +234,7 @@ class UIManager extends Object {
         builder.cardBg.visible = true;
         builder.splashView.visible = false;
         builder.mainMenuView.visible = false;
+        builder.mapSelectView.visible = false;
         builder.pauseMenuView.visible = false;
         builder.optionsView.activate(fromPause);
         builder.creditsView.visible = false;
@@ -222,6 +259,7 @@ class UIManager extends Object {
         builder.cardBg.visible = true;
         builder.splashView.visible = false;
         builder.mainMenuView.visible = false;
+        builder.mapSelectView.visible = false;
         builder.pauseMenuView.visible = false;
         builder.optionsView.visible = false;
         builder.creditsView.activate();
@@ -242,8 +280,10 @@ class UIManager extends Object {
      */
     function triggerMainAction(act:MenuAction) {
         switch (act) {
+            case OpenMapSelect: showMapSelect();
             case StartGame: if (onMenuAction != null) onMenuAction(StartGame);
             case StartSandbox: if (onMenuAction != null) onMenuAction(StartSandbox);
+            case RestartRace: if (onMenuAction != null) onMenuAction(RestartRace);
             case ResumeGame: if (hasActiveSave && onMenuAction != null) onMenuAction(ResumeGame);
             case OpenOptions: openOptions(false);
             case OpenCredits: showCredits();
@@ -272,6 +312,11 @@ class UIManager extends Object {
             if (uiUp) builder.mainMenuView.navigate(-1);
             else if (uiDown) builder.mainMenuView.navigate(1);
             if (uiConfirm) builder.mainMenuView.confirmSelection();
+        } else if (currentState == MapSelect) {
+            if (uiLeft || uiUp) builder.mapSelectView.navigate(-1);
+            else if (uiRight || uiDown) builder.mapSelectView.navigate(1);
+            if (uiConfirm) builder.mapSelectView.confirmSelection();
+            else if (uiCancel) showMainMenu();
         } else if (currentState == PauseMenu) {
             if (uiUp) builder.pauseMenuView.navigate(-1);
             else if (uiDown) builder.pauseMenuView.navigate(1);

@@ -15,6 +15,7 @@ import ui.components.UIEnums.OptionsTab;
 import ui.components.CardBackplate;
 import ui.views.splash.SplashView;
 import ui.views.mainmenu.MainMenuView;
+import ui.views.mapselect.MapSelectView;
 import ui.views.pause.PauseMenuView;
 import ui.views.options.OptionsView;
 import ui.views.credits.CreditsView;
@@ -22,8 +23,9 @@ import ui.components.TouchControlsHUD;
 
 /**
  * Composite UI Builder orchestrating modal backplates and views.
- * Assembles and lays out the title splash, main menu, pause menu, options, and credits views.
+ * Assembles and lays out the title splash, main menu, map selection, pause menu, options, and credits views.
  */
+@:keep
 class UIBuilder extends Object {
     /** Semi-transparent full-viewport dimming curtain. */
     public var modalDimmer:Bitmap;
@@ -37,6 +39,7 @@ class UIBuilder extends Object {
     /** Modular view panels. */
     public var splashView:SplashView;
     public var mainMenuView:MainMenuView;
+    public var mapSelectView:MapSelectView;
     public var pauseMenuView:PauseMenuView;
     public var optionsView:OptionsView;
     public var creditsView:CreditsView;
@@ -67,6 +70,8 @@ class UIBuilder extends Object {
         // 3. Modular screen views
         splashView = new SplashView(this);
         mainMenuView = new MainMenuView(this);
+        mapSelectView = new MapSelectView(this);
+        mapSelectView.visible = false;
         pauseMenuView = new PauseMenuView(this);
         optionsView = new OptionsView(input, gfxSettings, this);
         creditsView = new CreditsView(this);
@@ -95,12 +100,11 @@ class UIBuilder extends Object {
         cardBg.clear();
         if (!cardBg.visible) return;
 
-        cardBg.beginFill(UITheme.COLOR_CARD_BG, UITheme.ALPHA_CARD_SURFACE);
-        cardBg.lineStyle(2.0, UITheme.COLOR_ACCENT_CYAN, UITheme.ALPHA_CARD_BORDER);
-
         switch (state) {
             case MainMenu:
                 CardBackplate.drawMainMenu(cardBg, sw, sh, mainMenuView.selectedIndex);
+            case MapSelect:
+                CardBackplate.drawMapSelect(cardBg, sw, sh, mapSelectView.selectedIndex);
             case PauseMenu:
                 CardBackplate.drawPauseMenu(cardBg, sw, sh, pauseMenuView.selectedIndex);
             case OptionsMenu:
@@ -110,7 +114,6 @@ class UIBuilder extends Object {
                 CardBackplate.drawCreditsScreen(cardBg, sw, sh);
             default:
         }
-        cardBg.endFill();
     }
 
     /**
@@ -132,6 +135,7 @@ class UIBuilder extends Object {
 
         if (splashView != null && splashView.visible) splashView.layout(sw, sh);
         if (mainMenuView != null && mainMenuView.visible) mainMenuView.layout(sw, sh);
+        if (mapSelectView != null && mapSelectView.visible) mapSelectView.layout(sw, sh);
         if (pauseMenuView != null && pauseMenuView.visible) pauseMenuView.layout(sw, sh);
         if (optionsView != null && optionsView.visible) optionsView.layout(sw, sh);
         if (creditsView != null && creditsView.visible) creditsView.layout(sw, sh);

@@ -223,10 +223,15 @@ class UIIcons {
         }
         g.endFill();
 
-        // Render vector graphics directly onto GPU render target texture
-        var tex = new h3d.mat.Texture(size, size, [Target]);
-        g.drawTo(tex);
-        var tile = Tile.fromTexture(tex);
+        // Render vector graphics directly onto GPU render target texture (or fallback tile in headless Node.js)
+        var tile:Tile = null;
+        if (h3d.Engine.getCurrent() != null) {
+            var tex = new h3d.mat.Texture(size, size, [Target]);
+            g.drawTo(tex);
+            tile = Tile.fromTexture(tex);
+        } else {
+            tile = Tile.fromColor(color, size, size, 1.0);
+        }
         cache.set(key, tile);
         return tile;
     }

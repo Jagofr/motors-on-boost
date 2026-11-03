@@ -71,6 +71,7 @@ enum MapMode {
  * Manages boot splash sequencing, WebP texture decoding, 3D scene initialization,
  * car physics updates, third-person spring-arm camera tracking, and UI lifecycle.
  */
+@:keep
 class Main extends hxd.App {
     public var appState:AppState = IntroSequence;
     public var introState:IntroState = Studio;
@@ -106,6 +107,7 @@ class Main extends hxd.App {
     public var discHeader:Text;
     public var discBody:Text;
     public var discVersion:Text;
+    var discGraphics:h2d.Graphics;
     var logoRow:Object;
     var discLogos:Array<Bitmap> = [];
 
@@ -167,6 +169,7 @@ class Main extends hxd.App {
         #if js
         untyped js.Browser.window.app = this;
         untyped js.Browser.window.IntroState = IntroState;
+        untyped js.Browser.window.MapMode = MapMode;
         #end
     }
 
@@ -240,6 +243,7 @@ class Main extends hxd.App {
 
         // 3. Trademark & Disclosure Notice Screen
         screenDisclaimer = new Object(introContainer);
+        discGraphics = new h2d.Graphics(screenDisclaimer);
 
         discHeader = new Text(FontManager.titleFont, screenDisclaimer);
         discHeader.text = "TRADEMARK & LEGAL DISCLOSURES";
@@ -454,7 +458,7 @@ class Main extends hxd.App {
         var fillDir = new Vector(0.55, -0.78, 0.45);
         fillDir.normalize();
         fillLight = new DirLight(fillDir, s3d);
-        fillLight.color.setColor(0x55687C);
+        fillLight.color.setColor(0x788B9E);
         fillLight.enableSpecular = false;
 
         gfx = new GraphicsManager(s3d, s2d, dirLight, saveData.graphics, postRenderer);
@@ -470,7 +474,6 @@ class Main extends hxd.App {
 
         track = new Track(s3d);
         sandboxMap = new world.SandboxMap(s3d);
-        sandboxMap.registerPhysicsColliders(carPhysics.physicsWorld);
         sandboxMap.visible = false;
 
         traffic = new TrafficSystem(track.waypoints, s3d);
@@ -493,7 +496,14 @@ class Main extends hxd.App {
      */
     public function loadMap(mode:MapMode) {
         currentMapMode = mode;
+        if (skybox != null) skybox.visible = true;
         if (mode == Circuit) {
+            if (sandboxMap != null && carPhysics != null) {
+                sandboxMap.unregisterPhysicsColliders(carPhysics.physicsWorld);
+            }
+            if (track != null && carPhysics != null) {
+                track.registerPhysicsColliders(carPhysics.physicsWorld);
+            }
             if (track != null) track.visible = true;
             if (terrainGround != null) terrainGround.visible = true;
             if (sandboxMap != null) sandboxMap.visible = false;
@@ -502,6 +512,12 @@ class Main extends hxd.App {
                 ui.inGameHUD.initWaypoints(track.waypoints);
             }
         } else {
+            if (track != null && carPhysics != null) {
+                track.unregisterPhysicsColliders(carPhysics.physicsWorld);
+            }
+            if (sandboxMap != null && carPhysics != null) {
+                sandboxMap.registerPhysicsColliders(carPhysics.physicsWorld);
+            }
             if (track != null) track.visible = false;
             if (terrainGround != null) terrainGround.visible = false;
             if (sandboxMap != null) sandboxMap.visible = true;
@@ -516,24 +532,24 @@ class Main extends hxd.App {
      * Repositions the player vehicle to the sandbox central staging tarmac.
      */
     function resetCarToSandboxCenter() {
-        carPhysics.resetState(0.0, 0.0, 0.05, 1.5707963);
+        carPhysics.resetState(0.0, 0.0, 0.05, 0.0);
 
         playerMesh.x = 0.0;
         playerMesh.y = 0.0;
         playerMesh.z = 0.05;
-        playerMesh.setRotation(0, 0, 1.5707963);
+        playerMesh.setRotation(0, 0, 0.0);
     }
 
     /**
      * Repositions the player vehicle to the race track starting grid line.
      */
     function resetCarToStartLine() {
-        carPhysics.resetState(0.0, 0.0, 0.0, 1.5707963);
+        carPhysics.resetState(0.0, 0.0, Track.ROAD_LIFT, 0.0);
 
         playerMesh.x = 0.0;
         playerMesh.y = 0.0;
         playerMesh.z = Track.ROAD_LIFT;
-        playerMesh.setRotation(0, 0, 1.5707963);
+        playerMesh.setRotation(0, 0, 0.0);
     }
 
     /**
@@ -546,7 +562,8 @@ class Main extends hxd.App {
             posY: carPhysics.pos.y,
             posZ: carPhysics.pos.z,
             yaw: carPhysics.yaw,
-            forwardSpeed: carPhysics.forwardSpeed
+            forwardSpeed: carPhysics.forwardSpeed,
+            mapMode: (currentMapMode == Sandbox) ? "Sandbox" : "Circuit"
         };
         saveData.masterVol = audio.masterVolume;
         saveData.musicVol = audio.musicVolume;
@@ -558,7 +575,7 @@ class Main extends hxd.App {
     }
 
     /**
-     * Dispatches user menu selections (Start Highway, Start Sandbox, Resume, Options, Credits, Quit).
+     * Dispatches user menu selections (Map Select, Start Highway, Start Sandbox, Restart, Resume, Options, Credits, Quit).
      *
      * @param action Selected MenuAction enum variant.
      */
@@ -566,6 +583,9 @@ class Main extends hxd.App {
         input.flushInputs();
 
         switch (action) {
+            case OpenMapSelect:
+                ui.showMapSelect();
+
             case StartGame:
                 loadMap(Circuit);
                 resetCarToStartLine();
@@ -580,10 +600,31 @@ class Main extends hxd.App {
                 currentLap = 1;
                 ui.showInGame();
 
+            case RestartRace:
+                if (currentMapMode == Sandbox) {
+                    loadMap(Sandbox);
+                    resetCarToSandboxCenter();
+                } else {
+                    loadMap(Circuit);
+                    resetCarToStartLine();
+                }
+                raceTimer = 0.0;
+                currentLap = 1;
+                ui.showInGame();
+
             case ResumeGame:
                 if (saveData.hasActiveRun) {
-                    carPhysics.pos.set(saveData.playerState.posX, saveData.playerState.posY, saveData.playerState.posZ);
-                    carPhysics.yaw = saveData.playerState.yaw;
+                    if (saveData.playerState.mapMode == "Sandbox") {
+                        loadMap(Sandbox);
+                    } else if (saveData.playerState.mapMode == "Circuit") {
+                        loadMap(Circuit);
+                    }
+                    carPhysics.resetState(
+                        saveData.playerState.posX,
+                        saveData.playerState.posY,
+                        saveData.playerState.posZ,
+                        saveData.playerState.yaw
+                    );
                     carPhysics.forwardSpeed = saveData.playerState.forwardSpeed;
                 }
                 ui.showInGame();
@@ -599,7 +640,7 @@ class Main extends hxd.App {
     }
 
     /**
-     * Scales and centers a splash screen bitmap proportionally within the specified viewport dimensions.
+     * Scales and centers a splash screen bitmap to cover and fill the entire viewport.
      *
      * @param bmp The Bitmap instance to scale and position.
      * @param sw Viewport target width in pixels.
@@ -610,7 +651,7 @@ class Main extends hxd.App {
         var naturalW = bmp.tile.width;
         var naturalH = bmp.tile.height;
 
-        var scale = Math.min((sw * 0.90) / naturalW, (sh * 0.90) / naturalH);
+        var scale = Math.max(sw / naturalW, sh / naturalH);
         bmp.scaleX = scale;
         bmp.scaleY = scale;
 
@@ -640,6 +681,25 @@ class Main extends hxd.App {
         }
 
         if (discHeader != null && discBody != null) {
+            if (discGraphics != null) {
+                discGraphics.clear();
+                var pad = 28.0;
+                var frameW = Math.max(200.0, sw - pad * 2.0);
+                var frameH = Math.max(200.0, sh - pad * 2.0);
+                discGraphics.beginFill(0x060A10, 0.90);
+                discGraphics.lineStyle(1.5, 0x00E5FF, 0.35);
+                discGraphics.drawRoundedRect(pad, pad, frameW, frameH, 12.0);
+                discGraphics.endFill();
+
+                // Corner brackets
+                var bl = 22.0;
+                discGraphics.lineStyle(3.0, 0x00E5FF, 0.85);
+                discGraphics.moveTo(pad, pad + bl); discGraphics.lineTo(pad, pad); discGraphics.lineTo(pad + bl, pad);
+                discGraphics.moveTo(pad + frameW - bl, pad); discGraphics.lineTo(pad + frameW, pad); discGraphics.lineTo(pad + frameW, pad + bl);
+                discGraphics.moveTo(pad, pad + frameH - bl); discGraphics.lineTo(pad, pad + frameH); discGraphics.lineTo(pad + bl, pad + frameH);
+                discGraphics.moveTo(pad + frameW - bl, pad + frameH); discGraphics.lineTo(pad + frameW, pad + frameH); discGraphics.lineTo(pad + frameW, pad + frameH - bl);
+            }
+
             // Responsive line constraints ensuring text stays nicely proportioned
             var maxTextWidth = Math.min(sw * 0.88, 960.0);
             discHeader.maxWidth = maxTextWidth;
@@ -779,7 +839,7 @@ class Main extends hxd.App {
         if (skybox != null) skybox.syncCamera(s3d.camera.pos);
 
         switch (ui.currentState) {
-            case Splash | MainMenu | CreditsScreen:
+            case Splash | MainMenu | MapSelect | CreditsScreen:
                 if (postRenderer != null) postRenderer.blurShader.blurIntensity = 0.0;
                 showcaseAngle += 0.35 * dt;
                 var camDist = 11.0;
@@ -828,36 +888,26 @@ class Main extends hxd.App {
 
                 playerMesh.x = carPhysics.pos.x;
                 playerMesh.y = carPhysics.pos.y;
-                playerMesh.z = carPhysics.pos.z + (currentMapMode == Circuit ? Track.ROAD_LIFT : 0.05);
-                playerMesh.setRotation(0, 0, carPhysics.yaw + carPhysics.driftAngle);
-                playerMesh.rotate(carPhysics.pitch, 0, 0);
-                playerMesh.rotate(0, carPhysics.roll, 0);
+                playerMesh.z = carPhysics.pos.z;
+                // Note: h3d.Object.rotate pre-multiplies in parent space, and +Z rotation is CCW from top view.
+                // Since our yaw is clockwise from +Y (+X is Right), we negate yaw+driftAngle for Heaps Z rotation,
+                // and apply pitch (X) and roll (Y) before yaw (Z):
+                playerMesh.setRotation(carPhysics.pitch, carPhysics.roll, 0);
+                playerMesh.rotate(0, 0, -(carPhysics.yaw + carPhysics.driftAngle));
 
-                // Four-wheel steering and longitudinal spin animation
-                wheelSpinAngle += (carPhysics.forwardSpeed * dt) / 0.36;
-                rearWheelSpinAngle += ((carPhysics.forwardSpeed / 0.36) + carPhysics.wheelSpinVelocity[2]) * dt;
+                // Four-wheel steering, vertical suspension travel, and longitudinal spin animation
+                wheelSpinAngle += (carPhysics.forwardSpeed * dt) / entities.CarMesh.TIRE_RADIUS;
+                rearWheelSpinAngle += ((carPhysics.forwardSpeed / entities.CarMesh.TIRE_RADIUS) + carPhysics.wheelSpinVelocity[2]) * dt;
                 var maxSteerAngle = 0.55;
-                var currentSteer = input.steer * maxSteerAngle;
+                var currentSteer = -input.steer * maxSteerAngle;
+                var restLen = carPhysics.config.suspension.restLength;
                 if (playerMesh.wheels.length >= 4) {
-                    // Front-Left (0): Steer & Roll
-                    playerMesh.wheels[0].setRotation(0, 0, currentSteer);
-                    playerMesh.wheels[0].rotate(0, 1.5707963, 0);
-                    playerMesh.wheels[0].rotate(wheelSpinAngle, 0, 0);
-
-                    // Front-Right (1): Steer & Roll
-                    playerMesh.wheels[1].setRotation(0, 0, currentSteer);
-                    playerMesh.wheels[1].rotate(0, 1.5707963, 0);
-                    playerMesh.wheels[1].rotate(wheelSpinAngle, 0, 0);
-
-                    // Rear-Left (2): Roll with burnout spin
-                    playerMesh.wheels[2].setRotation(0, 0, 0);
-                    playerMesh.wheels[2].rotate(0, 1.5707963, 0);
-                    playerMesh.wheels[2].rotate(rearWheelSpinAngle, 0, 0);
-
-                    // Rear-Right (3): Roll with burnout spin
-                    playerMesh.wheels[3].setRotation(0, 0, 0);
-                    playerMesh.wheels[3].rotate(0, 1.5707963, 0);
-                    playerMesh.wheels[3].rotate(rearWheelSpinAngle, 0, 0);
+                    // Front wheels (0: FL, 1: FR) steer & roll
+                    playerMesh.updateWheelTransform(0, restLen - carPhysics.suspLength[0], wheelSpinAngle, currentSteer);
+                    playerMesh.updateWheelTransform(1, restLen - carPhysics.suspLength[1], wheelSpinAngle, currentSteer);
+                    // Rear wheels (2: RL, 3: RR) roll with burnout spin
+                    playerMesh.updateWheelTransform(2, restLen - carPhysics.suspLength[2], rearWheelSpinAngle, 0.0);
+                    playerMesh.updateWheelTransform(3, restLen - carPhysics.suspLength[3], rearWheelSpinAngle, 0.0);
                 }
 
                 chaseCam.update(dt, carPhysics, carPhysics.isBoosting);

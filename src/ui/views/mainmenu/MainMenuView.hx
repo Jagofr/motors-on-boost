@@ -12,9 +12,13 @@ import audio.AudioManager;
 /**
  * Main menu panel view providing navigation across play, resume, options, credits, and exit.
  */
+@:keep
 class MainMenuView extends Object {
     /** Menu title heading display. */
     public var titleText:Text;
+
+    /** Subtitle heading display. */
+    public var subtitleText:Text;
 
     /** Build version badge display. */
     public var versionText:Text;
@@ -24,8 +28,7 @@ class MainMenuView extends Object {
 
     /** Dispatched actions corresponding to each menu row. */
     public static var ACTIONS:Array<MenuAction> = [
-        StartGame,
-        StartSandbox,
+        OpenMapSelect,
         ResumeGame,
         OpenOptions,
         OpenCredits,
@@ -47,6 +50,9 @@ class MainMenuView extends Object {
     /** Callback invoked when an action is selected. */
     public var onActionSelected:MenuAction->Void;
 
+    /** Callback invoked when the hovered/selected index changes so backplates can redraw. */
+    public var onSelectionChanged:Void->Void;
+
     /**
      * Instantiates the main menu view and builds menu rows.
      *
@@ -59,14 +65,17 @@ class MainMenuView extends Object {
         titleText.text = "MAIN MENU";
         titleText.textColor = UITheme.COLOR_ACCENT_CYAN;
 
+        subtitleText = new Text(FontManager.regularFont, this);
+        subtitleText.text = "SELECT DRIVER OPERATION";
+        subtitleText.textColor = UITheme.COLOR_TEXT_MUTED;
+
         versionText = new Text(FontManager.regularFont, this);
         versionText.text = Version.DISPLAY;
         versionText.textColor = UITheme.COLOR_TEXT_MUTED;
 
-        var labels = ["START HIGHWAY RACE", "OPEN SANDBOX MAP", "RESUME SAVED RACE", "OPTIONS", "CREDITS", "EXIT TO SPLASH"];
+        var labels = ["PLAY SINGLEPLAYER", "RESUME SAVED RACE", "OPTIONS", "CREDITS", "EXIT TO SPLASH"];
         var iconTypes = [
             UIIcons.IconType.Play,
-            UIIcons.IconType.Sandbox,
             UIIcons.IconType.Resume,
             UIIcons.IconType.Settings,
             UIIcons.IconType.Credits,
@@ -74,19 +83,20 @@ class MainMenuView extends Object {
         ];
 
         for (i in 0...labels.length) {
-            var row = new MenuItemRow(UIIcons.get(iconTypes[i], UITheme.ICON_SIZE_MENU, UITheme.COLOR_ACCENT_CYAN), labels[i], 440, 44, this);
+            var row = new MenuItemRow(UIIcons.get(iconTypes[i], UITheme.ICON_SIZE_MENU, UITheme.COLOR_ACCENT_CYAN), labels[i], 460, 44, this);
             rows.push(row);
 
             row.interactive.onOver = function(_) {
                 if (visible) {
                     selectedIndex = i;
                     updateStyles();
+                    if (onSelectionChanged != null) onSelectionChanged();
                 }
             };
 
             row.interactive.onClick = function(_) {
                 if (visible) {
-                    if (i == 2 && !hasActiveSave) return;
+                    if (i == 1 && !hasActiveSave) return;
                     AudioManager.inst.playMenuBeep(AUDIO_BEEP_CONFIRM_FREQ, 0.08);
                     triggerAction(ACTIONS[i]);
                 }
@@ -102,7 +112,7 @@ class MainMenuView extends Object {
     public function activate(hasSave:Bool) {
         visible = true;
         hasActiveSave = hasSave;
-        selectedIndex = hasActiveSave ? 2 : 0;
+        selectedIndex = hasActiveSave ? 1 : 0;
         updateStyles();
     }
 
@@ -136,13 +146,14 @@ class MainMenuView extends Object {
         selectedIndex = (selectedIndex + dir + rows.length) % rows.length;
         AudioManager.inst.playMenuBeep(AUDIO_BEEP_NAV_FREQ, 0.04);
         updateStyles();
+        if (onSelectionChanged != null) onSelectionChanged();
     }
 
     /**
      * Confirms the currently focused selection.
      */
     public function confirmSelection() {
-        if (selectedIndex == 2 && !hasActiveSave) return;
+        if (selectedIndex == 1 && !hasActiveSave) return;
         AudioManager.inst.playMenuBeep(AUDIO_BEEP_CONFIRM_FREQ, 0.08);
         triggerAction(ACTIONS[selectedIndex]);
     }
@@ -153,7 +164,7 @@ class MainMenuView extends Object {
     public function updateStyles() {
         for (i in 0...rows.length) {
             var row = rows[i];
-            var isEnabled = !(i == 2 && !hasActiveSave);
+            var isEnabled = !(i == 1 && !hasActiveSave);
             row.setStyle(
                 i == selectedIndex,
                 isEnabled,
@@ -171,31 +182,44 @@ class MainMenuView extends Object {
      * @param sh Screen height in pixels.
      */
     public function layout(sw:Float, sh:Float) {
+        var cardW = Math.min(UITheme.MAIN_CARD_WIDTH, sw - 32.0);
+        var cardH = Math.min(UITheme.MAIN_CARD_HEIGHT, sh * 0.64);
+        var cardX = (sw - cardW) * 0.5;
+        var cardY = Math.max(76.0, (sh - cardH) * 0.5 + 14.0);
+
         if (titleText != null) {
             titleText.x = (sw - titleText.textWidth) * 0.5;
-            titleText.y = sh * 0.14;
+            titleText.y = Math.max(12.0, cardY - 76.0);
         }
+
+        if (subtitleText != null) {
+            subtitleText.x = (sw - subtitleText.textWidth) * 0.5;
+            subtitleText.y = Math.max(54.0, cardY - 28.0);
+        }
+
+        var totalRowsH = rows.length * UITheme.MAIN_ROW_STRIDE;
+        var startY = cardY + (cardH - totalRowsH) * 0.5 + 6.0;
 
         for (i in 0...rows.length) {
             var row = rows[i];
-            var rowY = sh * 0.31 + (i * UITheme.MAIN_ROW_STRIDE);
-            var rowStartX = sw * 0.5 - 190;
+            var rowY = startY + (i * UITheme.MAIN_ROW_STRIDE);
+            var rowStartX = cardX + 52.0;
 
             row.iconBmp.x = rowStartX;
-            row.iconBmp.y = rowY + 3;
+            row.iconBmp.y = rowY + 4;
 
-            row.labelTxt.x = rowStartX + 36;
-            row.labelTxt.y = rowY;
+            row.labelTxt.x = rowStartX + 40.0;
+            row.labelTxt.y = rowY + 2;
 
-            row.interactive.x = sw * 0.5 - 220;
-            row.interactive.y = rowY - 4;
-            row.interactive.width = 440;
-            row.interactive.height = 44;
+            row.interactive.x = cardX + 24.0;
+            row.interactive.y = rowY - 6.0;
+            row.interactive.width = cardW - 48.0;
+            row.interactive.height = 44.0;
         }
 
         if (versionText != null) {
             versionText.x = (sw - versionText.textWidth) * 0.5;
-            versionText.y = sh * 0.90;
+            versionText.y = Math.min(sh - 56.0, cardY + cardH + 14.0);
         }
     }
 }

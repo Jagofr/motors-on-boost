@@ -44,48 +44,63 @@ class UITheme {
     public static inline var COLOR_DARK_PANEL:Int = 0x21252B;
 
     /** Deep obsidian card background color. */
-    public static inline var COLOR_CARD_BG:Int = 0x13171F;
+    public static inline var COLOR_CARD_BG:Int = 0x0D1119;
+
+    /** Elevated header banner fill color for modal cards. */
+    public static inline var COLOR_CARD_HEADER:Int = 0x161E2E;
+
+    /** Subtle cyber grid / divider line color. */
+    public static inline var COLOR_DIVIDER:Int = 0x24344D;
 
     // =========================================================================
     // ALPHA / TRANSPARENCY METRICS
     // =========================================================================
 
     /** Dimming curtain darkness behind active modals. */
-    public static inline var ALPHA_MODAL_DIMMER:Float = 0.78;
+    public static inline var ALPHA_MODAL_DIMMER:Float = 0.76;
 
     /** Translucency opacity for floating frosted card surfaces. */
-    public static inline var ALPHA_CARD_SURFACE:Float = 0.88;
+    public static inline var ALPHA_CARD_SURFACE:Float = 0.92;
 
     /** Cyber border outline line alpha. */
-    public static inline var ALPHA_CARD_BORDER:Float = 0.45;
+    public static inline var ALPHA_CARD_BORDER:Float = 0.65;
 
     /** Active selected row highlight slot fill alpha. */
-    public static inline var ALPHA_SLOT_FILL:Float = 0.12;
+    public static inline var ALPHA_SLOT_FILL:Float = 0.16;
 
     /** Active selected row highlight slot border alpha. */
-    public static inline var ALPHA_SLOT_BORDER:Float = 0.70;
+    public static inline var ALPHA_SLOT_BORDER:Float = 0.85;
 
     /** Options tab button selected capsule fill alpha. */
-    public static inline var ALPHA_TAB_FILL:Float = 0.18;
+    public static inline var ALPHA_TAB_FILL:Float = 0.22;
 
     // =========================================================================
     // MODAL CARD DIMENSIONS & CORNER RADII
     // =========================================================================
 
     /** Main menu modal frame width in pixels. */
-    public static inline var MAIN_CARD_WIDTH:Float = 540.0;
+    public static inline var MAIN_CARD_WIDTH:Float = 560.0;
 
     /** Main menu modal frame height in pixels. */
-    public static inline var MAIN_CARD_HEIGHT:Float = 390.0;
+    public static inline var MAIN_CARD_HEIGHT:Float = 380.0;
 
     /** Main menu modal frame corner radius in pixels. */
     public static inline var MAIN_CARD_RADIUS:Float = 14.0;
+
+    /** Map selection modal frame width in pixels. */
+    public static inline var MAP_SELECT_CARD_WIDTH:Float = 860.0;
+
+    /** Map selection modal frame height in pixels. */
+    public static inline var MAP_SELECT_CARD_HEIGHT:Float = 480.0;
+
+    /** Map selection modal frame corner radius in pixels. */
+    public static inline var MAP_SELECT_CARD_RADIUS:Float = 16.0;
 
     /** Pause menu modal frame width in pixels. */
     public static inline var PAUSE_CARD_WIDTH:Float = 500.0;
 
     /** Pause menu modal frame height in pixels. */
-    public static inline var PAUSE_CARD_HEIGHT:Float = 320.0;
+    public static inline var PAUSE_CARD_HEIGHT:Float = 330.0;
 
     /** Pause menu modal frame corner radius in pixels. */
     public static inline var PAUSE_CARD_RADIUS:Float = 14.0;

@@ -2,3 +2,6 @@
 .vscode
 bin/
 .unittest/
+node_modules/
+aitests/node_modules/
+res/.tmp/

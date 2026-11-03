@@ -364,7 +364,7 @@ class InGameHUDView extends Object {
 
                 // Forward heading tick
                 var headLen = 9.0;
-                var headX = dotX - (Math.sin(car.yaw) * headLen);
+                var headX = dotX + (Math.sin(car.yaw) * headLen);
                 var headY = dotY - (Math.cos(car.yaw) * headLen);
                 canvas.lineStyle(2.0, 0xFFE066, 1.0);
                 canvas.moveTo(dotX, dotY);

@@ -27,6 +27,15 @@ interface IGroundProvider {
     public function getGroundNormal(x:Float, y:Float, outNormal:Vector):Void;
 
     /**
+     * Computes the surface friction coefficient mu at world coordinate (x, y).
+     *
+     * @param x World X coordinate in meters.
+     * @param y World Y coordinate in meters.
+     * @return Surface friction scalar (typically 0.4 to 1.1).
+     */
+    public function getGroundFriction(x:Float, y:Float):Float;
+
+    /**
      * Enforces perimeter boundaries (e.g. Armco guardrails on circuit, invisible walls on sandbox).
      * Repositions position in-place if boundary breached, and returns collision impulse multipliers.
      *

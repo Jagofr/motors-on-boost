@@ -4,11 +4,17 @@ package ui.components;
  * Dispatched user actions emitted from menu selections.
  */
 enum MenuAction {
+    /** Open the singleplayer map selection screen. */
+    OpenMapSelect;
+
     /** Start a fresh new circuit race on the highway track from the starting line. */
     StartGame;
 
     /** Launch into the open sandbox proving grounds to test physics, terrain hills, and ramps. */
     StartSandbox;
+
+    /** Restart the currently active user-selected map from its starting position. */
+    RestartRace;
 
     /** Resume an active in-progress race run restored from persistent storage. */
     ResumeGame;
@@ -32,6 +38,9 @@ enum UIState {
 
     /** Primary main menu selection screen. */
     MainMenu;
+
+    /** Singleplayer map selection screen before starting game session. */
+    MapSelect;
 
     /** In-game transparent HUD with speedometer and frame counter. */
     InGameHUD;
