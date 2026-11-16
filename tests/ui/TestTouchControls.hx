@@ -100,17 +100,33 @@ class TestTouchControls extends Test {
         controlsPanel.updateControlViewMode();
 
         Assert.equals(12, controlsPanel.getMaxRemapCount());
+        Assert.equals(12, controlsPanel.remapDecrInteractives.length);
+        Assert.equals(12, controlsPanel.remapIncrInteractives.length);
+        for (i in 0...11) {
+            Assert.isTrue(controlsPanel.remapDecrInteractives[i].visible, "Touch decrement button visible for row " + i);
+            Assert.isTrue(controlsPanel.remapIncrInteractives[i].visible, "Touch increment button visible for row " + i);
+        }
+        Assert.isFalse(controlsPanel.remapDecrInteractives[11].visible, "Reset row hides +/- buttons");
 
-        // Adjust index 0 (stickOffsetX)
-        controlsPanel.remapIndex = 0;
-        controlsPanel.adjustCurrentCustomOption(1); // +5px
-        var d = SaveSystem.load();
-        Assert.isTrue(d.touchSettings.stickOffsetX != 0.0);
+        // Increase & decrease offset row 0 (stickOffsetX) including negative offsets
+        controlsPanel.cycleCustomTouchRow(0, 1);
+        Assert.floatEquals(10.0, SaveSystem.load().touchSettings.stickOffsetX, 0.001);
+        controlsPanel.cycleCustomTouchRow(0, -1);
+        Assert.floatEquals(0.0, SaveSystem.load().touchSettings.stickOffsetX, 0.001);
+        controlsPanel.cycleCustomTouchRow(0, -1);
+        Assert.floatEquals(-10.0, SaveSystem.load().touchSettings.stickOffsetX, 0.001);
+
+        // Increase & decrease HUD Scale row 10
+        controlsPanel.cycleCustomTouchRow(10, -1);
+        Assert.floatEquals(0.95, SaveSystem.load().touchSettings.scale, 0.001);
+        controlsPanel.cycleCustomTouchRow(10, 1);
+        Assert.floatEquals(1.0, SaveSystem.load().touchSettings.scale, 0.001);
 
         // Reset defaults (index 11)
         controlsPanel.triggerRemapEntry(11);
         var resetData = SaveSystem.load();
         Assert.floatEquals(0.0, resetData.touchSettings.stickOffsetX, 0.001);
+        Assert.floatEquals(1.0, resetData.touchSettings.scale, 0.001);
     }
 
     public function testPersistentSensitivitySliderAcrossTabs() {

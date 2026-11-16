@@ -10,6 +10,10 @@ import ui.FontManager;
 /**
  * Reusable menu item row combining an icon, text label, and interactive hitzone.
  * Formatted with styling defaults driven by `UITheme`.
+ *
+ * @class MenuItemRow
+ * @extends h2d.Object
+ * @module ui/components/MenuItemRow
  */
 class MenuItemRow extends Object {
     /** Icon bitmap display. */

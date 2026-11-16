@@ -1,5 +1,6 @@
 package world;
 
+import config.WorldConfig;
 import h3d.scene.Object;
 import h3d.scene.Mesh;
 import h3d.prim.Polygon;
@@ -13,7 +14,10 @@ import physics.SplineMath;
  * Procedural circuit track builder and environment generator.
  * Generates continuous Catmull-Rom roadbed ribbon geometry, asphalt surface mesh,
  * continuous galvanized Armco guardrails, vertical steel support stanchions,
- * and background urban skyscraper geometry.
+ * @class Track
+ * @extends h3d.scene.Object
+ * @implements IGroundProvider
+ * @module world/Track
  */
 class Track extends Object implements IGroundProvider {
     /** High-density discrete Catmull-Rom spline waypoints defining track centerline. */
@@ -37,31 +41,40 @@ class Track extends Object implements IGroundProvider {
     /** Array of registered OimoPhysics static foundation bodies. */
     public var rigidBodies:Array<oimo.dynamics.rigidbody.RigidBody> = [];
 
+    /** Surrounding flat ambient ground plane owned directly by the circuit world. */
+    public var terrainGround:Mesh;
+
+    /** Active configurable circuit parameters. */
+    public var config:config.WorldConfig.TrackConfig;
+
     var scratchQuery:Vector = new Vector();
     var scratchFromCenter:Vector = new Vector();
 
-    /** Total roadway width in meters across all four lanes. */
+    /** Total roadway width in meters across all four lanes. @default 20.0 */
     public static inline var ROAD_WIDTH:Float = 20.0;
 
-    /** Distance from track centerline to outer edge of asphalt. */
+    /** Distance from track centerline to outer edge of asphalt. @default 10.0 */
     public static inline var HALF_WIDTH:Float = 10.0;
 
-    /** Additional gravel shoulder width extending past asphalt borders. */
+    /** Additional gravel shoulder width extending past asphalt borders. @default 4.0 */
     public static inline var BED_EXTRA_WIDTH:Float = 4.0;
 
-    /** Vertical elevation offset preventing coplanar Z-fighting between asphalt and sub-base. */
+    /** Vertical elevation offset preventing coplanar Z-fighting between asphalt and sub-base. @default 0.06 */
     public static inline var ROAD_LIFT:Float = 0.06;
 
-    /** Height of steel barrier guardrails above the asphalt plane in meters. */
+    /** Height of steel barrier guardrails above the asphalt plane in meters. @default 0.65 */
     public static inline var RAIL_HEIGHT:Float = 0.65;
 
     /**
      * Constructs and synthesizes the procedural circuit world.
      *
-     * @param parent Optional parent 3D scene graph node.
+     * @param {Null<Object>} [parent] Optional parent 3D scene graph node.
+     * @param {Null<config.WorldConfig.TrackConfig>} [config] Optional track geometry/friction configuration.
      */
-    public function new(?parent:Object) {
+    public function new(?parent:Object, ?config:config.WorldConfig.TrackConfig) {
         super(parent);
+        this.config = config != null ? config : WorldConfig.getDefaultTrack();
+        buildSurroundingTerrain();
         buildCircuitWaypoints();
         buildRoadBed();
         buildRoadRibbon();
@@ -71,23 +84,31 @@ class Track extends Object implements IGroundProvider {
     }
 
     /**
-     * Interpolates control keypoints using cubic Catmull-Rom splines into dense waypoint arrays.
+     * Builds the underlying ambient ground plane surrounding the circuit loop.
+     *
+     * @returns {Void}
      */
-    function buildCircuitWaypoints() {
-        var rawNodes = [
-            new Vector(0,    0,    0),
-            new Vector(0,    85,   0),
-            new Vector(30,   170,  1.5),
-            new Vector(90,   240,  3.0),
-            new Vector(170,  260,  3.0),
-            new Vector(250,  215,  1.5),
-            new Vector(280,  135,  0),
-            new Vector(255,  45,  -1.0),
-            new Vector(175, -25,  -1.0),
-            new Vector(110,  10,   0),
-            new Vector(60,  -40,   0),
-            new Vector(10,  -60,   0)
-        ];
+    private function buildSurroundingTerrain():Void {
+        var terrainPrim = new Cube(config.terrainWidth, config.terrainHeight, 0.4, true);
+        terrainPrim.unindex();
+        terrainPrim.addNormals();
+        terrainGround = new Mesh(terrainPrim, this);
+        terrainGround.material.color.setColor(config.terrainColor);
+        terrainGround.x = 110.0;
+        terrainGround.y = 90.0;
+        terrainGround.z = config.terrainZ;
+    }
+
+    /**
+     * Interpolates control keypoints using cubic Catmull-Rom splines into dense waypoint arrays.
+     *
+     * @returns {Void}
+     */
+    function buildCircuitWaypoints():Void {
+        var rawNodes:Array<Vector> = [];
+        for (node in config.controlNodes) {
+            rawNodes.push(new Vector(node[0], node[1], node[2]));
+        }
 
         var segments = 16;
         var n = rawNodes.length;
@@ -403,6 +424,8 @@ class Track extends Object implements IGroundProvider {
 
     /**
      * Computes the asphalt road elevation at the closest track centerline point.
+     * Extends a flat support shelf past the Armco guardrail so outer suspension
+     * raycasts remain supported when the chassis rides flush against the wall.
      *
      * @param x World X coordinate in meters.
      * @param y World Y coordinate in meters.
@@ -412,10 +435,12 @@ class Track extends Object implements IGroundProvider {
         scratchQuery.set(x, y, 0);
         var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
         var dist = Math.sqrt(proj.distSq);
-        if (dist <= HALF_WIDTH) {
+        var shelfHalf = HALF_WIDTH + 1.8;
+        var maxBed = HALF_WIDTH + BED_EXTRA_WIDTH;
+        if (dist <= shelfHalf) {
             return proj.z + ROAD_LIFT;
-        } else if (dist <= HALF_WIDTH + 2.0) {
-            var t = (dist - HALF_WIDTH) / 2.0;
+        } else if (dist <= maxBed) {
+            var t = (dist - shelfHalf) / (maxBed - shelfHalf);
             return (proj.z + ROAD_LIFT) * (1.0 - t) + (-2.5) * t;
         } else {
             return -2.5;
@@ -424,6 +449,8 @@ class Track extends Object implements IGroundProvider {
 
     /**
      * Computes road surface normal gradient at the closest track segment.
+     * Samples elevation along the centerline tangent so lateral wheel offsets near
+     * the guardrail never tilt the normal off the exterior embankment.
      *
      * @param x World X coordinate in meters.
      * @param y World Y coordinate in meters.
@@ -433,15 +460,15 @@ class Track extends Object implements IGroundProvider {
         scratchQuery.set(x, y, 0);
         var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
         var dist = Math.sqrt(proj.distSq);
-        if (dist > HALF_WIDTH + 2.0) {
+        if (dist > HALF_WIDTH + BED_EXTRA_WIDTH) {
             outNormal.set(0, 0, 1.0);
             return;
         }
         var tx = proj.segDirX;
         var ty = proj.segDirY;
         var eps = 0.5;
-        var zAhead = getGroundElevation(x + tx * eps, y + ty * eps);
-        var zBehind = getGroundElevation(x - tx * eps, y - ty * eps);
+        var zAhead = getGroundElevation(proj.centerPoint.x + tx * eps, proj.centerPoint.y + ty * eps);
+        var zBehind = getGroundElevation(proj.centerPoint.x - tx * eps, proj.centerPoint.y - ty * eps);
         var slopePitch = (zAhead - zBehind) / (2.0 * eps);
         var nx = -tx * slopePitch;
         var ny = -ty * slopePitch;
@@ -453,39 +480,51 @@ class Track extends Object implements IGroundProvider {
     /**
      * Returns surface friction coefficient for the active track section.
      *
-     * @param x World X coordinate in meters.
-     * @param y World Y coordinate in meters.
-     * @return Surface friction scalar.
+     * @param {Float} x World X coordinate in meters.
+     * @param {Float} y World Y coordinate in meters.
+     * @returns {Float} Surface friction scalar (`mu`).
      */
     public function getGroundFriction(x:Float, y:Float):Float {
         scratchQuery.set(x, y, 0);
         var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
         var dist = Math.sqrt(proj.distSq);
-        if (dist <= HALF_WIDTH) {
-            return 1.0; // High-grip asphalt
+        if (dist <= HALF_WIDTH - 1.2) {
+            return config.asphaltFriction; // Clean racing asphalt
+        } else if (dist <= HALF_WIDTH) {
+            return config.asphaltFriction * 0.88; // Outer painted kerb / rumble strip
         } else if (dist <= HALF_WIDTH + 2.0) {
-            return 0.65; // Gravel shoulder
+            return 0.55; // Loose gravel / dirt shoulder
         } else {
-            return 0.50; // Off-road dirt
+            return config.offroadFriction;
         }
     }
 
     /**
      * Enforces continuous Armco guardrail containment boundaries.
-     * Clamps vehicle inside the legal asphalt corridor and applies scrape friction.
+     * Clamps vehicle inside the legal asphalt corridor, preserves roadbed vertical
+     * floor clearance, and applies scrape friction.
+     *
+     * @param {Vector} pos Player position updated in-place on boundary hit.
+     * @param {Float} forwardSpeed Current longitudinal speed in m/s.
+     * @param {Float} lateralVelocity Current lateral speed in m/s.
+     * @returns {{ hitWall:Bool, speedMult:Float, latMult:Float }} Containment response.
      */
     public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
         scratchQuery.set(pos.x, pos.y, 0);
         var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
 
         var lateralDist = Math.sqrt(proj.distSq);
-        var maxHalf = HALF_WIDTH - 0.3; // Armco barrier inner collision rail
+        var maxHalf = config.halfWidth - 0.75;
         if (lateralDist > maxHalf && lateralDist > 0.001) {
             scratchFromCenter.set(pos.x - proj.centerPoint.x, pos.y - proj.centerPoint.y, 0);
             scratchFromCenter.normalize();
             pos.x = proj.centerPoint.x + scratchFromCenter.x * maxHalf;
             pos.y = proj.centerPoint.y + scratchFromCenter.y * maxHalf;
-            return { hitWall: true, speedMult: 0.94, latMult: 0.0 };
+            var roadFloorZ = proj.z + ROAD_LIFT;
+            if (pos.z < roadFloorZ) {
+                pos.z = roadFloorZ;
+            }
+            return { hitWall: true, speedMult: config.wallStickiness, latMult: 0.0 };
         }
         return { hitWall: false, speedMult: 1.0, latMult: 1.0 };
     }
@@ -505,7 +544,7 @@ class Track extends Object implements IGroundProvider {
         var body = new oimo.dynamics.rigidbody.RigidBody(rbConfig);
 
         var shapeConfig = new oimo.dynamics.rigidbody.ShapeConfig();
-        shapeConfig.geometry = new oimo.collision.geometry.BoxGeometry(new oimo.common.Vec3(500.0, 500.0, 5.0));
+        shapeConfig.geometry = new oimo.collision.geometry.BoxGeometry(new oimo.common.Vec3(config.foundationHalfSpan, config.foundationHalfSpan, 5.0));
         shapeConfig.restitution = 0.2;
         shapeConfig.friction = 0.5;
         body.addShape(new oimo.dynamics.rigidbody.Shape(shapeConfig));

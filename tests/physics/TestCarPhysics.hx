@@ -3,324 +3,260 @@ package tests.physics;
 import utest.Test;
 import utest.Assert;
 import h3d.Vector;
+import oimo.dynamics.World;
 import input.InputController;
-import physics.CarPhysics;
 import physics.CarConfig;
+import physics.CarPhysics;
+import world.IGroundProvider;
 
 /**
- * Unit test suite validating raycast suspension dynamics, Pacejka slip curves,
- * drift state machine transitions, and nitro capacity drain/recharge.
+ * Deterministic mock terrain provider supporting flat ground, sloped ramps,
+ * and configurable tire surface friction for isolated physics validation.
+ */
+class MockGroundProvider implements IGroundProvider {
+    public var mode:String = "flat";
+    public var friction:Float = 1.0;
+    public var slopeRadians:Float = 0.22; // ~12.6 deg
+    public var rampStartY:Float = 15.0;
+
+    public function new(?mode:String = "flat", friction:Float = 1.0) {
+        this.mode = mode;
+        this.friction = friction;
+    }
+
+    public function getGroundElevation(x:Float, y:Float):Float {
+        if (mode == "ramp") {
+            if (y <= rampStartY) return 0.0;
+            return (y - rampStartY) * Math.tan(slopeRadians);
+        } else if (mode == "hill") {
+            return y * Math.tan(slopeRadians);
+        }
+        return 0.0;
+    }
+
+    public function getGroundNormal(x:Float, y:Float, out:Vector):Void {
+        var active = (mode == "hill") || (mode == "ramp" && y > rampStartY);
+        if (active) {
+            out.set(0.0, -Math.sin(slopeRadians), Math.cos(slopeRadians));
+        } else {
+            out.set(0.0, 0.0, 1.0);
+        }
+    }
+
+    public function getGroundFriction(x:Float, y:Float):Float {
+        return friction;
+    }
+
+    public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
+        return { hitWall: false, speedMult: 1.0, latMult: 1.0 };
+    }
+
+    public function registerPhysicsColliders(world:World):Void {}
+    public function unregisterPhysicsColliders(world:World):Void {}
+}
+
+/**
+ * Comprehensive verification suite for the 4-wheel raycast CarPhysics engine:
+ * equilibrium stability, standstill slope stiction, acceleration/gears, reverse interlock,
+ * left/right steering sign correctness, smooth slope climbing, surface friction, boost, and Oimo sync.
  */
 class TestCarPhysics extends Test {
     var car:CarPhysics;
     var input:InputController;
+    var dt:Float = 1.0 / 60.0;
 
     public function setup() {
-        car = new CarPhysics();
+        car = new CarPhysics(0.0, 0.0, 0.0);
         input = new InputController();
     }
 
-    public function testInitialState() {
-        Assert.floatEquals(0.0, car.forwardSpeed, 0.001);
-        Assert.floatEquals(1.0, car.boostFuel, 0.001);
-        Assert.isFalse(car.isDrifting);
-        Assert.isFalse(car.isBoosting);
-        Assert.equals(4, car.suspLength.length);
-        Assert.equals(4, car.wheelOnGround.length);
-    }
-
-    public function testTunablePropertiesClamping() {
-        // tireSlipBias clamped [-1.0 .. 1.0]
-        car.tireSlipBias = -1.5;
-        Assert.floatEquals(-1.0, car.tireSlipBias, 0.001);
-        car.tireSlipBias = 2.0;
-        Assert.floatEquals(1.0, car.tireSlipBias, 0.001);
-        car.tireSlipBias = -0.3;
-        Assert.floatEquals(-0.3, car.tireSlipBias, 0.001);
-
-        // groundFriction
-        car.groundFriction = 1.25;
-        Assert.floatEquals(1.25, car.groundFriction, 0.001);
-
-        // driftTriggerAngle
-        car.driftTriggerAngle = 0.28;
-        Assert.floatEquals(0.28, car.driftTriggerAngle, 0.001);
-
-        // bodyRollScale
-        car.bodyRollScale = 0.85;
-        Assert.floatEquals(0.85, car.bodyRollScale, 0.001);
-    }
-
-    public function testThrottleAcceleration() {
-        input.throttle = 1.0;
-        input.brake = 0.0;
-        input.steer = 0.0;
-
-        // Simulate 1 second of forward driving
-        for (i in 0...60) {
-            car.update(1.0 / 60.0, input);
+    function stepSimulation(seconds:Float, steer:Float, throttle:Float, brake:Float, ?ground:IGroundProvider, handbrake:Bool = false, boost:Bool = false) {
+        var frames = Math.round(seconds / dt);
+        for (_ in 0...frames) {
+            input.steer = steer;
+            input.throttle = throttle;
+            input.brake = brake;
+            input.handbrake = handbrake;
+            input.boost = boost;
+            car.update(dt, input, null, ground);
         }
-
-        Assert.isTrue(car.forwardSpeed > 5.0, "Car should accelerate forward under full throttle");
-        Assert.isTrue(car.engineRPM > 1000.0, "Engine RPM should rise above idle during acceleration");
     }
 
-    public function testBrakingDeceleration() {
-        car.forwardSpeed = 30.0;
-        input.throttle = 0.0;
-        input.brake = 1.0;
-
-        for (i in 0...30) {
-            car.update(1.0 / 60.0, input);
-        }
-
-        Assert.isTrue(car.forwardSpeed < 30.0, "Car should decelerate under braking");
-    }
-
-    public function testNitroDrainAndRecharge() {
-        car.forwardSpeed = 20.0;
-        input.throttle = 1.0;
-        input.boost = true;
-
-        // Drain for 1 second
-        for (i in 0...60) {
-            car.update(1.0 / 60.0, input);
-        }
-
-        Assert.isTrue(car.isBoosting, "Car should be actively boosting");
-        Assert.isTrue(car.boostFuel < 1.0, "Boost fuel should drain while boosting");
-        var fuelAfterDrain = car.boostFuel;
-
-        // Stop boosting, let recharge for 1 second
-        input.boost = false;
-        for (i in 0...60) {
-            car.update(1.0 / 60.0, input);
-        }
-
-        Assert.isFalse(car.isBoosting, "Boosting should be inactive");
-        Assert.isTrue(car.boostFuel > fuelAfterDrain, "Boost fuel should recover over time");
-        Assert.isTrue(car.boostFuel <= 1.0, "Boost fuel should not exceed 100%");
-    }
-
-    public function testNitroDepletionStopsBoost() {
-        car.forwardSpeed = 20.0;
-        car.boostFuel = 0.02; // Nearly empty
-        input.throttle = 1.0;
-        input.boost = true;
-
-        for (i in 0...30) {
-            car.update(1.0 / 60.0, input);
-        }
-
-        Assert.isFalse(car.isBoosting, "Boosting must shut off once nitro fuel is exhausted");
-        Assert.floatEquals(0.0, car.boostFuel, 0.01);
-    }
-
-    public function testDriftInitiationViaHandbrake() {
-        car.forwardSpeed = 25.0; // Above minDriftSpeed
-        input.throttle = 1.0;
-        input.steer = 0.8; // Sharp steering
-        input.handbrake = true; // Trigger drift
-
-        for (i in 0...15) {
-            car.update(1.0 / 60.0, input);
-        }
-
-        Assert.isTrue(car.isDrifting, "Car should initiate drift when handbrake is engaged with steering");
-        Assert.isTrue(car.driftDirection != 0.0, "Drift direction should indicate left or right bias");
-    }
-
-    public function testDriftExitOnLowSpeed() {
-        car.forwardSpeed = 20.0;
-        car.isDrifting = true;
-        car.driftDirection = 1.0;
-
-        // Drop speed below exit threshold
-        car.forwardSpeed = 1.0;
-        input.handbrake = false;
-        input.steer = 0.0;
-
-        car.update(1.0 / 60.0, input);
-        Assert.isFalse(car.isDrifting, "Drift should terminate when speed drops below threshold");
-    }
-
-    public function testOimoRigidBodyBackbone() {
-        Assert.notNull(car.physicsWorld, "Oimo physics world must be initialized");
-        Assert.notNull(car.chassisBody, "Oimo chassis rigid body must be instantiated");
-
-        // Verify gravity along -Z
-        var g = car.physicsWorld.getGravity();
-        Assert.floatEquals(0.0, g.x, 0.001);
-        Assert.floatEquals(0.0, g.y, 0.001);
-        Assert.floatEquals(-9.81, g.z, 0.001);
-
-        // Verify chassis position
-        var pos = car.chassisBody.getPosition();
-        Assert.floatEquals(car.pos.x, pos.x, 0.001);
-        Assert.floatEquals(car.pos.y, pos.y, 0.001);
-        Assert.floatEquals(car.pos.z + 0.35, pos.z, 0.001);
-    }
-
-    public function testResetStateOimoSync() {
-        car.resetState(50.0, -120.0, 5.0, 3.14159);
-        Assert.floatEquals(50.0, car.pos.x, 0.001);
-        Assert.floatEquals(-120.0, car.pos.y, 0.001);
-        Assert.floatEquals(5.0, car.pos.z, 0.001);
-
-        var bPos = car.chassisBody.getPosition();
-        Assert.floatEquals(50.0, bPos.x, 0.001);
-        Assert.floatEquals(-120.0, bPos.y, 0.001);
-        Assert.floatEquals(5.35, bPos.z, 0.001);
-
-        var bVel = car.chassisBody.getLinearVelocity();
-        Assert.floatEquals(0.0, bVel.length(), 0.001);
-    }
-
-    public function testSteeringDirectionRightAndLeft() {
-        // Facing +Y (yaw = 0): steering right (+1.0) turns car rightward on screen toward +X
+    public function testFlatStandstillNoWobbleOrBounce() {
+        var ground = new MockGroundProvider("flat", 1.0);
         car.resetState(0.0, 0.0, 0.0, 0.0);
-        car.forwardSpeed = 20.0;
-        input.throttle = 1.0;
-        input.steer = 1.0; // Steer Right (D)
 
-        for (i in 0...30) {
-            car.update(1.0 / 60.0, input);
-        }
+        stepSimulation(2.0, 0.0, 0.0, 0.0, ground);
 
-        Assert.isTrue(car.yaw > 0.05, "Steering right (+1.0) must turn car rightward on screen");
-        Assert.isTrue(car.pos.x > 0.2, "Steering right (+1.0) while moving +Y must move vehicle rightward (+X)");
-        Assert.isTrue(car.pos.y > 5.0, "Vehicle must advance along +Y (Forward)");
+        Assert.floatEquals(0.0, car.pos.x, 0.005);
+        Assert.floatEquals(0.0, car.pos.y, 0.005);
+        Assert.floatEquals(0.0, car.pos.z, 0.025);
+        Assert.floatEquals(0.0, car.forwardSpeed, 0.02);
+        Assert.floatEquals(0.0, car.yaw, 0.005);
+        Assert.floatEquals(0.0, car.pitch, 0.02);
+        Assert.floatEquals(0.0, car.roll, 0.02);
+        Assert.equals(4, car.groundedWheelCount);
+        Assert.floatEquals(car.config.suspension.restLength, car.suspLength[0], 0.03);
+    }
 
-        // Facing +Y (yaw = 0): steering left (-1.0) turns car leftward on screen toward -X
+    public function testSlopeStandstillStictionHoldsWithoutCreep() {
+        var ground = new MockGroundProvider("hill", 1.0);
+        ground.slopeRadians = 0.18; // ~10.3 deg grade
         car.resetState(0.0, 0.0, 0.0, 0.0);
-        car.forwardSpeed = 20.0;
-        input.throttle = 1.0;
-        input.steer = -1.0; // Steer Left (A)
+        car.pitch = 0.18;
 
-        for (i in 0...30) {
-            car.update(1.0 / 60.0, input);
+        stepSimulation(2.0, 0.0, 0.0, 0.0, ground);
+
+        // Static friction holds car steady without rolling down the slope
+        Assert.isTrue(Math.abs(car.forwardSpeed) < 0.10, "Parked car crept down moderate slope: " + car.forwardSpeed);
+        Assert.isTrue(Math.abs(car.pos.y) < 0.10, "Parked car shifted Y on slope: " + car.pos.y);
+    }
+
+    public function testAccelerationShiftsThroughGears() {
+        var ground = new MockGroundProvider("flat", 1.0);
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+
+        stepSimulation(4.5, 0.0, 1.0, 0.0, ground);
+
+        Assert.isTrue(car.forwardSpeed > 28.0, "Expected strong acceleration > 28 m/s, got " + car.forwardSpeed);
+        Assert.isTrue(car.currentGear >= 2, "Expected automatic upshift >= 2nd gear, got " + car.currentGear);
+        Assert.isTrue(car.engineRPM > car.config.drivetrain.idleRPM);
+        Assert.isTrue(car.pos.y > 60.0);
+    }
+
+    public function testBrakingStopsAndEngagesReverse() {
+        var ground = new MockGroundProvider("flat", 1.0);
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+
+        stepSimulation(2.0, 0.0, 1.0, 0.0, ground);
+        var speedBeforeBrake = car.forwardSpeed;
+        Assert.isTrue(speedBeforeBrake > 12.0);
+
+        stepSimulation(3.5, 0.0, 0.0, 1.0, ground);
+        Assert.equals(-1, car.currentGear);
+        Assert.isTrue(car.forwardSpeed < -3.0, "Expected vehicle reversing when holding brake past stop, got " + car.forwardSpeed);
+    }
+
+    public function testSteeringLeftTurnsNegativeXAndRightTurnsPositiveX() {
+        var ground = new MockGroundProvider("flat", 1.0);
+
+        // Left steering test (input.steer < 0)
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        stepSimulation(0.8, 0.0, 1.0, 0.0, ground);
+        stepSimulation(1.4, -1.0, 1.0, 0.0, ground);
+        var leftPosX = car.pos.x;
+        var leftYaw = car.yaw;
+        Assert.isTrue(leftYaw < -0.25, "Steer Left must yield negative yaw, got " + leftYaw);
+        Assert.isTrue(leftPosX < -1.5, "Steer Left must translate vehicle toward -X, got " + leftPosX);
+
+        // Right steering test (input.steer > 0)
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        stepSimulation(0.8, 0.0, 1.0, 0.0, ground);
+        stepSimulation(1.4, 1.0, 1.0, 0.0, ground);
+        var rightPosX = car.pos.x;
+        var rightYaw = car.yaw;
+        Assert.isTrue(rightYaw > 0.25, "Steer Right must yield positive yaw, got " + rightYaw);
+        Assert.isTrue(rightPosX > 1.5, "Steer Right must translate vehicle toward +X, got " + rightPosX);
+
+        // Symmetric handling left vs right
+        Assert.floatEquals(-leftPosX, rightPosX, 0.25);
+        Assert.floatEquals(-leftYaw, rightYaw, 0.08);
+    }
+
+    public function testPartialAnalogSteerProducesProportionateArc() {
+        var ground = new MockGroundProvider("flat", 1.0);
+
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        stepSimulation(0.8, 0.0, 1.0, 0.0, ground);
+        stepSimulation(1.0, -0.45, 1.0, 0.0, ground);
+        var mildYaw = car.yaw;
+
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        stepSimulation(0.8, 0.0, 1.0, 0.0, ground);
+        stepSimulation(1.0, -1.0, 1.0, 0.0, ground);
+        var fullYaw = car.yaw;
+
+        Assert.isTrue(mildYaw < -0.05 && mildYaw > fullYaw, "Partial left stick should turn less sharply than full stick");
+    }
+
+    public function testSmoothSlopeClimbWithoutCatapultLaunch() {
+        var rampGround = new MockGroundProvider("ramp", 1.0);
+        rampGround.slopeRadians = 0.24; // ~13.7 deg continuous ramp starting at y = 15
+        rampGround.rampStartY = 15.0;
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+
+        var maxVerticalSpeed = 0.0;
+        var maxClearanceGap = 0.0;
+
+        var totalFrames = Math.round(3.5 / dt);
+        for (f in 0...totalFrames) {
+            input.steer = 0.0;
+            input.throttle = 1.0;
+            input.brake = 0.0;
+            input.handbrake = false;
+            input.boost = false;
+            car.update(dt, input, null, rampGround);
+
+            if (car.verticalVelocity > maxVerticalSpeed) maxVerticalSpeed = car.verticalVelocity;
+            var terrainZ = rampGround.getGroundElevation(car.pos.x, car.pos.y);
+            var gap = car.pos.z - terrainZ;
+            if (gap > maxClearanceGap) maxClearanceGap = gap;
         }
 
-        Assert.isTrue(car.yaw < -0.05, "Steering left (-1.0) must turn car leftward on screen");
-        Assert.isTrue(car.pos.x < -0.2, "Steering left (-1.0) while moving +Y must move vehicle leftward (-X)");
+        var finalTerrainZ = rampGround.getGroundElevation(car.pos.x, car.pos.y);
+        Assert.isTrue(car.pos.y > 40.0, "Car must climb onto ramp cleanly, y=" + car.pos.y);
+        Assert.isTrue(car.pos.z > 4.0, "Car must climb vertically up ramp, z=" + car.pos.z);
+        Assert.isTrue(car.pitch > 0.05, "Chassis nose must pitch up smoothly on ramp, pitch=" + car.pitch);
+        Assert.isTrue(maxClearanceGap < 0.75, "Ramp transition must NOT catapult car into the sky: maxGap=" + maxClearanceGap);
+        Assert.isTrue(car.pos.z >= finalTerrainZ - 0.35, "Car must not fall through ramp surface");
     }
 
-    public function testCarMeshAndWheelRimAlignment() {
-        var mesh = new entities.CarMesh();
-        Assert.equals(4, mesh.wheels.length);
-        Assert.equals(4, mesh.rimCaps.length);
+    public function testSurfaceMaterialFrictionGovernsGrip() {
+        var dryAsphalt = new MockGroundProvider("flat", 1.05);
+        var slickIce = new MockGroundProvider("flat", 0.22);
 
-        // Body mesh centered at Y = 0.0
-        Assert.floatEquals(0.0, mesh.bodyMesh.y, 0.001);
+        // Corner at speed on dry asphalt
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        stepSimulation(1.0, 0.0, 1.0, 0.0, dryAsphalt);
+        stepSimulation(1.2, 0.9, 0.6, 0.0, dryAsphalt);
+        var dryYaw = car.yaw;
 
-        // Left wheels (0: FL, 2: RL) are at x = -0.98 and rimCaps at z < 0 (pointing outward along -X)
-        Assert.floatEquals(-0.98, mesh.wheels[0].x, 0.001);
-        Assert.isTrue(mesh.rimCaps[0].z < 0.0, "Front-left rim cap must be on outer left face (-X)");
-        Assert.floatEquals(-0.98, mesh.wheels[2].x, 0.001);
-        Assert.isTrue(mesh.rimCaps[2].z < 0.0, "Rear-left rim cap must be on outer left face (-X)");
+        // Same cornering maneuver on slick ice
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        stepSimulation(1.0, 0.0, 1.0, 0.0, dryAsphalt);
+        stepSimulation(1.2, 0.9, 0.6, 0.0, slickIce);
+        var iceYaw = car.yaw;
 
-        // Right wheels (1: FR, 3: RR) are at x = +0.98 and rimCaps at z > 0 (pointing outward along +X)
-        Assert.floatEquals(0.98, mesh.wheels[1].x, 0.001);
-        Assert.isTrue(mesh.rimCaps[1].z > 0.0, "Front-right rim cap must be on outer right face (+X)");
-        Assert.floatEquals(0.98, mesh.wheels[3].x, 0.001);
-        Assert.isTrue(mesh.rimCaps[3].z > 0.0, "Rear-right rim cap must be on outer right face (+X)");
+        Assert.isTrue(dryYaw > iceYaw + 0.15, "Higher surface friction must provide sharper turn-in rate (" + dryYaw + " vs " + iceYaw + ")");
     }
 
-    public function testZeroFrictionAndRestitutionRule() {
-        var shape = car.chassisBody.getShapeList();
-        Assert.notNull(shape, "Chassis body shape must be present");
-        Assert.floatEquals(0.0, shape.getFriction(), 0.001);
-        Assert.floatEquals(0.0, shape.getRestitution(), 0.001);
+    public function testNitrousBoostAndRegeneration() {
+        var ground = new MockGroundProvider("flat", 1.0);
+
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        stepSimulation(2.0, 0.0, 1.0, 0.0, ground, false, false);
+        var normalSpeed = car.forwardSpeed;
+
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        stepSimulation(2.0, 0.0, 1.0, 0.0, ground, false, true);
+        var boostSpeed = car.forwardSpeed;
+        var fuelAfterBurn = car.boostFuel;
+
+        Assert.isTrue(boostSpeed > normalSpeed + 2.0, "Nitrous boost must increase speed significantly");
+        Assert.isTrue(fuelAfterBurn < car.config.boost.maxFuel - 0.2);
+
+        stepSimulation(2.0, 0.0, 0.0, 0.0, ground, false, false);
+        Assert.isTrue(car.boostFuel > fuelAfterBurn, "Nitrous fuel must regenerate after releasing boost");
     }
 
-    public function testIsGroundedStateDetection() {
-        // When dropped from 15.0m elevation (in mid-air)
-        car.resetState(0.0, 0.0, 15.0, 0.0);
-        car.update(1.0 / 60.0, input);
-        Assert.isFalse(car.isGrounded, "Car at 15.0m elevation with ground at 0.0m must be airborne (isGrounded == false)");
-
-        // When positioned on the road (Z = 0.06m)
-        car.resetState(0.0, 0.0, 0.06, 0.0);
-        car.update(1.0 / 60.0, input);
-        Assert.isTrue(car.isGrounded, "Car positioned at road surface must be grounded (isGrounded == true)");
-    }
-
-    public function testLandingBufferEnergyTranslation() {
-        // Place car airborne falling at -10 m/s
-        car.resetState(0.0, 0.0, 2.0, 0.0);
-        car.forwardSpeed = 20.0;
-        car.verticalVelocity = -10.0;
+    public function testOimoRigidBodySync() {
+        car.resetState(12.5, -45.0, 2.0, 0.0);
+        car.forwardSpeed = 24.0;
         car.syncToOimoBody();
-        car.update(1.0 / 60.0, input);
-        Assert.isFalse(car.isGrounded, "Car at 2.0m height must be airborne");
 
-        // Touchdown occurs on road surface (Z = 0.06)
-        car.pos.z = 0.06;
-        car.verticalVelocity = -10.0;
-        car.forwardSpeed = 20.0;
-        car.syncToOimoBody();
-        var speedBeforeLanding = car.forwardSpeed;
-
-        car.update(1.0 / 60.0, input);
-        Assert.isTrue(car.isGrounded, "Car should land on ground contact");
-        // 30% of 10 m/s downward velocity should translate into forward speed (+3.0 m/s)
-        Assert.isTrue(car.forwardSpeed > speedBeforeLanding + 2.0, "Landing buffer must convert vertical downward velocity into forward boost");
-    }
-
-    public function testHeadingDirectionVectorsConsistency() {
-        var carFwd = new h3d.Vector();
-        var carRight = new h3d.Vector();
-
-        // Yaw = 0 (Facing +Y forward, +X right)
-        car.yaw = 0.0;
-        car.getForwardVector(carFwd);
-        car.getRightVector(carRight);
-        Assert.floatEquals(0.0, carFwd.x, 0.001);
-        Assert.floatEquals(1.0, carFwd.y, 0.001);
-        Assert.floatEquals(1.0, carRight.x, 0.001);
-        Assert.floatEquals(0.0, carRight.y, 0.001);
-
-        // TrafficCar heading consistency
-        var dummyMesh = new entities.TrafficCarMesh(0xFFFFFF);
-        var tc = new entities.TrafficSystem.TrafficCar(dummyMesh, 0, false, 17.0);
-        tc.yaw = 1.5707963; // Facing +Y in standard angle (pi/2)
-        var tcFwd = new h3d.Vector();
-        var tcRight = new h3d.Vector();
-        tc.getForwardVector(tcFwd);
-        tc.getRightVector(tcRight);
-        Assert.floatEquals(0.0, tcFwd.x, 0.001);
-        Assert.floatEquals(1.0, tcFwd.y, 0.001);
-        Assert.floatEquals(1.0, tcRight.x, 0.001);
-        Assert.floatEquals(0.0, tcRight.y, 0.001);
-    }
-
-    public function testCarMeshPublicConstantsAndWheelTransform() {
-        Assert.floatEquals(0.36, entities.CarMesh.TIRE_RADIUS, 0.001);
-        Assert.floatEquals(0.30, entities.CarMesh.TIRE_WIDTH, 0.001);
-        Assert.floatEquals(1.88, entities.CarMesh.CHASSIS_WIDTH, 0.001);
-        Assert.floatEquals(4.30, entities.CarMesh.CHASSIS_LENGTH, 0.001);
-
-        var mesh = new entities.CarMesh();
-        mesh.updateWheelTransform(0, 0.10, 1.5, 0.35);
-        Assert.floatEquals(entities.CarMesh.TIRE_RADIUS + 0.10 * 0.45, mesh.wheels[0].z, 0.001);
-    }
-
-    public function testStandstillStabilizationNoWobble() {
-        car.resetState(0.0, 0.0, 0.0, 0.0);
-        car.forwardSpeed = 0.05;
-        car.lateralVelocity = 0.05;
-        input.throttle = 0.0;
-        input.brake = 0.0;
-        input.steer = 0.0;
-
-        for (i in 0...60) {
-            car.update(1.0 / 60.0, input);
-        }
-
-        Assert.floatEquals(0.0, car.forwardSpeed, 0.01);
-        Assert.floatEquals(0.0, car.lateralVelocity, 0.01);
-        var angVel = car.chassisBody.getAngularVelocity();
-        Assert.floatEquals(0.0, angVel.z, 0.01);
+        Assert.floatEquals(12.5, car.chassisBody.getPosition().x, 0.001);
+        Assert.floatEquals(-45.0, car.chassisBody.getPosition().y, 0.001);
+        Assert.floatEquals(2.0 + car.config.chassis.cogHeight, car.chassisBody.getPosition().z, 0.001);
+        Assert.floatEquals(24.0, car.chassisBody.getLinearVelocity().y, 0.01);
     }
 }
-

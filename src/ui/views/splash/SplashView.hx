@@ -10,6 +10,10 @@ import ui.components.CardBackplate;
 
 /**
  * Title splash screen with game logo, cyber backing badge, and animated pulsating entrance prompt.
+ *
+ * @class SplashView
+ * @extends h2d.Object
+ * @module ui/views/splash/SplashView
  */
 class SplashView extends Object {
     /** Vector graphics backdrop for title and prompt capsules. */

@@ -4,6 +4,13 @@ import h3d.Vector;
 
 /**
  * Result data structure describing the orthogonal projection of a point onto a track segment.
+ *
+ * @typedef {Object} SegmentProjection
+ * @property {Vector} centerPoint Closest 3D coordinate located along the segment centerline.
+ * @property {Float} distSq Squared Euclidean distance from the query point to the centerline.
+ * @property {Float} z Interpolated track elevation (Z coordinate) at the projection point.
+ * @property {Float} segDirX Normalized unit heading X component along the segment.
+ * @property {Float} segDirY Normalized unit heading Y component along the segment.
  */
 typedef SegmentProjection = {
     /** The closest 3D coordinate point located along the segment centerline. */
@@ -25,18 +32,21 @@ typedef SegmentProjection = {
 /**
  * Mathematical utilities for cubic Catmull-Rom spline curves and track segment projections.
  * Provides continuous interpolation for smooth racetrack geometry and collision projection.
+ *
+ * @class SplineMath
+ * @module physics/SplineMath
  */
 class SplineMath {
     /**
      * Evaluates standard cubic Catmull-Rom spline interpolation between control nodes p1 and p2.
      * Uses adjacent control nodes p0 and p3 to establish smooth tangent continuity.
      *
-     * @param p0 Position value of the preceding control point.
-     * @param p1 Position value of the starting segment control point.
-     * @param p2 Position value of the ending segment control point.
-     * @param p3 Position value of the subsequent control point.
-     * @param t Normalized interpolation parameter along the segment in the range [0.0, 1.0].
-     * @return Interpolated coordinate scalar along the spline curve.
+     * @param {Float} p0 Position value of the preceding control point.
+     * @param {Float} p1 Position value of the starting segment control point.
+     * @param {Float} p2 Position value of the ending segment control point.
+     * @param {Float} p3 Position value of the subsequent control point.
+     * @param {Float} t Normalized interpolation parameter along the segment in [0.0, 1.0].
+     * @returns {Float} Interpolated coordinate scalar along the spline curve.
      */
     public static inline function catmullRom(p0:Float, p1:Float, p2:Float, p3:Float, t:Float):Float {
         var t2 = t * t;
@@ -48,10 +58,10 @@ class SplineMath {
      * Projects an arbitrary 3D position onto a finite 3D line segment spanned between nodes `a` and `b`.
      * Calculates the nearest point on the segment, squared distance, and segment tangent orientation.
      *
-     * @param p Query coordinate in world space.
-     * @param a Segment starting node vector.
-     * @param b Segment ending node vector.
-     * @return Projection record containing closest point, squared distance, Z elevation, and heading vector.
+     * @param {Vector} p Query coordinate in world space.
+     * @param {Vector} a Segment starting node vector.
+     * @param {Vector} b Segment ending node vector.
+     * @returns {SegmentProjection} Closest point, squared distance, Z elevation, and heading vector.
      */
     public static function projectOntoSegment(p:Vector, a:Vector, b:Vector):SegmentProjection {
         var abX = b.x - a.x;
@@ -94,9 +104,9 @@ class SplineMath {
     /**
      * Identifies the closest adjacent track spline segment along a closed circular waypoint loop.
      *
-     * @param p Query coordinate in world space.
-     * @param waypoints Array of loop waypoints ordered chronologically around the closed track.
-     * @return Best matching segment projection record with minimum squared distance.
+     * @param {Vector} p Query coordinate in world space.
+     * @param {Array<Vector>} waypoints Ordered closed-loop track centerline waypoints.
+     * @returns {SegmentProjection} Best matching segment projection record with minimum squared distance.
      */
     public static function getClosestSegment(p:Vector, waypoints:Array<Vector>):SegmentProjection {
         var count = waypoints.length;

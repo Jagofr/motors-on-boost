@@ -15,6 +15,10 @@ import audio.AudioManager;
 /**
  * Composite hardware configuration and options modal container view.
  * Integrates tab navigation across Graphics, Audio, Keyboard, and Gamepad subpanels.
+ *
+ * @class OptionsView
+ * @extends h2d.Object
+ * @module ui/views/options/OptionsView
  */
 @:keep
 class OptionsView extends Object {
@@ -45,6 +49,9 @@ class OptionsView extends Object {
 
     /** Callback invoked when the user selects back / return. */
     public var onBack:Void->Void;
+
+    /** Callback invoked whenever the active OptionsTab changes so modal backplates redraw. */
+    public var onTabChanged:Null<Void->Void>;
 
     /** True if opened during an active race. */
     public var isOpenedFromPause:Bool = false;
@@ -154,6 +161,7 @@ class OptionsView extends Object {
         }
 
         updateTabStyles();
+        if (onTabChanged != null) onTabChanged();
     }
 
     /**

@@ -11,6 +11,10 @@ import audio.AudioManager;
 
 /**
  * Audio channels volume sliders configuration subpanel view.
+ *
+ * @class AudioOptionsPanel
+ * @extends h2d.Object
+ * @module ui/views/options/AudioOptionsPanel
  */
 class AudioOptionsPanel extends Object {
     /** Text items displaying channel labels and slider bars. */

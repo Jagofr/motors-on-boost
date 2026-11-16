@@ -6,6 +6,10 @@ import h3d.shader.ScreenShader;
  * Screen-space radial directional motion blur post-processing shader.
  * Samples scene pixels along vectors radiating from a focal origin point
  * (such as the vehicle vanishing point or screen center) scaled dynamically by vehicle velocity.
+ *
+ * @class RadialBlurShader
+ * @extends h3d.shader.ScreenShader
+ * @module graphics/RadialBlurShader
  */
 class RadialBlurShader extends ScreenShader {
     static var SRC = {

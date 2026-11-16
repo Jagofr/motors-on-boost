@@ -1,6 +1,7 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { attachSocketRelay } = require('../server/socket-relay');
 
 const PORT = 7725;
 const WEB_DIR = path.resolve(__dirname, '..', 'web');
@@ -39,7 +40,9 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(filePath).pipe(res);
 });
 
+attachSocketRelay(server, '/ws');
+
 server.listen(PORT, '127.0.0.1', () => {
-  console.log(`[AITests Server] Serving ${WEB_DIR} at http://127.0.0.1:${PORT}`);
+  console.log(`[AITests Server] Serving ${WEB_DIR} at http://127.0.0.1:${PORT} (WS Relay at /ws)`);
 });
 

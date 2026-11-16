@@ -1,5 +1,6 @@
 package world;
 
+import config.WorldConfig;
 import h3d.scene.Object;
 import h3d.scene.Mesh;
 import h3d.prim.Polygon;
@@ -19,6 +20,11 @@ import hxd.IndexBuffer;
  * - Banked 25-degree high-speed bowl for high lateral-G cornering and Pacejka drift breakaway.
  * - 4 high-mast perimeter floodlight towers providing balanced illumination without harsh shadows.
  * - Invisible elastic boundary walls at +/-195 meters.
+ *
+ * @class SandboxMap
+ * @extends h3d.scene.Object
+ * @implements IGroundProvider
+ * @module world/SandboxMap
  */
 class SandboxMap extends Object implements IGroundProvider {
     /** Primary terrain surface mesh. */
@@ -48,15 +54,20 @@ class SandboxMap extends Object implements IGroundProvider {
     /** Launch ramp crest elevation in meters. */
     public static inline var RAMP_CREST_Z:Float = 3.8;
 
+    /** Active configurable sandbox map parameters. */
+    public var config:config.WorldConfig.SandboxConfig;
+
     var scratchNormal:Vector = new Vector();
 
     /**
      * Constructs and initializes the open sandbox proving grounds.
      *
-     * @param parent Optional parent 3D scene graph node.
+     * @param {Null<Object>} [parent] Optional parent 3D scene graph node.
+     * @param {Null<config.WorldConfig.SandboxConfig>} [config] Optional arena feature & surface configuration.
      */
-    public function new(?parent:Object) {
+    public function new(?parent:Object, ?config:config.WorldConfig.SandboxConfig) {
         super(parent);
+        this.config = config != null ? config : WorldConfig.getDefaultSandbox();
         buildTerrainMesh();
         buildSkidpad();
         buildFloodlights();
@@ -98,26 +109,21 @@ class SandboxMap extends Object implements IGroundProvider {
             elev += HILL_APEX_Z * hillEnvelope;
         }
 
-        // 4. Inclined Launch Ramp (X in [-22, 22], Y in [70, 125])
-        if (x >= -22.0 && x <= 22.0 && y >= 70.0 && y <= 125.0) {
-            var xEdgeDist = Math.min(22.0 - Math.abs(x), 4.0) / 4.0;
-            if (y <= 120.0) {
-                var rampFrac = (y - 70.0) / 50.0;
-                elev += Math.max(0.0, rampFrac * rampFrac * RAMP_CREST_Z * xEdgeDist);
-            } else {
-                // Sharp drop-off crest lip over 5 meters
-                var dropFrac = 1.0 - ((y - 120.0) / 5.0);
-                elev += Math.max(0.0, dropFrac * RAMP_CREST_Z * xEdgeDist);
-            }
+        // 4. Inclined Launch Ramp (X in [-24, 24], Y in [70, 120])
+        if (x >= -24.0 && x <= 24.0 && y >= 70.0 && y <= 120.0) {
+            var xFrac = Math.sin(((x + 24.0) / 48.0) * Math.PI);
+            var rampFrac = (y - 70.0) / 50.0;
+            elev += rampFrac * rampFrac * RAMP_CREST_Z * xFrac;
         }
 
         // 5. Banked High-Speed Bowl (Centered at X: -100, Y: -100)
+        // Uses smooth cosine/sine blend: peak at radius ~70m (~5.0m elevation) and smoothly tapers to 0 at r=25m and r=100m
         var bowlDx = x - (-100.0);
         var bowlDy = y - (-100.0);
         var bowlDist = Math.sqrt(bowlDx * bowlDx + bowlDy * bowlDy);
-        if (bowlDist > 25.0 && bowlDist < 75.0) {
-            var bowlFrac = (bowlDist - 25.0) / 50.0;
-            elev += Math.sin(bowlFrac * (Math.PI * 0.5)) * 5.2;
+        if (bowlDist > 25.0 && bowlDist < 100.0) {
+            var bowlFrac = (bowlDist - 25.0) / 75.0;
+            elev += Math.sin(bowlFrac * Math.PI) * 5.0;
         }
 
         return elev;
@@ -147,27 +153,30 @@ class SandboxMap extends Object implements IGroundProvider {
     /**
      * Computes surface friction coefficient mu across proving ground sectors.
      *
-     * @param x World X coordinate in meters.
-     * @param y World Y coordinate in meters.
-     * @return Surface friction scalar.
+     * @param {Float} x World X coordinate in meters.
+     * @param {Float} y World Y coordinate in meters.
+     * @returns {Float} Surface friction scalar (`mu`).
      */
     public function getGroundFriction(x:Float, y:Float):Float {
         var distSq = x * x + y * y;
         if (distSq < 36.0 * 36.0) {
-            return 1.05; // High-grip asphalt skidpad
+            return config.skidpadFriction; // High-grip dry asphalt skidpad
+        }
+        if (distSq < 52.0 * 52.0) {
+            return 0.44; // Low-grip wet/polished transition apron around skidpad
         }
         if (x >= -22.0 && x <= 22.0 && y >= 70.0 && y <= 125.0) {
-            return 1.0; // Launch ramp surface
+            return config.concreteFeatureFriction; // High-grip concrete launch ramp
         }
         if (x > 35.0 && x < 140.0 && y > -50.0 && y < 50.0) {
-            return 0.85; // Rolling moguls
+            return 0.58; // Loose dirt & gravel moguls
         }
         var hillDx = x - (-95.0);
         var hillDy = y - 95.0;
         if (hillDx * hillDx + hillDy * hillDy < 60.0 * 60.0) {
-            return 0.80; // Mountain hill climb
+            return 0.62; // Packed dirt mountain climb
         }
-        return 0.75; // Proving grounds dirt/snow baseline
+        return config.turfFriction; // Proving grounds dirt/turf baseline
     }
 
     /**
@@ -259,7 +268,7 @@ class SandboxMap extends Object implements IGroundProvider {
      * Constructs the 3D polygon mesh representation of the continuous heightfield.
      */
     function buildTerrainMesh() {
-        var divisions = 64;
+        var divisions = 96;
         var step = (HALF_SPAN * 2.0) / divisions;
 
         var pts:Array<Point> = [];

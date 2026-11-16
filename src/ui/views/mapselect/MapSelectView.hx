@@ -14,6 +14,10 @@ import audio.AudioManager;
  * Singleplayer map selection screen view.
  * Allows the player to choose between the Highway Circuit and Open Sandbox Proving Grounds
  * before starting a singleplayer driving session.
+ *
+ * @class MapSelectView
+ * @extends h2d.Object
+ * @module ui/views/mapselect/MapSelectView
  */
 @:keep
 class MapSelectView extends Object {

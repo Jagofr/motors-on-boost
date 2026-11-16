@@ -11,6 +11,10 @@ import Version;
 
 /**
  * Game development credits, authorship attribution, and technology disclosure view.
+ *
+ * @class CreditsView
+ * @extends h2d.Object
+ * @module ui/views/credits/CreditsView
  */
 class CreditsView extends Object {
     /** Title banner display. */

@@ -10,6 +10,10 @@ import audio.AudioManager;
 
 /**
  * Mid-race pause menu modal overlay view.
+ *
+ * @class PauseMenuView
+ * @extends h2d.Object
+ * @module ui/views/pause/PauseMenuView
  */
 @:keep
 class PauseMenuView extends Object {

@@ -5,7 +5,7 @@
  * falling back to local cached assets if offline or if network encounters errors.
  */
 
-const CACHE_NAME = 'mob-motors-on-boost-v0-4-1';
+const CACHE_NAME = 'mob-motors-on-boost-v0-6-1';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -52,8 +52,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Bypass chrome-extension and non-HTTP/HTTPS schemes
+  // Bypass chrome-extension, non-HTTP/HTTPS schemes, and live multiplayer relay endpoints
   if (!event.request.url.startsWith('http://') && !event.request.url.startsWith('https://')) {
+    return;
+  }
+  if (event.request.url.includes('relay.ashx') || event.request.url.includes('/ws')) {
     return;
   }
 

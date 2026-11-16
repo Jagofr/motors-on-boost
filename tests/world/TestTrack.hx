@@ -70,11 +70,19 @@ class TestTrack extends Test {
         var resInside = track.enforceBoundaries(insidePos, 20.0, 0.0);
         Assert.isFalse(resInside.hitWall);
 
-        // Boundary enforcement outside track (breached Armco rail at lateral > 10m)
-        var outsidePos = new Vector(15.0, 10, 0);
+        // Boundary enforcement outside track (breached Armco rail at lateral > 9.25m)
+        var outsidePos = new Vector(15.0, 10, -1.0);
         var resOutside = track.enforceBoundaries(outsidePos, 20.0, 0.0);
+        var clampedSurfaceZ = track.getGroundElevation(outsidePos.x, outsidePos.y);
         Assert.isTrue(resOutside.hitWall);
         Assert.floatEquals(0.94, resOutside.speedMult, 0.001);
+        Assert.isTrue(outsidePos.z >= clampedSurfaceZ - 0.001, "Boundary enforcement must keep chassis at or above roadbed surface");
+
+        // Guardrail wheel support shelf: outer wheel at x = 9.25 + 0.98 = 10.23m matches inner roadbed elevation
+        Assert.floatEquals(clampedSurfaceZ, track.getGroundElevation(10.23, 10.0), 0.01);
+        var railNormal = new Vector();
+        track.getGroundNormal(10.23, 10.0, railNormal);
+        Assert.isTrue(railNormal.z > 0.99, "Outer wheel near guardrail must not receive embankment cliff normal");
     }
 }
 

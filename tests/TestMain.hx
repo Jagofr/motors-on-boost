@@ -4,6 +4,7 @@ import utest.Runner;
 import utest.ITest;
 import utest.ui.text.PrintReport;
 import tests.core.TestVersion;
+import tests.core.TestBootAndConfig;
 import tests.physics.TestSplineMath;
 import tests.physics.TestCarConfig;
 import tests.physics.TestCarPhysics;
@@ -16,7 +17,9 @@ import tests.camera.TestChaseCamera;
 import tests.ui.TestGraphicsOptions;
 import tests.ui.TestTouchControls;
 import tests.ui.TestMapSelectAndRestart;
+import tests.ui.TestFullMenuAndOptionsFlow;
 import tests.audio.TestAudioManager;
+import tests.net.TestMultiplayer;
 
 /**
  * Main test runner executing full test suite across all codebase modules.
@@ -84,6 +87,7 @@ class TestMain {
 
         var cases:Array<{mod:String, name:String, testCase:utest.ITest}> = [
             { mod: "core", name: "TestVersion", testCase: new TestVersion() },
+            { mod: "core", name: "TestBootAndConfig", testCase: new TestBootAndConfig() },
             { mod: "physics", name: "TestSplineMath", testCase: new TestSplineMath() },
             { mod: "physics", name: "TestCarConfig", testCase: new TestCarConfig() },
             { mod: "physics", name: "TestCarPhysics", testCase: new TestCarPhysics() },
@@ -96,7 +100,9 @@ class TestMain {
             { mod: "ui", name: "TestGraphicsOptions", testCase: new TestGraphicsOptions() },
             { mod: "ui", name: "TestTouchControls", testCase: new TestTouchControls() },
             { mod: "ui", name: "TestMapSelectAndRestart", testCase: new TestMapSelectAndRestart() },
-            { mod: "audio", name: "TestAudioManager", testCase: new TestAudioManager() }
+            { mod: "ui", name: "TestFullMenuAndOptionsFlow", testCase: new TestFullMenuAndOptionsFlow() },
+            { mod: "audio", name: "TestAudioManager", testCase: new TestAudioManager() },
+            { mod: "net", name: "TestMultiplayer", testCase: new TestMultiplayer() }
         ];
 
         var countAdded = 0;

@@ -4,6 +4,7 @@ import h2d.Object;
 import h2d.Graphics;
 import h2d.Bitmap;
 import h2d.Tile;
+import core.AssetPreloader;
 import input.InputController;
 import ui.components.UITheme;
 import save.SaveSystem;
@@ -17,6 +18,9 @@ import save.SaveSystem.TouchSettings;
  * Uses custom 512x512 vector icons loaded from `res/icons` with frosted glass plate styling.
  * Fully independent multi-touch concurrency supporting simultaneous chords
  * (Gas + Steer, Gas + Nitro, Gas + Drift, Drift + Nitro, Brake + Nitro, etc.).
+ *
+ * @class TouchControlsHUD
+ * @extends h2d.Object
  */
 class TouchControlsHUD extends Object {
     /** Reference to active input controller. */
@@ -24,6 +28,9 @@ class TouchControlsHUD extends Object {
 
     /** Mobile touch layout configuration profile. */
     public var touchSettings:TouchSettings = null;
+
+    /** Optional provider returning up-to-date touch layout settings. */
+    public var getTouchSettings:Null<Void -> TouchSettings>;
 
     /** Vector graphics context for virtual button plates and indicators. */
     public var canvas:Graphics;
@@ -124,42 +131,11 @@ class TouchControlsHUD extends Object {
 
         canvas = new Graphics(this);
 
-        // Load custom PNG icons from res/icons (512x512 source)
-        try {
-            var burnTile = hxd.Res.load("icons/burn.png").toTile();
-            burnTile.setCenterRatio(0.5, 0.5);
-            nitroIconBmp = new Bitmap(burnTile, this);
-            nitroIconBmp.smooth = true;
-        } catch (e:haxe.Exception) {
-            trace("[TouchControlsHUD] Failed to load icons/burn.png: " + e.message);
-        }
-
-        try {
-            var gasTile = hxd.Res.load("icons/gas-pedal.png").toTile();
-            gasTile.setCenterRatio(0.5, 0.5);
-            gasIconBmp = new Bitmap(gasTile, this);
-            gasIconBmp.smooth = true;
-        } catch (e:haxe.Exception) {
-            trace("[TouchControlsHUD] Failed to load icons/gas-pedal.png: " + e.message);
-        }
-
-        try {
-            var brakeTile = hxd.Res.load("icons/brake.png").toTile();
-            brakeTile.setCenterRatio(0.5, 0.5);
-            brakeIconBmp = new Bitmap(brakeTile, this);
-            brakeIconBmp.smooth = true;
-        } catch (e:haxe.Exception) {
-            trace("[TouchControlsHUD] Failed to load icons/brake.png: " + e.message);
-        }
-
-        try {
-            var handbrakeTile = hxd.Res.load("icons/hand-brake.png").toTile();
-            handbrakeTile.setCenterRatio(0.5, 0.5);
-            driftIconBmp = new Bitmap(handbrakeTile, this);
-            driftIconBmp.smooth = true;
-        } catch (e:haxe.Exception) {
-            trace("[TouchControlsHUD] Failed to load icons/hand-brake.png: " + e.message);
-        }
+        // Load custom PNG icons safely from res/icons cache (512x512 source)
+        nitroIconBmp = loadIconBitmap("icons/burn.png");
+        gasIconBmp = loadIconBitmap("icons/gas-pedal.png");
+        brakeIconBmp = loadIconBitmap("icons/brake.png");
+        driftIconBmp = loadIconBitmap("icons/hand-brake.png");
 
         // Register window event target for Heaps / desktop / test dispatching
         windowEventTarget = onWindowEvent;
@@ -171,9 +147,12 @@ class TouchControlsHUD extends Object {
             nativeCanvas = cast js.Browser.document.getElementById("webgl");
             if (nativeCanvas != null) {
                 nativeTouchStartHandler = function(e:js.html.TouchEvent) {
-                    if (!visible || !inputRef.isTouchActive) {
-                        inputRef.isTouchActive = true;
+                    inputRef.isTouchActive = true;
+                    if (parent == null || !parent.visible) return;
+                    if (!visible) {
                         visible = true;
+                        var s2d = getScene();
+                        if (s2d != null) layout(s2d.width, s2d.height);
                     }
                     e.preventDefault();
                     for (t in e.changedTouches) {
@@ -183,6 +162,7 @@ class TouchControlsHUD extends Object {
                     }
                 };
                 nativeTouchMoveHandler = function(e:js.html.TouchEvent) {
+                    if (parent == null || !parent.visible || !visible) return;
                     e.preventDefault();
                     for (t in e.changedTouches) {
                         var p = clientToHUD(t.clientX, t.clientY);
@@ -190,6 +170,10 @@ class TouchControlsHUD extends Object {
                     }
                 };
                 nativeTouchEndHandler = function(e:js.html.TouchEvent) {
+                    if (parent == null || !parent.visible || !visible) {
+                        for (t in e.changedTouches) nativeTouchesActive.remove(t.identifier);
+                        return;
+                    }
                     e.preventDefault();
                     for (t in e.changedTouches) {
                         nativeTouchesActive.remove(t.identifier);
@@ -197,6 +181,10 @@ class TouchControlsHUD extends Object {
                     }
                 };
                 nativeTouchCancelHandler = function(e:js.html.TouchEvent) {
+                    if (parent == null || !parent.visible || !visible) {
+                        for (t in e.changedTouches) nativeTouchesActive.remove(t.identifier);
+                        return;
+                    }
                     e.preventDefault();
                     for (t in e.changedTouches) {
                         nativeTouchesActive.remove(t.identifier);
@@ -712,11 +700,29 @@ class TouchControlsHUD extends Object {
         canvas.endFill();
     }
 
+    function loadIconBitmap(path:String):Null<Bitmap> {
+        var tile = AssetPreloader.tryLoadEmbeddedTile(path);
+        if (tile == null) return null;
+        var centered = tile.clone();
+        centered.setCenterRatio(0.5, 0.5);
+        var bmp = new Bitmap(centered, this);
+        bmp.smooth = true;
+        return bmp;
+    }
+
+    function resolveTouchSettings():TouchSettings {
+        if (getTouchSettings != null) {
+            var provided = getTouchSettings();
+            if (provided != null) return provided;
+        }
+        return SaveSystem.load().touchSettings;
+    }
+
     /**
      * Re-reads touch configuration profile from storage and updates button positions.
      */
     public function refreshSettings() {
-        touchSettings = SaveSystem.load().touchSettings;
+        touchSettings = resolveTouchSettings();
         var s2d = getScene();
         if (s2d != null) {
             layout(s2d.width, s2d.height);
@@ -728,12 +734,12 @@ class TouchControlsHUD extends Object {
      * Preserves exact ergonomically separated positions across all display aspect ratios
      * while applying custom offsets and scales when in Custom mode.
      *
-     * @param sw Screen width in pixels.
-     * @param sh Screen height in pixels.
+     * @param {Float} sw Screen width in pixels.
+     * @param {Float} sh Screen height in pixels.
      */
     public function layout(sw:Float, sh:Float) {
         if (touchSettings == null) {
-            touchSettings = SaveSystem.load().touchSettings;
+            touchSettings = resolveTouchSettings();
         }
 
         var s:Float = 1.0;

@@ -10,7 +10,32 @@ import graphics.GraphicsManager;
 import audio.AudioManager;
 
 /**
+ * Declarative descriptor for a single configurable graphics option row.
+ *
+ * @typedef {Object} GraphicsOptionDef
+ * @property {String} name Short identifier name.
+ * @property {String} label UI display label prefix.
+ * @property {Bool} [menuOnly=false] Locks editing while inside an active run.
+ * @property {Bool} [triggersLayout=false] Triggers UI re-layout when changed.
+ * @property {GraphicsSettings->Bool} [disabledWhen] Predicate disabling the row.
+ * @property {GraphicsSettings->String} formatValue Formats the current setting value.
+ * @property {GraphicsSettings->Int->Void} cycle Advances or rewinds the option value.
+ */
+typedef GraphicsOptionDef = {
+    var name:String;
+    var label:String;
+    @:optional var menuOnly:Bool;
+    @:optional var triggersLayout:Bool;
+    @:optional var disabledWhen:GraphicsSettings->Bool;
+    var formatValue:GraphicsSettings->String;
+    var cycle:GraphicsSettings->Int->Void;
+}
+
+/**
  * Graphics hardware and rendering quality settings subpanel view.
+ *
+ * @class GraphicsOptionsPanel
+ * @extends h2d.Object
  */
 class GraphicsOptionsPanel extends Object {
     /** Graphics option label text objects. */
@@ -37,11 +62,100 @@ class GraphicsOptionsPanel extends Object {
     /** Audio frequency played when cycling graphics parameters in Hz. */
     public static inline var AUDIO_CYCLE_FREQ:Float = 480.0;
 
-    public static var NAMES:Array<String> = [
-        "Textures", "Shadow Level", "Shadow Res", "Lighting", "Lighting Res",
-        "Mipmapping", "Anisotropy", "Anti-Aliasing", "AA Level", "Model Geometry",
-        "Reflections", "Reflection Level", "Render Scale", "UI Resolution"
+    static var OPTION_DEFS:Array<GraphicsOptionDef> = [
+        {
+            name: "Textures", label: "Texture Fidelity:    ", menuOnly: true,
+            formatValue: s -> s.textures,
+            cycle: (s, d) -> s.textures = cycleArray(["Off", "Very Low", "Low", "Medium", "High", "Ultra", "Unreal"], s.textures, d)
+        },
+        {
+            name: "Shadow Level", label: "Shadow Quality:      ",
+            formatValue: s -> s.shadowLevel,
+            cycle: (s, d) -> {
+                s.shadowLevel = cycleArray(["Off", "Normal", "High", "Ultra", "Dynamic"], s.shadowLevel, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyShadows();
+            }
+        },
+        {
+            name: "Shadow Res", label: "Shadow Buffer:       ",
+            disabledWhen: s -> s.shadowLevel == "Off",
+            formatValue: s -> s.shadowRes + "p",
+            cycle: (s, d) -> {
+                s.shadowRes = cycleArray([512, 1024, 2048, 4096], s.shadowRes, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyShadows();
+            }
+        },
+        {
+            name: "Lighting", label: "Lighting Pipeline:   ", menuOnly: true,
+            formatValue: s -> s.lightingLevel,
+            cycle: (s, d) -> {
+                s.lightingLevel = cycleArray(["Low", "Medium", "High", "Ultra (RTX/Path)"], s.lightingLevel, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyLighting();
+            }
+        },
+        {
+            name: "Lighting Res", label: "Light Buffer:        ",
+            formatValue: s -> s.lightingRes + "p",
+            cycle: (s, d) -> s.lightingRes = cycleArray([512, 1024, 2048], s.lightingRes, d)
+        },
+        {
+            name: "Mipmapping", label: "Mipmapping Filters:  ", menuOnly: true,
+            formatValue: s -> s.mipmapping ? "Enabled" : "Disabled",
+            cycle: (s, _) -> s.mipmapping = !s.mipmapping
+        },
+        {
+            name: "Anisotropy", label: "Anisotropy Sampling: ", menuOnly: true,
+            disabledWhen: s -> !s.mipmapping,
+            formatValue: s -> s.anisotropic + "x",
+            cycle: (s, d) -> s.anisotropic = cycleArray([1, 2, 4, 8, 16], s.anisotropic, d)
+        },
+        {
+            name: "Anti-Aliasing", label: "Anti-Aliasing Pass:  ",
+            formatValue: s -> s.aaType,
+            cycle: (s, d) -> s.aaType = cycleArray(["None", "FXAA", "TSAA", "SMAA", "MSAA"], s.aaType, d)
+        },
+        {
+            name: "AA Level", label: "AA Multiplier:       ",
+            disabledWhen: s -> s.aaType == "None",
+            formatValue: s -> s.aaLevel + "x",
+            cycle: (s, d) -> s.aaLevel = cycleArray([2, 4, 8], s.aaLevel, d)
+        },
+        {
+            name: "Model Geometry", label: "Model Geometry LOD:  ", menuOnly: true,
+            formatValue: s -> s.modelGeometry,
+            cycle: (s, d) -> s.modelGeometry = cycleArray(["Very Low", "Low", "Medium", "High", "Ultra"], s.modelGeometry, d)
+        },
+        {
+            name: "Reflections", label: "Screen Reflections:  ",
+            formatValue: s -> s.modelReflections ? "Active" : "Disabled",
+            cycle: (s, _) -> s.modelReflections = !s.modelReflections
+        },
+        {
+            name: "Reflection Level", label: "Reflection Updates:  ",
+            disabledWhen: s -> !s.modelReflections,
+            formatValue: s -> s.reflectionLevel,
+            cycle: (s, d) -> s.reflectionLevel = cycleArray(["Low", "Medium", "High", "Ultra"], s.reflectionLevel, d)
+        },
+        {
+            name: "Render Scale", label: "3D Render Resolution:",
+            formatValue: s -> s.renderScale + "x (" + Math.round(s.renderScale * 100) + "%)",
+            cycle: (s, d) -> {
+                s.renderScale = cycleArray([0.25, 0.334, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0], s.renderScale, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyRenderScale();
+            }
+        },
+        {
+            name: "UI Resolution", label: "UI Interface Target: ", triggersLayout: true,
+            formatValue: s -> s.uiResolution,
+            cycle: (s, d) -> {
+                s.uiResolution = cycleArray(["720p (HD)", "1080p (FHD)", "1440p (2K)", "2160p (4K)", "Native / Match Window"], s.uiResolution, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyUIResolution();
+            }
+        }
     ];
+
+    /** Ordered display names corresponding to each option index. */
+    public static var NAMES:Array<String> = [for (def in OPTION_DEFS) def.name];
 
     /** Callback invoked when UI resolution changes so the parent options view and UI can immediately re-layout. */
     public var onUIResolutionChanged:Void->Void;
@@ -112,92 +226,40 @@ class GraphicsOptionsPanel extends Object {
     /**
      * Checks if a graphics setting is currently disabled due to its parent option setting.
      *
-     * @param idx Option index.
-     * @return True if the option should be grayed out and non-interactive.
+     * @param {Int} idx Option index.
+     * @returns {Bool} True if the option should be grayed out and non-interactive.
      */
     public function isOptionDisabled(idx:Int):Bool {
-        switch (idx) {
-            case 2: return settings.shadowLevel == "Off";
-            case 6: return !settings.mipmapping;
-            case 8: return settings.aaType == "None";
-            case 11: return !settings.modelReflections;
-            default: return false;
-        }
+        if (idx < 0 || idx >= OPTION_DEFS.length) return false;
+        var pred = OPTION_DEFS[idx].disabledWhen;
+        return (pred != null) ? pred(settings) : false;
     }
 
     /**
      * Cycles an option setting in forward (+1) or backward (-1) direction.
      *
-     * @param idx Option index.
-     * @param dir Direction multiplier.
+     * @param {Int} idx Option index.
+     * @param {Int} dir Direction multiplier.
      */
     public function cycleOption(idx:Int, dir:Int) {
+        if (idx < 0 || idx >= OPTION_DEFS.length) return;
         if (isOptionDisabled(idx)) {
             AudioManager.inst.playMenuBeep(220.0, 0.05);
             return;
         }
 
         AudioManager.inst.playMenuBeep(AUDIO_CYCLE_FREQ, 0.05);
-        var s = settings;
+        var def = OPTION_DEFS[idx];
+        if (isOpenedFromPause && def.menuOnly == true) return;
 
-        switch (idx) {
-            case 0:
-                if (isOpenedFromPause) return;
-                var list = ["Off", "Very Low", "Low", "Medium", "High", "Ultra", "Unreal"];
-                s.textures = cycleArray(list, s.textures, dir);
-            case 1:
-                var list = ["Off", "Normal", "High", "Ultra", "Dynamic"];
-                s.shadowLevel = cycleArray(list, s.shadowLevel, dir);
-                if (GraphicsManager.inst != null) GraphicsManager.inst.applyShadows();
-            case 2:
-                var list = [512, 1024, 2048, 4096];
-                s.shadowRes = cycleArray(list, s.shadowRes, dir);
-                if (GraphicsManager.inst != null) GraphicsManager.inst.applyShadows();
-            case 3:
-                if (isOpenedFromPause) return;
-                var list = ["Low", "Medium", "High", "Ultra (RTX/Path)"];
-                s.lightingLevel = cycleArray(list, s.lightingLevel, dir);
-                if (GraphicsManager.inst != null) GraphicsManager.inst.applyLighting();
-            case 4:
-                var list = [512, 1024, 2048];
-                s.lightingRes = cycleArray(list, s.lightingRes, dir);
-            case 5:
-                if (isOpenedFromPause) return;
-                s.mipmapping = !s.mipmapping;
-            case 6:
-                if (isOpenedFromPause) return;
-                var list = [1, 2, 4, 8, 16];
-                s.anisotropic = cycleArray(list, s.anisotropic, dir);
-            case 7:
-                var list = ["None", "FXAA", "TSAA", "SMAA", "MSAA"];
-                s.aaType = cycleArray(list, s.aaType, dir);
-            case 8:
-                var list = [2, 4, 8];
-                s.aaLevel = cycleArray(list, s.aaLevel, dir);
-            case 9:
-                if (isOpenedFromPause) return;
-                var list = ["Very Low", "Low", "Medium", "High", "Ultra"];
-                s.modelGeometry = cycleArray(list, s.modelGeometry, dir);
-            case 10:
-                s.modelReflections = !s.modelReflections;
-            case 11:
-                var list = ["Low", "Medium", "High", "Ultra"];
-                s.reflectionLevel = cycleArray(list, s.reflectionLevel, dir);
-            case 12:
-                var list = [0.25, 0.334, 0.5, 0.75, 1.0, 2.0, 3.0, 4.0];
-                s.renderScale = cycleArray(list, s.renderScale, dir);
-                if (GraphicsManager.inst != null) GraphicsManager.inst.applyRenderScale();
-            case 13:
-                var list = ["720p (HD)", "1080p (FHD)", "1440p (2K)", "2160p (4K)", "Native / Match Window"];
-                s.uiResolution = cycleArray(list, s.uiResolution, dir);
-                if (GraphicsManager.inst != null) GraphicsManager.inst.applyUIResolution();
-                if (onUIResolutionChanged != null) onUIResolutionChanged();
+        def.cycle(settings, dir);
+        if (def.triggersLayout == true && onUIResolutionChanged != null) {
+            onUIResolutionChanged();
         }
-
         updateStyles();
     }
 
-    function cycleArray<T>(arr:Array<T>, curr:T, dir:Int):T {
+    static function cycleArray<T>(arr:Array<T>, curr:T, dir:Int):T {
         var idx = arr.indexOf(curr);
         if (idx == -1) idx = 0;
         var next = (idx + dir + arr.length) % arr.length;
@@ -207,7 +269,7 @@ class GraphicsOptionsPanel extends Object {
     /**
      * Navigates cursor up or down with automated viewport scrolling.
      *
-     * @param dir Navigation offset (-1 or +1).
+     * @param {Int} dir Navigation offset (-1 or +1).
      */
     public function navigate(dir:Int) {
         selectedIndex = (selectedIndex + dir + items.length) % items.length;
@@ -220,7 +282,7 @@ class GraphicsOptionsPanel extends Object {
     /**
      * Scrolls the visible option rows up or down.
      *
-     * @param dir Scroll direction delta (-1 or +1).
+     * @param {Int} dir Scroll direction delta (-1 or +1).
      */
     public function scroll(dir:Int) {
         var maxScroll = Math.max(0, items.length - maxVisibleRows);
@@ -248,61 +310,31 @@ class GraphicsOptionsPanel extends Object {
      * Refreshes text displays and highlights.
      */
     public function updateStyles() {
-        var s = settings;
         var inGameLocked = isOpenedFromPause;
 
-        var shadowResStr = isOptionDisabled(2) ? "[DISABLED]" : (s.shadowRes + "p");
-        var anisoStr = isOptionDisabled(6) ? "[DISABLED]" : (s.anisotropic + "x");
-        var aaLevelStr = isOptionDisabled(8) ? "[DISABLED]" : (s.aaLevel + "x");
-        var reflLevelStr = isOptionDisabled(11) ? "[DISABLED]" : s.reflectionLevel;
-
-        var vals = [
-            s.textures + (inGameLocked ? " [LOCKED IN-RUN]" : ""),
-            s.shadowLevel,
-            shadowResStr,
-            s.lightingLevel + (inGameLocked ? " [LOCKED IN-RUN]" : ""),
-            s.lightingRes + "p",
-            (s.mipmapping ? "Enabled" : "Disabled") + (inGameLocked ? " [LOCKED IN-RUN]" : ""),
-            anisoStr + (inGameLocked && !isOptionDisabled(6) ? " [LOCKED IN-RUN]" : ""),
-            s.aaType,
-            aaLevelStr,
-            s.modelGeometry + (inGameLocked ? " [LOCKED IN-RUN]" : ""),
-            s.modelReflections ? "Active" : "Disabled",
-            reflLevelStr,
-            s.renderScale + "x (" + Math.round(s.renderScale * 100) + "%)",
-            s.uiResolution
-        ];
-
-        var titles = [
-            "Texture Fidelity:    ", "Shadow Quality:      ", "Shadow Buffer:       ", "Lighting Pipeline:   ", "Light Buffer:        ",
-            "Mipmapping Filters:  ", "Anisotropy Sampling: ", "Anti-Aliasing Pass:  ", "AA Multiplier:       ", "Model Geometry LOD:  ",
-            "Screen Reflections:  ", "Reflection Updates:  ", "3D Render Resolution:", "UI Interface Target: "
-        ];
-
         for (i in 0...items.length) {
+            var def = OPTION_DEFS[i];
             var item = items[i];
-            var isLocked = inGameLocked && (i == 0 || i == 3 || i == 5 || i == 6 || i == 9);
             var isDisabled = isOptionDisabled(i);
+            var isMenuOnly = (def.menuOnly == true);
+            var isLocked = inGameLocked && isMenuOnly;
 
-            if (i == selectedIndex) {
-                if (isDisabled) {
-                    item.textColor = UITheme.COLOR_TEXT_DISABLED;
-                } else if (isLocked) {
-                    item.textColor = UITheme.COLOR_TEXT_MUTED;
-                } else {
-                    item.textColor = UITheme.COLOR_ACCENT_CYAN;
-                }
-                item.text = "> " + titles[i] + vals[i] + " <";
+            var valueStr = isDisabled ? "[DISABLED]" : def.formatValue(settings);
+            if (!isDisabled && isLocked) valueStr += " [LOCKED IN-RUN]";
+
+            if (isDisabled) {
+                item.textColor = UITheme.COLOR_TEXT_DISABLED;
+            } else if (isLocked) {
+                item.textColor = UITheme.COLOR_TEXT_MUTED;
+            } else if (i == selectedIndex) {
+                item.textColor = UITheme.COLOR_ACCENT_CYAN;
             } else {
-                if (isDisabled) {
-                    item.textColor = UITheme.COLOR_TEXT_DISABLED;
-                } else if (isLocked) {
-                    item.textColor = UITheme.COLOR_TEXT_MUTED;
-                } else {
-                    item.textColor = UITheme.COLOR_TEXT_NORMAL;
-                }
-                item.text = "  " + titles[i] + vals[i] + "  ";
+                item.textColor = UITheme.COLOR_TEXT_NORMAL;
             }
+
+            var prefix = (i == selectedIndex) ? "> " : "  ";
+            var suffix = (i == selectedIndex) ? " <" : "  ";
+            item.text = prefix + def.label + valueStr + suffix;
         }
     }
 

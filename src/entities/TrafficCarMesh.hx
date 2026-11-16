@@ -9,6 +9,10 @@ import h3d.prim.Disc;
 /**
  * Procedural 3D composite mesh representation of civilian traffic vehicles.
  * Generates chassis, tinted cabin glass, illuminated front headlights, red taillights, and 4 wheels.
+ *
+ * @class TrafficCarMesh
+ * @extends h3d.scene.Object
+ * @module entities/TrafficCarMesh
  */
 class TrafficCarMesh extends Object {
     /** Main chassis body mesh rendered with assigned traffic paint color. */

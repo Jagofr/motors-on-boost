@@ -106,6 +106,40 @@ typedef GameSaveData = {
 
     /** Mobile touch controls positioning, offsets, and scale profile. */
     var ?touchSettings:TouchSettings;
+
+    /** Optional persisted key & gamepad custom bindings snapshot. */
+    var ?bindings:SavedInputBindings;
+
+    /** Optional persisted exclusive hardware device filter ("Both", "KeyboardOnly", "GamepadOnly"). */
+    var ?exclusiveDevice:String;
+}
+
+/**
+ * Serialized keyboard scan-codes and gamepad button indices persisted between sessions.
+ *
+ * @typedef {Object} SavedInputBindings
+ * @property {Int} keyLeft Keyboard key code for left steer.
+ * @property {Int} keyRight Keyboard key code for right steer.
+ * @property {Int} keyGas Keyboard key code for throttle.
+ * @property {Int} keyBrake Keyboard key code for braking/reverse.
+ * @property {Int} keyHandbrake Keyboard key code for handbrake.
+ * @property {Int} keyBoost Keyboard key code for boost.
+ * @property {Int} padGas Gamepad button index for throttle.
+ * @property {Int} padBrake Gamepad button index for brake.
+ * @property {Int} padHandbrake Gamepad button index for handbrake.
+ * @property {Int} padBoost Gamepad button index for boost.
+ */
+typedef SavedInputBindings = {
+    var keyLeft:Int;
+    var keyRight:Int;
+    var keyGas:Int;
+    var keyBrake:Int;
+    var keyHandbrake:Int;
+    var keyBoost:Int;
+    var padGas:Int;
+    var padBrake:Int;
+    var padHandbrake:Int;
+    var padBoost:Int;
 }
 
 /**
@@ -220,39 +254,24 @@ class SaveSystem {
 
     /**
      * Loads saved game data from persistent localStorage with automatic forward migration.
-     * If no save is found or an exception occurs, returns a clean default dataset.
+     * Iterates ordered schema keys newest-to-oldest to avoid duplicated fallback logic.
      *
-     * @return Parsed GameSaveData record or clean defaults.
+     * @returns {GameSaveData} Parsed GameSaveData record or clean defaults.
      */
     public static function load():GameSaveData {
         #if js
         try {
             var storage = js.Browser.getLocalStorage();
-            var raw = storage.getItem(STORAGE_KEY_V4);
+            var raw:Null<String> = null;
             var isLegacy = false;
+            var orderedKeys = [STORAGE_KEY_V4, STORAGE_KEY_V3, STORAGE_KEY_V2, STORAGE_KEY_V1, LEGACY_STORAGE_KEY];
 
-            // Step 1: Fallback reading from v3 key if v4 not found
-            if (raw == null) {
-                raw = storage.getItem(STORAGE_KEY_V3);
-                if (raw != null) isLegacy = true;
-            }
-
-            // Step 2: Fallback reading from v2 key if v3 not found
-            if (raw == null) {
-                raw = storage.getItem(STORAGE_KEY_V2);
-                if (raw != null) isLegacy = true;
-            }
-
-            // Step 3: Fallback reading from v1 key if v2 not found
-            if (raw == null) {
-                raw = storage.getItem(STORAGE_KEY_V1);
-                if (raw != null) isLegacy = true;
-            }
-
-            // Step 4: Fallback reading from prototype key if still not found
-            if (raw == null) {
-                raw = storage.getItem(LEGACY_STORAGE_KEY);
-                if (raw != null) isLegacy = true;
+            for (i in 0...orderedKeys.length) {
+                raw = storage.getItem(orderedKeys[i]);
+                if (raw != null) {
+                    isLegacy = (i > 0);
+                    break;
+                }
             }
 
             if (raw != null) {

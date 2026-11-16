@@ -3,69 +3,92 @@ package tests.camera;
 import utest.Test;
 import utest.Assert;
 import h3d.Camera;
-import camera.ChaseCamera;
+import input.InputController;
 import physics.CarPhysics;
+import camera.ChaseCamera;
+import tests.physics.TestCarPhysics.MockGroundProvider;
 
 /**
- * Unit test suite validating chase camera spring-arm lag, speed FOV scaling,
- * and trauma screen shake decay.
+ * Unit test suite verifying ChaseCamera velocity-aligned spring lag, speed/boost FOV expansion,
+ * lateral-G banking limits, terrain clearance floor protection, and trauma decay.
  */
 class TestChaseCamera extends Test {
     var cam:Camera;
-    var chaseCam:ChaseCamera;
+    var chase:ChaseCamera;
     var car:CarPhysics;
+    var input:InputController;
+    var dt:Float = 1.0 / 60.0;
 
     public function setup() {
         cam = new Camera();
-        chaseCam = new ChaseCamera(cam, 0, -10, 4);
-        car = new CarPhysics();
+        car = new CarPhysics(0.0, 0.0, 0.0);
+        chase = new ChaseCamera(cam, 0.0, -ChaseCamera.BASE_DISTANCE, ChaseCamera.BASE_HEIGHT);
+        input = new InputController();
     }
 
-    public function testInitialFov() {
-        Assert.floatEquals(65.0, cam.fovY, 0.01);
-        Assert.floatEquals(0.0, chaseCam.trauma, 0.001);
+    public function testSnapBehindPlacesCameraDirectlyBehindHeading() {
+        car.resetState(10.0, 20.0, 1.0, 0.0);
+        chase.snapBehind(car);
+
+        Assert.floatEquals(10.0, cam.pos.x, 0.05);
+        Assert.floatEquals(20.0 - ChaseCamera.BASE_DISTANCE, cam.pos.y, 0.05);
+        Assert.floatEquals(1.0 + ChaseCamera.BASE_HEIGHT, cam.pos.z, 0.05);
+        Assert.isTrue(cam.target.y > car.pos.y);
     }
 
-    public function testTraumaClampingAndDecay() {
-        // Adding massive impulse should be capped at ceiling 0.55
-        chaseCam.addTrauma(2.0);
-        Assert.floatEquals(0.55, chaseCam.trauma, 0.01);
+    public function testDynamicFollowAndBoostFovExpansion() {
+        var ground = new MockGroundProvider("flat", 1.0);
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        chase.snapBehind(car);
 
-        // Update camera, trauma should decay exponentially
-        chaseCam.update(0.1, car, false);
-        Assert.isTrue(chaseCam.trauma < 0.55, "Trauma must decay over time");
-        Assert.isTrue(chaseCam.trauma >= 0.0, "Trauma cannot fall below 0");
-    }
-
-    public function testSpeedFovScaling() {
-        car.forwardSpeed = 60.0; // High speed
-        chaseCam.update(0.05, car, false);
-        Assert.isTrue(cam.fovY > 65.0, "FOV must increase at high vehicle speed");
-
-        // Nitrous boost adds additional FOV
-        var fovCruising = cam.fovY;
-        chaseCam.update(0.05, car, true);
-        Assert.isTrue(cam.fovY > fovCruising, "Nitrous boost must widen FOV further");
-        Assert.isTrue(cam.fovY <= 82.0, "FOV must remain comfortably bounded and not extreme at top speed");
-    }
-
-    public function testControlledDistanceLagAtTopSpeed() {
-        car.yaw = 0.0; // Heading +Y
-        car.forwardSpeed = 75.0; // Top speed ~270 km/h
-
-        // Simulate 60 physics frames at top speed
-        for (i in 0...60) {
-            car.pos.y += car.forwardSpeed * (1.0 / 60.0);
-            chaseCam.update(1.0 / 60.0, car, false);
+        // Accelerate forward and hold right steer
+        for (i in 0...150) {
+            input.throttle = 1.0;
+            input.steer = i > 45 ? 0.65 : 0.0;
+            input.boost = true;
+            car.update(dt, input, null, ground);
+            chase.update(dt, car, car.isBoosting);
         }
 
-        var dx = cam.pos.x - car.pos.x;
-        var dy = cam.pos.y - car.pos.y;
-        var horizontalDist = Math.sqrt(dx * dx + dy * dy);
+        // Camera should smoothly follow behind the vehicle along +Y/+X path and expand FOV
+        Assert.isTrue(cam.pos.y > 10.0, "Camera should follow car forward down track");
+        Assert.isTrue(cam.fovY > ChaseCamera.BASE_FOV + 4.0, "FOV should expand dynamically with speed & boost");
+        Assert.isTrue(Math.abs(cam.up.x) <= ChaseCamera.MAX_BANK_RAD + 0.02, "Camera bank must stay subtly bounded");
+    }
 
-        // Assert distance lag remains tightly bounded to a slight lagging back
-        Assert.isTrue(horizontalDist >= ChaseCamera.BASE_DISTANCE, "Camera must trail behind vehicle");
-        Assert.isTrue(horizontalDist <= ChaseCamera.BASE_DISTANCE + 3.2, "Physical distance lag must be slight rather than lagging far away at high speed");
+    public function testTraumaSofteningClampingAndDecay() {
+        Assert.floatEquals(0.0, chase.trauma, 0.001);
+
+        chase.addTrauma(0.35);
+        Assert.floatEquals(0.175, chase.trauma, 0.001);
+
+        chase.addTrauma(10.0);
+        Assert.floatEquals(1.0, chase.trauma, 0.001);
+
+        var ground = new MockGroundProvider("flat", 1.0);
+        car.resetState(0.0, 0.0, 0.0, 0.0);
+        for (_ in 0...120) {
+            car.update(dt, input, null, ground);
+            chase.update(dt, car, false);
+        }
+        Assert.floatEquals(0.0, chase.trauma, 0.001);
+    }
+
+    public function testTerrainFloorClearanceGuardPreventsUndergroundClipping() {
+        var rampGround = new MockGroundProvider("ramp", 1.0);
+        rampGround.slopeRadians = 0.25;
+        rampGround.rampStartY = 0.0;
+
+        car.resetState(0.0, 20.0, rampGround.getGroundElevation(0.0, 20.0), 0.0);
+        car.groundProvider = rampGround;
+
+        // Place camera deliberately underground before updating
+        cam.pos.z = -5.0;
+        for (_ in 0...20) {
+            chase.update(dt, car, false);
+        }
+
+        var floorAtCam = rampGround.getGroundElevation(cam.pos.x, cam.pos.y);
+        Assert.isTrue(cam.pos.z >= floorAtCam + 0.4, "Chase camera must never clip below rising terrain");
     }
 }
-

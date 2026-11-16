@@ -13,7 +13,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="M.O.B." />
 
-  <!-- iOS Home Screen Icons (iOS ignores manifest icons) -->
+  <!-- Standard & iOS Home Screen Icons -->
+  <link rel="icon" type="image/png" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" sizes="512x512" href="./icons/icon-512.png" />
@@ -22,8 +23,8 @@
     html, body {
       margin: 0;
       padding: 0;
-      width: 100%;
-      height: 100%;
+      width: 100dvw;
+      height: 100dvh;
       overflow: hidden;
       background-color: #000;
       touch-action: none;
@@ -33,16 +34,22 @@
       width: 100%;
       height: 100%;
       display: block;
+      background-color: #000;
+      outline: none;
     }
 
-    /* iOS & Mobile Landscape Enforcement Overlay */
+    html.portrait-blocked #webgl {
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    /* Mobile & Tablet Landscape Enforcement Overlay */
     #rotate-device-overlay {
       display: none;
       position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
+      inset: 0;
+      width: 100dvw;
+      height: 100dvh;
       background-color: #08080c;
       color: #fff;
       z-index: 999999;
@@ -51,28 +58,61 @@
       justify-content: center;
       text-align: center;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      padding: 20px;
+      padding: max(1.25rem, env(safe-area-inset-top, 0px))
+               max(1.25rem, env(safe-area-inset-right, 0px))
+               max(1.25rem, env(safe-area-inset-bottom, 0px))
+               max(1.25rem, env(safe-area-inset-left, 0px));
       box-sizing: border-box;
+      overflow-wrap: anywhere;
+    }
+
+    html.portrait-blocked #rotate-device-overlay {
+      display: flex;
     }
 
     #rotate-device-overlay .rotate-icon {
-      font-size: 54px;
-      margin-bottom: 16px;
+      font-size: clamp(2.5rem, 2rem + 2.5dvw, 4rem);
+      margin-bottom: 1rem;
       animation: rotate-pulse 2s infinite ease-in-out;
     }
 
     #rotate-device-overlay h2 {
-      margin: 0 0 8px 0;
-      font-size: 1.4rem;
+      margin: 0 0 0.5rem 0;
+      font-size: clamp(1.25rem, 1rem + 2dvw, 2.25rem);
       letter-spacing: 0.1em;
       text-transform: uppercase;
       color: #ff0055;
+      text-wrap: balance;
     }
 
     #rotate-device-overlay p {
       margin: 0;
-      font-size: 0.95rem;
+      max-inline-size: 38ch;
+      font-size: clamp(0.95rem, 0.85rem + 0.8dvw, 1.35rem);
+      line-height: 1.45;
       color: #8892b0;
+      text-wrap: pretty;
+    }
+
+    #force-landscape-btn {
+      margin-top: 1.25rem;
+      min-block-size: 48px;
+      min-inline-size: 44px;
+      padding: 0.75rem 1.5rem;
+      font-size: clamp(0.95rem, 0.85rem + 0.5dvw, 1.15rem);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #08080c;
+      background-color: #00e5ff;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    #force-landscape-btn[hidden] {
+      display: none;
     }
 
     @keyframes rotate-pulse {
@@ -80,24 +120,216 @@
       50% { transform: rotate(-90deg); }
     }
 
-    /* Trigger shield when in portrait mode on mobile viewports */
-    @media screen and (orientation: portrait) and (max-width: 1024px) {
-      #rotate-device-overlay {
-        display: flex;
+    @media (prefers-reduced-motion: reduce) {
+      #rotate-device-overlay .rotate-icon {
+        animation: none;
       }
     }
   </style>
 </head>
 <body>
-  <!-- Portrait Lock Fallback Banner -->
-  <div id="rotate-device-overlay">
-    <div class="rotate-icon">📱 ↷</div>
-    <h2>Rotate Device</h2>
-    <p>Please turn your iPhone to landscape mode to drive.</p>
+  <!-- Mobile / Tablet Portrait Gate Overlay -->
+  <div id="rotate-device-overlay" role="status" aria-live="polite">
+    <div class="rotate-icon" aria-hidden="true">📱 ↷</div>
+    <h2 id="rotate-heading">Landscape Mode Required</h2>
+    <p id="rotate-message">Rotate your phone or tablet to landscape mode to load and play.</p>
+    <button id="force-landscape-btn" type="button" hidden>Switch to Landscape</button>
   </div>
 
-  <canvas id="webgl"></canvas>
-  <script src="game.js?v=0.4.1"></script>
+  <canvas id="webgl" tabindex="0"></canvas>
+
+  <script>
+    (function () {
+      const overlayEl = document.getElementById('rotate-device-overlay');
+      const forceBtn = document.getElementById('force-landscape-btn');
+      const GAME_SCRIPT_SRC = 'game.js?v=0.6.0';
+
+      let gameScriptLoaded = false;
+      let evalSeq = 0;
+
+      window.__mobPortraitBlocked = false;
+
+      function isMobileOrTablet() {
+        const ua = navigator.userAgent || '';
+        const match = window.matchMedia ? function (q) { return window.matchMedia(q).matches; } : function () { return false; };
+        const hasCoarsePrimary = match('(pointer: coarse)');
+        const hasHoverNone = match('(hover: none)');
+        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Tablet|PlayBook|Silk|Kindle|KF[A-Z]+/i.test(ua);
+        const isIPadDesktopUA = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
+        return Boolean(hasCoarsePrimary || isMobileUA || isIPadDesktopUA || (hasHoverNone && navigator.maxTouchPoints > 0));
+      }
+
+      function isPortraitOrientation() {
+        if (window.matchMedia && window.matchMedia('(orientation: portrait)').matches) {
+          return true;
+        }
+        return window.innerHeight > window.innerWidth;
+      }
+
+      function setAppPaused(paused) {
+        if (window.app && typeof window.app.setOrientationPaused === 'function') {
+          window.app.setOrientationPaused(Boolean(paused));
+        }
+      }
+
+      function applyBlockedState(blocked, canOfferForceButton) {
+        const isBlocked = Boolean(blocked);
+        window.__mobPortraitBlocked = isBlocked;
+        document.documentElement.classList.toggle('portrait-blocked', isBlocked);
+        if (overlayEl) {
+          overlayEl.setAttribute('aria-hidden', isBlocked ? 'false' : 'true');
+        }
+        if (forceBtn) {
+          forceBtn.hidden = !(isBlocked && canOfferForceButton);
+        }
+        setAppPaused(isBlocked);
+        if (!isBlocked) {
+          window.dispatchEvent(new CustomEvent('mob-orientation-unlocked'));
+        }
+      }
+
+      function ensureGameLoaded() {
+        if (gameScriptLoaded || window.__mobPortraitBlocked) return;
+        gameScriptLoaded = true;
+        const script = document.createElement('script');
+        script.src = GAME_SCRIPT_SRC;
+        script.async = false;
+        document.body.appendChild(script);
+      }
+
+      function waitForLandscapeTransition(timeoutMs) {
+        if (!isPortraitOrientation()) return Promise.resolve(true);
+        return new Promise(function (resolve) {
+          let settled = false;
+          let timerId = null;
+          function finish() {
+            if (settled) return;
+            if (!isPortraitOrientation()) {
+              settled = true;
+              cleanup();
+              resolve(true);
+            }
+          }
+          function cleanup() {
+            if (timerId !== null) clearTimeout(timerId);
+            window.removeEventListener('resize', finish);
+            window.removeEventListener('orientationchange', finish);
+            if (window.screen && window.screen.orientation && typeof window.screen.orientation.removeEventListener === 'function') {
+              window.screen.orientation.removeEventListener('change', finish);
+            }
+          }
+          window.addEventListener('resize', finish);
+          window.addEventListener('orientationchange', finish);
+          if (window.screen && window.screen.orientation && typeof window.screen.orientation.addEventListener === 'function') {
+            window.screen.orientation.addEventListener('change', finish);
+          }
+          timerId = setTimeout(function () {
+            if (settled) return;
+            settled = true;
+            cleanup();
+            resolve(!isPortraitOrientation());
+          }, timeoutMs);
+        });
+      }
+
+      async function attemptForceLandscape(fromUserGesture) {
+        if (!isPortraitOrientation()) return 'landscape';
+        const orientationApi = window.screen && window.screen.orientation;
+        const hasLockFn = Boolean(orientationApi && typeof orientationApi.lock === 'function');
+        if (!hasLockFn) {
+          return 'unsupported';
+        }
+
+        if (fromUserGesture && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+          try {
+            await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+          } catch (_) {}
+        }
+
+        const modes = ['landscape', 'landscape-primary'];
+        for (let i = 0; i < modes.length; i++) {
+          try {
+            await orientationApi.lock(modes[i]);
+            const switched = await waitForLandscapeTransition(250);
+            if (switched) {
+              return 'forced';
+            }
+          } catch (err) {
+            const errName = err && err.name ? String(err.name) : '';
+            if (errName === 'NotSupportedError') {
+              return 'unsupported';
+            }
+            if (errName === 'SecurityError' || errName === 'InvalidStateError') {
+              return fromUserGesture ? 'unsupported' : 'needs-gesture';
+            }
+          }
+        }
+        return isPortraitOrientation() ? 'unsupported' : 'forced';
+      }
+
+      async function evaluateOrientation() {
+        const seq = ++evalSeq;
+        const mobileOrTablet = isMobileOrTablet();
+        const portrait = isPortraitOrientation();
+
+        if (!mobileOrTablet || !portrait) {
+          applyBlockedState(false, false);
+          if (mobileOrTablet && window.matchMedia &&
+              (window.matchMedia('(display-mode: fullscreen)').matches ||
+               window.matchMedia('(display-mode: standalone)').matches) &&
+              window.screen && window.screen.orientation &&
+              typeof window.screen.orientation.lock === 'function') {
+            try { window.screen.orientation.lock('landscape').catch(function () {}); } catch (_) {}
+          }
+          ensureGameLoaded();
+          return;
+        }
+
+        window.__mobPortraitBlocked = true;
+        setAppPaused(true);
+
+        const lockResult = await attemptForceLandscape(false);
+        if (seq !== evalSeq) return;
+
+        if (lockResult === 'forced' || lockResult === 'landscape' || !isPortraitOrientation()) {
+          applyBlockedState(false, false);
+          ensureGameLoaded();
+          return;
+        }
+
+        applyBlockedState(true, lockResult === 'needs-gesture');
+      }
+
+      if (forceBtn) {
+        forceBtn.addEventListener('click', async function () {
+          const result = await attemptForceLandscape(true);
+          if (result === 'forced' || result === 'landscape' || !isPortraitOrientation()) {
+            applyBlockedState(false, false);
+            ensureGameLoaded();
+          } else {
+            applyBlockedState(true, false);
+          }
+        });
+      }
+
+      window.MOBOrientationGate = {
+        isMobileOrTablet: isMobileOrTablet,
+        isPortraitOrientation: isPortraitOrientation,
+        isGameLoaded: function () { return gameScriptLoaded; },
+        evaluate: evaluateOrientation,
+        attemptForceLandscape: attemptForceLandscape
+      };
+
+      window.addEventListener('resize', evaluateOrientation);
+      window.addEventListener('orientationchange', evaluateOrientation);
+      if (window.screen && window.screen.orientation && typeof window.screen.orientation.addEventListener === 'function') {
+        window.screen.orientation.addEventListener('change', evaluateOrientation);
+      }
+
+      evaluateOrientation();
+    })();
+  </script>
+
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

@@ -3,11 +3,16 @@ package ui;
 import h2d.Object;
 import h2d.Graphics;
 import h2d.Text;
+import save.SaveSystem.TouchSettings;
 
 /**
  * Procedural hardware layout and diagram generator for physical input controllers.
  * Draws vector schematic representations of Nintendo BayX / Xbox gamepad controllers
  * and desktop WASD / Arrow keyboard layouts with dynamic callouts.
+ *
+ * @class ControlDiagrams
+ * @extends h2d.Object
+ * @module ui/ControlDiagrams
  */
 class ControlDiagrams extends Object {
     /** Vector graphics canvas for controller contours, buttons, and callout lines. */
@@ -291,16 +296,21 @@ class ControlDiagrams extends Object {
     }
 
     /**
-     * Renders a vector schematic layout of the mobile touch driving interface.
-     * Illustrates the left-hand virtual analog joystick and nitro button,
-     * and the right-hand brake disc, handbrake drift, and gas pedal buttons.
+     * Renders a vector schematic layout of the mobile touch driving interface,
+     * optionally previewing active `TouchSettings` offsets and control scaling.
+     *
+     * @param ts Optional active touch layout customization settings.
      */
-    public function drawTouchLayout() {
+    public function drawTouchLayout(?ts:TouchSettings) {
         g.clear();
         labelsContainer.removeChildren();
 
         var cx = 0.0;
         var cy = 0.0;
+        var sc = (ts != null) ? Math.max(0.5, Math.min(1.5, ts.scale)) : 1.0;
+        var ox = function(v:Float):Float return v * 0.35;
+        var clampX = function(x:Float):Float return Math.max(cx - 195.0, Math.min(cx + 195.0, x));
+        var clampY = function(y:Float):Float return Math.max(cy - 70.0, Math.min(cy + 70.0, y));
 
         // 1. Tablet/Phone Bezel Silhouette
         g.beginFill(0x181B20, 0.85);
@@ -313,47 +323,52 @@ class ControlDiagrams extends Object {
         g.drawRoundedRect(cx - 228, cy - 98, 456, 196, 10);
 
         // 2. Left Side: Virtual Analog Joystick (Steering)
-        var stickX = cx - 170;
-        var stickY = cy + 42;
+        var stickX = clampX(cx - 170 + (ts != null ? ox(ts.stickOffsetX) : 0.0));
+        var stickY = clampY(cy + 42 + (ts != null ? ox(ts.stickOffsetY) : 0.0));
+        var stickR = 32.0 * sc;
         g.beginFill(0x0A0F16, 0.7);
         g.lineStyle(2.0, 0x00E5FF, 0.9);
-        g.drawCircle(stickX, stickY, 32);
+        g.drawCircle(stickX, stickY, stickR);
         g.endFill();
         g.beginFill(0x00E5FF, 0.35);
         g.lineStyle(1.5, 0x00E5FF, 0.95);
-        g.drawCircle(stickX, stickY, 16);
+        g.drawCircle(stickX, stickY, 16.0 * sc);
         g.endFill();
 
         // 3. Left Side: Nitro Boost Button
-        var nitroX = cx - 170;
-        var nitroY = cy - 42;
+        var nitroX = clampX(cx - 170 + (ts != null ? ox(ts.nitroOffsetX) : 0.0));
+        var nitroY = clampY(cy - 42 + (ts != null ? ox(ts.nitroOffsetY) : 0.0));
+        var nitroR = 22.0 * sc;
         g.beginFill(0x3A1808, 0.7);
         g.lineStyle(2.0, 0xFF6600, 0.9);
-        g.drawCircle(nitroX, nitroY, 22);
+        g.drawCircle(nitroX, nitroY, nitroR);
         g.endFill();
 
         // 4. Right Side: Gas / Throttle Pedal (Lower-Right)
-        var gasX = cx + 175;
-        var gasY = cy + 45;
+        var gasX = clampX(cx + 175 + (ts != null ? ox(ts.gasOffsetX) : 0.0));
+        var gasY = clampY(cy + 45 + (ts != null ? ox(ts.gasOffsetY) : 0.0));
+        var gasR = 24.0 * sc;
         g.beginFill(0x082E1E, 0.7);
         g.lineStyle(2.0, 0x00FF88, 0.9);
-        g.drawCircle(gasX, gasY, 24);
+        g.drawCircle(gasX, gasY, gasR);
         g.endFill();
 
         // 5. Right Side: Handbrake Drift Lever (Mid-Right)
-        var driftX = cx + 195;
-        var driftY = cy - 20;
+        var driftX = clampX(cx + 195 + (ts != null ? ox(ts.driftOffsetX) : 0.0));
+        var driftY = clampY(cy - 20 + (ts != null ? ox(ts.driftOffsetY) : 0.0));
+        var driftR = 20.0 * sc;
         g.beginFill(0x2E2008, 0.7);
         g.lineStyle(2.0, 0xFFCC00, 0.9);
-        g.drawCircle(driftX, driftY, 20);
+        g.drawCircle(driftX, driftY, driftR);
         g.endFill();
 
         // 6. Right Side: Brake / Reverse Disc (Upper-Right)
-        var brakeX = cx + 140;
-        var brakeY = cy - 54;
+        var brakeX = clampX(cx + 140 + (ts != null ? ox(ts.brakeOffsetX) : 0.0));
+        var brakeY = clampY(cy - 54 + (ts != null ? ox(ts.brakeOffsetY) : 0.0));
+        var brakeR = 20.0 * sc;
         g.beginFill(0x2E0D12, 0.7);
         g.lineStyle(2.0, 0xFF3344, 0.9);
-        g.drawCircle(brakeX, brakeY, 20);
+        g.drawCircle(brakeX, brakeY, brakeR);
         g.endFill();
 
         // 7. Top-Right: Pause Button
@@ -364,13 +379,13 @@ class ControlDiagrams extends Object {
         g.drawCircle(pauseX, pauseY, 11);
         g.endFill();
 
-        // Callouts
+        // Callouts (fixed outer label coordinates with anchored endpoints)
         var callouts = [
-            { x1: stickX, y1: stickY + 34, x2: stickX, y2: cy + 122, text: "LEFT THUMB: Analog Steering Joystick" },
-            { x1: nitroX, y1: nitroY - 24, x2: nitroX, y2: cy - 122, text: "LEFT FINGER: Nitro Boost" },
-            { x1: gasX, y1: gasY + 26, x2: gasX, y2: cy + 122, text: "RIGHT THUMB: Gas / Throttle" },
-            { x1: driftX + 22, y1: driftY, x2: cx + 265, y2: driftY, text: "HANDBRAKE (DRIFT)" },
-            { x1: brakeX, y1: brakeY - 22, x2: brakeX, y2: cy - 122, text: "BRAKE / REVERSE" },
+            { x1: stickX, y1: stickY + stickR + 2.0, x2: cx - 170, y2: cy + 122, text: "LEFT THUMB: Analog Steering Joystick" },
+            { x1: nitroX, y1: nitroY - nitroR - 2.0, x2: cx - 170, y2: cy - 122, text: "LEFT FINGER: Nitro Boost" },
+            { x1: gasX, y1: gasY + gasR + 2.0, x2: cx + 175, y2: cy + 122, text: "RIGHT THUMB: Gas / Throttle" },
+            { x1: driftX + driftR + 2.0, y1: driftY, x2: cx + 265, y2: cy - 20, text: "HANDBRAKE (DRIFT)" },
+            { x1: brakeX, y1: brakeY - brakeR - 2.0, x2: cx + 140, y2: cy - 122, text: "BRAKE / REVERSE" },
             { x1: pauseX, y1: pauseY - 13, x2: cx + 230, y2: cy - 110, text: "PAUSE" }
         ];
 

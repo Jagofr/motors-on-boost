@@ -6,6 +6,7 @@ import h2d.Graphics;
 import h2d.Bitmap;
 import h2d.Tile;
 import input.InputController;
+import net.MultiplayerManager;
 import save.SaveSystem.GraphicsSettings;
 import ui.FontManager;
 import ui.components.UITheme;
@@ -16,6 +17,8 @@ import ui.components.CardBackplate;
 import ui.views.splash.SplashView;
 import ui.views.mainmenu.MainMenuView;
 import ui.views.mapselect.MapSelectView;
+import ui.views.multiplayer.MultiplayerLobbyView;
+import ui.views.multiplayer.MultiplayerMenuView;
 import ui.views.pause.PauseMenuView;
 import ui.views.options.OptionsView;
 import ui.views.credits.CreditsView;
@@ -24,6 +27,10 @@ import ui.components.TouchControlsHUD;
 /**
  * Composite UI Builder orchestrating modal backplates and views.
  * Assembles and lays out the title splash, main menu, map selection, pause menu, options, and credits views.
+ *
+ * @class UIBuilder
+ * @extends h2d.Object
+ * @module ui/UIBuilder
  */
 @:keep
 class UIBuilder extends Object {
@@ -40,6 +47,8 @@ class UIBuilder extends Object {
     public var splashView:SplashView;
     public var mainMenuView:MainMenuView;
     public var mapSelectView:MapSelectView;
+    public var multiplayerMenuView:MultiplayerMenuView;
+    public var multiplayerLobbyView:MultiplayerLobbyView;
     public var pauseMenuView:PauseMenuView;
     public var optionsView:OptionsView;
     public var creditsView:CreditsView;
@@ -57,8 +66,9 @@ class UIBuilder extends Object {
      * @param gfxSettings Current graphics configuration profile.
      * @param hasSave True if an active race save exists.
      * @param parent Optional parent 2D scene object.
+     * @param mp Optional peer-to-peer multiplayer coordinator.
      */
-    public function new(input:InputController, gfxSettings:GraphicsSettings, hasSave:Bool, ?parent:Object) {
+    public function new(input:InputController, gfxSettings:GraphicsSettings, hasSave:Bool, ?parent:Object, ?mp:MultiplayerManager) {
         super(parent);
 
         // 1. Fullscreen dimming modal curtain
@@ -72,6 +82,10 @@ class UIBuilder extends Object {
         mainMenuView = new MainMenuView(this);
         mapSelectView = new MapSelectView(this);
         mapSelectView.visible = false;
+        multiplayerMenuView = new MultiplayerMenuView(this);
+        multiplayerMenuView.visible = false;
+        multiplayerLobbyView = new MultiplayerLobbyView(mp, this);
+        multiplayerLobbyView.visible = false;
         pauseMenuView = new PauseMenuView(this);
         optionsView = new OptionsView(input, gfxSettings, this);
         creditsView = new CreditsView(this);
@@ -105,6 +119,10 @@ class UIBuilder extends Object {
                 CardBackplate.drawMainMenu(cardBg, sw, sh, mainMenuView.selectedIndex);
             case MapSelect:
                 CardBackplate.drawMapSelect(cardBg, sw, sh, mapSelectView.selectedIndex);
+            case MultiplayerMenu:
+                CardBackplate.drawMultiplayerMenu(cardBg, sw, sh, multiplayerMenuView.selectedIndex, multiplayerMenuView.enteredCode.length > 0);
+            case MultiplayerLobby:
+                CardBackplate.drawMultiplayerLobby(cardBg, sw, sh, multiplayerLobbyView.isHostRole(), multiplayerLobbyView.selectedMapIndex, multiplayerLobbyView.focusedActionIdx);
             case PauseMenu:
                 CardBackplate.drawPauseMenu(cardBg, sw, sh, pauseMenuView.selectedIndex);
             case OptionsMenu:
@@ -136,6 +154,8 @@ class UIBuilder extends Object {
         if (splashView != null && splashView.visible) splashView.layout(sw, sh);
         if (mainMenuView != null && mainMenuView.visible) mainMenuView.layout(sw, sh);
         if (mapSelectView != null && mapSelectView.visible) mapSelectView.layout(sw, sh);
+        if (multiplayerMenuView != null && multiplayerMenuView.visible) multiplayerMenuView.layout(sw, sh);
+        if (multiplayerLobbyView != null && multiplayerLobbyView.visible) multiplayerLobbyView.layout(sw, sh);
         if (pauseMenuView != null && pauseMenuView.visible) pauseMenuView.layout(sw, sh);
         if (optionsView != null && optionsView.visible) optionsView.layout(sw, sh);
         if (creditsView != null && creditsView.visible) creditsView.layout(sw, sh);

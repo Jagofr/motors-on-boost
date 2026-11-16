@@ -16,10 +16,17 @@ import physics.CarPhysics;
  * - Bottom-Center: Curved electric arc Nitrous Boost gauge with flame iconography, proportional fuel capacity meter, and live percentage display.
  * - Top-Right: Discreet performance frame rate (FPS) counter.
  * Fully optimized for zero per-frame garbage collector allocations.
+ *
+ * @class InGameHUDView
+ * @extends h2d.Object
+ * @module ui/views/hud/InGameHUDView
  */
 class InGameHUDView extends Object {
     /** Primary vector graphics canvas for drawing gauges, badges, minimap, and meter arcs. */
     public var canvas:Graphics;
+
+    /** Optional remote peer minimap dots populated during multiplayer sessions. */
+    public var remotePeerMarkers:Array<{ x:Float, y:Float, colorHex:Int }> = [];
 
     // Top-Left Speedometer & Telemetry
     var speedText:Text;
@@ -346,6 +353,17 @@ class InGameHUDView extends Object {
             var rangeX = mapMaxX - mapMinX;
             var rangeY = mapMaxY - mapMinY;
             if (rangeX > 0 && rangeY > 0) {
+                for (rm in remotePeerMarkers) {
+                    var rNormX = (rm.x - mapMinX) / rangeX;
+                    var rNormY = (rm.y - mapMinY) / rangeY;
+                    var rDotX = minimapX + innerMargin + (rNormX * mapDrawW);
+                    var rDotY = minimapY + minimapH - innerMargin - (rNormY * mapDrawH);
+                    canvas.beginFill(rm.colorHex, 1.0);
+                    canvas.lineStyle(1.2, 0x0A0E14, 0.9);
+                    canvas.drawCircle(rDotX, rDotY, 3.6);
+                    canvas.endFill();
+                }
+
                 var normPx = (car.pos.x - mapMinX) / rangeX;
                 var normPy = (car.pos.y - mapMinY) / rangeY;
                 var dotX = minimapX + innerMargin + (normPx * mapDrawW);

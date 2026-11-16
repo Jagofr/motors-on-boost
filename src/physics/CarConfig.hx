@@ -3,341 +3,323 @@ package physics;
 import haxe.Json;
 
 /**
- * Tunable suspension configuration parameters.
+ * Rigid chassis geometry, inertia, and aerodynamic drag/downforce configuration.
+ *
+ * @typedef {Object} ChassisConfig
+ */
+typedef ChassisConfig = {
+    var massKg:Float;
+    var wheelbase:Float;
+    var trackWidth:Float;
+    var cogHeight:Float;
+    var pitchInertia:Float;
+    var rollInertia:Float;
+    var yawInertia:Float;
+    var aeroDragArea:Float;
+    var aeroDownforce:Float;
+    var rollingResistance:Float;
+}
+
+/**
+ * Four-wheel raycast strut spring-damper and axle anti-roll bar parameters.
+ *
+ * @typedef {Object} SuspensionConfig
  */
 typedef SuspensionConfig = {
-    /** Unloaded spring rest length from chassis mount to wheel contact in meters. */
     var restLength:Float;
-
-    /** Linear spring stiffness rate in N/m. */
-    var springRate:Float;
-
-    /** Shock absorber viscous damping coefficient in Ns/m. */
-    var damping:Float;
-
-    /** Transverse anti-roll bar torsional stiffness rate in N/m. */
+    var unloadedLength:Float;
+    var minLength:Float;
+    var springStiffness:Float;
+    var bumpDamping:Float;
+    var reboundDamping:Float;
     var antiRollStiffness:Float;
-
-    /** Minimum allowable spring compression travel in meters before bump-stop contact. */
-    var minTravel:Float;
-
-    /** Maximum allowable spring extension travel in meters before full droop. */
-    var maxTravel:Float;
-
-    /** Dynamic chassis roll multiplier affecting suspension lean and spring compression. */
-    var bodyRollScale:Float;
+    var maxWheelForce:Float;
 }
 
 /**
- * Mechanical and pneumatic tire adhesion parameters.
- */
-typedef TireConfig = {
-    /** Tire slip angle at which lateral grip reaches peak adhesion in radians. */
-    var peakSlipAngle:Float;
-
-    /** Base lateral cornering stiffness coefficient along the linear slip region. */
-    var baseLateralStiffness:Float;
-
-    /** Longitudinal friction coefficient during acceleration and threshold braking. */
-    var longitudinalGrip:Float;
-
-    /** Rolling resistance deceleration coefficient in m/s². */
-    var rollingResistance:Float;
-
-    /** Front vs rear tire slip bias [-1.0 .. 1.0]. Negative = rear bias / oversteer, Positive = front bias / understeer, 0.0 = neutral. */
-    var tireSlipBias:Float;
-
-    /** Global ground contact friction scalar multiplying tire adhesion and braking. */
-    var groundFriction:Float;
-
-    /** Burnout wheelspin multiplier during standstill launches or full-throttle power corners. */
-    var wheelspinAmount:Float;
-}
-
-/**
- * Arcade drift handling and momentum assist multipliers.
- */
-typedef DriftConfig = {
-    /** Lateral tire stiffness scaling multiplier during active slide (30-40% baseline). */
-    var lateralStiffnessScale:Float;
-
-    /** Counter-steer rotational torque assist multiplier stabilizing slide angle. */
-    var counterSteerTorque:Float;
-
-    /** Blending rate at which linear velocity vector aligns with vehicle forward heading. */
-    var forwardBiasRate:Float;
-
-    /** Minimum longitudinal velocity in m/s required to initiate an intentional drift slide. */
-    var minDriftSpeed:Float;
-
-    /** Base rotational yaw rate during active drift slide in rad/s. */
-    var driftYawRate:Float;
-
-    /** Threshold speed in m/s below which an active drift automatically terminates. */
-    var driftExitSpeed:Float;
-
-    /** Vehicle body slip angle threshold in radians required to trigger active drift physics. */
-    var driftTriggerAngle:Float;
-}
-
-/**
- * Internal combustion powertrain, transmission ratios, and differential settings.
+ * Multi-gear automatic transmission, torque curve, braking, and nitrous boost limits.
+ *
+ * @typedef {Object} DrivetrainConfig
  */
 typedef DrivetrainConfig = {
-    /** Forward progressive gear reduction ratios (1st through 6th). */
-    var gearRatios:Array<Float>;
-
-    /** Reverse gear reduction ratio (negative). */
-    var reverseRatio:Float;
-
-    /** Final drive differential axle reduction ratio. */
-    var finalDrive:Float;
-
-    /** Engine baseline idle rotational speed in revolutions per minute. */
     var idleRPM:Float;
-
-    /** Engine maximum redline rotational cutoff in revolutions per minute. */
     var redlineRPM:Float;
-
-    /** Automatic transmission up-shift threshold RPM. */
+    var peakTorqueNm:Float;
+    var finalDrive:Float;
+    var gearRatios:Array<Float>;
+    var reverseRatio:Float;
     var shiftUpRPM:Float;
-
-    /** Automatic transmission down-shift threshold RPM. */
     var shiftDownRPM:Float;
-
-    /** Shifting disengagement latency duration in seconds. */
-    var shiftDelay:Float;
-
-    /** Simulated limited-slip differential torque transfer lockup ratio [0.0 - 1.0]. */
-    var lsdLockRatio:Float;
-
-    /** Peak flywheel torque delivery in Newton-meters. */
-    var maxEngineTorque:Float;
+    var maxForwardSpeed:Float;
+    var maxReverseSpeed:Float;
+    var brakeForce:Float;
+    var engineBrakeTorque:Float;
 }
 
 /**
- * Aerodynamic quadratic drag and ground-effect downforce coefficients.
+ * Pacejka lateral slip curve, speed-blended Ackermann geometry, and low-speed stiction settings.
+ *
+ * @typedef {Object} TireConfig
  */
-typedef AeroConfig = {
-    /** Longitudinal quadratic aerodynamic drag coefficient (Fd = 0.5 * rho * Cd * A * v²). */
-    var dragCoeff:Float;
-
-    /** Aerodynamic downforce coefficient generating normal load at high velocities. */
-    var downforceCoeff:Float;
+typedef TireConfig = {
+    var pacejkaB:Float;
+    var pacejkaC:Float;
+    var pacejkaD:Float;
+    var pacejkaE:Float;
+    var relaxationLength:Float;
+    var minSlipSpeed:Float;
+    var stictionSpeed:Float;
+    var maxSteerAngle:Float;
+    var highSpeedSteerDamp:Float;
+    var ackermannFactor:Float;
+    var handbrakeRearGrip:Float;
+    var driftSlipThreshold:Float;
 }
 
 /**
- * Complete vehicle dynamics and performance configuration schema.
- * Represents a fully serializable, runtime-swappable vehicle tuning profile.
+ * Nitrous oxide fuel reserve and thrust boost profile.
+ *
+ * @typedef {Object} BoostConfig
+ */
+typedef BoostConfig = {
+    var maxFuel:Float;
+    var burnRate:Float;
+    var regenRate:Float;
+    var thrustForce:Float;
+    var speedBonus:Float;
+}
+
+/**
+ * Complete serialized vehicle tuning specification consumed by CarPhysics solvers.
+ *
+ * @typedef {Object} VehicleConfigData
  */
 typedef VehicleConfigData = {
-    /** Human-readable vehicle model designation. */
-    var name:String;
-
-    /** Vehicle curb weight mass in kilograms. */
-    var mass:Float;
-
-    /** Rotational yaw moment of inertia about vertical Z-axis in kg·m². */
-    var yawInertia:Float;
-
-    /** Rotational pitch moment of inertia about transverse Y-axis in kg·m². */
-    var pitchInertia:Float;
-
-    /** Rotational roll moment of inertia about longitudinal X-axis in kg·m². */
-    var rollInertia:Float;
-
-    /** Baseline top speed under standard atmospheric propulsion in m/s (~245 km/h). */
-    var baseTopSpeed:Float;
-
-    /** Absolute terminal velocity while nitrous oxide injection is active in m/s (~316 km/h). */
-    var boostTopSpeed:Float;
-
-    /** Standard engine acceleration rate in m/s². */
-    var baseAcceleration:Float;
-
-    /** Nitrous oxide augmented acceleration rate in m/s². */
-    var boostAcceleration:Float;
-
-    /** Primary service brake deceleration rate in m/s². */
-    var brakeDecel:Float;
-
-    /** Reverse gear terminal velocity limit in m/s (~65 km/h). */
-    var reverseTopSpeed:Float;
-
-    /** Four-wheel independent suspension configuration. */
+    var chassis:ChassisConfig;
     var suspension:SuspensionConfig;
-
-    /** Tire contact patch and slip friction parameters. */
-    var tires:TireConfig;
-
-    /** Arcade drift mechanics and momentum assist tuning. */
-    var drift:DriftConfig;
-
-    /** Powertrain, transmission, and differential configuration. */
     var drivetrain:DrivetrainConfig;
-
-    /** Aerodynamic drag and downforce characteristics. */
-    var aero:AeroConfig;
+    var tires:TireConfig;
+    var boost:BoostConfig;
 }
 
 /**
- * Factory and serialization utilities for vehicle dynamics configurations.
- * Supports loading and dumping vehicle tuning profiles via JSON for runtime balancing.
+ * Central vehicle geometry constants, default tuning factory, safe parameter clamping,
+ * and JSON serialization helpers for the 4-wheel raycast physics engine.
+ *
+ * @class CarConfig
+ * @module physics/CarConfig
  */
 class CarConfig {
+    /** Outer tire radius in meters (aligned 1:1 with visual CarMesh cylinder). */
+    public static inline var TIRE_RADIUS:Float = 0.36;
+
+    /** Tire tread section width in meters. */
+    public static inline var TIRE_WIDTH:Float = 0.30;
+
+    /** Physical and visual chassis body width in meters. */
+    public static inline var CHASSIS_WIDTH:Float = 1.88;
+
+    /** Physical and visual chassis bumper-to-bumper length in meters. */
+    public static inline var CHASSIS_LENGTH:Float = 4.30;
+
+    /** Center of gravity height above wheel contact plane in meters. */
+    public static inline var COG_HEIGHT:Float = 0.48;
+
+    /** Nominal axle-to-axle wheelbase matching CarMesh front/rear offsets (+/- 1.35 m). */
+    public static inline var WHEELBASE:Float = 2.70;
+
+    /** Nominal left-to-right track width matching CarMesh wheel offsets (+/- 0.98 m). */
+    public static inline var TRACK_WIDTH:Float = 1.96;
+
     /**
-     * Constructs and returns the default high-performance arcade vehicle configuration.
-     * Tuned for responsive arcade-sim dynamics inspired by classic high-speed street racers.
+     * Returns a freshly allocated default sports-coupe vehicle configuration.
      *
-     * @return Fully populated `VehicleConfigData` structure.
+     * @returns {VehicleConfigData} Validated default tuning profile.
      */
     public static function getDefault():VehicleConfigData {
         return {
-            name: "Apex GT-R Prototype",
-            mass: 1350.0,
-            yawInertia: 1750.0,
-            pitchInertia: 1350.0,
-            rollInertia: 620.0,
-            baseTopSpeed: 68.0,
-            boostTopSpeed: 88.0,
-            baseAcceleration: 28.0,
-            boostAcceleration: 48.0,
-            brakeDecel: 38.0,
-            reverseTopSpeed: 18.0,
+            chassis: {
+                massKg: 1450.0,
+                wheelbase: WHEELBASE,
+                trackWidth: TRACK_WIDTH,
+                cogHeight: COG_HEIGHT,
+                pitchInertia: 2200.0,
+                rollInertia: 780.0,
+                yawInertia: 2450.0,
+                aeroDragArea: 0.36,
+                aeroDownforce: 1.85,
+                rollingResistance: 0.014
+            },
             suspension: {
-                restLength: 0.45,
-                springRate: 32000.0,
-                damping: 2600.0,
-                antiRollStiffness: 9500.0,
-                minTravel: 0.08,
-                maxTravel: 0.52,
-                bodyRollScale: 1.0
-            },
-            tires: {
-                peakSlipAngle: 0.16,
-                baseLateralStiffness: 34.0,
-                longitudinalGrip: 1.15,
-                rollingResistance: 2.0,
-                tireSlipBias: -0.45,
-                groundFriction: 1.0,
-                wheelspinAmount: 1.2
-            },
-            drift: {
-                lateralStiffnessScale: 0.35,
-                counterSteerTorque: 3.4,
-                forwardBiasRate: 3.8,
-                minDriftSpeed: 12.0,
-                driftYawRate: 2.8,
-                driftExitSpeed: 8.0,
-                driftTriggerAngle: 0.22
+                restLength: 0.36,
+                unloadedLength: 0.50,
+                minLength: 0.14,
+                springStiffness: 25400.0,
+                bumpDamping: 3950.0,
+                reboundDamping: 5450.0,
+                antiRollStiffness: 14500.0,
+                maxWheelForce: 13500.0
             },
             drivetrain: {
-                gearRatios: [3.40, 2.20, 1.55, 1.18, 0.92, 0.76],
-                reverseRatio: -3.10,
-                finalDrive: 3.73,
-                idleRPM: 1000.0,
-                redlineRPM: 8000.0,
-                shiftUpRPM: 7200.0,
-                shiftDownRPM: 3400.0,
-                shiftDelay: 0.20,
-                lsdLockRatio: 0.72,
-                maxEngineTorque: 540.0
+                idleRPM: 950.0,
+                redlineRPM: 7600.0,
+                peakTorqueNm: 560.0,
+                finalDrive: 3.75,
+                gearRatios: [3.42, 2.28, 1.65, 1.28, 1.02, 0.84],
+                reverseRatio: -3.15,
+                shiftUpRPM: 6900.0,
+                shiftDownRPM: 2850.0,
+                maxForwardSpeed: 72.0,
+                maxReverseSpeed: 19.0,
+                brakeForce: 19500.0,
+                engineBrakeTorque: 95.0
             },
-            aero: {
-                dragCoeff: 0.0032,
-                downforceCoeff: 0.0045
+            tires: {
+                pacejkaB: 9.2,
+                pacejkaC: 1.52,
+                pacejkaD: 1.08,
+                pacejkaE: -0.35,
+                relaxationLength: 0.34,
+                minSlipSpeed: 1.2,
+                stictionSpeed: 0.65,
+                maxSteerAngle: 0.54,
+                highSpeedSteerDamp: 0.026,
+                ackermannFactor: 0.65,
+                handbrakeRearGrip: 0.28,
+                driftSlipThreshold: 0.14
+            },
+            boost: {
+                maxFuel: 1.0,
+                burnRate: 0.28,
+                regenRate: 0.12,
+                thrustForce: 7800.0,
+                speedBonus: 14.0
             }
         };
     }
 
     /**
-     * Parses a vehicle configuration from a serialized JSON string.
-     * Falls back cleanly to default configuration on syntax or structure error.
+     * Deep-copies and clamps a VehicleConfigData structure so invalid values or zero divisors
+     * can never destabilize suspension or tire integration.
      *
-     * @param jsonString Raw JSON encoded configuration string.
-     * @return Deserialized `VehicleConfigData` instance.
+     * @param {VehicleConfigData} cfg Input vehicle configuration (defaults used if null).
+     * @returns {VehicleConfigData} Safe clamped configuration clone.
      */
-    public static function fromJson(jsonString:String):VehicleConfigData {
-        if (jsonString == null || jsonString.length == 0) {
-            return getDefault();
-        }
-        try {
-            var raw:Dynamic = Json.parse(jsonString);
-            var def = getDefault();
+    public static function clamp(?cfg:VehicleConfigData):VehicleConfigData {
+        var def = getDefault();
+        if (cfg == null) return def;
 
-            // Safely merge fields with fallback defaults
-            var cfg:VehicleConfigData = {
-                name: raw.name != null ? raw.name : def.name,
-                mass: raw.mass != null ? raw.mass : def.mass,
-                yawInertia: raw.yawInertia != null ? raw.yawInertia : def.yawInertia,
-                pitchInertia: raw.pitchInertia != null ? raw.pitchInertia : def.pitchInertia,
-                rollInertia: raw.rollInertia != null ? raw.rollInertia : def.rollInertia,
-                baseTopSpeed: raw.baseTopSpeed != null ? raw.baseTopSpeed : def.baseTopSpeed,
-                boostTopSpeed: raw.boostTopSpeed != null ? raw.boostTopSpeed : def.boostTopSpeed,
-                baseAcceleration: raw.baseAcceleration != null ? raw.baseAcceleration : def.baseAcceleration,
-                boostAcceleration: raw.boostAcceleration != null ? raw.boostAcceleration : def.boostAcceleration,
-                brakeDecel: raw.brakeDecel != null ? raw.brakeDecel : def.brakeDecel,
-                reverseTopSpeed: raw.reverseTopSpeed != null ? raw.reverseTopSpeed : def.reverseTopSpeed,
-                suspension: raw.suspension != null ? {
-                    restLength: raw.suspension.restLength != null ? raw.suspension.restLength : def.suspension.restLength,
-                    springRate: raw.suspension.springRate != null ? raw.suspension.springRate : def.suspension.springRate,
-                    damping: raw.suspension.damping != null ? raw.suspension.damping : def.suspension.damping,
-                    antiRollStiffness: raw.suspension.antiRollStiffness != null ? raw.suspension.antiRollStiffness : def.suspension.antiRollStiffness,
-                    minTravel: raw.suspension.minTravel != null ? raw.suspension.minTravel : def.suspension.minTravel,
-                    maxTravel: raw.suspension.maxTravel != null ? raw.suspension.maxTravel : def.suspension.maxTravel,
-                    bodyRollScale: raw.suspension.bodyRollScale != null ? raw.suspension.bodyRollScale : def.suspension.bodyRollScale
-                } : def.suspension,
-                tires: raw.tires != null ? {
-                    peakSlipAngle: raw.tires.peakSlipAngle != null ? raw.tires.peakSlipAngle : def.tires.peakSlipAngle,
-                    baseLateralStiffness: raw.tires.baseLateralStiffness != null ? raw.tires.baseLateralStiffness : def.tires.baseLateralStiffness,
-                    longitudinalGrip: raw.tires.longitudinalGrip != null ? raw.tires.longitudinalGrip : def.tires.longitudinalGrip,
-                    rollingResistance: raw.tires.rollingResistance != null ? raw.tires.rollingResistance : def.tires.rollingResistance,
-                    tireSlipBias: raw.tires.tireSlipBias != null ? raw.tires.tireSlipBias : def.tires.tireSlipBias,
-                    groundFriction: raw.tires.groundFriction != null ? raw.tires.groundFriction : def.tires.groundFriction,
-                    wheelspinAmount: raw.tires.wheelspinAmount != null ? raw.tires.wheelspinAmount : def.tires.wheelspinAmount
-                } : def.tires,
-                drift: raw.drift != null ? {
-                    lateralStiffnessScale: raw.drift.lateralStiffnessScale != null ? raw.drift.lateralStiffnessScale : def.drift.lateralStiffnessScale,
-                    counterSteerTorque: raw.drift.counterSteerTorque != null ? raw.drift.counterSteerTorque : def.drift.counterSteerTorque,
-                    forwardBiasRate: raw.drift.forwardBiasRate != null ? raw.drift.forwardBiasRate : def.drift.forwardBiasRate,
-                    minDriftSpeed: raw.drift.minDriftSpeed != null ? raw.drift.minDriftSpeed : def.drift.minDriftSpeed,
-                    driftYawRate: raw.drift.driftYawRate != null ? raw.drift.driftYawRate : def.drift.driftYawRate,
-                    driftExitSpeed: raw.drift.driftExitSpeed != null ? raw.drift.driftExitSpeed : def.drift.driftExitSpeed,
-                    driftTriggerAngle: raw.drift.driftTriggerAngle != null ? raw.drift.driftTriggerAngle : def.drift.driftTriggerAngle
-                } : def.drift,
-                drivetrain: raw.drivetrain != null ? {
-                    gearRatios: raw.drivetrain.gearRatios != null ? raw.drivetrain.gearRatios : def.drivetrain.gearRatios,
-                    reverseRatio: raw.drivetrain.reverseRatio != null ? raw.drivetrain.reverseRatio : def.drivetrain.reverseRatio,
-                    finalDrive: raw.drivetrain.finalDrive != null ? raw.drivetrain.finalDrive : def.drivetrain.finalDrive,
-                    idleRPM: raw.drivetrain.idleRPM != null ? raw.drivetrain.idleRPM : def.drivetrain.idleRPM,
-                    redlineRPM: raw.drivetrain.redlineRPM != null ? raw.drivetrain.redlineRPM : def.drivetrain.redlineRPM,
-                    shiftUpRPM: raw.drivetrain.shiftUpRPM != null ? raw.drivetrain.shiftUpRPM : def.drivetrain.shiftUpRPM,
-                    shiftDownRPM: raw.drivetrain.shiftDownRPM != null ? raw.drivetrain.shiftDownRPM : def.drivetrain.shiftDownRPM,
-                    shiftDelay: raw.drivetrain.shiftDelay != null ? raw.drivetrain.shiftDelay : def.drivetrain.shiftDelay,
-                    lsdLockRatio: raw.drivetrain.lsdLockRatio != null ? raw.drivetrain.lsdLockRatio : def.drivetrain.lsdLockRatio,
-                    maxEngineTorque: raw.drivetrain.maxEngineTorque != null ? raw.drivetrain.maxEngineTorque : def.drivetrain.maxEngineTorque
-                } : def.drivetrain,
-                aero: raw.aero != null ? {
-                    dragCoeff: raw.aero.dragCoeff != null ? raw.aero.dragCoeff : def.aero.dragCoeff,
-                    downforceCoeff: raw.aero.downforceCoeff != null ? raw.aero.downforceCoeff : def.aero.downforceCoeff
-                } : def.aero
-            };
-            return cfg;
-        } catch (e:haxe.Exception) {
-            trace("CarConfig parse error: " + e.message);
-            return getDefault();
+        var c = cfg.chassis != null ? cfg.chassis : def.chassis;
+        var s = cfg.suspension != null ? cfg.suspension : def.suspension;
+        var d = cfg.drivetrain != null ? cfg.drivetrain : def.drivetrain;
+        var t = cfg.tires != null ? cfg.tires : def.tires;
+        var b = cfg.boost != null ? cfg.boost : def.boost;
+
+        var ratios = (d.gearRatios != null && d.gearRatios.length > 0)
+            ? d.gearRatios.copy()
+            : def.drivetrain.gearRatios.copy();
+        for (i in 0...ratios.length) {
+            ratios[i] = clampVal(ratios[i], 0.3, 6.0, def.drivetrain.gearRatios[0]);
         }
+
+        var minLen = clampVal(s.minLength, 0.04, 0.30, def.suspension.minLength);
+        var restLen = clampVal(s.restLength, minLen + 0.06, 0.65, def.suspension.restLength);
+        var unloadedLen = clampVal(s.unloadedLength, restLen + 0.04, 0.90, def.suspension.unloadedLength);
+
+        var idle = clampVal(d.idleRPM, 500.0, 2500.0, def.drivetrain.idleRPM);
+        var redline = clampVal(d.redlineRPM, idle + 1500.0, 12000.0, def.drivetrain.redlineRPM);
+
+        return {
+            chassis: {
+                massKg: clampVal(c.massKg, 400.0, 5000.0, def.chassis.massKg),
+                wheelbase: clampVal(c.wheelbase, 1.2, 5.0, def.chassis.wheelbase),
+                trackWidth: clampVal(c.trackWidth, 0.8, 3.0, def.chassis.trackWidth),
+                cogHeight: clampVal(c.cogHeight, 0.20, 1.20, def.chassis.cogHeight),
+                pitchInertia: clampVal(c.pitchInertia, 300.0, 12000.0, def.chassis.pitchInertia),
+                rollInertia: clampVal(c.rollInertia, 150.0, 6000.0, def.chassis.rollInertia),
+                yawInertia: clampVal(c.yawInertia, 300.0, 12000.0, def.chassis.yawInertia),
+                aeroDragArea: clampVal(c.aeroDragArea, 0.0, 3.0, def.chassis.aeroDragArea),
+                aeroDownforce: clampVal(c.aeroDownforce, 0.0, 10.0, def.chassis.aeroDownforce),
+                rollingResistance: clampVal(c.rollingResistance, 0.001, 0.25, def.chassis.rollingResistance)
+            },
+            suspension: {
+                restLength: restLen,
+                unloadedLength: unloadedLen,
+                minLength: minLen,
+                springStiffness: clampVal(s.springStiffness, 5000.0, 180000.0, def.suspension.springStiffness),
+                bumpDamping: clampVal(s.bumpDamping, 500.0, 40000.0, def.suspension.bumpDamping),
+                reboundDamping: clampVal(s.reboundDamping, 500.0, 40000.0, def.suspension.reboundDamping),
+                antiRollStiffness: clampVal(s.antiRollStiffness, 0.0, 80000.0, def.suspension.antiRollStiffness),
+                maxWheelForce: clampVal(s.maxWheelForce, 2000.0, 60000.0, def.suspension.maxWheelForce)
+            },
+            drivetrain: {
+                idleRPM: idle,
+                redlineRPM: redline,
+                peakTorqueNm: clampVal(d.peakTorqueNm, 50.0, 3000.0, def.drivetrain.peakTorqueNm),
+                finalDrive: clampVal(d.finalDrive, 1.0, 8.0, def.drivetrain.finalDrive),
+                gearRatios: ratios,
+                reverseRatio: clampVal(d.reverseRatio, -6.0, -0.5, def.drivetrain.reverseRatio),
+                shiftUpRPM: clampVal(d.shiftUpRPM, idle + 500.0, redline - 100.0, def.drivetrain.shiftUpRPM),
+                shiftDownRPM: clampVal(d.shiftDownRPM, idle + 100.0, redline - 600.0, def.drivetrain.shiftDownRPM),
+                maxForwardSpeed: clampVal(d.maxForwardSpeed, 10.0, 150.0, def.drivetrain.maxForwardSpeed),
+                maxReverseSpeed: clampVal(d.maxReverseSpeed, 5.0, 50.0, def.drivetrain.maxReverseSpeed),
+                brakeForce: clampVal(d.brakeForce, 1000.0, 80000.0, def.drivetrain.brakeForce),
+                engineBrakeTorque: clampVal(d.engineBrakeTorque, 0.0, 1000.0, def.drivetrain.engineBrakeTorque)
+            },
+            tires: {
+                pacejkaB: clampVal(t.pacejkaB, 2.0, 25.0, def.tires.pacejkaB),
+                pacejkaC: clampVal(t.pacejkaC, 0.5, 2.5, def.tires.pacejkaC),
+                pacejkaD: clampVal(t.pacejkaD, 0.3, 2.5, def.tires.pacejkaD),
+                pacejkaE: clampVal(t.pacejkaE, -2.0, 1.0, def.tires.pacejkaE),
+                relaxationLength: clampVal(t.relaxationLength, 0.05, 2.0, def.tires.relaxationLength),
+                minSlipSpeed: clampVal(t.minSlipSpeed, 0.25, 5.0, def.tires.minSlipSpeed),
+                stictionSpeed: clampVal(t.stictionSpeed, 0.05, 2.5, def.tires.stictionSpeed),
+                maxSteerAngle: clampVal(t.maxSteerAngle, 0.10, 0.85, def.tires.maxSteerAngle),
+                highSpeedSteerDamp: clampVal(t.highSpeedSteerDamp, 0.0, 0.15, def.tires.highSpeedSteerDamp),
+                ackermannFactor: clampVal(t.ackermannFactor, 0.0, 1.0, def.tires.ackermannFactor),
+                handbrakeRearGrip: clampVal(t.handbrakeRearGrip, 0.05, 1.0, def.tires.handbrakeRearGrip),
+                driftSlipThreshold: clampVal(t.driftSlipThreshold, 0.05, 0.60, def.tires.driftSlipThreshold)
+            },
+            boost: {
+                maxFuel: clampVal(b.maxFuel, 0.1, 10.0, def.boost.maxFuel),
+                burnRate: clampVal(b.burnRate, 0.01, 2.0, def.boost.burnRate),
+                regenRate: clampVal(b.regenRate, 0.0, 2.0, def.boost.regenRate),
+                thrustForce: clampVal(b.thrustForce, 0.0, 30000.0, def.boost.thrustForce),
+                speedBonus: clampVal(b.speedBonus, 0.0, 50.0, def.boost.speedBonus)
+            }
+        };
     }
 
     /**
-     * Serializes a vehicle configuration data structure into a formatted JSON string.
+     * Serializes a vehicle config struct into formatted JSON.
      *
-     * @param config Target vehicle configuration.
-     * @param pretty Whether to apply indentation formatting.
-     * @return JSON encoded string.
+     * @param {VehicleConfigData} cfg Vehicle config to serialize.
+     * @returns {String} JSON representation.
      */
-    public static function toJson(config:VehicleConfigData, pretty:Bool = true):String {
-        return Json.stringify(config, pretty ? "  " : null);
+    public static function toJson(cfg:VehicleConfigData):String {
+        return Json.stringify(clamp(cfg), null, "  ");
+    }
+
+    /**
+     * Parses JSON into a safely validated VehicleConfigData profile (falls back on defaults on error).
+     *
+     * @param {String} jsonText Input JSON string.
+     * @returns {VehicleConfigData} Clamped configuration profile.
+     */
+    public static function fromJson(jsonText:String):VehicleConfigData {
+        if (jsonText == null || StringTools.trim(jsonText).length == 0) {
+            return getDefault();
+        }
+        try {
+            var parsed:Dynamic = Json.parse(jsonText);
+            return clamp(parsed);
+        } catch (_:Dynamic) {
+            return getDefault();
+        }
+    }
+
+    static inline function clampVal(v:Float, minV:Float, maxV:Float, fallback:Float):Float {
+        if (Math.isNaN(v) || !Math.isFinite(v)) return fallback;
+        return v < minV ? minV : (v > maxV ? maxV : v);
     }
 }
-

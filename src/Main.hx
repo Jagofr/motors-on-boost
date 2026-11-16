@@ -1,561 +1,436 @@
 package;
 
-import h3d.scene.Mesh;
-import h3d.prim.Cube;
-import h3d.scene.fwd.DirLight;
-import h3d.Vector;
+import h2d.Bitmap;
 import h2d.Object;
 import h2d.Text;
-import h2d.Bitmap;
-import h2d.Tile;
-
-import input.InputController;
-import physics.CarPhysics;
+import h3d.Engine;
 import camera.ChaseCamera;
-import ui.UIManager;
-import ui.components.UIEnums.MenuAction;
-import audio.AudioManager;
-import graphics.GraphicsManager;
-import save.SaveSystem;
-import ui.FontManager;
-import world.Track;
-import world.Skybox;
+import config.GameConfig;
+import config.GameConfig.GameConfigData;
+import core.AssetPreloader;
+import core.IntroController;
+import core.IntroController.IntroState;
 import entities.CarMesh;
 import entities.TrafficSystem;
-import graphics.PostProcessRenderer;
+import graphics.GraphicsManager;
+import input.InputController;
+import audio.AudioManager;
+import net.MultiplayerManager;
+import net.NetworkProtocol.LobbyStatus;
+import net.NetworkProtocol.NetworkRole;
+import net.NetworkProtocol.PeerSlotInfo;
+import net.NetworkProtocol.SpawnSlot;
+import net.SocketTransport.WebSocketTransport;
+import physics.CarPhysics;
+import save.SaveSystem;
+import ui.FontManager;
+import ui.UIManager;
+import ui.components.UIEnums.MenuAction;
+import world.SandboxMap;
+import world.Track;
+import world.WorldManager;
+import world.WorldManager.MapMode;
 
 /**
- * Sequential boot loader and splash screen sequence stages.
- */
-enum IntroState {
-    /** Null or uninitialized state. */
-    None;
-
-    /** Studio production splash screen (RvL // Rogue). */
-    Studio;
-
-    /** Engine and language splash screen (Haxe & Heaps.io). */
-    Engine;
-
-    /** Legal disclosures, attribution notices, and health advisory screen. */
-    Disclaimer;
-
-    /** Splash sequence finished; transferred to 3D game showcase. */
-    Complete;
-}
-
-/**
- * Top-level application lifecycle state.
+ * Top-level application lifecycle phase.
+ *
+ * @enum {Int} AppState
+ * @module Main
  */
 enum AppState {
-    /** Boot sequence running intro splash screens. */
+    /** Boot sequence displaying studio, engine, and legal disclaimer screens while loading assets. */
     IntroSequence;
 
-    /** Interactive 3D gameplay and user interface system active. */
+    /** Interactive 3D world showcase, UI navigation, and gameplay active. */
     InGameUI;
 }
 
 /**
- * World driving environment and map mode.
- */
-enum MapMode {
-    /** High-speed urban highway circuit with multi-agent traffic. */
-    Circuit;
-
-    /** Open sandbox proving grounds with terrain hills, moguls, ramps, and banked bowl. */
-    Sandbox;
-}
-
-/**
- * Main application entry point for M.O.B. (Motors on Boost).
- * Manages boot splash sequencing, WebP texture decoding, 3D scene initialization,
- * car physics updates, third-person spring-arm camera tracking, and UI lifecycle.
+ * Thin application entry point and coordinator for M.O.B. (Motors on Boost).
+ * Delegates boot sequencing to `IntroController`, asynchronous loading to `AssetPreloader`,
+ * 3D world orchestration to `WorldManager`, and UI workflows to `UIManager`.
+ *
+ * @class Main
+ * @extends hxd.App
+ * @module Main
  */
 @:keep
 class Main extends hxd.App {
-    public var appState:AppState = IntroSequence;
-    public var introState:IntroState = Studio;
-    public var currentMapMode:MapMode = Circuit;
-
-    // Core Engine & Display Constants
+    /** Default virtual canvas width in logical pixels. @default 1280 */
     public static inline var VIRTUAL_BASE_WIDTH:Int = 1280;
+
+    /** Default virtual canvas height in logical pixels. @default 720 */
     public static inline var VIRTUAL_BASE_HEIGHT:Int = 720;
+
+    /** Minimum legal disclaimer dwell duration in seconds. @default 5.5 */
     public static inline var DISCLAIMER_MIN_DURATION:Float = 5.5;
+
+    /** Showcase reveal curtain fade duration in seconds. @default 1.2 */
     public static inline var SHOWCASE_FADE_DURATION:Float = 1.2;
+
+    /** Speed threshold activating radial blur in km/h. @default 140.0 */
     public static inline var RADIAL_BLUR_SPEED_THRESHOLD_KMH:Float = 140.0;
+
+    /** Camera far clipping distance in meters. @default 1500.0 */
     public static inline var CAMERA_FAR_PLANE:Float = 1500.0;
 
-    // Intro Phase Timers & Transitions
-    var introTimer:Float = 0.0;
-    var introAlpha:Float = 0.0;
-    var isFadingOut:Bool = false;
-    public var introContainer:Object;
-    var introBg:Bitmap;
-    public var screenStudio:Object;
-    public var screenEngine:Object;
-    public var screenDisclaimer:Object;
+    /** Top-level runtime configuration bundle. */
+    public var config:GameConfigData;
 
-    // Post-Intro Showcase Fade-in Transition
-    var showcaseFadeTimer:Float = 0.0;
-    var showcaseFadeDuration:Float = SHOWCASE_FADE_DURATION;
-    var isShowcaseFadingIn:Bool = false;
-    var showcaseCurtain:Bitmap;
+    /** Active lifecycle state (boot sequence vs interactive UI/gameplay). */
+    public var appState:AppState = IntroSequence;
 
-    // Splash Bitmaps loaded via WebP decoder
-    var studioSplashBmp:Bitmap;
-    var engineSplashBmp:Bitmap;
-    public var discHeader:Text;
-    public var discBody:Text;
-    public var discVersion:Text;
-    var discGraphics:h2d.Graphics;
-    var logoRow:Object;
-    var discLogos:Array<Bitmap> = [];
+    /** Current intro state mirrored for external inspection. */
+    @:keep public var introState:IntroState = Studio;
 
-    // Background Asset Pre-loading
-    var isLoadingStarted:Bool = false;
-    var isLoadingComplete:Bool = false;
-    var disclaimerMinDuration:Float = DISCLAIMER_MIN_DURATION; // Locked time (seconds)
+    /** Active playable map mode mirrored for external inspection. */
+    @:keep public var currentMapMode:MapMode = Circuit;
 
-    // Game Core Systems & Singletons
-    var fpsText:Text;
-    var speedText:Text;
-    public var ui:UIManager;
-    public var audio:AudioManager;
-    public var gfx:GraphicsManager;
-    public var saveData:GameSaveData;
+    /** Background WebP/texture/scene preloader running silently without progress bars. */
+    @:keep public var preloader:AssetPreloader;
 
-    public var track:Track;
-    public var sandboxMap:world.SandboxMap;
-    public var traffic:TrafficSystem;
-    public var playerMesh:CarMesh;
-    public var carPhysics:CarPhysics;
-    var terrainGround:Mesh;
-    public var input:InputController;
-    public var chaseCam:ChaseCamera;
-    var dirLight:DirLight;
-    var fillLight:DirLight;
-    var skybox:Skybox;
-    var postRenderer:PostProcessRenderer;
-    var wheelSpinAngle:Float = 0.0;
-    var rearWheelSpinAngle:Float = 0.0;
+    /** Intro slide and disclosure sequence state machine. */
+    @:keep public var introController:IntroController;
 
-    var showcaseAngle:Float = 0.0;
+    /** Unified 3D world, skybox, physics, traffic, and camera manager. */
+    @:keep public var world:WorldManager;
+
+    /** Modular 2D menu and HUD coordinator. */
+    @:keep public var ui:UIManager;
+
+    /** Peer-to-peer multiplayer coordinator (Host-authoritative validation over dumb socket relay). */
+    @:keep public var multiplayer:MultiplayerManager;
+
+    /** Unified keyboard, gamepad, and multi-touch input rack controller. */
+    @:keep public var input:InputController;
+
+    /** WebAudio synthesized SFX and ambient music manager. */
+    @:keep public var audio:AudioManager;
+
+    /** GPU shadows, lighting, MSAA, and resolution profile manager. */
+    @:keep public var gfx:GraphicsManager;
+
+    /** Serialized player progress, settings, and bindings profile. */
+    @:keep public var saveData:GameSaveData;
+
+    // =========================================================================
+    // EXTERNAL JS FACADE MIRRORS (COMPATIBLE WITH PLAYWRIGHT / AITESTS)
+    // =========================================================================
+
+    @:keep public var introTimer:Float = 0.0;
+    var syncedIntroTimer:Float = 0.0;
+
+    @:keep public var introContainer:Object;
+    @:keep public var introBg:Bitmap;
+    @:keep public var screenStudio:Object;
+    @:keep public var screenEngine:Object;
+    @:keep public var screenDisclaimer:Object;
+    @:keep public var studioSplashBmp:Bitmap;
+    @:keep public var engineSplashBmp:Bitmap;
+    @:keep public var discHeader:Text;
+
+    @:keep public var track:Track;
+    @:keep public var sandboxMap:SandboxMap;
+    @:keep public var traffic:TrafficSystem;
+    @:keep public var playerMesh:CarMesh;
+    @:keep public var carPhysics:CarPhysics;
+    @:keep public var chaseCam:ChaseCamera;
+
+    var systemsInitialized:Bool = false;
+    /** Whether mobile/tablet portrait orientation lock currently suspends game updates and rendering. */
+    @:keep public var pausedByOrientation:Bool = false;
     var raceTimer:Float = 0.0;
     var currentLap:Int = 1;
     var totalLaps:Int = 3;
 
+    /**
+     * Initializes engine scaling, embedded assets, background preloader, and the boot intro sequence.
+     *
+     * @returns {Void}
+     */
     override function init() {
         super.init();
-
-        engine.backgroundColor = 0x000000;
-
-        #if js
-        hxd.Res.initEmbed();
-        #else
-        hxd.Res.initLocal();
-        #end
-
-        FontManager.init();
-        input = new InputController();
-
-        // Responsive High-DPI & Multi-Resolution UI Scaling
-        // Target virtual baseline: 1280x720. AutoZoom scales UI elements, fonts,
-        // and interactive touch hitboxes proportionally on 2K/4K and mobile Retina displays.
-        s2d.scaleMode = AutoZoom(VIRTUAL_BASE_WIDTH, VIRTUAL_BASE_HEIGHT, false);
-
-        buildIntroScreens();
-        setIntroScreen(Studio);
+        config = GameConfig.getDefault();
 
         #if js
         untyped js.Browser.window.app = this;
         untyped js.Browser.window.IntroState = IntroState;
         untyped js.Browser.window.MapMode = MapMode;
+        syncOrientationPauseFromHost();
         #end
-    }
 
-    // =========================================================================
-    // NATIVE WEBP DECODER (DOM Image -> Canvas -> Bytes -> Heaps Texture -> Tile)
-    // =========================================================================
+        s2d.scaleMode = AutoZoom(config.resolution.baseWidth, config.resolution.baseHeight, false);
+        engine.backgroundColor = 0x000000;
 
-    /**
-     * Decodes WebP image assets natively using an offscreen HTML5 canvas buffer pipeline.
-     * Extracts RGBA byte buffers and uploads them into hardware Heaps textures.
-     *
-     * @param path Relative path to the WebP image asset.
-     * @param onLoaded Callback invoked with the decoded Heaps `h2d.Tile`.
-     */
-    function loadWebpTile(path:String, onLoaded:Tile->Void) {
         #if js
-        var img = new js.html.Image();
-        img.onload = function(_) {
-            var w = img.naturalWidth;
-            var h = img.naturalHeight;
-
-            var canvas = js.Browser.document.createCanvasElement();
-            canvas.width = w;
-            canvas.height = h;
-
-            var ctx = canvas.getContext2d();
-            ctx.drawImage(img, 0, 0);
-
-            var imgData = ctx.getImageData(0, 0, w, h);
-            var bytes = haxe.io.Bytes.ofData(imgData.data.buffer);
-
-            var bmp = new hxd.BitmapData(w, h);
-            bmp.setPixels(new hxd.Pixels(w, h, bytes, hxd.PixelFormat.RGBA));
-
-            var tex = h3d.mat.Texture.fromBitmap(bmp);
-            var tile = Tile.fromTexture(tex);
-            onLoaded(tile);
-        };
-        img.onerror = function(err) {
-            trace("WebP load failure for: " + path);
-        };
-        img.src = path;
+        hxd.Res.initEmbed();
         #else
-        trace("WebP loading requires JS/HTML5 target.");
+        try {
+            hxd.Res.initEmbed();
+        } catch (e:Dynamic) {}
         #end
+
+        FontManager.init();
+        input = new InputController(config.input);
+
+        preloader = new AssetPreloader(config.intro);
+        introController = new IntroController(s2d, preloader, config.intro);
+        introController.onAssetsBound = syncIntroFacade;
+        introController.onStateChanged = function(_) syncIntroFacade();
+        introController.onIntroComplete = activateMainSplash;
+        introController.setScreen(Studio);
+        syncIntroFacade();
+
+        // Begin background preloading & deferred 3D world build immediately without any progress bar UI
+        preloader.start(ensureDeferredSystemsInitialized);
     }
 
     /**
-     * Constructs and initializes the intro sequence container and its three stages:
-     * Studio splash, Engine splash, and the Trademark & Legal Disclosures notice screen.
-     */
-    function buildIntroScreens() {
-        introContainer = new Object(s2d);
-
-        // Solid Black Opaque Backplate
-        introBg = new Bitmap(Tile.fromColor(0x000000, 1, 1, 1.0), introContainer);
-
-        // 1. Studio Splash
-        screenStudio = new Object(introContainer);
-        loadWebpTile("intro/jagofr-rvl-splash.webp", function(tile) {
-            studioSplashBmp = new Bitmap(tile, screenStudio);
-            layoutIntro();
-        });
-
-        // 2. Engine Splash
-        screenEngine = new Object(introContainer);
-        loadWebpTile("intro/heaps-haxe-splash.webp", function(tile) {
-            engineSplashBmp = new Bitmap(tile, screenEngine);
-            layoutIntro();
-        });
-
-        // 3. Trademark & Disclosure Notice Screen
-        screenDisclaimer = new Object(introContainer);
-        discGraphics = new h2d.Graphics(screenDisclaimer);
-
-        discHeader = new Text(FontManager.titleFont, screenDisclaimer);
-        discHeader.text = "TRADEMARK & LEGAL DISCLOSURES";
-        discHeader.textColor = 0x00E5FF;
-        discHeader.textAlign = Center;
-
-        discBody = new Text(FontManager.regularFont, screenDisclaimer);
-        discBody.textColor = 0xC2D1E0;
-        discBody.textAlign = Center;
-        discBody.lineSpacing = 5.0;
-        discBody.text = 
-            "M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" +
-            "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" +
-            "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" +
-            "are the intellectual property of their respective creators. All rights reserved.\n\n" +
-            "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" +
-            "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" +
-            "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" +
-            "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" +
-            "Please play in a well-lit environment and take a 15-minute break for every hour of play.";
-
-        discVersion = new Text(FontManager.regularFont, screenDisclaimer);
-        discVersion.text = Version.DISPLAY;
-        discVersion.textColor = 0x5A738E;
-        discVersion.textAlign = Center;
-
-        logoRow = new Object(screenDisclaimer);
-
-        var logoPaths = [
-            "intro/icons/logo_haxe.webp",
-            "intro/icons/logo_heaps.webp",
-            "intro/icons/logo_webgl.webp"
-        ];
-
-        for (path in logoPaths) {
-            loadWebpTile(path, function(tile) {
-                var bmp = new Bitmap(tile, logoRow);
-                discLogos.push(bmp);
-                layoutIntro();
-            });
-        }
-
-        layoutIntro();
-    }
-
-    /**
-     * Switches the active intro stage and begins its cross-fade lifecycle.
-     * Initiates asynchronous background resource allocation when transitioning to the disclaimer.
+     * Lazily constructs audio, persistent save data, 3D world systems, and hidden UI views.
+     * Safe and idempotent if invoked asynchronously during boot or synchronously on fast-forward.
      *
-     * @param target The target IntroState stage to transition into.
+     * @returns {Void}
      */
-    public function setIntroScreen(target:IntroState) {
-        introState = target;
-        introTimer = 0.0;
-        introAlpha = 0.0;
-        isFadingOut = false;
-
-        screenStudio.visible = (introState == Studio);
-        screenEngine.visible = (introState == Engine);
-        screenDisclaimer.visible = (introState == Disclaimer);
-
-        screenStudio.alpha = 0.0;
-        screenEngine.alpha = 0.0;
-        screenDisclaimer.alpha = 0.0;
-
-        if (introState == Disclaimer && !isLoadingStarted) {
-            startBackgroundLoading();
-        }
-
-        layoutIntro();
-    }
-
-    /**
-     * Advances the active intro screen timer, manages alpha cross-fading, evaluates
-     * user skip inputs for the studio/engine screens, and enforces mandatory minimum duration for the disclaimer.
-     *
-     * @param dt Delta time in seconds since last frame.
-     */
-    function updateIntro(dt:Float) {
-        introTimer += dt;
-
-        var allowSkip = (introState == Studio || introState == Engine);
-        if (allowSkip && input.anyKeyPressed && !isFadingOut) {
-            input.flushInputs();
-            isFadingOut = true;
-            introTimer = Math.max(introTimer, 2.5);
-        }
-
-        switch (introState) {
-            case Studio | Engine:
-                var fadeInEnd = 0.8;
-                var holdEnd = 2.4;
-                var fadeOutEnd = 3.2;
-
-                if (introTimer < fadeInEnd) {
-                    introAlpha = introTimer / fadeInEnd;
-                } else if (introTimer < holdEnd) {
-                    introAlpha = 1.0;
-                } else if (introTimer < fadeOutEnd) {
-                    introAlpha = 1.0 - ((introTimer - holdEnd) / (fadeOutEnd - holdEnd));
-                } else {
-                    introAlpha = 0.0;
-                    setIntroScreen(introState == Studio ? Engine : Disclaimer);
-                    return;
-                }
-
-                var currentScreen = (introState == Studio) ? screenStudio : screenEngine;
-                currentScreen.alpha = Math.max(0.0, Math.min(1.0, introAlpha));
-
-            case Disclaimer:
-                var fadeInEnd = 1.0;
-
-                if (introTimer < fadeInEnd) {
-                    introAlpha = introTimer / fadeInEnd;
-                    screenDisclaimer.alpha = introAlpha;
-                } else if (introTimer < disclaimerMinDuration || !isLoadingComplete) {
-                    introAlpha = 1.0;
-                    screenDisclaimer.alpha = 1.0;
-                } else if (introTimer < disclaimerMinDuration + 1.0) {
-                    var fadeProgress = (introTimer - disclaimerMinDuration) / 1.0;
-                    introAlpha = 1.0 - Math.min(1.0, fadeProgress);
-                    
-                    screenDisclaimer.alpha = introAlpha;
-                    introBg.alpha = 1.0; // Keep background completely black as text fades out
-                } else {
-                    finishIntroSequence();
-                    return;
-                }
-
-            default:
-        }
-    }
-
-    /**
-     * Finalizes the boot sequence, disposes of intro DOM containers, initializes the 3D scene,
-     * triggers the smooth 1.2s cross-fade curtain, and presents the main splash menu.
-     */
-    public function finishIntroSequence() {
-        if (!isLoadingStarted) {
-            startBackgroundLoading();
-        }
-        introState = Complete;
-        appState = InGameUI;
-        introContainer.remove();
-
-        input.flushInputs();
-
-        engine.backgroundColor = 0x1A1F26;
-
-        // Setup smooth transition into the 3D scene & splash UI
-        isShowcaseFadingIn = true;
-        showcaseFadeTimer = 0.0;
-
-        showcaseCurtain = new Bitmap(Tile.fromColor(0x000000, 1, 1, 1.0), s2d);
-        showcaseCurtain.scaleX = s2d.width;
-        showcaseCurtain.scaleY = s2d.height;
-
-        if (ui != null) {
-            ui.visible = true;
-            ui.alpha = 0.0;
-            ui.showSplash();
-        }
-    }
-
-    /**
-     * Asynchronously loads player save data, initializes audio subsystems, allocates 3D world meshes,
-     * builds highway track waypoints, spawns traffic fleet, and prepares UI while disclaimer is active.
-     */
-    function startBackgroundLoading() {
-        isLoadingStarted = true;
+    function ensureDeferredSystemsInitialized():Void {
+        if (systemsInitialized) return;
+        systemsInitialized = true;
 
         saveData = SaveSystem.load();
-        input.steerSensitivity = (saveData.steerSensitivity != null && saveData.steerSensitivity > 0.0) ? saveData.steerSensitivity : 1.0;
+        input.loadFromSave(saveData);
 
-        audio = new AudioManager();
+        audio = new AudioManager(config.audio);
         audio.masterVolume = saveData.masterVol;
         audio.musicVolume = saveData.musicVol;
         audio.sfxVolume = saveData.sfxVol;
 
-        carPhysics = new CarPhysics(0.0, 0.0, 0.0);
-        chaseCam = new ChaseCamera(s3d.camera, 0.0, -10.0, 4.0);
+        world = new WorldManager(s3d, config);
 
-        // High-performance post-processing renderer supporting radial directional blur
-        postRenderer = new PostProcessRenderer();
-        s3d.renderer = postRenderer;
-        s3d.camera.zFar = CAMERA_FAR_PLANE;
+        gfx = new GraphicsManager(s3d, s2d, world.dirLight, saveData.graphics);
+        gfx.applyAll();
 
-        // Atmospheric panoramic gradient blue skybox
-        skybox = new Skybox(s3d);
+        multiplayer = new MultiplayerManager(new WebSocketTransport());
 
-        fpsText = new Text(FontManager.regularFont, s2d);
-        fpsText.textColor = 0xFFEE00;
-        fpsText.x = 14;
-        fpsText.y = 14;
-        fpsText.visible = false;
-
-        speedText = new Text(FontManager.regularFont, s2d);
-        speedText.textColor = 0x00E5FF;
-        speedText.x = 14;
-        speedText.y = 36;
-        speedText.visible = false;
-
-        // Position directional sunlight at the tallest south-east point of the entire map
-        // (X: +350.0 [East], Y: -250.0 [South], Z: 140.0 [Apex Summit elevation])
-        var sunDir = new Vector(-0.55, 0.78, -0.32);
-        sunDir.normalize();
-        dirLight = new DirLight(sunDir, s3d);
-        dirLight.setPosition(350.0, -250.0, 140.0);
-        dirLight.color.setColor(0xFFF2D9);
-
-        // Soft secondary fill light from opposite quadrant to soften shadows across tracks and hills
-        var fillDir = new Vector(0.55, -0.78, 0.45);
-        fillDir.normalize();
-        fillLight = new DirLight(fillDir, s3d);
-        fillLight.color.setColor(0x788B9E);
-        fillLight.enableSpecular = false;
-
-        gfx = new GraphicsManager(s3d, s2d, dirLight, saveData.graphics, postRenderer);
-
-        var terrainPrim = new Cube(800.0, 800.0, 0.4, true);
-        terrainPrim.unindex();
-        terrainPrim.addNormals();
-        terrainGround = new Mesh(terrainPrim, s3d);
-        terrainGround.material.color.setColor(0x111418);
-        terrainGround.x = 110.0;
-        terrainGround.y = 90.0;
-        terrainGround.z = -2.5;
-
-        track = new Track(s3d);
-        sandboxMap = new world.SandboxMap(s3d);
-        sandboxMap.visible = false;
-
-        traffic = new TrafficSystem(track.waypoints, s3d);
-        playerMesh = new CarMesh(s3d);
-
-        ui = new UIManager(input, saveData.graphics, saveData.hasActiveRun, s2d);
+        ui = new UIManager(input, saveData.graphics, saveData.hasActiveRun, s2d, multiplayer);
         ui.visible = false;
         ui.onMenuAction = handleMenuAction;
+        ui.onPauseRequested = pauseActiveGame;
+        ui.builder.optionsView.controlsPanel.getSaveData = function() return saveData;
+        ui.builder.optionsView.controlsPanel.onSaveDataUpdated = function(updated) saveData = updated;
+        ui.builder.touchControlsHUD.getTouchSettings = function() return saveData != null ? saveData.touchSettings : null;
 
-        loadMap(Circuit);
-        resetCarToStartLine();
+        multiplayer.onLobbyChanged = function() {
+            if (ui != null && ui.builder != null && ui.builder.multiplayerLobbyView != null) {
+                ui.builder.multiplayerLobbyView.refreshFromManager();
+                if (ui.currentState == MultiplayerLobby) ui.layout();
+            }
+        };
+        multiplayer.onMatchStart = function(mode:MapMode, mySpawn:SpawnSlot, roster:Array<PeerSlotInfo>) {
+            loadMap(mode);
+            if (world != null) {
+                world.clearRemoteCars();
+                world.setTrafficEnabled(false);
+                world.spawnPlayerAt(mySpawn.x, mySpawn.y, mySpawn.z, mySpawn.yaw);
+                for (p in roster) {
+                    if (p.peerId == multiplayer.localPeerId) {
+                        world.setPlayerPaintColor(p.colorHex);
+                    }
+                }
+            }
+            if (ui != null) {
+                ui.inGameHUD.remotePeerMarkers = [];
+                raceTimer = 0.0;
+                currentLap = 1;
+                appState = InGameUI;
+                ui.visible = true;
+                ui.alpha = 1.0;
+                ui.showInGame();
+            }
+        };
+        multiplayer.onReturnToLobby = function() {
+            if (world != null) {
+                world.clearRemoteCars();
+                world.setTrafficEnabled(true);
+            }
+            if (ui != null) {
+                ui.inGameHUD.remotePeerMarkers = [];
+                ui.showMultiplayerLobby();
+            }
+        };
+        multiplayer.onHostDisconnected = function() {
+            if (world != null) {
+                world.clearRemoteCars();
+                world.setTrafficEnabled(true);
+            }
+            if (ui != null) {
+                ui.inGameHUD.remotePeerMarkers = [];
+            }
+        };
 
-        isLoadingComplete = true;
+        syncWorldFacade();
+        syncHUDMapBounds();
+        if (appState == IntroSequence) {
+            if (engine != null) engine.backgroundColor = 0x000000;
+            layoutIntro();
+        }
     }
 
     /**
-     * Toggles visibility and environment systems between Highway Circuit and Open Sandbox Proving Grounds.
+     * Transitions cleanly from finished boot sequence into the interactive 3D showcase and Title Splash.
      *
-     * @param mode Target MapMode to activate.
+     * @returns {Void}
      */
-    public function loadMap(mode:MapMode) {
-        currentMapMode = mode;
-        if (skybox != null) skybox.visible = true;
-        if (mode == Circuit) {
-            if (sandboxMap != null && carPhysics != null) {
-                sandboxMap.unregisterPhysicsColliders(carPhysics.physicsWorld);
-            }
-            if (track != null && carPhysics != null) {
-                track.registerPhysicsColliders(carPhysics.physicsWorld);
-            }
-            if (track != null) track.visible = true;
-            if (terrainGround != null) terrainGround.visible = true;
-            if (sandboxMap != null) sandboxMap.visible = false;
-            if (traffic != null) traffic.visible = true;
-            if (ui != null && ui.inGameHUD != null && track != null) {
-                ui.inGameHUD.initWaypoints(track.waypoints);
-            }
-        } else {
-            if (track != null && carPhysics != null) {
-                track.unregisterPhysicsColliders(carPhysics.physicsWorld);
-            }
-            if (sandboxMap != null && carPhysics != null) {
-                sandboxMap.registerPhysicsColliders(carPhysics.physicsWorld);
-            }
-            if (track != null) track.visible = false;
-            if (terrainGround != null) terrainGround.visible = false;
-            if (sandboxMap != null) sandboxMap.visible = true;
-            if (traffic != null) traffic.visible = false;
-            if (ui != null && ui.inGameHUD != null) {
-                ui.inGameHUD.initSandboxBounds(world.SandboxMap.WALL_LIMIT);
+    function activateMainSplash():Void {
+        ensureDeferredSystemsInitialized();
+        syncIntroFacade();
+        appState = InGameUI;
+        engine.backgroundColor = 0x1A1F26;
+        input.flushInputs();
+
+        if (ui != null) {
+            ui.visible = true;
+            var inviteRoom = MultiplayerManager.detectInviteRoomFromUrl();
+            if (inviteRoom != null && multiplayer != null) {
+                ui.alpha = 1.0;
+                multiplayer.joinRoom(inviteRoom, "GUEST");
+                ui.showMultiplayerLobby();
+            } else {
+                ui.alpha = 0.0;
+                ui.showSplash();
             }
         }
     }
 
     /**
-     * Repositions the player vehicle to the sandbox central staging tarmac.
+     * Mirrors `IntroController` nodes and state onto `Main` fields for external script inspection.
+     *
+     * @returns {Void}
      */
-    function resetCarToSandboxCenter() {
-        carPhysics.resetState(0.0, 0.0, 0.05, 0.0);
-
-        playerMesh.x = 0.0;
-        playerMesh.y = 0.0;
-        playerMesh.z = 0.05;
-        playerMesh.setRotation(0, 0, 0.0);
+    function syncIntroFacade():Void {
+        if (introController == null) return;
+        introState = introController.state;
+        introTimer = introController.timer;
+        syncedIntroTimer = introTimer;
+        introContainer = introController.introContainer;
+        introBg = introController.introBg;
+        screenStudio = introController.screenStudio;
+        screenEngine = introController.screenEngine;
+        screenDisclaimer = introController.screenDisclaimer;
+        studioSplashBmp = introController.studioSplashBmp;
+        engineSplashBmp = introController.engineSplashBmp;
+        discHeader = introController.discHeader;
     }
 
     /**
-     * Repositions the player vehicle to the race track starting grid line.
+     * Mirrors `WorldManager` active subsystems onto `Main` fields for external inspection.
+     *
+     * @returns {Void}
      */
-    function resetCarToStartLine() {
-        carPhysics.resetState(0.0, 0.0, Track.ROAD_LIFT, 0.0);
-
-        playerMesh.x = 0.0;
-        playerMesh.y = 0.0;
-        playerMesh.z = Track.ROAD_LIFT;
-        playerMesh.setRotation(0, 0, 0.0);
+    function syncWorldFacade():Void {
+        if (world == null) return;
+        currentMapMode = world.currentMapMode;
+        track = world.track;
+        sandboxMap = world.sandboxMap;
+        traffic = world.traffic;
+        playerMesh = world.playerMesh;
+        carPhysics = world.carPhysics;
+        chaseCam = world.chaseCam;
     }
 
     /**
-     * Serializes active race progress, coordinates, audio settings, and graphics profiles to storage.
+     * Updates minimap coordinate bounds inside the in-game HUD to match the active map mode.
+     *
+     * @returns {Void}
      */
-    function saveCurrentRun() {
+    function syncHUDMapBounds():Void {
+        if (ui == null || ui.inGameHUD == null || world == null) return;
+        if (world.currentMapMode == Circuit && world.track != null) {
+            ui.inGameHUD.initWaypoints(world.track.waypoints);
+        } else if (world.currentMapMode == Sandbox) {
+            ui.inGameHUD.initSandboxBounds(SandboxMap.WALL_LIMIT);
+        }
+    }
+
+    /**
+     * Switches the active intro slide stage.
+     *
+     * @param {IntroState} target Intro stage to display.
+     * @returns {Void}
+     */
+    @:keep public function setIntroScreen(target:IntroState):Void {
+        if (introController != null) {
+            introController.setScreen(target);
+            syncIntroFacade();
+        }
+    }
+
+    /**
+     * Recalculates responsive layout for active boot screens.
+     *
+     * @returns {Void}
+     */
+    @:keep public function layoutIntro():Void {
+        if (introController != null) {
+            introController.layout();
+        }
+    }
+
+    /**
+     * Finalizes the intro sequence early, ensuring deferred systems exist before showing the Splash UI.
+     *
+     * @returns {Void}
+     */
+    @:keep public function finishIntroSequence():Void {
+        ensureDeferredSystemsInitialized();
+        if (introController != null) {
+            introController.finishSequence();
+        } else {
+            activateMainSplash();
+        }
+    }
+
+    /**
+     * Switches active 3D environment geometry, physics colliders, and HUD minimap bounds.
+     *
+     * @param {MapMode} mode Target map (`Circuit` or `Sandbox`).
+     * @returns {Void}
+     */
+    @:keep public function loadMap(mode:MapMode):Void {
+        if (world == null) return;
+        world.loadMap(mode);
+        syncWorldFacade();
+        syncHUDMapBounds();
+        if (appState == IntroSequence) {
+            if (engine != null) engine.backgroundColor = 0x000000;
+            layoutIntro();
+        }
+    }
+
+    /**
+     * Repositions the player vehicle at the Sandbox center launch pad.
+     *
+     * @returns {Void}
+     */
+    @:keep public function resetCarToSandboxCenter():Void {
+        if (world != null) world.resetCarToSandboxCenter();
+    }
+
+    /**
+     * Repositions the player vehicle at the Highway Circuit starting grid line.
+     *
+     * @returns {Void}
+     */
+    @:keep public function resetCarToStartLine():Void {
+        if (world != null) world.resetCarToStartLine();
+    }
+
+    /**
+     * Persists active race vehicle coordinates, volumes, bindings, and graphics settings.
+     *
+     * @returns {Void}
+     */
+    @:keep public function saveCurrentRun():Void {
+        if (multiplayer != null && multiplayer.status == InMatch) return;
+        if (saveData == null || carPhysics == null || world == null) return;
         saveData.hasActiveRun = true;
         saveData.playerState = {
             posX: carPhysics.pos.x,
@@ -563,37 +438,68 @@ class Main extends hxd.App {
             posZ: carPhysics.pos.z,
             yaw: carPhysics.yaw,
             forwardSpeed: carPhysics.forwardSpeed,
-            mapMode: (currentMapMode == Sandbox) ? "Sandbox" : "Circuit"
+            mapMode: (world.currentMapMode == Sandbox) ? "Sandbox" : "Circuit"
         };
-        saveData.masterVol = audio.masterVolume;
-        saveData.musicVol = audio.musicVolume;
-        saveData.sfxVol = audio.sfxVolume;
-        saveData.steerSensitivity = input.steerSensitivity;
-        saveData.graphics = ui.gfxSettings;
+        if (audio != null) {
+            saveData.masterVol = audio.masterVolume;
+            saveData.musicVol = audio.musicVolume;
+            saveData.sfxVol = audio.sfxVolume;
+        }
+        input.exportToSave(saveData);
+        if (ui != null) saveData.graphics = ui.gfxSettings;
         SaveSystem.save(saveData);
-        ui.setHasActiveSave(true);
+        if (ui != null) ui.setHasActiveSave(true);
     }
 
     /**
-     * Dispatches user menu selections (Map Select, Start Highway, Start Sandbox, Restart, Resume, Options, Credits, Quit).
+     * Saves the active session cleanly and presents the in-game pause menu.
      *
-     * @param action Selected MenuAction enum variant.
+     * @returns {Void}
      */
-    function handleMenuAction(action:MenuAction) {
+    @:keep public function pauseActiveGame():Void {
+        input.flushInputs();
+        if (world != null) world.clearPostEffects();
+        saveCurrentRun();
+        if (ui != null) ui.showPause();
+    }
+
+    /**
+     * Routes menu selections triggered across main menu, map select, and pause screens.
+     *
+     * @param {MenuAction} action Dispatched UI menu action.
+     * @returns {Void}
+     */
+    @:keep public function handleMenuAction(action:MenuAction):Void {
         input.flushInputs();
 
         switch (action) {
             case OpenMapSelect:
                 ui.showMapSelect();
 
+            case OpenMultiplayer:
+                ui.showMultiplayerMenu();
+
             case StartGame:
+                if (multiplayer != null && multiplayer.role != None) multiplayer.leaveRoom();
+                if (world != null) {
+                    world.clearRemoteCars();
+                    world.setTrafficEnabled(true);
+                }
+                ui.inGameHUD.remotePeerMarkers = [];
                 loadMap(Circuit);
                 resetCarToStartLine();
+                if (traffic != null) traffic.resetPositions();
                 raceTimer = 0.0;
                 currentLap = 1;
                 ui.showInGame();
 
             case StartSandbox:
+                if (multiplayer != null && multiplayer.role != None) multiplayer.leaveRoom();
+                if (world != null) {
+                    world.clearRemoteCars();
+                    world.setTrafficEnabled(true);
+                }
+                ui.inGameHUD.remotePeerMarkers = [];
                 loadMap(Sandbox);
                 resetCarToSandboxCenter();
                 raceTimer = 0.0;
@@ -601,24 +507,36 @@ class Main extends hxd.App {
                 ui.showInGame();
 
             case RestartRace:
-                if (currentMapMode == Sandbox) {
-                    loadMap(Sandbox);
-                    resetCarToSandboxCenter();
-                } else {
-                    loadMap(Circuit);
-                    resetCarToStartLine();
+                if (multiplayer != null && multiplayer.status == InMatch && multiplayer.localSpawnSlot != null) {
+                    if (world != null) {
+                        world.spawnPlayerAt(multiplayer.localSpawnSlot.x, multiplayer.localSpawnSlot.y, multiplayer.localSpawnSlot.z, multiplayer.localSpawnSlot.yaw);
+                    }
+                    ui.showInGame();
+                    return;
+                }
+                if (world != null) {
+                    world.reloadCurrentMap();
+                    syncWorldFacade();
+                    syncHUDMapBounds();
                 }
                 raceTimer = 0.0;
                 currentLap = 1;
                 ui.showInGame();
 
             case ResumeGame:
-                if (saveData.hasActiveRun) {
-                    if (saveData.playerState.mapMode == "Sandbox") {
-                        loadMap(Sandbox);
-                    } else if (saveData.playerState.mapMode == "Circuit") {
-                        loadMap(Circuit);
+                if (multiplayer != null && multiplayer.role != None && multiplayer.status != InMatch) multiplayer.leaveRoom();
+                if (multiplayer != null && multiplayer.status == InMatch) {
+                    ui.showInGame();
+                    return;
+                }
+                if (saveData != null && saveData.hasActiveRun && carPhysics != null) {
+                    if (world != null) {
+                        world.clearRemoteCars();
+                        world.setTrafficEnabled(true);
                     }
+                    ui.inGameHUD.remotePeerMarkers = [];
+                    var targetMode = (saveData.playerState.mapMode == "Sandbox") ? Sandbox : Circuit;
+                    loadMap(targetMode);
                     carPhysics.resetState(
                         saveData.playerState.posX,
                         saveData.playerState.posY,
@@ -630,147 +548,35 @@ class Main extends hxd.App {
                 ui.showInGame();
 
             case OpenOptions:
+                ui.openOptions(false);
+
             case OpenCredits:
                 ui.showCredits();
 
             case QuitToTitle:
+                if (multiplayer != null && multiplayer.status == InMatch) {
+                    if (multiplayer.role == Host) {
+                        multiplayer.returnToLobby();
+                    } else {
+                        multiplayer.leaveRoom();
+                        if (world != null) {
+                            world.clearRemoteCars();
+                            world.setTrafficEnabled(true);
+                        }
+                        ui.inGameHUD.remotePeerMarkers = [];
+                        ui.showMainMenu();
+                    }
+                    return;
+                }
                 saveCurrentRun();
                 ui.showMainMenu();
         }
     }
 
     /**
-     * Scales and centers a splash screen bitmap to cover and fill the entire viewport.
+     * Propagates viewport resize events to graphics scaling and active boot or gameplay layouts.
      *
-     * @param bmp The Bitmap instance to scale and position.
-     * @param sw Viewport target width in pixels.
-     * @param sh Viewport target height in pixels.
-     */
-    function scaleAndCenterSplash(bmp:Bitmap, sw:Float, sh:Float) {
-        if (bmp == null || bmp.tile == null) return;
-        var naturalW = bmp.tile.width;
-        var naturalH = bmp.tile.height;
-
-        var scale = Math.max(sw / naturalW, sh / naturalH);
-        bmp.scaleX = scale;
-        bmp.scaleY = scale;
-
-        bmp.x = (sw - (naturalW * scale)) * 0.5;
-        bmp.y = (sh - (naturalH * scale)) * 0.5;
-    }
-
-    /**
-     * Responsive layout calculator for the boot intro sequence.
-     * Positions headers, legal body text, partner logos, and build version indicators.
-     */
-    function layoutIntro() {
-        var sw = s2d != null ? s2d.width : hxd.Window.getInstance().width;
-        var sh = s2d != null ? s2d.height : hxd.Window.getInstance().height;
-
-        if (introBg != null) {
-            introBg.scaleX = sw;
-            introBg.scaleY = sh;
-        }
-
-        if (studioSplashBmp != null) {
-            scaleAndCenterSplash(studioSplashBmp, sw, sh);
-        }
-
-        if (engineSplashBmp != null) {
-            scaleAndCenterSplash(engineSplashBmp, sw, sh);
-        }
-
-        if (discHeader != null && discBody != null) {
-            if (discGraphics != null) {
-                discGraphics.clear();
-                var pad = 28.0;
-                var frameW = Math.max(200.0, sw - pad * 2.0);
-                var frameH = Math.max(200.0, sh - pad * 2.0);
-                discGraphics.beginFill(0x060A10, 0.90);
-                discGraphics.lineStyle(1.5, 0x00E5FF, 0.35);
-                discGraphics.drawRoundedRect(pad, pad, frameW, frameH, 12.0);
-                discGraphics.endFill();
-
-                // Corner brackets
-                var bl = 22.0;
-                discGraphics.lineStyle(3.0, 0x00E5FF, 0.85);
-                discGraphics.moveTo(pad, pad + bl); discGraphics.lineTo(pad, pad); discGraphics.lineTo(pad + bl, pad);
-                discGraphics.moveTo(pad + frameW - bl, pad); discGraphics.lineTo(pad + frameW, pad); discGraphics.lineTo(pad + frameW, pad + bl);
-                discGraphics.moveTo(pad, pad + frameH - bl); discGraphics.lineTo(pad, pad + frameH); discGraphics.lineTo(pad + bl, pad + frameH);
-                discGraphics.moveTo(pad + frameW - bl, pad + frameH); discGraphics.lineTo(pad + frameW, pad + frameH); discGraphics.lineTo(pad + frameW, pad + frameH - bl);
-            }
-
-            // Responsive line constraints ensuring text stays nicely proportioned
-            var maxTextWidth = Math.min(sw * 0.88, 960.0);
-            discHeader.maxWidth = maxTextWidth;
-            discBody.maxWidth = maxTextWidth;
-
-            var headerGap = 16.0;
-            var logoGap = 22.0;
-
-            var targetIconHeight = Math.min(38.0, sh * 0.06);
-            var logoSpacing = 32.0; // very light spacing horizontally
-            var totalLogoWidth = 0.0;
-
-            if (logoRow != null && discLogos.length > 0) {
-                for (bmp in discLogos) {
-                    if (bmp.tile != null) {
-                        var s = targetIconHeight / bmp.tile.height;
-                        bmp.scaleX = s;
-                        bmp.scaleY = s;
-                        totalLogoWidth += (bmp.tile.width * s);
-                    }
-                }
-                totalLogoWidth += logoSpacing * (discLogos.length - 1);
-            }
-            if (Math.isNaN(totalLogoWidth)) totalLogoWidth = 0.0;
-
-            var hHeight = discHeader.textHeight;
-            if (Math.isNaN(hHeight) || hHeight <= 0) hHeight = 36.0;
-
-            var bHeight = discBody.textHeight;
-            if (Math.isNaN(bHeight) || bHeight <= 0) bHeight = 320.0;
-
-            var vGap = 14.0;
-            var vHeight = (discVersion != null) ? discVersion.textHeight : 0.0;
-            if (Math.isNaN(vHeight)) vHeight = 20.0;
-
-            var totalBlockHeight = hHeight + headerGap + bHeight + (discLogos.length > 0 ? (logoGap + targetIconHeight) : 0.0) + (discVersion != null ? (vGap + vHeight) : 0.0);
-            if (Math.isNaN(totalBlockHeight) || totalBlockHeight <= 0) totalBlockHeight = 400.0;
-
-            var blockStartY = Math.max(16.0, (sh - totalBlockHeight) * 0.5);
-            if (Math.isNaN(blockStartY)) blockStartY = 24.0;
-
-            discHeader.x = (sw - maxTextWidth) * 0.5;
-            discHeader.y = blockStartY;
-
-            discBody.x = (sw - maxTextWidth) * 0.5;
-            discBody.y = discHeader.y + hHeight + headerGap;
-
-            var rowY = discBody.y + bHeight + logoGap;
-            if (logoRow != null && discLogos.length > 0) {
-                var currX = (sw - totalLogoWidth) * 0.5;
-                if (Math.isNaN(currX)) currX = (sw - 200.0) * 0.5;
-
-                for (bmp in discLogos) {
-                    bmp.x = currX;
-                    bmp.y = rowY;
-                    currX += (bmp.tile.width * bmp.scaleX) + logoSpacing;
-                }
-            }
-
-            if (discVersion != null) {
-                discVersion.maxWidth = maxTextWidth;
-                discVersion.x = (sw - maxTextWidth) * 0.5;
-                discVersion.y = (discLogos.length > 0) ? (rowY + targetIconHeight + vGap) : (discBody.y + bHeight + vGap);
-            }
-        }
-    }
-
-    /**
-     * Responds to browser canvas resize and device orientation changes.
-     * Synchronizes 2D UI scene scaling, applies 3D offscreen render scales,
-     * adjusts full-screen curtain dimensions, and triggers responsive UI layouts.
+     * @returns {Void}
      */
     override function onResize() {
         super.onResize();
@@ -782,155 +588,179 @@ class Main extends hxd.App {
             s2d.checkResize();
         }
 
-        if (showcaseCurtain != null && s2d != null) {
-            showcaseCurtain.scaleX = s2d.width;
-            showcaseCurtain.scaleY = s2d.height;
-        }
-
         if (appState == IntroSequence) {
             layoutIntro();
-        } else if (ui != null) {
-            ui.layout();
+        } else {
+            if (introController != null) introController.layout();
+            if (ui != null) ui.layout();
         }
     }
 
     /**
-     * Primary per-frame update loop.
-     * Polls player inputs, advances intro sequence or in-game state machines, updates
-     * vehicle raycast physics, simulates traffic AI, updates third-person spring camera,
-     * scales radial blur post-processing, and refreshes UI telemetry.
+     * Suspends or resumes game simulation, audio, and rendering in response to portrait orientation lock.
+     * Automatically pauses an active drive so returning to landscape resumes cleanly from PauseMenu.
      *
-     * @param dt Delta time elapsed since last frame in seconds.
+     * @param {Bool} blocked True when a mobile/tablet viewport is in unsupported portrait orientation.
+     * @returns {Void}
      */
-    override function update(dt:Float) {
-        input.update(dt);
+    @:keep public function setOrientationPaused(blocked:Bool):Void {
+        if (pausedByOrientation == blocked) return;
+        pausedByOrientation = blocked;
+        if (input != null) input.flushInputs();
 
+        if (blocked) {
+            if (systemsInitialized && ui != null && ui.currentState == InGameHUD) {
+                pauseActiveGame();
+            } else if (world != null) {
+                world.clearPostEffects();
+            }
+            if (audio != null) audio.suspend();
+        } else {
+            if (audio != null) audio.resume();
+            onResize();
+        }
+    }
+
+    /**
+     * Synchronizes orientation lock state from the HTML shell's `MOBOrientationGate` if present.
+     *
+     * @returns {Bool} True while portrait orientation blocks game execution.
+     */
+    function syncOrientationPauseFromHost():Bool {
+        #if js
+        var blocked:Bool = js.Syntax.code("Boolean(window.__mobPortraitBlocked)");
+        if (blocked != pausedByOrientation) {
+            setOrientationPaused(blocked);
+        }
+        #end
+        return pausedByOrientation;
+    }
+
+    /**
+     * Suppresses 3D world rendering while boot intro screens are active or orientation is blocked
+     * so no gameplay frame ever flashes prematurely or during portrait lock.
+     *
+     * @param {Engine} e Active Heaps hardware engine.
+     * @returns {Void}
+     */
+    override function render(e:Engine) {
+        if (pausedByOrientation) {
+            if (e != null) e.clear(0x000000, 1.0);
+            return;
+        }
         if (appState == IntroSequence) {
-            updateIntro(dt);
+            if (e != null) e.clear(0x000000, 1.0);
+            if (s2d != null) s2d.render(e);
+            return;
+        }
+        super.render(e);
+    }
+
+    /**
+     * Main per-frame update loop stepping input polling, boot progression, world showcase/driving,
+     * and HUD telemetry.
+     *
+     * @param {Float} dt Elapsed frame time in seconds.
+     * @returns {Void}
+     */
+    @:keep public override function update(dt:Float) {
+        if (syncOrientationPauseFromHost()) {
             return;
         }
 
-        if (ui == null) return;
+        input.update(dt);
 
-        // Post-intro smooth fade-in management
-        if (isShowcaseFadingIn) {
-            showcaseFadeTimer += dt;
-            var progress = Math.min(1.0, showcaseFadeTimer / showcaseFadeDuration);
-
-            if (showcaseCurtain != null) {
-                showcaseCurtain.alpha = 1.0 - progress;
-            }
-            if (ui != null) {
-                ui.alpha = progress;
-            }
-
-            if (progress >= 1.0) {
-                isShowcaseFadingIn = false;
-                if (showcaseCurtain != null) {
-                    showcaseCurtain.remove();
-                    showcaseCurtain = null;
+        if (appState == IntroSequence) {
+            if (introController != null) {
+                if (introTimer != syncedIntroTimer) {
+                    introController.timer = introTimer;
                 }
-                if (ui != null) ui.alpha = 1.0;
+                if (input.anyKeyPressed || input.uiConfirmPressed) {
+                    introController.trySkip();
+                }
+                introController.update(dt);
+                introTimer = introController.timer;
+                syncedIntroTimer = introTimer;
             }
+            return;
         }
 
-        ui.update(dt, input.uiUpPressed, input.uiDownPressed, input.uiLeftPressed, input.uiRightPressed, input.uiConfirmPressed, input.uiCancelPressed);
+        if (introController != null) {
+            introController.updateShowcaseCurtain(dt, ui);
+        }
 
-        if (skybox != null) skybox.syncCamera(s3d.camera.pos);
+        if (ui == null || world == null) return;
+
+        var uiCancel = input.uiCancelPressed;
+        if (!uiCancel && !ui.isOpenedFromPause && input.pausePressed
+            && (ui.currentState == MapSelect || ui.currentState == MultiplayerMenu || ui.currentState == MultiplayerLobby || ui.currentState == CreditsScreen || ui.currentState == OptionsMenu)) {
+            uiCancel = true;
+        }
+        if (multiplayer != null) {
+            multiplayer.update(dt);
+        }
+        ui.update(dt, input.uiUpPressed, input.uiDownPressed, input.uiLeftPressed, input.uiRightPressed, input.uiConfirmPressed, uiCancel);
+        world.syncSkybox();
 
         switch (ui.currentState) {
-            case Splash | MainMenu | MapSelect | CreditsScreen:
-                if (postRenderer != null) postRenderer.blurShader.blurIntensity = 0.0;
-                showcaseAngle += 0.35 * dt;
-                var camDist = 11.0;
-                s3d.camera.pos.set(
-                    carPhysics.pos.x + Math.sin(showcaseAngle) * camDist,
-                    carPhysics.pos.y - Math.cos(showcaseAngle) * camDist,
-                    carPhysics.pos.z + 4.2
-                );
-                s3d.camera.target.set(carPhysics.pos.x, carPhysics.pos.y, carPhysics.pos.z + 1.2);
+            case Splash | MainMenu | MapSelect | MultiplayerMenu | MultiplayerLobby | CreditsScreen:
+                world.updateShowcaseCamera(dt);
 
             case PauseMenu | OptionsMenu:
-                if (postRenderer != null) postRenderer.blurShader.blurIntensity = 0.0;
-                if (ui.isOpenedFromPause && input.pausePressed && !input.isListeningForRemap) {
+                world.clearPostEffects();
+                if ((ui.currentState == PauseMenu || ui.isOpenedFromPause) && input.pausePressed && !input.isListeningForRemap) {
                     input.flushInputs();
                     ui.showInGame();
                 }
 
             case InGameHUD:
                 if (input.pausePressed) {
-                    input.flushInputs();
-                    if (postRenderer != null) postRenderer.blurShader.blurIntensity = 0.0;
-                    saveCurrentRun();
-                    ui.showPause();
+                    pauseActiveGame();
                     return;
                 }
-
-                var wasDrifting = carPhysics.isDrifting;
-                if (currentMapMode == Circuit) {
-                    carPhysics.update(dt, input, track != null ? track.waypoints : null, track);
-                    if (traffic != null) traffic.update(dt, carPhysics, chaseCam);
-                } else {
-                    carPhysics.update(dt, input, null, sandboxMap);
+                var kmh = world.updateDriving(dt, input);
+                if (multiplayer != null && multiplayer.status == InMatch) {
+                    multiplayer.updateInMatch(dt, world.carPhysics, input, world.getActiveGround());
+                    world.syncRemoteCars(dt, multiplayer.remoteStates);
+                    var markers:Array<{ x:Float, y:Float, colorHex:Int }> = [];
+                    for (st in multiplayer.remoteStates) {
+                        markers.push({ x: st.x, y: st.y, colorHex: st.colorHex });
+                    }
+                    ui.inGameHUD.remotePeerMarkers = markers;
                 }
-
-                if (!wasDrifting && carPhysics.isDrifting) chaseCam.addTrauma(0.35);
-                if (input.boost && carPhysics.forwardSpeed > 20.0) chaseCam.addTrauma(0.12 * dt * 60.0);
-
-                // High-speed radial directional blur scaling
-                var kmh = Math.round(Math.abs(carPhysics.forwardSpeed) * 3.6);
-                var blurIntensity = 0.0;
-                if (kmh > RADIAL_BLUR_SPEED_THRESHOLD_KMH) {
-                    blurIntensity = Math.min(0.065, ((kmh - RADIAL_BLUR_SPEED_THRESHOLD_KMH) / 180.0) * 0.055);
-                }
-                if (input.boost && kmh > 70) blurIntensity = Math.min(0.08, blurIntensity + 0.025);
-                if (postRenderer != null) postRenderer.blurShader.blurIntensity = blurIntensity;
-
-                playerMesh.x = carPhysics.pos.x;
-                playerMesh.y = carPhysics.pos.y;
-                playerMesh.z = carPhysics.pos.z;
-                // Note: h3d.Object.rotate pre-multiplies in parent space, and +Z rotation is CCW from top view.
-                // Since our yaw is clockwise from +Y (+X is Right), we negate yaw+driftAngle for Heaps Z rotation,
-                // and apply pitch (X) and roll (Y) before yaw (Z):
-                playerMesh.setRotation(carPhysics.pitch, carPhysics.roll, 0);
-                playerMesh.rotate(0, 0, -(carPhysics.yaw + carPhysics.driftAngle));
-
-                // Four-wheel steering, vertical suspension travel, and longitudinal spin animation
-                wheelSpinAngle += (carPhysics.forwardSpeed * dt) / entities.CarMesh.TIRE_RADIUS;
-                rearWheelSpinAngle += ((carPhysics.forwardSpeed / entities.CarMesh.TIRE_RADIUS) + carPhysics.wheelSpinVelocity[2]) * dt;
-                var maxSteerAngle = 0.55;
-                var currentSteer = -input.steer * maxSteerAngle;
-                var restLen = carPhysics.config.suspension.restLength;
-                if (playerMesh.wheels.length >= 4) {
-                    // Front wheels (0: FL, 1: FR) steer & roll
-                    playerMesh.updateWheelTransform(0, restLen - carPhysics.suspLength[0], wheelSpinAngle, currentSteer);
-                    playerMesh.updateWheelTransform(1, restLen - carPhysics.suspLength[1], wheelSpinAngle, currentSteer);
-                    // Rear wheels (2: RL, 3: RR) roll with burnout spin
-                    playerMesh.updateWheelTransform(2, restLen - carPhysics.suspLength[2], rearWheelSpinAngle, 0.0);
-                    playerMesh.updateWheelTransform(3, restLen - carPhysics.suspLength[3], rearWheelSpinAngle, 0.0);
-                }
-
-                chaseCam.update(dt, carPhysics, carPhysics.isBoosting);
-
                 raceTimer += dt;
-                ui.inGameHUD.updateTelemetry(dt, carPhysics, kmh, carPhysics.isBoosting, raceTimer, currentLap, totalLaps);
+                ui.inGameHUD.updateTelemetry(dt, world.carPhysics, kmh, world.carPhysics.isBoosting, raceTimer, currentLap, totalLaps);
         }
     }
 
-    /** Returns the 2D UI scene instance. */
-    public function getS2d():h2d.Scene { return s2d; }
+    /** Returns the 2D UI scene instance. @returns {h2d.Scene} */
+    public function getS2d():h2d.Scene return s2d;
 
-    /** Returns the 3D world scene instance. */
-    public function getS3d():h3d.scene.Scene { return s3d; }
+    /** Returns the 3D world scene instance. @returns {h3d.scene.Scene} */
+    public function getS3d():h3d.scene.Scene return s3d;
 
-    /** Returns the low-level rendering hardware engine. */
-    public function getEngine():h3d.Engine { return engine; }
+    /** Returns the underlying Heaps hardware engine. @returns {h3d.Engine} */
+    public function getEngine():h3d.Engine return engine;
 
     static function main() {
         #if js
-        js.Browser.window.onload = function() {
+        var startApp = function() {
+            if (js.Syntax.code("Boolean(window.__mobPortraitBlocked)")) {
+                js.Browser.window.addEventListener("mob-orientation-unlocked", function(_) {
+                    if (js.Syntax.code("!window.app && !window.__mobPortraitBlocked")) {
+                        new Main();
+                    }
+                }, { once: true });
+                return;
+            }
             new Main();
         };
+        var readyState:String = untyped js.Browser.document.readyState;
+        if (readyState == "complete") {
+            startApp();
+        } else {
+            js.Browser.window.addEventListener("load", function(_) startApp(), { once: true });
+        }
         #else
         new Main();
         #end

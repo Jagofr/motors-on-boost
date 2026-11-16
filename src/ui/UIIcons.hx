@@ -5,6 +5,9 @@ import h2d.Graphics;
 
 /**
  * Enumeration of vector-drawn UI iconography types rendered procedurally into cached textures.
+ *
+ * @enum {Int} IconType
+ * @module ui/UIIcons
  */
 enum IconType {
     /** Right-pointing triangle arrow representing race play. */
@@ -48,6 +51,9 @@ enum IconType {
 
     /** Mountain topography profile representing open sandbox proving grounds. */
     Sandbox;
+
+    /** Connected peer-to-peer racing silhouettes representing multiplayer lobby. */
+    Multiplayer;
 
     /** Exit doorway with directional arrow representing exit to title. */
     Exit;
@@ -211,6 +217,14 @@ class UIIcons {
                 g.lineTo(pad, pad + w * 0.85);
                 g.beginFill(color, 0.4);
                 g.drawCircle(pad + w * 0.78, pad + w * 0.22, w * 0.08);
+
+            case Multiplayer:
+                // Connected peer-to-peer nodes (Host + Client racing silhouettes)
+                g.drawCircle(pad + w * 0.34, pad + w * 0.32, w * 0.16);
+                g.drawRoundedRect(pad + w * 0.12, pad + w * 0.56, w * 0.44, w * 0.34, 3);
+                g.beginFill(color, 0.72);
+                g.drawCircle(pad + w * 0.72, pad + w * 0.38, w * 0.13);
+                g.drawRoundedRect(pad + w * 0.54, pad + w * 0.60, w * 0.36, w * 0.28, 3);
 
             case Exit:
                 // Open doorway frame with outbound directional arrow

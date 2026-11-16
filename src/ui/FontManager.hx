@@ -8,6 +8,9 @@ import hxd.res.FontBuilder;
  * Typography resource manager and font cache.
  * Resolves font sizes for standard body copy, section titles, hero headings,
  * and exposes unicode glyph symbols for UI audio sliders.
+ *
+ * @class FontManager
+ * @module ui/FontManager
  */
 class FontManager {
     /** Primary body copy font (21pt). */

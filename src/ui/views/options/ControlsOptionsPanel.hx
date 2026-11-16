@@ -2,9 +2,11 @@ package ui.views.options;
 
 import h2d.Object;
 import h2d.Text;
+import h2d.Graphics;
 import h2d.Interactive;
 import ui.FontManager;
 import ui.ControlDiagrams;
+import ui.components.CardBackplate;
 import ui.components.UITheme;
 import ui.components.UIEnums.OptionsTab;
 import input.InputController;
@@ -12,12 +14,16 @@ import input.InputController.InputAction;
 import input.InputController.ExclusiveDevice;
 import audio.AudioManager;
 import save.SaveSystem;
+import save.SaveSystem.GameSaveData;
 import save.SaveSystem.TouchSettings;
 
 /**
  * Controller, keyboard, and touch screen configuration, schematic diagrams,
  * and custom action / button remapping subpanel.
  * Features an independent persistent steering sensitivity slider active across all control modes.
+ *
+ * @class ControlsOptionsPanel
+ * @extends h2d.Object
  */
 @:keep
 class ControlsOptionsPanel extends Object {
@@ -67,6 +73,10 @@ class ControlsOptionsPanel extends Object {
     // CONTENT CONTAINERS
     // =========================================================================
 
+    /** Procedural background graphics for header buttons and touch custom grid cards. */
+    public var headerBg:Graphics;
+    public var remapBg:Graphics;
+
     /** Vector schematic diagram canvas. */
     public var diagramViewer:ControlDiagrams;
 
@@ -79,11 +89,26 @@ class ControlsOptionsPanel extends Object {
     /** Remapping interactive hitzones. */
     public var remapInteractives:Array<Interactive> = [];
 
+    /** Dedicated decrement `[ - ]` button labels and touch hitzones for custom touch rows. */
+    public var remapDecrBtns:Array<Text> = [];
+    public var remapDecrInteractives:Array<Interactive> = [];
+
+    /** Dedicated increment `[ + ]` button labels and touch hitzones for custom touch rows. */
+    public var remapIncrBtns:Array<Text> = [];
+    public var remapIncrInteractives:Array<Interactive> = [];
+
     /** Currently highlighted remapping item index. */
     public var remapIndex:Int = 0;
 
     /** Status notice text shown when waiting for remapping input. */
     public var remapStatusNotice:Text;
+
+    private var lastSw:Float = 0.0;
+    private var lastSh:Float = 0.0;
+    private var lastCardX:Float = 0.0;
+    private var lastCardY:Float = 0.0;
+    private var lastCardW:Float = 0.0;
+    private var lastCardH:Float = 0.0;
 
     /** Active view mode ("Diagram" or "Custom"). */
     public var controlViewMode:String = "Diagram";
@@ -95,7 +120,13 @@ class ControlsOptionsPanel extends Object {
     public var currentTab:OptionsTab = Keyboard;
 
     /** Callback invoked whenever touch control settings are modified. */
-    public var onTouchSettingsChanged:Void->Void;
+    public var onTouchSettingsChanged:Null<Void -> Void>;
+
+    /** Optional provider returning the active persistent save structure. */
+    public var getSaveData:Null<Void -> GameSaveData>;
+
+    /** Optional callback notified whenever save settings are mutated and persisted. */
+    public var onSaveDataUpdated:Null<GameSaveData -> Void>;
 
     /** Interactive remapping row hitzone width in pixels. */
     public static inline var REMAP_ROW_WIDTH:Float = 540.0;
@@ -119,19 +150,21 @@ class ControlsOptionsPanel extends Object {
         super(parent);
         this.inputRef = input;
 
+        headerBg = new Graphics(this);
+
         // 1. General Steering Sensitivity Row
         sensContainer = new Object(this);
 
         sensDecrBtn = new Text(FontManager.regularFont, sensContainer);
         sensDecrBtn.text = "[ < -2% ]";
         sensDecrBtn.textColor = UITheme.COLOR_ACCENT_CYAN;
-        sensDecrInter = new Interactive(80, 28, sensContainer);
+        sensDecrInter = new Interactive(80, 30, sensContainer);
         sensDecrInter.onClick = function(_) adjustSensitivity(-0.02);
 
         sensLabel = new Text(FontManager.regularFont, sensContainer);
         sensLabel.textColor = UITheme.COLOR_TEXT_NORMAL;
 
-        sensRowInter = new Interactive(320, 28, sensContainer);
+        sensRowInter = new Interactive(320, 30, sensContainer);
         sensRowInter.onClick = function(_) {
             // Cycle sensitivity by +2% or wrap around
             var next = inputRef.steerSensitivity >= 0.99 ? -1.0 : 0.02;
@@ -141,7 +174,7 @@ class ControlsOptionsPanel extends Object {
         sensIncrBtn = new Text(FontManager.regularFont, sensContainer);
         sensIncrBtn.text = "[ +2% > ]";
         sensIncrBtn.textColor = UITheme.COLOR_ACCENT_CYAN;
-        sensIncrInter = new Interactive(80, 28, sensContainer);
+        sensIncrInter = new Interactive(80, 30, sensContainer);
         sensIncrInter.onClick = function(_) adjustSensitivity(0.02);
 
         // 2. Header Status & Mode Buttons
@@ -150,39 +183,77 @@ class ControlsOptionsPanel extends Object {
         toggleExclusiveInter.onClick = function(_) toggleExclusiveDevice();
 
         toggleViewModeBtn = new Text(FontManager.regularFont, this);
-        toggleViewModeInter = new Interactive(300, 32, this);
-        toggleViewModeInter.onClick = function(_) {
-            controlViewMode = (controlViewMode == "Diagram") ? "Custom" : "Diagram";
-            if (currentTab == Touch) {
-                var d = SaveSystem.load();
-                if (d.touchSettings == null) d.touchSettings = SaveSystem.getDefaultTouchSettings();
-                d.touchSettings.mode = (controlViewMode == "Diagram") ? "Default" : "Custom";
-                SaveSystem.save(d);
-                if (onTouchSettingsChanged != null) onTouchSettingsChanged();
-            }
-            updateControlViewMode();
-        };
+        toggleViewModeInter = new Interactive(360, 32, this);
+        toggleViewModeInter.onClick = function(_) toggleCustomMode();
 
         // 3. Diagram Viewer
         diagramViewer = new ControlDiagrams(this);
 
         // 4. Remapping List Container
         remapContainer = new Object(this);
+        remapBg = new Graphics(remapContainer);
         for (i in 0...MAX_REMAP_ITEMS) {
+            var idx = i;
+
+            var decrTxt = new Text(FontManager.regularFont, remapContainer);
+            decrTxt.text = "- 10";
+            decrTxt.textColor = UITheme.COLOR_ACCENT_CYAN;
+            decrTxt.visible = false;
+            remapDecrBtns.push(decrTxt);
+
+            var decrInter = new Interactive(68, 34, remapContainer);
+            decrInter.visible = false;
+            decrInter.onOver = function(_) {
+                if (visible && controlViewMode == "Custom" && currentTab == Touch) {
+                    remapIndex = idx;
+                    updateRemapStyles();
+                }
+            };
+            decrInter.onClick = function(_) {
+                if (visible && controlViewMode == "Custom" && currentTab == Touch) {
+                    cycleCustomTouchRow(idx, -1);
+                }
+            };
+            remapDecrInteractives.push(decrInter);
+
             var txt = new Text(FontManager.regularFont, remapContainer);
             remapItems.push(txt);
 
             var inter = new Interactive(REMAP_ROW_WIDTH, REMAP_ROW_HEIGHT, remapContainer);
             inter.onOver = function(_) {
                 if (visible && controlViewMode == "Custom") {
-                    remapIndex = i;
+                    remapIndex = idx;
                     updateRemapStyles();
                 }
             };
             inter.onClick = function(_) {
-                if (visible && controlViewMode == "Custom") triggerRemapEntry(i);
+                if (visible && controlViewMode == "Custom") {
+                    remapIndex = idx;
+                    triggerRemapEntry(idx);
+                }
             };
             remapInteractives.push(inter);
+
+            var incrTxt = new Text(FontManager.regularFont, remapContainer);
+            incrTxt.text = "+ 10";
+            incrTxt.textColor = UITheme.COLOR_ACCENT_CYAN;
+            incrTxt.visible = false;
+            remapIncrBtns.push(incrTxt);
+
+            var incrInter = new Interactive(68, 34, remapContainer);
+            incrInter.visible = false;
+            incrInter.onOver = function(_) {
+                if (visible && controlViewMode == "Custom" && currentTab == Touch) {
+                    remapIndex = idx;
+                    updateRemapStyles();
+                }
+            };
+            incrInter.onClick = function(_) {
+                if (visible && controlViewMode == "Custom" && currentTab == Touch) {
+                    cycleCustomTouchRow(idx, 1);
+                }
+            };
+            remapIncrInteractives.push(incrInter);
         }
 
         remapStatusNotice = new Text(FontManager.regularFont, this);
@@ -193,7 +264,34 @@ class ControlsOptionsPanel extends Object {
         touchDiagram = diagramViewer;
         customTouchList = remapContainer;
 
+        inputRef.onRemapComplete = function(bound:Bool) {
+            remapStatusNotice.visible = false;
+            if (bound) persistInputBindings();
+            updateRemapStyles();
+        };
+
         updateSensitivityDisplay();
+    }
+
+    function loadActiveSave():GameSaveData {
+        var d = (getSaveData != null) ? getSaveData() : SaveSystem.load();
+        if (d == null) d = SaveSystem.load();
+        if (d.touchSettings == null) d.touchSettings = SaveSystem.getDefaultTouchSettings();
+        return d;
+    }
+
+    function persistActiveSave(d:GameSaveData) {
+        SaveSystem.save(d);
+        if (onSaveDataUpdated != null) onSaveDataUpdated(d);
+    }
+
+    /**
+     * Synchronizes current key/gamepad bindings and exclusive hardware selection to save storage.
+     */
+    public function persistInputBindings() {
+        var d = loadActiveSave();
+        inputRef.exportToSave(d);
+        persistActiveSave(d);
     }
 
     /**
@@ -207,13 +305,14 @@ class ControlsOptionsPanel extends Object {
         } else if (currentTab == Gamepad) {
             inputRef.exclusiveDevice = (inputRef.exclusiveDevice == GamepadOnly) ? Both : GamepadOnly;
         }
+        persistInputBindings();
         updateControlHeaderButtons();
     }
 
     /**
      * Increments or decrements steering sensitivity by fractional delta or integer steps (typically 0.02 = 2%).
      *
-     * @param stepsOrDelta Change amount (-0.02, +0.02, -1, or +1).
+     * @param {Float} stepsOrDelta Change amount (-0.02, +0.02, -1, or +1).
      */
     public function adjustSensitivity(stepsOrDelta:Float) {
         var delta = (Math.abs(stepsOrDelta) >= 1.0) ? (stepsOrDelta * 0.02) : stepsOrDelta;
@@ -223,12 +322,9 @@ class ControlsOptionsPanel extends Object {
         AudioManager.inst.playMenuBeep(420 + sens * 240, 0.04);
         updateSensitivityDisplay();
 
-        var d = SaveSystem.load();
+        var d = loadActiveSave();
         d.steerSensitivity = sens;
-        SaveSystem.save(d);
-        #if js
-        if (untyped js.Browser.window.app != null) untyped js.Browser.window.app.saveData = d;
-        #end
+        persistActiveSave(d);
     }
 
     /**
@@ -251,7 +347,9 @@ class ControlsOptionsPanel extends Object {
             toggleExclusiveBtn.text = "[INTERFACE: MULTI-TOUCH ACTIVE]";
             toggleExclusiveBtn.textColor = UITheme.COLOR_GREEN_SUCCESS;
             toggleExclusiveInter.visible = false;
-            toggleViewModeBtn.text = "[MODE: " + (controlViewMode == "Diagram" ? "DEFAULT LAYOUT" : "CUSTOM LAYOUT") + "]";
+            toggleViewModeBtn.text = (controlViewMode == "Diagram")
+                ? "[MODE: DEFAULT LAYOUT  |  TAP TO CUSTOMIZE]"
+                : "[MODE: CUSTOM OFFSETS  |  TAP FOR PREVIEW]";
             toggleViewModeBtn.textColor = UITheme.COLOR_ACCENT_CYAN;
             return;
         }
@@ -276,16 +374,18 @@ class ControlsOptionsPanel extends Object {
         diagramViewer.visible = (controlViewMode == "Diagram");
         remapContainer.visible = (controlViewMode == "Custom");
 
+        updateControlHeaderButtons();
+        updateSensitivityDisplay();
+
         if (controlViewMode == "Diagram") {
             if (currentTab == Keyboard) diagramViewer.drawKeyboardLayout();
             else if (currentTab == Gamepad) diagramViewer.drawGamepadLayout();
-            else if (currentTab == Touch) diagramViewer.drawTouchLayout();
+            else if (currentTab == Touch) diagramViewer.drawTouchLayout(loadActiveSave().touchSettings);
         } else {
             updateRemapStyles();
         }
 
-        updateControlHeaderButtons();
-        updateSensitivityDisplay();
+        applySubpanelLayout();
     }
 
     /**
@@ -300,27 +400,22 @@ class ControlsOptionsPanel extends Object {
     /**
      * Initiates remapping capture or activates an option entry.
      *
-     * @param idx Action row index.
+     * @param {Int} idx Action row index.
      */
     public function triggerRemapEntry(idx:Int) {
         if (currentTab == Touch) {
-            var d = SaveSystem.load();
-            var ts = d.touchSettings != null ? d.touchSettings : SaveSystem.getDefaultTouchSettings();
+            remapIndex = idx;
             if (idx == 11) {
-                // Reset to default touch layout
                 AudioManager.inst.playMenuBeep(320, 0.08);
+                var d = loadActiveSave();
                 d.touchSettings = SaveSystem.getDefaultTouchSettings();
                 d.touchSettings.mode = "Custom";
-                SaveSystem.save(d);
-                #if js
-                if (untyped js.Browser.window.app != null) untyped js.Browser.window.app.saveData = d;
-                #end
+                persistActiveSave(d);
                 if (onTouchSettingsChanged != null) onTouchSettingsChanged();
                 updateRemapStyles();
                 return;
             }
 
-            // Click cycles value forward
             adjustCurrentCustomOption(1);
             return;
         }
@@ -329,6 +424,7 @@ class ControlsOptionsPanel extends Object {
             AudioManager.inst.playMenuBeep(320, 0.08);
             if (currentTab == Keyboard) inputRef.bindings.resetKeyboardDefaults();
             else inputRef.bindings.resetGamepadDefaults();
+            persistInputBindings();
             updateRemapStyles();
             return;
         }
@@ -344,13 +440,13 @@ class ControlsOptionsPanel extends Object {
     /**
      * Adjusts the currently selected custom setting left (-1) or right (+1).
      *
-     * @param dir Navigation direction multiplier (-1 or +1).
+     * @param {Int} dir Navigation direction multiplier (-1 or +1).
      */
     public function adjustCurrentCustomOption(dir:Int) {
         if (currentTab != Touch) return;
 
-        var d = SaveSystem.load();
-        var ts = d.touchSettings != null ? d.touchSettings : SaveSystem.getDefaultTouchSettings();
+        var d = loadActiveSave();
+        var ts = d.touchSettings;
         ts.mode = "Custom";
         var delta = dir * 10.0;
 
@@ -369,41 +465,35 @@ class ControlsOptionsPanel extends Object {
                 var s = Math.round((ts.scale + dir * 0.05) * 100) / 100.0;
                 ts.scale = Math.max(0.5, Math.min(1.5, s));
             case 11:
-                // No adjustment for reset row
                 return;
         }
 
         d.touchSettings = ts;
-        SaveSystem.save(d);
-        #if js
-        if (untyped js.Browser.window.app != null) untyped js.Browser.window.app.saveData = d;
-        #end
+        persistActiveSave(d);
         AudioManager.inst.playMenuBeep(450 + remapIndex * 20, 0.04);
         if (onTouchSettingsChanged != null) onTouchSettingsChanged();
         updateRemapStyles();
     }
-
 
     /**
      * Toggles between Default layout diagram and Custom layout adjustment list.
      */
     public function toggleCustomMode() {
         controlViewMode = (controlViewMode == "Diagram") ? "Custom" : "Diagram";
-        var d = SaveSystem.load();
-        d.touchSettings.mode = (controlViewMode == "Diagram") ? "Default" : "Custom";
-        SaveSystem.save(d);
-        #if js
-        if (untyped js.Browser.window.app != null) untyped js.Browser.window.app.saveData = d;
-        #end
+        if (currentTab == Touch) {
+            var d = loadActiveSave();
+            d.touchSettings.mode = (controlViewMode == "Diagram") ? "Default" : "Custom";
+            persistActiveSave(d);
+            if (onTouchSettingsChanged != null) onTouchSettingsChanged();
+        }
         updateControlViewMode();
-        if (onTouchSettingsChanged != null) onTouchSettingsChanged();
     }
 
     /**
      * Adjusts a specific touch custom option row by index and direction.
      *
-     * @param row Option row index (0-11).
-     * @param dir Increment or decrement direction (-1 or +1).
+     * @param {Int} row Option row index (0-11).
+     * @param {Int} dir Increment or decrement direction (-1 or +1).
      */
     public function cycleCustomTouchRow(row:Int, dir:Int) {
         remapIndex = row;
@@ -420,7 +510,7 @@ class ControlsOptionsPanel extends Object {
     /**
      * Navigates cursor up or down when in custom remapping mode.
      *
-     * @param dir Navigation offset (-1 or +1).
+     * @param {Int} dir Navigation offset (-1 or +1).
      */
     public function navigate(dir:Int) {
         var count = getMaxRemapCount();
@@ -429,48 +519,94 @@ class ControlsOptionsPanel extends Object {
         updateRemapStyles();
     }
 
+    function fmtSignedPx(val:Float):String {
+        var n = Math.round(val);
+        return (n > 0 ? "+" : "") + n + " px";
+    }
+
+    function hideTouchStepButtons() {
+        for (i in 0...MAX_REMAP_ITEMS) {
+            remapDecrBtns[i].visible = false;
+            remapDecrInteractives[i].visible = false;
+            remapIncrBtns[i].visible = false;
+            remapIncrInteractives[i].visible = false;
+        }
+    }
+
+    function applyRemapRowLabels(labels:Array<String>, resetIdx:Int) {
+        hideTouchStepButtons();
+        var count = labels.length;
+        for (i in 0...MAX_REMAP_ITEMS) {
+            var item = remapItems[i];
+            var inter = remapInteractives[i];
+            if (i < count) {
+                item.visible = true;
+                inter.visible = true;
+                if (i == remapIndex) {
+                    item.textColor = UITheme.COLOR_ACCENT_CYAN;
+                    item.text = "> " + labels[i] + " <";
+                } else {
+                    item.textColor = (i == resetIdx) ? 0xE5C07B : UITheme.COLOR_TEXT_NORMAL;
+                    item.text = "  " + labels[i] + "  ";
+                }
+            } else {
+                item.visible = false;
+                inter.visible = false;
+            }
+        }
+    }
+
     /**
      * Refreshes text and highlights in remapping / custom list.
      */
     public function updateRemapStyles() {
-        var count = getMaxRemapCount();
-
         if (currentTab == Touch) {
-            var d = SaveSystem.load();
-            var ts = d.touchSettings != null ? d.touchSettings : SaveSystem.getDefaultTouchSettings();
+            var ts = loadActiveSave().touchSettings;
             var labels = [
-                "Analog Joystick Offset X:  " + Math.round(ts.stickOffsetX) + " px  [ < / > ]",
-                "Analog Joystick Offset Y:  " + Math.round(ts.stickOffsetY) + " px  [ < / > ]",
-                "Nitro Button Offset X:     " + Math.round(ts.nitroOffsetX) + " px  [ < / > ]",
-                "Nitro Button Offset Y:     " + Math.round(ts.nitroOffsetY) + " px  [ < / > ]",
-                "Gas Pedal Offset X:        " + Math.round(ts.gasOffsetX) + " px  [ < / > ]",
-                "Gas Pedal Offset Y:        " + Math.round(ts.gasOffsetY) + " px  [ < / > ]",
-                "Brake Disc Offset X:       " + Math.round(ts.brakeOffsetX) + " px  [ < / > ]",
-                "Brake Disc Offset Y:       " + Math.round(ts.brakeOffsetY) + " px  [ < / > ]",
-                "Handbrake Offset X:        " + Math.round(ts.driftOffsetX) + " px  [ < / > ]",
-                "Handbrake Offset Y:        " + Math.round(ts.driftOffsetY) + " px  [ < / > ]",
-                "Touch Controls Scale:      " + Math.round(ts.scale * 100) + "%  [ < / > ]",
-                "[RESET TOUCH LAYOUT TO DEFAULTS]"
+                "Joystick X:   " + fmtSignedPx(ts.stickOffsetX),
+                "Joystick Y:   " + fmtSignedPx(ts.stickOffsetY),
+                "Nitro Btn X:  " + fmtSignedPx(ts.nitroOffsetX),
+                "Nitro Btn Y:  " + fmtSignedPx(ts.nitroOffsetY),
+                "Gas Pedal X:  " + fmtSignedPx(ts.gasOffsetX),
+                "Gas Pedal Y:  " + fmtSignedPx(ts.gasOffsetY),
+                "Brake Disc X: " + fmtSignedPx(ts.brakeOffsetX),
+                "Brake Disc Y: " + fmtSignedPx(ts.brakeOffsetY),
+                "Handbrake X:  " + fmtSignedPx(ts.driftOffsetX),
+                "Handbrake Y:  " + fmtSignedPx(ts.driftOffsetY),
+                "HUD Scale:    " + Math.round(ts.scale * 100) + "%",
+                "RESET DEFAULT LAYOUT"
             ];
 
             for (i in 0...MAX_REMAP_ITEMS) {
-                var item = remapItems[i];
-                var inter = remapInteractives[i];
-                if (i < count) {
-                    item.visible = true;
-                    inter.visible = true;
-                    if (i == remapIndex) {
-                        item.textColor = UITheme.COLOR_ACCENT_CYAN;
-                        item.text = "> " + labels[i] + " <";
-                    } else {
-                        item.textColor = (i == 11) ? 0xE5C07B : UITheme.COLOR_TEXT_NORMAL;
-                        item.text = "  " + labels[i] + "  ";
-                    }
+                var isSel = (i == remapIndex);
+                remapItems[i].visible = true;
+                remapInteractives[i].visible = true;
+                remapItems[i].text = labels[i];
+
+                if (i < 11) {
+                    remapItems[i].textColor = isSel ? UITheme.COLOR_ACCENT_CYAN : UITheme.COLOR_TEXT_NORMAL;
+
+                    var decrBtn = remapDecrBtns[i];
+                    var incrBtn = remapIncrBtns[i];
+                    decrBtn.text = (i == 10) ? "- 5%" : "- 10";
+                    incrBtn.text = (i == 10) ? "+ 5%" : "+ 10";
+                    decrBtn.textColor = isSel ? UITheme.COLOR_ACCENT_GOLD : UITheme.COLOR_ACCENT_CYAN;
+                    incrBtn.textColor = isSel ? UITheme.COLOR_ACCENT_GOLD : UITheme.COLOR_ACCENT_CYAN;
+
+                    decrBtn.visible = true;
+                    remapDecrInteractives[i].visible = true;
+                    incrBtn.visible = true;
+                    remapIncrInteractives[i].visible = true;
                 } else {
-                    item.visible = false;
-                    inter.visible = false;
+                    remapItems[i].textColor = isSel ? UITheme.COLOR_ACCENT_CYAN : UITheme.COLOR_ACCENT_GOLD;
+                    remapDecrBtns[i].visible = false;
+                    remapDecrInteractives[i].visible = false;
+                    remapIncrBtns[i].visible = false;
+                    remapIncrInteractives[i].visible = false;
                 }
             }
+
+            applySubpanelLayout();
             return;
         }
 
@@ -485,25 +621,8 @@ class ControlsOptionsPanel extends Object {
             "Nitro Boost:          " + (isGamepad ? InputController.getGamepadBtnName(b.padBoost) : InputController.getKeyName(b.keyBoost)),
             "[RESET TO DEFAULTS]"
         ];
-
-        for (i in 0...MAX_REMAP_ITEMS) {
-            var item = remapItems[i];
-            var inter = remapInteractives[i];
-            if (i < count) {
-                item.visible = true;
-                inter.visible = true;
-                if (i == remapIndex) {
-                    item.textColor = UITheme.COLOR_ACCENT_CYAN;
-                    item.text = "> " + labels[i] + " <";
-                } else {
-                    item.textColor = (i == 6) ? 0xE5C07B : UITheme.COLOR_TEXT_NORMAL;
-                    item.text = "  " + labels[i] + "  ";
-                }
-            } else {
-                item.visible = false;
-                inter.visible = false;
-            }
-        }
+        applyRemapRowLabels(labels, 6);
+        applySubpanelLayout();
     }
 
     /**
@@ -517,66 +636,103 @@ class ControlsOptionsPanel extends Object {
      * @param cardH Modal card height.
      */
     public function layout(sw:Float, sh:Float, cardX:Float = 0, cardY:Float = 0, cardW:Float = 0, cardH:Float = 0) {
-        var effectiveCardX = (cardW > 0) ? cardX : (sw - UITheme.OPTIONS_CARD_WIDTH) * 0.5;
-        var effectiveCardY = (cardH > 0) ? cardY : sh * 0.16;
-        var effectiveCardW = (cardW > 0) ? cardW : UITheme.OPTIONS_CARD_WIDTH;
-        var effectiveCardH = (cardH > 0) ? cardH : UITheme.OPTIONS_CARD_HEIGHT;
+        lastSw = sw;
+        lastSh = sh;
+        lastCardX = cardX;
+        lastCardY = cardY;
+        lastCardW = cardW;
+        lastCardH = cardH;
+        applySubpanelLayout();
+    }
 
-        // 1. Steering Sensitivity Slider at top
-        var sensY = effectiveCardY + 54.0;
+    function applySubpanelLayout() {
+        var sw = (lastSw > 0) ? lastSw : 1280.0;
+        var sh = (lastSh > 0) ? lastSh : 720.0;
+        var effectiveCardW = (lastCardW > 0) ? lastCardW : UITheme.OPTIONS_CARD_WIDTH;
+        var effectiveCardH = (lastCardH > 0) ? lastCardH : UITheme.OPTIONS_CARD_HEIGHT;
+        var effectiveCardX = (lastCardW > 0) ? lastCardX : (sw - effectiveCardW) * 0.5;
+        var effectiveCardY = (lastCardH > 0) ? lastCardY : Math.max(12.0, (sh - effectiveCardH) * 0.5);
+
+        if (headerBg != null) headerBg.clear();
+        if (remapBg != null) remapBg.clear();
+
+        // 1. Steering Sensitivity Slider cleanly below tab bar divider (cardY + 60)
+        var sensY = effectiveCardY + 66.0;
         if (sensLabel != null) {
             sensLabel.x = (sw - sensLabel.textWidth) * 0.5;
             sensLabel.y = sensY;
             sensRowInter.x = sensLabel.x;
-            sensRowInter.y = sensY;
+            sensRowInter.y = sensY + 5.0;
             sensRowInter.width = sensLabel.textWidth;
-            sensRowInter.height = 24.0;
+            sensRowInter.height = 30.0;
 
-            sensDecrBtn.x = sensLabel.x - sensDecrBtn.textWidth - 14.0;
+            sensDecrBtn.x = sensLabel.x - sensDecrBtn.textWidth - 16.0;
             sensDecrBtn.y = sensY;
-            sensDecrInter.x = sensDecrBtn.x;
-            sensDecrInter.y = sensY;
-            sensDecrInter.width = sensDecrBtn.textWidth;
-            sensDecrInter.height = 24.0;
+            sensDecrInter.x = sensDecrBtn.x - 6.0;
+            sensDecrInter.y = sensY + 5.0;
+            sensDecrInter.width = sensDecrBtn.textWidth + 12.0;
+            sensDecrInter.height = 30.0;
 
-            sensIncrBtn.x = sensLabel.x + sensLabel.textWidth + 14.0;
+            sensIncrBtn.x = sensLabel.x + sensLabel.textWidth + 16.0;
             sensIncrBtn.y = sensY;
-            sensIncrInter.x = sensIncrBtn.x;
-            sensIncrInter.y = sensY;
-            sensIncrInter.width = sensIncrBtn.textWidth;
-            sensIncrInter.height = 24.0;
+            sensIncrInter.x = sensIncrBtn.x - 6.0;
+            sensIncrInter.y = sensY + 5.0;
+            sensIncrInter.width = sensIncrBtn.textWidth + 12.0;
+            sensIncrInter.height = 30.0;
+
+            if (headerBg != null) {
+                CardBackplate.drawChamferedBox(headerBg, sensDecrInter.x, sensDecrInter.y, sensDecrInter.width, sensDecrInter.height, 4.0, 0x101C2C, 0.72, UITheme.COLOR_ACCENT_CYAN, 0.55, 1.0);
+                CardBackplate.drawChamferedBox(headerBg, sensIncrInter.x, sensIncrInter.y, sensIncrInter.width, sensIncrInter.height, 4.0, 0x101C2C, 0.72, UITheme.COLOR_ACCENT_CYAN, 0.55, 1.0);
+            }
         }
 
         // 2. Mode and Device Header Buttons
-        var headerY = sensY + 34.0;
+        var headerY = sensY + 36.0;
         if (toggleExclusiveBtn != null) {
-            toggleExclusiveBtn.x = effectiveCardX + 50.0;
+            toggleExclusiveBtn.x = effectiveCardX + 40.0;
             toggleExclusiveBtn.y = headerY;
-            toggleExclusiveInter.x = toggleExclusiveBtn.x;
-            toggleExclusiveInter.y = toggleExclusiveBtn.y;
+            toggleExclusiveInter.x = toggleExclusiveBtn.x - 8.0;
+            toggleExclusiveInter.y = headerY + 4.0;
+            toggleExclusiveInter.width = Math.max(220.0, toggleExclusiveBtn.textWidth + 16.0);
+            toggleExclusiveInter.height = 32.0;
         }
         if (toggleViewModeBtn != null) {
-            toggleViewModeBtn.x = effectiveCardX + effectiveCardW - 350.0;
+            var modeW = Math.max(260.0, toggleViewModeBtn.textWidth + 24.0);
+            var modeX = effectiveCardX + effectiveCardW - modeW - 36.0;
+            toggleViewModeBtn.x = modeX + 12.0;
             toggleViewModeBtn.y = headerY;
-            toggleViewModeInter.x = toggleViewModeBtn.x;
-            toggleViewModeInter.y = toggleViewModeBtn.y;
+            toggleViewModeInter.x = modeX;
+            toggleViewModeInter.y = headerY + 4.0;
+            toggleViewModeInter.width = modeW;
+            toggleViewModeInter.height = 32.0;
+
+            if (headerBg != null) {
+                CardBackplate.drawChamferedBox(
+                    headerBg, modeX, headerY + 4.0, modeW, 32.0, 5.0,
+                    0x102438, 0.80, UITheme.COLOR_ACCENT_CYAN, 0.85, 1.3
+                );
+            }
         }
 
         // 3. Diagram Viewer
         if (diagramViewer != null) {
             diagramViewer.x = effectiveCardX + (effectiveCardW * 0.5);
-            diagramViewer.y = effectiveCardY + 320.0;
+            diagramViewer.y = effectiveCardY + Math.min(340.0, effectiveCardH * 0.57);
             diagramViewer.setScale(0.92);
         }
 
-        // 4. Remapping List
-        var remapStartY = headerY + 42.0;
+        // 4. Remapping List / Touch Custom Stepper Grid
         if (remapStatusNotice != null) {
             remapStatusNotice.x = (sw - remapStatusNotice.textWidth) * 0.5;
-            remapStatusNotice.y = remapStartY;
+            remapStatusNotice.y = headerY + 36.0;
         }
 
-        var itemsStartY = remapStartY + 24.0;
+        if (currentTab == Touch) {
+            layoutTouchCustomGrid(effectiveCardX, effectiveCardY, effectiveCardW, effectiveCardH, headerY + 44.0);
+            return;
+        }
+
+        var itemsStartY = headerY + 62.0;
         for (i in 0...MAX_REMAP_ITEMS) {
             var item = remapItems[i];
             var inter = remapInteractives[i];
@@ -586,6 +742,98 @@ class ControlsOptionsPanel extends Object {
             inter.y = item.y;
             inter.width = REMAP_ROW_WIDTH;
             inter.height = REMAP_ROW_HEIGHT;
+        }
+    }
+
+    function layoutTouchCustomGrid(cardX:Float, cardY:Float, cardW:Float, cardH:Float, gridTop:Float) {
+        var padX = 32.0;
+        var colGap = 20.0;
+        var cellW = (cardW - (padX * 2.0) - colGap) * 0.5;
+        var availH = Math.max(180.0, cardH - (gridTop - cardY) - 14.0);
+        var rowStride = Math.min(56.0, availH / 6.0);
+        var cellH = Math.min(44.0, Math.max(26.0, rowStride - 8.0));
+        var btnW = Math.min(68.0, Math.max(48.0, cellW * 0.165));
+        var btnH = Math.min(34.0, cellH - 6.0);
+
+        for (i in 0...MAX_REMAP_ITEMS) {
+            var col = i % 2;
+            var row = Std.int(i / 2);
+            var cellX = cardX + padX + col * (cellW + colGap);
+            var cellY = gridTop + row * rowStride;
+            var centerY = cellY + cellH * 0.5;
+            var textTopY = centerY - 20.0;
+            var isSel = (i == remapIndex);
+
+            var item = remapItems[i];
+            var inter = remapInteractives[i];
+
+            if (i < 11) {
+                var btnY = cellY + (cellH - btnH) * 0.5;
+                var decrX = cellX + 6.0;
+                var incrX = cellX + cellW - btnW - 6.0;
+                var midX = decrX + btnW + 4.0;
+                var midW = Math.max(40.0, (incrX - 4.0) - midX);
+
+                var decrBtn = remapDecrBtns[i];
+                var decrInter = remapDecrInteractives[i];
+                decrBtn.x = decrX + (btnW - decrBtn.textWidth) * 0.5;
+                decrBtn.y = textTopY;
+                decrInter.x = decrX;
+                decrInter.y = btnY;
+                decrInter.width = btnW;
+                decrInter.height = btnH;
+
+                var incrBtn = remapIncrBtns[i];
+                var incrInter = remapIncrInteractives[i];
+                incrBtn.x = incrX + (btnW - incrBtn.textWidth) * 0.5;
+                incrBtn.y = textTopY;
+                incrInter.x = incrX;
+                incrInter.y = btnY;
+                incrInter.width = btnW;
+                incrInter.height = btnH;
+
+                item.x = midX + (midW - item.textWidth) * 0.5;
+                item.y = textTopY;
+                inter.x = midX;
+                inter.y = btnY;
+                inter.width = midW;
+                inter.height = btnH;
+
+                if (remapBg != null && controlViewMode == "Custom") {
+                    CardBackplate.drawChamferedBox(
+                        remapBg, cellX, cellY, cellW, cellH, 6.0,
+                        isSel ? 0x132235 : 0x0F1622, isSel ? 0.90 : 0.72,
+                        isSel ? UITheme.COLOR_ACCENT_CYAN : UITheme.COLOR_DIVIDER, isSel ? 0.90 : 0.55,
+                        isSel ? 1.6 : 1.0
+                    );
+                    CardBackplate.drawChamferedBox(
+                        remapBg, decrX, btnY, btnW, btnH, 4.0,
+                        0x15273D, 0.92,
+                        isSel ? UITheme.COLOR_ACCENT_GOLD : UITheme.COLOR_ACCENT_CYAN, 0.82, 1.2
+                    );
+                    CardBackplate.drawChamferedBox(
+                        remapBg, incrX, btnY, btnW, btnH, 4.0,
+                        0x15273D, 0.92,
+                        isSel ? UITheme.COLOR_ACCENT_GOLD : UITheme.COLOR_ACCENT_CYAN, 0.82, 1.2
+                    );
+                }
+            } else {
+                item.x = cellX + (cellW - item.textWidth) * 0.5;
+                item.y = textTopY;
+                inter.x = cellX;
+                inter.y = cellY;
+                inter.width = cellW;
+                inter.height = cellH;
+
+                if (remapBg != null && controlViewMode == "Custom") {
+                    CardBackplate.drawChamferedBox(
+                        remapBg, cellX, cellY, cellW, cellH, 6.0,
+                        isSel ? 0x241B12 : 0x1A1510, 0.85,
+                        isSel ? UITheme.COLOR_ACCENT_CYAN : UITheme.COLOR_ACCENT_ORANGE, 0.85,
+                        isSel ? 1.6 : 1.2
+                    );
+                }
+            }
         }
     }
 }

@@ -4,6 +4,9 @@ package ui.components;
  * Design system palette and visual constants for user interface theming.
  * Centralizes theme colors, alpha transparencies, card dimensions, and layout metrics
  * so visual aesthetics can be adjusted in a single source of truth.
+ *
+ * @class UITheme
+ * @module ui/components/UITheme
  */
 class UITheme {
     // =========================================================================
@@ -82,10 +85,19 @@ class UITheme {
     public static inline var MAIN_CARD_WIDTH:Float = 560.0;
 
     /** Main menu modal frame height in pixels. */
-    public static inline var MAIN_CARD_HEIGHT:Float = 380.0;
+    public static inline var MAIN_CARD_HEIGHT:Float = 432.0;
 
     /** Main menu modal frame corner radius in pixels. */
     public static inline var MAIN_CARD_RADIUS:Float = 14.0;
+
+    /** Multiplayer lobby modal frame width in pixels. */
+    public static inline var LOBBY_CARD_WIDTH:Float = 860.0;
+
+    /** Multiplayer lobby modal frame height in pixels. */
+    public static inline var LOBBY_CARD_HEIGHT:Float = 500.0;
+
+    /** Multiplayer lobby modal frame corner radius in pixels. */
+    public static inline var LOBBY_CARD_RADIUS:Float = 14.0;
 
     /** Map selection modal frame width in pixels. */
     public static inline var MAP_SELECT_CARD_WIDTH:Float = 860.0;

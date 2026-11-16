@@ -1,5 +1,6 @@
 package world;
 
+import config.WorldConfig;
 import h3d.scene.Object;
 import h3d.scene.Mesh;
 import h3d.prim.Sphere;
@@ -48,20 +49,35 @@ class SkyGradientShader extends Shader {
     };
 
     /**
-     * Constructs and initializes the gradient blue sky shader.
+     * Constructs and initializes the sky gradient shader with configurable palette.
+     *
+     * @param {Int} [topHex=0x1052B8] Zenith sky color.
+     * @param {Int} [horizonHex=0x7AC2F2] Horizon atmosphere blend color.
+     * @param {Int} [groundHex=0x141A24] Lower hemisphere nadir fill color.
      */
-    public function new() {
+    public function new(topHex:Int = 0x1052B8, horizonHex:Int = 0x7AC2F2, groundHex:Int = 0x141A24) {
         super();
-        // Radiant arcade sky: deep azure zenith, bright celestial blue horizon, dark dusk nadir
-        topColor.set(0.06, 0.32, 0.72);      // #1052B8 Deep radiant blue
-        horizonColor.set(0.48, 0.76, 0.95);  // #7AC2F2 Bright atmospheric cyan
-        groundColor.set(0.08, 0.10, 0.14);   // #141A24 Deep asphalt ground tone
+        setHexColor(topColor, topHex);
+        setHexColor(horizonColor, horizonHex);
+        setHexColor(groundColor, groundHex);
+    }
+
+    /** Converts a 24-bit RGB hex integer into normalized shader Vec3 channels. */
+    private static function setHexColor(target:h3d.Vector, hex:Int):Void {
+        target.set(
+            ((hex >> 16) & 0xFF) / 255.0,
+            ((hex >> 8) & 0xFF) / 255.0,
+            (hex & 0xFF) / 255.0
+        );
     }
 }
 
 /**
  * Procedural panoramic skybox sphere encompassing the 3D scene.
  * Translates dynamically with the active camera to project an infinite atmospheric horizon.
+ *
+ * @class Skybox
+ * @module world/Skybox
  */
 class Skybox extends Object {
     /** High-density inverted celestial dome mesh. */
@@ -70,36 +86,39 @@ class Skybox extends Object {
     /** Active atmospheric gradient shader instance. */
     public var skyShader:SkyGradientShader;
 
-    /**
-     * Constructs the procedural gradient blue skybox.
-     *
-     * @param parent Optional parent 3D scene graph node.
-     */
-    public function new(?parent:Object) {
-        super(parent);
+    /** Active skybox configuration profile. */
+    public var config:config.WorldConfig.SkyboxConfig;
 
-        // Geodesic celestial dome (radius: 950m, 32 longitude segments, 24 latitude segments)
-        var spherePrim = new Sphere(950.0, 32, 24);
+    /**
+     * Constructs the procedural skybox from optional configuration settings.
+     *
+     * @param {Null<Object>} [parent] Optional parent 3D scene graph node.
+     * @param {Null<config.WorldConfig.SkyboxConfig>} [config] Optional geometry & color palette config.
+     */
+    public function new(?parent:Object, ?config:config.WorldConfig.SkyboxConfig) {
+        super(parent);
+        this.config = config != null ? config : WorldConfig.getDefaultSkybox();
+
+        var spherePrim = new Sphere(this.config.radius, this.config.segments, 24);
         spherePrim.addNormals();
 
         skyMesh = new Mesh(spherePrim, this);
-        // Disable backface culling on main pass so interior of sphere is fully visible
         skyMesh.material.mainPass.culling = None;
         skyMesh.material.shadows = false;
         skyMesh.material.mainPass.depthWrite = false;
         skyMesh.material.mainPass.depthTest = LessEqual;
 
-        skyShader = new SkyGradientShader();
+        skyShader = new SkyGradientShader(this.config.topColor, this.config.horizonColor);
         skyMesh.material.mainPass.addShader(skyShader);
     }
 
     /**
      * Synchronizes skybox center position with the active camera eye point.
-     * Keeps the celestial horizon stationary regardless of vehicle movement.
      *
-     * @param camPos World coordinate position of the active scene camera.
+     * @param {Vector} camPos World coordinate position of the active scene camera.
+     * @returns {Void}
      */
-    public function syncCamera(camPos:Vector) {
+    public function syncCamera(camPos:Vector):Void {
         if (camPos == null) return;
         this.x = camPos.x;
         this.y = camPos.y;

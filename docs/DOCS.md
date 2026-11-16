@@ -4,45 +4,35 @@ This ledger records active tuning variables across physics, input, track geometr
 
 ---
 
-## 1. Raycast Suspension & Arcade Vehicle Dynamics (`src/physics/CarPhysics.hx` & `CarConfig.hx`)
+## 1. 4-Wheel Raycast Suspension & Vehicle Dynamics (`src/physics/`)
 
-| Parameter | Current Value | Target Range | Description / Impact |
-|---|---|---|---|
-| `TOP_SPEED` | `68.0` m/s (~245 km/h) | `62.0 - 70.0` | Base maximum speed under normal engine throttle. |
-| `BOOST_TOP_SPEED` | `88.0` m/s (~316 km/h) | `82.0 - 90.0` | Maximum velocity ceiling during active nitrous injection. |
-| `ACCELERATION` | `28.0` m/s² | `24.0 - 30.0` | Engine torque bite. Scaled by shift disengagement latency and ground friction. |
-| `BOOST_ACCEL` | `48.0` m/s² | `42.0 - 52.0` | Forward surge when nitrous oxide is engaged. |
-| `BRAKING` | `38.0` m/s² | `36.0 - 44.0` | Threshold foot-brake deceleration rate scaled by ground friction. |
-| `suspension.restLength` | `0.45` m | `0.40 - 0.50` | Unloaded spring height from chassis to road contact. |
-| `suspension.springRate` | `32000.0` N/m | `28000 - 36000` | Linear spring stiffness for road surface tracking. |
-| `suspension.damping` | `2600.0` Ns/m | `2200 - 3000` | Shock absorber viscous compression/rebound damping. |
-| `suspension.antiRollStiffness` | `9500.0` N/m | `8000 - 12000` | Transverse anti-roll bar torque preventing unnatural roll. |
-| `suspension.bodyRollScale` | `1.0` | `0.5 - 2.0` | Dynamic chassis roll scaling directly affecting suspension spring compression/extension. |
-| `tires.peakSlipAngle` | `0.16` rad (~9.2°) | `0.14 - 0.18` | Slip angle at which lateral tire adhesion peaks. |
-| `tires.baseLateralStiffness` | `34.0` | `30.0 - 38.0` | Baseline cornering stiffness in linear slip region. |
-| `tires.tireSlipBias` | `-0.45` | `-1.0 to 1.0` | Front vs rear slip bias. Negative = rear bias / oversteer; Positive = front bias / understeer; 0 = neutral. |
-| `tires.groundFriction` | `1.0` | `0.2 - 2.0` | Global ground contact scalar multiplying tire adhesion, braking, and rolling drag. |
-| `tires.wheelspinAmount` | `1.2` | `0.5 - 3.0` | Burnout wheelspin scalar for standstill full-throttle launches and power cornering. |
-| `drift.driftTriggerAngle` | `0.22` rad (~12.6°) | `0.10 - 0.35` | Chassis angle relative to velocity required to engage active drift physics. |
-| `drift.lateralStiffnessScale` | `0.35` (35%) | `0.30 - 0.40` | Lateral grip scale during active drift slide. |
-| `drift.counterSteerTorque` | `3.4` | `2.8 - 3.8` | Artificial yaw torque assist when counter-steering slide. |
-| `drift.forwardBiasRate` | `3.8` | `3.0 - 4.5` | Momentum blending rate aligning velocity to vehicle heading. |
-| `drivetrain.gearRatios` | `[3.40, 2.20, 1.55, 1.18, 0.92, 0.76]` | Progressive 6-speed | Progressive gear reductions with final drive `3.73`. |
-| `drivetrain.idleRPM / redlineRPM` | `1000.0 / 8000.0` | `1000 / 8000` | Engine flywheel RPM limits and shift window (`3400 - 7200`). |
-| `boost.capacity` | `1.0` (100%) | `1.0` | Nitrous oxide reservoir capacity. |
-| `boost.drainRate` | `0.25` / s | `0.20 - 0.35` | Nitrous burn rate during active boost (4.0s sustained full boost). |
-| `boost.rechargeRate` | `0.10` / s | `0.05 - 0.15` | Passive idle recharge rate (10.0s empty-to-full). |
+| Parameter / Module | Current Value / Design | Description / Impact |
+|---|---|---|
+| Fixed Integration | `1 / 240` s (`FIXED_SUBSTEP`) | Deterministic 240Hz micro-stepping (`dt <= 0.05s`) synchronized with `oimo.dynamics.World`. |
+| `chassis.massKg / cogHeight` | `1450.0` kg / `0.48` m | Vehicle curb mass and COG elevation (`CarConfig.WHEELBASE = 2.70m`, `TRACK_WIDTH = 1.96m`). |
+| `suspension.restLength` | `0.36` m (`min 0.14`, `unloaded 0.50`) | Loaded equilibrium strut length matching `CarMesh.TIRE_RADIUS = 0.36m` ground contact. |
+| `suspension.springStiffness` | `25400.0` N/m | Four-wheel raycast spring rate yielding `0.14m` curb sag against `-9.81 m/s^2` gravity. |
+| `suspension.bumpDamping / reboundDamping` | `3950.0` / `5450.0` Ns/m | Asymmetric damper curve absorbing compressions smoothly and controlling rebound. |
+| `suspension.antiRollStiffness` | `14500.0` N/m | Front and rear axle Anti-Roll Bar load transfer resisting excessive cornering body roll. |
+| `tires.pacejkaB / C / D / E` | `9.2 / 1.52 / 1.08 / -0.35` | Pacejka Magic Formula lateral adhesion with combined Friction Circle (`|F_xy| <= mu * F_z`). |
+| `tires.relaxationLength / minSlipSpeed` | `0.34` m / `1.2` m/s | Distance-filtered slip relaxation and low-speed denominator stabilization. |
+| `tires.stictionSpeed` | `0.65` m/s | Static contact holding canceling slope gravity creep and standstill jitter at rest. |
+| `tires.maxSteerAngle / ackermannFactor` | `0.54` rad / `0.65` | Speed-blended Ackermann inner/outer front wheel geometry (`highSpeedSteerDamp = 0.026`). |
+| `drivetrain.gearRatios / finalDrive` | `[3.42, 2.28, 1.65, 1.28, 1.02, 0.84]` / `3.75` | 6-speed automatic + reverse (`-3.15`) transmission, `560 Nm` peak torque, `950 - 7600 RPM`. |
+| `drivetrain.maxForwardSpeed` | `72.0` m/s (`+14.0` boost bonus) | Governed top speed (~259 km/h base, ~309 km/h with nitrous boost thrust `7800 N`). |
+| `boost.maxFuel / burnRate / regenRate` | `1.0` / `0.28 /s` / `0.12 /s` | Nitrous fuel reserve capacity, combustion burn rate, and passive idle recharge rate. |
 
 ---
 
-## 2. Steering Rack Emulation & Controls (`src/input/InputController.hx` & `src/save/SaveSystem.hx`)
+## 2. Multi-Device Analog & Digital Controls (`src/input/InputController.hx` & `src/save/SaveSystem.hx`)
 
 | Parameter | Current Value | Description / Impact |
 |---|---|---|
-| `steerSensitivity` | `1.0` (100%) | Granular steering sensitivity multiplier scalable from 0% to 100% in 2% steps. |
-| `STEER_SPEED` | `4.2` | Turn-in rate for digital keyboard inputs (WASD / Arrows). |
-| `RETURN_SPEED` | `6.5` | Self-centering rate returning wheels to neutral upon key release. |
-| `GAMEPAD_DEADZONE` | `0.12` | Deadzone threshold filtering stick drift on analog gamepads. |
+| Steering Sign Convention | `-1.0 = Left (-X / yaw < 0)`, `+1.0 = Right (+X / yaw > 0)` | Uniform sign mapping across keyboard, analog gamepad thumbstick, D-pad, and virtual touch stick. |
+| `rawDigitalSteer` | Internal `[ -1.0, 1.0 ]` | Persistent keyboard/D-pad rack state kept decoupled from analog overrides and `steerSensitivity`. |
+| `steerSensitivity` | `1.0` (`[0.1, 1.0]`) | Applied solely to final combined output so sensitivity never compounds across frames. |
+| `STEER_SPEED / RETURN_SPEED` | `4.2` / `6.5` rad/s | Turn-in slew and return-to-center rates for digital inputs. |
+| `GAMEPAD_DEADZONE` | `0.12` (rescaled `[0..1]`) | Deadzone-rescaled thumbstick response (`pow(norm, 1.35)`) for smooth analog precision. |
 
 ---
 
@@ -75,14 +65,13 @@ This ledger records active tuning variables across physics, input, track geometr
 
 | Parameter | Current Value | Description / Impact |
 |---|---|---|
-| `BASE_DISTANCE` | `7.5` m | Follow distance behind vehicle at zero speed. |
-| `BASE_HEIGHT` | `2.8` m | Vertical elevation above vehicle chassis at zero speed. |
-| `BASE_FOV` | `65.0°` | Base vertical field of view angle when cruising or stationary. |
-| `MAX_SPEED_FOV` | `77.0°` | Smoothly dilated FOV angle at terminal velocity (+3.5° under nitrous boost). |
-| `accelPullBack` | Dynamic (`0.0 - 0.55m`) | Spring-damped camera pull-back during forward acceleration (+0.35m boost). |
-| `velocityFeedforward` | `0.65` | Forward velocity feedforward anchoring camera tightly behind chassis at 200+ km/h. |
-| `MAX_TRAUMA_CEILING` | `0.55` | Clamped maximum trauma ceiling preventing violent screen disorientation. |
-| `TRAUMA_DECAY_RATE` | `3.8` | Rapid exponential decay settling trauma crisp and punchy. |
+| `BASE_DISTANCE` | `6.8` m | Nominal trailing follow distance (`+1.5m` speed pull-back, `+0.75m` boost surge). |
+| `BASE_HEIGHT` | `2.55` m | Nominal camera height above vehicle wheel contact reference with slope pitch lift. |
+| `BASE_FOV` | `65.0`° | Baseline vertical FOV (`+10.5°` speed bonus, `+11.5°` nitrous boost bonus). |
+| `MAX_BANK_RAD` | `0.055` rad | Subtle bounded camera roll (~3.2°) aligned with lateral cornering and chassis roll. |
+| `MIN_GROUND_CLEARANCE` | `0.95` m | Minimum ground clearance guarded against `IGroundProvider` terrain during steep climbs. |
+| Tracking Filter | `SmoothDamp` + velocity alignment | Blends chassis heading and velocity direction above `3.5 m/s` with look-ahead target. |
+| `trauma` / `addTrauma()` | `[0.0, 1.0]` (`0.5x` softened) | Quadratic trauma shake with linear decay (`1.45 / s`). |
 
 ---
 

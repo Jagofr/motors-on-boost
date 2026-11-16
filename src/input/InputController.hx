@@ -1,5 +1,6 @@
 package input;
 
+import config.GameConfig;
 import hxd.Key;
 import hxd.Pad;
 
@@ -117,10 +118,16 @@ class InputBindings {
  * Cross-platform input manager and hardware listener.
  * Captures keyboard keystrokes, gamepad axes, analog triggers, and mobile touch events.
  * Performs digital steering rack rate-of-turn smoothing and self-centering.
+ *
+ * @class InputController
+ * @module input/InputController
  */
 class InputController {
     /** Steering rack position in range [-1.0 (full left), +1.0 (full right)]. */
     public var steer:Float = 0.0;
+
+    /** Internal persistent digital steering rack state [-1.0, 1.0] decoupled from analog inputs and sensitivity scaling. */
+    private var rawDigitalSteer:Float = 0.0;
 
     /** Longitudinal throttle percentage in range [0.0, 1.0]. */
     public var throttle:Float = 0.0;
@@ -184,6 +191,9 @@ class InputController {
     /** True if awaiting gamepad button input for remapping; false if awaiting keyboard. */
     public var listeningForGamepad:Bool = false;
 
+    /** Callback notified when key/gamepad capture completes (`true` = bound, `false` = cancelled). */
+    public var onRemapComplete:Null<Bool -> Void>;
+
     /** Active Heaps gamepad instance, or null if no controller is paired. */
     var pad:Pad;
 
@@ -227,17 +237,51 @@ class InputController {
     /** User configured steering sensitivity scalar in range [0.0, 1.0] (default 1.0). */
     public var steerSensitivity:Float = 1.0;
 
-    /** Steering rate of turn for keyboard keys in units per second. */
+    /** Active input rack slew and deadzone configuration profile. */
+    public var config:config.GameConfig.InputConfig;
+
+    /** Steering rate of turn for keyboard keys in units per second. @default 4.2 */
     static inline var STEER_SPEED:Float = 4.2;
 
-    /** Self-centering return-to-center speed when keys are released in units per second. */
+    /** Self-centering return-to-center speed when keys are released in units per second. @default 6.5 */
     static inline var RETURN_SPEED:Float = 6.5;
 
-    /** Analog stick deadzone threshold filtering jitter. */
+    /** Analog stick deadzone threshold filtering jitter. @default 0.12 */
     static inline var GAMEPAD_DEADZONE:Float = 0.12;
 
-    /** Threshold on analog stick to trigger discrete UI navigation pulses. */
+    /** Threshold on analog stick to trigger discrete UI navigation pulses. @default 0.55 */
     static inline var UI_STICK_THRESHOLD:Float = 0.55;
+
+    /** Lookup map from Heaps key scan-codes to readable display strings. */
+    private static var KEY_NAMES:Map<Int, String> = [
+        Key.SPACE => "SPACE",
+        Key.SHIFT => "L-SHIFT",
+        Key.CTRL => "CTRL",
+        Key.ALT => "ALT",
+        Key.UP => "UP ARROW",
+        Key.DOWN => "DOWN ARROW",
+        Key.LEFT => "LEFT ARROW",
+        Key.RIGHT => "RIGHT ARROW",
+        Key.ENTER => "ENTER"
+    ];
+
+    /** Lookup map from controller button indices to readable display labels. */
+    private static var PAD_BTN_NAMES:Map<Int, String> = [
+        0 => "A (Bottom)",
+        1 => "B (Right)",
+        2 => "X (Left)",
+        3 => "Y (Top)",
+        4 => "LB",
+        5 => "RB",
+        6 => "LT",
+        7 => "RT",
+        8 => "Select",
+        9 => "Start",
+        12 => "D-Pad Up",
+        13 => "D-Pad Down",
+        14 => "D-Pad Left",
+        15 => "D-Pad Right"
+    ];
 
     public static inline var BTN_SOUTH:Int = 0;
     public static inline var BTN_EAST:Int = 1;
@@ -254,11 +298,76 @@ class InputController {
     public static inline var DPAD_RIGHT:Int = 15;
 
     /**
-     * Initializes the input controller, sets up touch detection, and registers gamepad listeners.
+     * Initializes the input controller with optional configuration overrides, sets up
+     * touch detection, and pairs connected gamepads.
+     *
+     * @param {Null<config.GameConfig.InputConfig>} [config] Optional input slew & deadzone config.
      */
-    public function new() {
+    public function new(?config:config.GameConfig.InputConfig) {
+        this.config = config != null ? config : GameConfig.getDefault().input;
+        this.steerSensitivity = this.config.defaultSteerSensitivity;
         Pad.wait(onPadConnected);
         initTouchDetection();
+    }
+
+    /**
+     * Hydrates custom key/gamepad bindings, steering sensitivity, and device mode from save data.
+     *
+     * @param {save.SaveSystem.GameSaveData} data Loaded save payload.
+     * @returns {Void}
+     */
+    public function loadFromSave(data:save.SaveSystem.GameSaveData):Void {
+        if (data == null) return;
+        if (data.steerSensitivity != null) {
+            steerSensitivity = data.steerSensitivity;
+        }
+        if (data.bindings != null) {
+            bindings.keyLeft = data.bindings.keyLeft;
+            bindings.keyRight = data.bindings.keyRight;
+            bindings.keyGas = data.bindings.keyGas;
+            bindings.keyBrake = data.bindings.keyBrake;
+            bindings.keyHandbrake = data.bindings.keyHandbrake;
+            bindings.keyBoost = data.bindings.keyBoost;
+            bindings.padGas = data.bindings.padGas;
+            bindings.padBrake = data.bindings.padBrake;
+            bindings.padHandbrake = data.bindings.padHandbrake;
+            bindings.padBoost = data.bindings.padBoost;
+        }
+        if (data.exclusiveDevice != null) {
+            exclusiveDevice = switch (data.exclusiveDevice) {
+                case "KeyboardOnly": KeyboardOnly;
+                case "GamepadOnly": GamepadOnly;
+                default: Both;
+            };
+        }
+    }
+
+    /**
+     * Writes active custom bindings and exclusive device filter into a save record.
+     *
+     * @param {save.SaveSystem.GameSaveData} data Target save record to populate.
+     * @returns {Void}
+     */
+    public function exportToSave(data:save.SaveSystem.GameSaveData):Void {
+        if (data == null) return;
+        data.steerSensitivity = steerSensitivity;
+        data.bindings = {
+            keyLeft: bindings.keyLeft,
+            keyRight: bindings.keyRight,
+            keyGas: bindings.keyGas,
+            keyBrake: bindings.keyBrake,
+            keyHandbrake: bindings.keyHandbrake,
+            keyBoost: bindings.keyBoost,
+            padGas: bindings.padGas,
+            padBrake: bindings.padBrake,
+            padHandbrake: bindings.padHandbrake,
+            padBoost: bindings.padBoost
+        };
+        data.exclusiveDevice = switch (exclusiveDevice) {
+            case KeyboardOnly: "KeyboardOnly";
+            case GamepadOnly: "GamepadOnly";
+            case Both: "Both";
+        };
     }
 
     /**
@@ -331,6 +440,7 @@ class InputController {
         tabPrevPressed = false;
         tabNextPressed = false;
         anyKeyPressed = false;
+        rawDigitalSteer = 0.0;
         inputCooldown = 0.22;
     }
 
@@ -416,62 +526,97 @@ class InputController {
             }
         }
 
-        // 2. Continuous Driving Controls Integration
+        // 2. Continuous Driving Controls Integration (strictly - = Left, + = Right across all devices)
         var allowKeyboard = (exclusiveDevice == Both || exclusiveDevice == KeyboardOnly);
         var allowGamepad = (exclusiveDevice == Both || exclusiveDevice == GamepadOnly);
 
         var keyLeft = allowKeyboard && (Key.isDown(bindings.keyLeft) || Key.isDown(Key.LEFT));
         var keyRight = allowKeyboard && (Key.isDown(bindings.keyRight) || Key.isDown(Key.RIGHT));
+        var dpadLeft = allowGamepad && pad != null && isBtnDown(DPAD_LEFT);
+        var dpadRight = allowGamepad && pad != null && isBtnDown(DPAD_RIGHT);
         var keyGas = allowKeyboard && (Key.isDown(bindings.keyGas) || Key.isDown(Key.UP));
         var keyReverse = allowKeyboard && (Key.isDown(bindings.keyBrake) || Key.isDown(Key.DOWN));
 
-        if (keyLeft && !keyRight) digitalSteerTarget = -1.0;
-        else if (keyRight && !keyLeft) digitalSteerTarget = 1.0;
+        var steerLeft = keyLeft || dpadLeft;
+        var steerRight = keyRight || dpadRight;
+
+        if (steerLeft && !steerRight) digitalSteerTarget = 1.0;
+        else if (steerRight && !steerLeft) digitalSteerTarget = -1.0;
         else digitalSteerTarget = 0.0;
 
-        // Digital steering rack simulation with turn-in rate and return-to-center centering
+        var steerRate = config.steerSpeed;
+        var returnRate = config.returnSpeed;
+        var padDeadzone = config.gamepadDeadzone;
+
+        // Digital steering rack simulation kept independent from analog sticks and sensitivity scaling
         if (digitalSteerTarget != 0.0) {
-            if (steer < digitalSteerTarget) steer = Math.min(digitalSteerTarget, steer + STEER_SPEED * dt);
-            else if (steer > digitalSteerTarget) steer = Math.max(digitalSteerTarget, steer - STEER_SPEED * dt);
+            if (rawDigitalSteer < digitalSteerTarget) rawDigitalSteer = Math.min(digitalSteerTarget, rawDigitalSteer + steerRate * dt);
+            else if (rawDigitalSteer > digitalSteerTarget) rawDigitalSteer = Math.max(digitalSteerTarget, rawDigitalSteer - steerRate * dt);
         } else {
-            if (steer > 0.0) steer = Math.max(0.0, steer - RETURN_SPEED * dt);
-            else if (steer < 0.0) steer = Math.min(0.0, steer + RETURN_SPEED * dt);
+            if (rawDigitalSteer > 0.0) rawDigitalSteer = Math.max(0.0, rawDigitalSteer - returnRate * dt);
+            else if (rawDigitalSteer < 0.0) rawDigitalSteer = Math.min(0.0, rawDigitalSteer + returnRate * dt);
         }
+
+        var combinedSteer = rawDigitalSteer;
 
         throttle = keyGas ? 1.0 : 0.0;
         brake = keyReverse ? 1.0 : 0.0;
         handbrake = allowKeyboard && Key.isDown(bindings.keyHandbrake);
         boost = allowKeyboard && Key.isDown(bindings.keyBoost);
 
-        // Analog gamepad stick steering and progressive triggers
+        // Analog gamepad thumbstick steering (deadzone-rescaled & sign-flipped) and progressive triggers
         if (allowGamepad && pad != null) {
-            if (Math.abs(stickX) > GAMEPAD_DEADZONE) {
-                var sign = stickX < 0 ? -1.0 : 1.0;
-                steer = sign * Math.pow(Math.abs(stickX), 1.4);
+            var absStick = Math.abs(stickX);
+            if (absStick > padDeadzone && padDeadzone < 0.99) {
+                var sign = stickX < 0.0 ? 1.0 : -1.0;
+                var norm = Math.max(0.0, Math.min(1.0, (absStick - padDeadzone) / (1.0 - padDeadzone)));
+                var padSteer = sign * Math.pow(norm, 1.35);
+                if (digitalSteerTarget == 0.0 || Math.abs(padSteer) >= Math.abs(combinedSteer)) {
+                    combinedSteer = padSteer;
+                }
             }
 
-            var padThrottle = getAnalogValue(bindings.padGas);
-            var padBrakeVal = getAnalogValue(bindings.padBrake);
+            var padThrottle = Math.max(0.0, Math.min(1.0, getAnalogValue(bindings.padGas)));
+            var padBrakeVal = Math.max(0.0, Math.min(1.0, getAnalogValue(bindings.padBrake)));
 
             if (isBtnDown(bindings.padGas)) padThrottle = 1.0;
             if (isBtnDown(bindings.padBrake)) padBrakeVal = 1.0;
 
-            if (padThrottle > 0.05) throttle = padThrottle;
-            if (padBrakeVal > 0.05) brake = padBrakeVal;
+            if (padThrottle > 0.05) throttle = Math.max(throttle, padThrottle);
+            if (padBrakeVal > 0.05) brake = Math.max(brake, padBrakeVal);
 
             if (isBtnDown(bindings.padHandbrake)) handbrake = true;
             if (isBtnDown(bindings.padBoost)) boost = true;
         }
 
-        // Mobile touch controls blending
-        if (Math.abs(touchSteer) > 0.01) steer = touchSteer;
-        if (touchThrottle > 0.0) throttle = Math.max(throttle, touchThrottle);
-        if (touchBrake > 0.0) brake = Math.max(brake, touchBrake);
+        // Virtual multi-touch analog stick & pedal blending (small inner deadzone prevents resting jitter)
+        var absTouchSteer = Math.abs(touchSteer);
+        if (absTouchSteer > 0.03) {
+            var tSign = touchSteer < 0.0 ? 1.0 : -1.0;
+            var tNorm = Math.max(0.0, Math.min(1.0, (absTouchSteer - 0.03) / 0.97));
+            var touchCurved = tSign * Math.pow(tNorm, 1.15);
+            if (digitalSteerTarget == 0.0 || Math.abs(touchCurved) >= Math.abs(combinedSteer)) {
+                combinedSteer = touchCurved;
+            }
+        }
+        if (touchThrottle > 0.0) throttle = Math.max(throttle, Math.min(1.0, touchThrottle));
+        if (touchBrake > 0.0) brake = Math.max(brake, Math.min(1.0, touchBrake));
         if (touchHandbrake) handbrake = true;
         if (touchBoost) boost = true;
 
-        // Apply user-configured steering sensitivity scalar [0.0 - 1.0]
-        steer = Math.max(-1.0, Math.min(1.0, steer * steerSensitivity));
+        throttle = Math.max(0.0, Math.min(1.0, throttle));
+        brake = Math.max(0.0, Math.min(1.0, brake));
+
+        // Apply user-configured steering sensitivity scalar [0.1 - 1.0] against slightly boosted base sensitivity (1.20x)
+        var clampedSens = Math.max(0.1, Math.min(1.0, steerSensitivity));
+        steer = Math.max(-1.0, Math.min(1.0, combinedSteer * 1.20 * clampedSens));
+    }
+
+    function finishRemapping(bound:Bool) {
+        isListeningForRemap = false;
+        listeningAction = null;
+        flushInputs();
+        if (onRemapComplete != null) onRemapComplete(bound);
     }
 
     /**
@@ -489,9 +634,7 @@ class InputController {
                         case Handbrake: bindings.keyHandbrake = k;
                         case Boost: bindings.keyBoost = k;
                     }
-                    isListeningForRemap = false;
-                    listeningAction = null;
-                    flushInputs();
+                    finishRemapping(true);
                     return;
                 }
             }
@@ -505,9 +648,7 @@ class InputController {
                         case Boost: bindings.padBoost = i;
                         default:
                     }
-                    isListeningForRemap = false;
-                    listeningAction = null;
-                    flushInputs();
+                    finishRemapping(true);
                     return;
                 }
             }
@@ -515,56 +656,29 @@ class InputController {
 
         // Allow cancellation via Escape or Start button
         if (Key.isDown(Key.ESCAPE) || isBtnDown(BTN_START)) {
-            isListeningForRemap = false;
-            listeningAction = null;
-            flushInputs();
+            finishRemapping(false);
         }
     }
 
     /**
      * Formats keyboard scan-code into a human-readable display string.
      *
-     * @param k Key code.
-     * @return Readable name string.
+     * @param {Int} k Heaps key scan-code.
+     * @returns {String} Readable key label.
      */
     public static function getKeyName(k:Int):String {
-        return switch (k) {
-            case Key.SPACE: "SPACE";
-            case Key.SHIFT: "L-SHIFT";
-            case Key.CTRL: "CTRL";
-            case Key.ALT: "ALT";
-            case Key.UP: "UP ARROW";
-            case Key.DOWN: "DOWN ARROW";
-            case Key.LEFT: "LEFT ARROW";
-            case Key.RIGHT: "RIGHT ARROW";
-            case Key.ENTER: "ENTER";
-            default: String.fromCharCode(k);
-        };
+        var named = KEY_NAMES.get(k);
+        return named != null ? named : String.fromCharCode(k);
     }
 
     /**
      * Formats gamepad button index into a human-readable display string.
      *
-     * @param btn Button index.
-     * @return Readable button name string.
+     * @param {Int} btn Zero-based gamepad button index.
+     * @returns {String} Readable button label.
      */
     public static function getGamepadBtnName(btn:Int):String {
-        return switch (btn) {
-            case 0: "A (Bottom)";
-            case 1: "B (Right)";
-            case 2: "X (Left)";
-            case 3: "Y (Top)";
-            case 4: "LB";
-            case 5: "RB";
-            case 6: "LT";
-            case 7: "RT";
-            case 8: "Select";
-            case 9: "Start";
-            case 12: "D-Pad Up";
-            case 13: "D-Pad Down";
-            case 14: "D-Pad Left";
-            case 15: "D-Pad Right";
-            default: "Btn " + btn;
-        };
+        var named = PAD_BTN_NAMES.get(btn);
+        return named != null ? named : "Btn " + btn;
     }
 }

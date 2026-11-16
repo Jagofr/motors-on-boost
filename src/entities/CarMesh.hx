@@ -5,37 +5,36 @@ import h3d.scene.Mesh;
 import h3d.prim.Cube;
 import h3d.prim.Cylinder;
 import h3d.prim.Disc;
+import physics.CarConfig;
 
 /**
  * Procedural 3D composite mesh representation of the player race vehicle.
- * Constructed with higher polygon density and layered geometric volumes:
- * aerodynamic lower chassis, sculpted hood, front splitter, side skirts,
- * rear diffuser, cabin canopy with windshield taper, aerodynamic wing spoiler
- * with support stanchions, quad exhaust tips, LED headlights/taillights,
- * and high-resolution wheel assemblies with outer rim caps.
+ *
+ * @class CarMesh
+ * @module entities/CarMesh
  */
 class CarMesh extends Object {
-    /** Tire rolling radius in meters. */
-    public static inline var TIRE_RADIUS:Float = 0.36;
+    /** Tire rolling radius in meters shared with physics config. @default 0.36 */
+    public static inline var TIRE_RADIUS:Float = CarConfig.TIRE_RADIUS;
 
-    /** Tire tread width in meters. */
-    public static inline var TIRE_WIDTH:Float = 0.30;
+    /** Tire tread width in meters shared with physics config. @default 0.30 */
+    public static inline var TIRE_WIDTH:Float = CarConfig.TIRE_WIDTH;
 
-    /** Overall vehicle chassis bounding width in meters. */
-    public static inline var CHASSIS_WIDTH:Float = 1.88;
+    /** Overall vehicle chassis bounding width in meters. @default 1.88 */
+    public static inline var CHASSIS_WIDTH:Float = CarConfig.CHASSIS_WIDTH;
 
-    /** Overall vehicle chassis bounding length in meters. */
-    public static inline var CHASSIS_LENGTH:Float = 4.30;
+    /** Overall vehicle chassis bounding length in meters. @default 4.30 */
+    public static inline var CHASSIS_LENGTH:Float = CarConfig.CHASSIS_LENGTH;
 
-    /** Overall vehicle chassis bounding height in meters. */
+    /** Overall vehicle chassis bounding height in meters. @default 0.44 */
     public static inline var CHASSIS_HEIGHT:Float = 0.44;
 
-    /** Local chassis offset coordinates for each wheel attachment point [X, Y, isLeft]. */
+    /** Local chassis visual hub coordinates for [FL, FR, RL, RR]. */
     public static var WHEEL_OFFSETS(default, never):Array<{x:Float, y:Float, isLeft:Bool}> = [
-        { x: -0.98, y:  1.35, isLeft: true  }, // 0: FL
-        { x:  0.98, y:  1.35, isLeft: false }, // 1: FR
-        { x: -0.98, y: -1.35, isLeft: true  }, // 2: RL
-        { x:  0.98, y: -1.35, isLeft: false }  // 3: RR
+        { x: -0.98, y:  1.35, isLeft: true  },
+        { x:  0.98, y:  1.35, isLeft: false },
+        { x: -0.98, y: -1.35, isLeft: true  },
+        { x:  0.98, y: -1.35, isLeft: false }
     ];
 
     /** Primary lower chassis body mesh. */

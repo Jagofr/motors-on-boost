@@ -5,54 +5,72 @@ import utest.Assert;
 import physics.CarConfig;
 
 /**
- * Unit test suite validating CarConfig default values, ranges, and JSON serialization.
+ * Unit test suite validating vehicle configuration defaults, geometric alignment with CarMesh,
+ * defensive parameter clamping, and JSON serialization round-trips.
  */
 class TestCarConfig extends Test {
-    public function testDefaultConfigValues() {
-        var cfg = CarConfig.getDefault();
-
-        // Mass and speeds
-        Assert.isTrue(cfg.mass > 500.0 && cfg.mass < 3000.0);
-        Assert.isTrue(cfg.baseTopSpeed > 40.0);
-        Assert.isTrue(cfg.boostTopSpeed > cfg.baseTopSpeed);
-        Assert.isTrue(cfg.baseAcceleration > 10.0);
-        Assert.isTrue(cfg.boostAcceleration > cfg.baseAcceleration);
-
-        // Suspension
-        Assert.isTrue(cfg.suspension.restLength > 0.1 && cfg.suspension.restLength < 1.0);
-        Assert.isTrue(cfg.suspension.springRate > 1000.0);
-        Assert.isTrue(cfg.suspension.antiRollStiffness > 100.0);
-        Assert.isTrue(cfg.suspension.bodyRollScale > 0.0);
-
-        // Tires
-        Assert.isTrue(cfg.tires.tireSlipBias >= -1.0 && cfg.tires.tireSlipBias <= 1.0);
-        Assert.isTrue(cfg.tires.groundFriction > 0.5 && cfg.tires.groundFriction <= 2.0);
-        Assert.isTrue(cfg.tires.wheelspinAmount >= 0.0);
-
-        // Drift
-        Assert.isTrue(cfg.drift.lateralStiffnessScale >= 0.2 && cfg.drift.lateralStiffnessScale <= 0.6);
-        Assert.isTrue(cfg.drift.driftTriggerAngle > 0.05 && cfg.drift.driftTriggerAngle < 1.0);
-        Assert.isTrue(cfg.drift.minDriftSpeed > 5.0);
-
-        // Drivetrain
-        Assert.isTrue(cfg.drivetrain.gearRatios.length >= 4);
-        Assert.isTrue(cfg.drivetrain.redlineRPM > cfg.drivetrain.idleRPM);
+    public function testStaticGeometryConstants() {
+        Assert.floatEquals(0.36, CarConfig.TIRE_RADIUS, 0.0001);
+        Assert.floatEquals(0.30, CarConfig.TIRE_WIDTH, 0.0001);
+        Assert.floatEquals(1.88, CarConfig.CHASSIS_WIDTH, 0.0001);
+        Assert.floatEquals(4.30, CarConfig.CHASSIS_LENGTH, 0.0001);
+        Assert.floatEquals(0.48, CarConfig.COG_HEIGHT, 0.0001);
+        Assert.floatEquals(2.70, CarConfig.WHEELBASE, 0.0001);
+        Assert.floatEquals(1.96, CarConfig.TRACK_WIDTH, 0.0001);
     }
 
-    public function testJsonSerializationRoundtrip() {
+    public function testDefaultProfileValidity() {
         var cfg = CarConfig.getDefault();
-        cfg.tires.tireSlipBias = -0.45; // Test custom rear bias
-        cfg.drift.driftTriggerAngle = 0.32;
+        Assert.isTrue(cfg.chassis.massKg > 800.0);
+        Assert.isTrue(cfg.suspension.minLength < cfg.suspension.restLength);
+        Assert.isTrue(cfg.suspension.restLength < cfg.suspension.unloadedLength);
+        Assert.isTrue(cfg.suspension.bumpDamping > 0.0);
+        Assert.isTrue(cfg.suspension.reboundDamping >= cfg.suspension.bumpDamping);
+        Assert.isTrue(cfg.suspension.antiRollStiffness > 0.0);
 
-        var jsonStr = CarConfig.toJson(cfg);
-        Assert.isTrue(jsonStr.length > 50);
+        Assert.isTrue(cfg.drivetrain.idleRPM < cfg.drivetrain.shiftDownRPM);
+        Assert.isTrue(cfg.drivetrain.shiftDownRPM < cfg.drivetrain.shiftUpRPM);
+        Assert.isTrue(cfg.drivetrain.shiftUpRPM < cfg.drivetrain.redlineRPM);
+        Assert.equals(6, cfg.drivetrain.gearRatios.length);
 
-        var restored = CarConfig.fromJson(jsonStr);
-        Assert.notNull(restored);
-        Assert.floatEquals(cfg.mass, restored.mass, 0.001);
-        Assert.floatEquals(-0.45, restored.tires.tireSlipBias, 0.001);
-        Assert.floatEquals(0.32, restored.drift.driftTriggerAngle, 0.001);
-        Assert.floatEquals(cfg.boostTopSpeed, restored.boostTopSpeed, 0.001);
+        Assert.isTrue(cfg.tires.pacejkaD > 0.5);
+        Assert.isTrue(cfg.tires.relaxationLength > 0.05);
+        Assert.isTrue(cfg.tires.stictionSpeed > 0.05);
+        Assert.isTrue(cfg.boost.maxFuel > 0.0);
+    }
+
+    public function testClampSanitizesInvalidBounds() {
+        var cfg = CarConfig.getDefault();
+        cfg.chassis.massKg = -50.0;
+        cfg.suspension.unloadedLength = 0.05;
+        cfg.suspension.restLength = 0.90;
+        cfg.tires.relaxationLength = 0.0;
+        cfg.drivetrain.redlineRPM = 200.0;
+        cfg.drivetrain.gearRatios = [];
+
+        var clamped = CarConfig.clamp(cfg);
+        Assert.isTrue(clamped.chassis.massKg >= 400.0);
+        Assert.isTrue(clamped.suspension.unloadedLength > clamped.suspension.restLength);
+        Assert.isTrue(clamped.suspension.restLength > clamped.suspension.minLength);
+        Assert.isTrue(clamped.tires.relaxationLength >= 0.05);
+        Assert.isTrue(clamped.drivetrain.redlineRPM > clamped.drivetrain.idleRPM);
+        Assert.isTrue(clamped.drivetrain.gearRatios.length >= 1);
+    }
+
+    public function testJsonRoundTripAndMalformedFallback() {
+        var cfg = CarConfig.getDefault();
+        cfg.chassis.massKg = 1620.0;
+        cfg.tires.maxSteerAngle = 0.49;
+
+        var json = CarConfig.toJson(cfg);
+        var parsed = CarConfig.fromJson(json);
+        Assert.floatEquals(1620.0, parsed.chassis.massKg, 0.01);
+        Assert.floatEquals(0.49, parsed.tires.maxSteerAngle, 0.001);
+
+        var fallbackNull = CarConfig.fromJson(null);
+        Assert.floatEquals(1450.0, fallbackNull.chassis.massKg, 0.01);
+
+        var fallbackCorrupt = CarConfig.fromJson("{ broken json !!!");
+        Assert.floatEquals(1450.0, fallbackCorrupt.chassis.massKg, 0.01);
     }
 }
-

@@ -2,6 +2,7 @@ package ui;
 
 import h2d.Object;
 import input.InputController;
+import net.MultiplayerManager;
 import save.SaveSystem.GraphicsSettings;
 import ui.components.UIEnums.MenuAction;
 import ui.components.UIEnums.UIState;
@@ -12,6 +13,9 @@ import ui.UIBuilder;
  * User interface manager, menu hierarchy, and modal coordinator.
  * Manages UI state machine, dispatches controller/touch navigation inputs to modular views,
  * and delegates visual element assembly and layout to `UIBuilder`.
+ *
+ * @class UIManager
+ * @extends h2d.Object
  */
 @:keep
 class UIManager extends Object {
@@ -29,7 +33,10 @@ class UIManager extends Object {
     inline function get_inGameHUD():ui.views.hud.InGameHUDView return builder.inGameHUDView;
 
     /** Callback invoked upon selecting a menu action. */
-    public var onMenuAction:MenuAction->Void;
+    public var onMenuAction:Null<MenuAction -> Void>;
+
+    /** Optional callback invoked when pause is requested via touch HUD or pause shortcut. */
+    public var onPauseRequested:Null<Void -> Void>;
 
     /** Reference to active input controller. */
     var inputRef:InputController;
@@ -47,8 +54,9 @@ class UIManager extends Object {
      * @param initialGfx Current graphics settings profile.
      * @param hasSave True if an in-progress race run is available to resume.
      * @param parent Optional parent 2D scene graph node.
+     * @param mp Optional peer-to-peer multiplayer coordinator.
      */
-    public function new(input:InputController, initialGfx:GraphicsSettings, hasSave:Bool, ?parent:Object) {
+    public function new(input:InputController, initialGfx:GraphicsSettings, hasSave:Bool, ?parent:Object, ?mp:MultiplayerManager) {
         super(parent);
         this.visible = false; // Stay hidden until finishIntroSequence() triggers
         this.inputRef = input;
@@ -56,7 +64,7 @@ class UIManager extends Object {
         this.hasActiveSave = hasSave;
 
         // Instantiate modular UI Builder
-        builder = new UIBuilder(input, initialGfx, hasSave, this);
+        builder = new UIBuilder(input, initialGfx, hasSave, this, mp);
 
         // Wire subview callbacks
         builder.splashView.onEnter = function() showMainMenu();
@@ -67,6 +75,21 @@ class UIManager extends Object {
         };
         builder.mapSelectView.onBack = function() showMainMenu();
         builder.mapSelectView.onSelectionChanged = function() layout();
+        builder.multiplayerMenuView.onHostSelected = function() {
+            if (mp != null) mp.hostRoom(null, "HOST");
+            showMultiplayerLobby();
+        };
+        builder.multiplayerMenuView.onJoinSelected = function(code:String) {
+            if (mp != null) mp.joinRoom(code, "GUEST");
+            showMultiplayerLobby();
+        };
+        builder.multiplayerMenuView.onBack = function() showMainMenu();
+        builder.multiplayerMenuView.onSelectionChanged = function() layout();
+        builder.multiplayerLobbyView.onBack = function() {
+            if (mp != null) mp.leaveRoom();
+            showMultiplayerMenu();
+        };
+        builder.multiplayerLobbyView.onVisualRefresh = function() layout();
         builder.pauseMenuView.onResume = function() if (onMenuAction != null) onMenuAction(ResumeGame);
         builder.pauseMenuView.onRestart = function() if (onMenuAction != null) onMenuAction(RestartRace);
         builder.pauseMenuView.onOptions = function() openOptions(true);
@@ -75,6 +98,9 @@ class UIManager extends Object {
         builder.optionsView.onBack = function() {
             if (isOpenedFromPause) showPause();
             else showMainMenu();
+        };
+        builder.optionsView.onTabChanged = function() {
+            if (currentState == OptionsMenu) layout();
         };
         builder.optionsView.gfxPanel.onUIResolutionChanged = function() {
             layout();
@@ -85,15 +111,45 @@ class UIManager extends Object {
         };
         builder.touchControlsHUD.onPauseTriggered = function() {
             if (currentState == InGameHUD) {
-                showPause();
+                if (onPauseRequested != null) onPauseRequested();
+                else showPause();
             }
         };
+    }
+
+    function prepareTransition(state:UIState, showModalCard:Bool, ?helpMsg:String, resetTouch:Bool = true) {
+        inputRef.flushInputs();
+        currentState = state;
+
+        builder.modalDimmer.visible = showModalCard;
+        builder.cardBg.visible = showModalCard;
+        builder.splashView.visible = false;
+        builder.mainMenuView.visible = false;
+        builder.mapSelectView.visible = false;
+        builder.multiplayerMenuView.visible = false;
+        builder.multiplayerLobbyView.visible = false;
+        builder.pauseMenuView.visible = false;
+        builder.optionsView.visible = false;
+        builder.creditsView.visible = false;
+        builder.inGameHUDView.visible = false;
+        builder.touchControlsHUD.visible = false;
+
+        if (resetTouch) {
+            builder.touchControlsHUD.resetTouchStates();
+        }
+
+        if (helpMsg != null) {
+            builder.helpText.text = helpMsg;
+            builder.helpText.visible = true;
+        } else {
+            builder.helpText.visible = false;
+        }
     }
 
     /**
      * Updates the active save run availability flag and re-styles the main menu items.
      *
-     * @param val True if a saved run is present.
+     * @param {Bool} val True if a saved run is present.
      */
     public function setHasActiveSave(val:Bool) {
         hasActiveSave = val;
@@ -104,22 +160,9 @@ class UIManager extends Object {
      * Reveals and transitions to the title splash screen.
      */
     public function showSplash() {
-        this.visible = true; // Reveal UI container
-        inputRef.flushInputs();
-        currentState = Splash;
-
-        builder.modalDimmer.visible = false;
-        builder.cardBg.visible = false;
+        this.visible = true;
+        prepareTransition(Splash, false, null, false);
         builder.splashView.activate();
-        builder.mainMenuView.visible = false;
-        builder.mapSelectView.visible = false;
-        builder.pauseMenuView.visible = false;
-        builder.optionsView.visible = false;
-        builder.creditsView.visible = false;
-        builder.inGameHUDView.visible = false;
-        builder.touchControlsHUD.visible = false;
-        builder.helpText.visible = false;
-
         layout();
     }
 
@@ -127,23 +170,8 @@ class UIManager extends Object {
      * Activates the primary main menu screen with option cards and icons.
      */
     public function showMainMenu() {
-        inputRef.flushInputs();
-        currentState = MainMenu;
-
-        builder.modalDimmer.visible = true;
-        builder.cardBg.visible = true;
-        builder.splashView.visible = false;
+        prepareTransition(MainMenu, true, "[Up / Down / D-Pad] Select    [A / Enter] Confirm", false);
         builder.mainMenuView.activate(hasActiveSave);
-        builder.mapSelectView.visible = false;
-        builder.pauseMenuView.visible = false;
-        builder.optionsView.visible = false;
-        builder.creditsView.visible = false;
-        builder.inGameHUDView.visible = false;
-        builder.touchControlsHUD.visible = false;
-
-        builder.helpText.text = "[Up / Down / D-Pad] Select    [A / Enter] Confirm";
-        builder.helpText.visible = true;
-
         layout();
     }
 
@@ -151,23 +179,26 @@ class UIManager extends Object {
      * Activates the singleplayer map selection screen before starting a game session.
      */
     public function showMapSelect() {
-        inputRef.flushInputs();
-        currentState = MapSelect;
-
-        builder.modalDimmer.visible = true;
-        builder.cardBg.visible = true;
-        builder.splashView.visible = false;
-        builder.mainMenuView.visible = false;
+        prepareTransition(MapSelect, true, "[Left / Right / Up / Down] Select Map    [A / Enter] Launch    [B / Esc] Back", false);
         builder.mapSelectView.activate();
-        builder.pauseMenuView.visible = false;
-        builder.optionsView.visible = false;
-        builder.creditsView.visible = false;
-        builder.inGameHUDView.visible = false;
-        builder.touchControlsHUD.visible = false;
+        layout();
+    }
 
-        builder.helpText.text = "[Left / Right / Up / Down] Select Map    [A / Enter] Launch    [B / Esc] Back";
-        builder.helpText.visible = true;
+    /**
+     * Activates the peer-to-peer multiplayer Host-or-Join entry menu.
+     */
+    public function showMultiplayerMenu() {
+        prepareTransition(MultiplayerMenu, true, "[Left / Right] Host or Join    [Type A-Z / 0-9] Invite Code    [A / Enter] Confirm    [B / Esc] Back", false);
+        builder.multiplayerMenuView.activate();
+        layout();
+    }
 
+    /**
+     * Activates the peer-to-peer multiplayer staging lobby screen.
+     */
+    public function showMultiplayerLobby() {
+        prepareTransition(MultiplayerLobby, true, "[Up / Down] Select Map    [A / Enter] Start Match (Host)    [B / Esc] Back", false);
+        builder.multiplayerLobbyView.activate();
         layout();
     }
 
@@ -175,23 +206,9 @@ class UIManager extends Object {
      * Hides modal overlays and transitions to the transparent in-game HUD.
      */
     public function showInGame() {
-        inputRef.flushInputs();
-        currentState = InGameHUD;
-
-        builder.modalDimmer.visible = false;
-        builder.cardBg.visible = false;
-        builder.splashView.visible = false;
-        builder.mainMenuView.visible = false;
-        builder.mapSelectView.visible = false;
-        builder.pauseMenuView.visible = false;
-        builder.optionsView.visible = false;
-        builder.creditsView.visible = false;
+        prepareTransition(InGameHUD, false, null, true);
         builder.inGameHUDView.visible = true;
-        builder.helpText.visible = false;
-
-        // Auto-show touch controls if device has touch capability or touch was registered
         builder.touchControlsHUD.visible = inputRef.isTouchActive;
-        builder.touchControlsHUD.resetTouchStates();
         layout();
     }
 
@@ -199,52 +216,20 @@ class UIManager extends Object {
      * Activates the in-run pause menu modal overlay.
      */
     public function showPause() {
-        inputRef.flushInputs();
-        currentState = PauseMenu;
-
-        builder.modalDimmer.visible = true;
-        builder.cardBg.visible = true;
-        builder.splashView.visible = false;
-        builder.mainMenuView.visible = false;
-        builder.mapSelectView.visible = false;
+        prepareTransition(PauseMenu, true, "[Up / Down] Select    [A / Enter] Confirm    [B / Esc] Resume", true);
         builder.pauseMenuView.activate();
-        builder.optionsView.visible = false;
-        builder.creditsView.visible = false;
-        builder.inGameHUDView.visible = false;
-        builder.touchControlsHUD.visible = false;
-        builder.touchControlsHUD.resetTouchStates();
-
-        builder.helpText.text = "[Up / Down] Select    [A / Enter] Confirm    [B / Esc] Resume";
-        builder.helpText.visible = true;
-
         layout();
     }
 
     /**
      * Opens the options configuration modal.
      *
-     * @param fromPause True if opened during a race; disables in-run restricted options.
+     * @param {Bool} fromPause True if opened during a race; disables in-run restricted options.
      */
     public function openOptions(fromPause:Bool) {
-        inputRef.flushInputs();
-        currentState = OptionsMenu;
         isOpenedFromPause = fromPause;
-
-        builder.modalDimmer.visible = true;
-        builder.cardBg.visible = true;
-        builder.splashView.visible = false;
-        builder.mainMenuView.visible = false;
-        builder.mapSelectView.visible = false;
-        builder.pauseMenuView.visible = false;
+        prepareTransition(OptionsMenu, true, "[LB / RB / Q / E] Switch Tabs    [Left / Right] Value    [B / Esc] Back", true);
         builder.optionsView.activate(fromPause);
-        builder.creditsView.visible = false;
-        builder.inGameHUDView.visible = false;
-        builder.touchControlsHUD.visible = false;
-        builder.touchControlsHUD.resetTouchStates();
-
-        builder.helpText.text = "[LB / RB / Q / E] Switch Tabs    [Left / Right] Value    [B / Esc] Back";
-        builder.helpText.visible = true;
-
         layout();
     }
 
@@ -252,24 +237,8 @@ class UIManager extends Object {
      * Opens the credits and technical disclosures overlay.
      */
     public function showCredits() {
-        inputRef.flushInputs();
-        currentState = CreditsScreen;
-
-        builder.modalDimmer.visible = true;
-        builder.cardBg.visible = true;
-        builder.splashView.visible = false;
-        builder.mainMenuView.visible = false;
-        builder.mapSelectView.visible = false;
-        builder.pauseMenuView.visible = false;
-        builder.optionsView.visible = false;
+        prepareTransition(CreditsScreen, true, "[B / Esc / Enter] Return to Main Menu", true);
         builder.creditsView.activate();
-        builder.inGameHUDView.visible = false;
-        builder.touchControlsHUD.visible = false;
-        builder.touchControlsHUD.resetTouchStates();
-
-        builder.helpText.text = "[B / Esc / Enter] Return to Main Menu";
-        builder.helpText.visible = true;
-
         layout();
     }
 
@@ -281,6 +250,7 @@ class UIManager extends Object {
     function triggerMainAction(act:MenuAction) {
         switch (act) {
             case OpenMapSelect: showMapSelect();
+            case OpenMultiplayer: if (onMenuAction != null) onMenuAction(OpenMultiplayer); else showMultiplayerMenu();
             case StartGame: if (onMenuAction != null) onMenuAction(StartGame);
             case StartSandbox: if (onMenuAction != null) onMenuAction(StartSandbox);
             case RestartRace: if (onMenuAction != null) onMenuAction(RestartRace);
@@ -317,6 +287,29 @@ class UIManager extends Object {
             else if (uiRight || uiDown) builder.mapSelectView.navigate(1);
             if (uiConfirm) builder.mapSelectView.confirmSelection();
             else if (uiCancel) showMainMenu();
+        } else if (currentState == MultiplayerMenu) {
+            var mpMenu = builder.multiplayerMenuView;
+            var navLeft = uiLeft || uiUp;
+            var navRight = uiRight || uiDown;
+            if (mpMenu.shouldCaptureWasdAsText()) {
+                var allowArrowOrPadLeft = hxd.Key.isDown(hxd.Key.LEFT) || hxd.Key.isDown(hxd.Key.UP) || !(hxd.Key.isDown(hxd.Key.A) || hxd.Key.isDown(hxd.Key.W));
+                var allowArrowOrPadRight = hxd.Key.isDown(hxd.Key.RIGHT) || hxd.Key.isDown(hxd.Key.DOWN) || !(hxd.Key.isDown(hxd.Key.D) || hxd.Key.isDown(hxd.Key.S));
+                navLeft = navLeft && allowArrowOrPadLeft;
+                navRight = navRight && allowArrowOrPadRight;
+            }
+            if (navLeft) mpMenu.navigate(-1);
+            else if (navRight) mpMenu.navigate(1);
+            if (uiConfirm) mpMenu.confirmSelection();
+            else if (uiCancel && !mpMenu.consumeBackspaceCancel()) showMainMenu();
+        } else if (currentState == MultiplayerLobby) {
+            builder.multiplayerLobbyView.updateTimer(dt);
+            if (uiLeft || uiUp) builder.multiplayerLobbyView.navigate(-1);
+            else if (uiRight || uiDown) builder.multiplayerLobbyView.navigate(1);
+            if (uiConfirm) builder.multiplayerLobbyView.confirmFocused();
+            else if (uiCancel) {
+                if (builder.multiplayerLobbyView.onBack != null) builder.multiplayerLobbyView.onBack();
+                else showMainMenu();
+            }
         } else if (currentState == PauseMenu) {
             if (uiUp) builder.pauseMenuView.navigate(-1);
             else if (uiDown) builder.pauseMenuView.navigate(1);
@@ -341,7 +334,7 @@ class UIManager extends Object {
                 if (uiUp) opt.audioPanel.navigate(-1);
                 else if (uiDown) opt.audioPanel.navigate(1);
                 if (uiLeft) opt.audioPanel.adjustVolume(opt.audioPanel.selectedIndex, -0.1);
-                if (uiRight) opt.audioPanel.adjustVolume(opt.audioPanel.selectedIndex, 0.1);
+                if (uiRight || uiConfirm) opt.audioPanel.adjustVolume(opt.audioPanel.selectedIndex, 0.1);
             } else {
                 if (opt.controlsPanel.controlViewMode == "Custom") {
                     if (uiUp) opt.controlsPanel.navigate(-1);
@@ -352,6 +345,7 @@ class UIManager extends Object {
                 } else {
                     if (uiLeft) opt.controlsPanel.adjustSensitivity(-0.02);
                     if (uiRight) opt.controlsPanel.adjustSensitivity(0.02);
+                    if (uiConfirm) opt.controlsPanel.toggleCustomMode();
                 }
             }
 

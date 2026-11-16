@@ -6,6 +6,77 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.6.1] - 2026-11-15
+### Added
+- **Cross-Device LAN/WAN Hybrid Relay (`web/relay.ashx`, `server/socket-relay.js`, `src/net/SocketTransport.hx`)**:
+  - Added ASP.NET `MobSocketRelayHandler` (`/relay.ashx`) for IIS and HTTP JSON `POST /relay.ashx` support alongside WebSockets in `server/socket-relay.js`.
+  - Updated `WebSocketTransport` to target `/relay.ashx` and fail over cleanly within `1000ms` to HTTP polling (`60ms`) instead of falling directly into single-browser `BroadcastChannel`, enabling phone-to-desktop connections across the same network.
+- **Host or Join Menu, Direct Invite Code & Join Resilience (`src/ui/views/multiplayer/MultiplayerMenuView.hx`, `src/net/MultiplayerManager.hx`, `src/Main.hx`)**:
+  - Added **Host or Join** entry modal (`UIState.MultiplayerMenu`), `MultiplayerManager.extractRoomCode()`, capture-phase typing/pasting, and tap prompt input.
+  - Added `MultiplayerManager.update(dt)` automatic `MSG_JOIN_REQUEST` retries (`0.8s`), join timeout error recovery (`8.0s`), and background-tab snapshot broadcasting (`broadcastHostWorldSnapshot`).
+- **Touch-First 2-Column Offset & Scale Stepper Grid (`src/ui/views/options/ControlsOptionsPanel.hx`, `src/ui/ControlDiagrams.hx`, `src/ui/views/options/OptionsView.hx`)**:
+  - Added dedicated `- 10` / `+ 10` (`px`) and `- 5%` / `+ 5%` (`HUD Scale`) touch buttons across a 2-column × 6-row grid, live `TouchSettings` preview inside `ControlDiagrams.drawTouchLayout`, and immediate tab capsule redraw via `OptionsView.onTabChanged`.
+### Changed
+- **Versioning & Service Worker (`src/Version.hx`, `web/sw.js`, `tests/core/TestVersion.hx`)**:
+  - Bumped semantic version to **`v0.6.1 (Build 0014)`**, updated cache key to `mob-motors-on-boost-v0-6-1`, and excluded `relay.ashx` and `/ws` from service worker fetch caching.
+
+*For detailed release notes, see [`changelogs/2026-11-15-v0.6.1-cross-device-lan-relay-invite-codes-and-touch-steppers.md`](./changelogs/2026-11-15-v0.6.1-cross-device-lan-relay-invite-codes-and-touch-steppers.md).*
+
+## [0.6.0] - 2026-11-15
+### Added
+- **Peer-to-Peer Client/Server Lobby Multiplayer (`src/net/`, `src/entities/RemoteCarActor.hx`, `src/ui/views/multiplayer/MultiplayerMenuView.hx`, `MultiplayerLobbyView.hx`)**:
+  - Added stateless RFC 6455 WebSocket room relay server (`server/socket-relay.js`, `server/multiplayer-server.js`, `aitests/server.js`) that exclusively manages WebSocket connections and forwards packets without server-side game validation.
+  - Added Host-authoritative `MultiplayerManager` performing all match validation on the Host client: version check (`Version.NUMBER`), capacity limit (`MAX_PLAYERS = 8`), callsign sanitization, staggered grid spawns, anti-teleport clamping, speed bounds (`[-25, 95] m/s`), NaN rejection, and boundary enforcement.
+  - Added **Host or Join** entry screen (`UIState.MultiplayerMenu` / `MultiplayerMenuView`) allowing players to host a lobby or directly type/paste an Invite Code (`X5VC8D`) to join, alongside shareable `?room=<ROOM_ID>` invite link auto-join.
+  - Enabled Host map selection across both `Highway Circuit` and `Sandbox Proving Grounds`, synced live 3D remote `RemoteCarActor` liveries/wheels, soft vehicle collision separation, and HUD minimap peer markers.
+### Changed
+- **Versioning & Release Tracking (`src/Version.hx`, `web/sw.js`)**:
+  - Expanded Main Menu with `MULTIPLAYER LOBBY` and bumped semantic version to **`v0.6.0 (Build 0013)`**.
+
+*For detailed release notes, see [`changelogs/2026-11-15-v0.6.0-p2p-client-server-lobby-multiplayer.md`](./changelogs/2026-11-15-v0.6.0-p2p-client-server-lobby-multiplayer.md).*
+
+## [0.5.1] - 2026-11-14
+### Changed
+- **Calibrated Steering Polarity & Base Sensitivity (`src/input/InputController.hx`)**:
+  - Flipped digital, analog gamepad stick (`stickX`), and virtual touch (`touchSteer`) steering output signs to align with in-engine right-handed chassis yaw orientation across all input modes.
+  - Increased base steering authority multiplier by `1.20x` prior to sensitivity percentage scaling (`[0.2, 1.0]`).
+### Added
+- **Multi-Surface Tire Friction Materials & Higher Terrain Detail (`src/world/Track.hx`, `src/world/SandboxMap.hx`)**:
+  - Partitioned Circuit `Track.getGroundFriction` into racing asphalt (`1.00`), painted kerb/rumble strip (`0.88`), and loose gravel shoulder (`0.55`).
+  - Partitioned `SandboxMap.getGroundFriction` into dry asphalt skidpad (`1.00`), slick wet transition apron (`0.44`), concrete launch ramp (`1.05`), loose dirt moguls (`0.58`), and packed dirt mountain climb (`0.62`), and increased `SandboxMap` terrain mesh tessellation to `96x96`.
+- **Versioning & Release Tracking (`src/Version.hx`, `web/sw.js`)**:
+  - Bumped semantic version to **`v0.5.1 (Build 0012)`** and updated PWA cache key to `mob-motors-on-boost-v0-5-1`.
+### Fixed
+- **Circuit Guardrail Ground-Clipping (`src/world/Track.hx`)**:
+  - Extended the flat roadbed elevation shelf in `Track.getGroundElevation` to `HALF_WIDTH + 1.8m` (`11.8m`) so outer wheels riding flush against the Armco barrier no longer raycast off the `-2.5m` exterior drop-off.
+  - Updated `Track.getGroundNormal` to compute longitudinal pitch along centerline tangents rather than lateral wheel positions, and added vertical road-floor clamping in `Track.enforceBoundaries` (`maxHalf = halfWidth - 0.75m`).
+
+*For detailed release notes, see [`changelogs/2026-11-14-v0.5.1-steering-inversion-terrain-materials-and-rail-clipping-fix.md`](./changelogs/2026-11-14-v0.5.1-steering-inversion-terrain-materials-and-rail-clipping-fix.md).*
+
+## [0.5.0] - 2026-11-14
+### Added
+- **Clean-Room 240 Hz 4-Wheel Raycast Vehicle Physics (`src/physics/CarConfig.hx`, `SuspensionSolver.hx`, `DrivetrainSolver.hx`, `TireSlipSolver.hx`, `CarPhysics.hx`)**:
+  - Deleted legacy simcade physics and built a modular pure-simulation 4-wheel raycast solver with asymmetric bump/rebound dampers (`3,950` / `5,450 N·s/m`), progressive bump-stops, and front/rear Anti-Roll Bars (`14,500 N/m`).
+  - Implemented 6-speed automatic + reverse `DrivetrainSolver` with bell-shaped torque curve (`560 N·m`), viscous wheelspin tracking, `62% / 38%` brake bias, handbrake rear lock, and terrain-tangent nitrous boost thrust (`7,800 N`).
+  - Added `TireSlipSolver` with longitudinal weight transfer, speed-blended Ackermann geometry, first-order relaxation-filtered Pacejka Magic Formula lateral grip, combined Friction Circle clamping, and low-speed 2D slope stiction hold.
+- **Velocity-Aligned Spring-Damper Chase Camera (`src/camera/ChaseCamera.hx`)**:
+  - Rewrote chase camera using `SmoothDamp` spring-damper tracking aligned to velocity at speed, subtle cornering roll banking, dynamic speed/boost FOV, quadratic trauma shake, and terrain ground-clearance raycasting.
+- **Physics Skill & Unit Suites (`tests/physics/`, `tests/camera/`, `.agents/skills/vehicle-physics-and-camera/SKILL.md`)**:
+  - Rewrote architecture skill documentation and added `TestCarConfig`, `TestCarPhysics`, and `TestChaseCamera`.
+
+*For detailed release notes, see [`changelogs/2026-11-14-v0.5.0-clean-room-raycast-vehicle-physics-and-chase-camera.md`](./changelogs/2026-11-14-v0.5.0-clean-room-raycast-vehicle-physics-and-chase-camera.md).*
+
+## [0.4.4] - 2026-11-03
+### Added
+- **Modular Architecture & Configuration Schemas (`src/config/`, `src/core/`, `src/world/WorldManager.hx`)**:
+  - Extracted typed configs (`GameConfig.hx`, `WorldConfig.hx`), `WorldManager.hx`, and comprehensive `@jsdoc`-style documentation (`docs/DOCS.md`, `docs/API_REFERENCE.md`).
+- **Zero-Flash Boot Sequence & Background Preloader (`src/core/AssetPreloader.hx`, `src/core/IntroController.hx`)**:
+  - Gated Splash/3D initialization cleanly behind `Studio -> Engine -> Disclaimer` while loading assets asynchronously in memory with zero progress bar.
+- **Map Select, Pause Restart, Save/Resume & Portrait Gate (`src/ui/views/mapselect/MapSelectView.hx`, `web/index.html`)**:
+  - Added Map Select screen, in-map Pause Restart, active run persistence (`RESUME SAVED RACE`), mobile/tablet portrait blocking overlay (`#rotate-device-overlay`), and 3-input-profile (`keyboard`, `gamepad`, `touch`) 5-scenario Playwright E2E suite.
+
+*For detailed release notes, see [`changelogs/2026-11-03-v0.4.4-modular-architecture-preloader-and-orientation-gate.md`](./changelogs/2026-11-03-v0.4.4-modular-architecture-preloader-and-orientation-gate.md).*
+
 ## [0.4.1] - 2026-10-22
 ### Added
 - **OimoPhysics 3D Rigid Body Collision Backbone (`src/physics/CarPhysics.hx`)**:

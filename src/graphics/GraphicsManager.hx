@@ -6,37 +6,83 @@ import h3d.scene.fwd.DirLight;
 import save.SaveSystem.GraphicsSettings;
 
 /**
- * Graphics pipeline controller and hardware configuration manager.
- * Applies render scaling, shadow mapping profiles, and directional sunlight color
- * temperatures dynamically based on user graphics quality preferences.
+ * Virtual 2D UI scale resolution descriptor.
+ *
+ * @typedef {Object} UIResolutionPreset
+ * @property {Bool} isNative True for 1:1 native pixel Resize scaling.
+ * @property {Int} width Virtual baseline width when `isNative` is false.
+ * @property {Int} height Virtual baseline height when `isNative` is false.
+ */
+typedef UIResolutionPreset = {
+    var isNative:Bool;
+    var width:Int;
+    var height:Int;
+}
+
+/**
+ * Scene illumination preset pairing solar tint with softened ambient sky fill.
+ *
+ * @typedef {Object} LightingPreset
+ * @property {Int} sunColor Primary directional solar color hex.
+ * @property {Int} ambientColor Global ambient scene fill color hex.
+ */
+typedef LightingPreset = {
+    var sunColor:Int;
+    var ambientColor:Int;
+}
+
+/**
+ * Graphics pipeline controller and hardware quality manager.
+ * Applies render scaling, virtual UI scale modes, shadows, lighting temperatures,
+ * and MSAA hardware sampling declaratively.
+ *
+ * @class GraphicsManager
+ * @module graphics/GraphicsManager
  */
 class GraphicsManager {
-    /** Global singleton instance for access across settings and engine loops. */
+    /** Global singleton instance for settings panels and resize listeners. */
     public static var inst:GraphicsManager;
 
-    /** Currently active user graphics configuration settings profile. */
+    /** Declarative lookup table mapping UI resolution labels to Heaps ScaleMode settings. */
+    private static var UI_RES_PRESETS:Map<String, UIResolutionPreset> = [
+        "720p (HD)" => { isNative: false, width: 1280, height: 720 },
+        "1080p (FHD)" => { isNative: false, width: 1920, height: 1080 },
+        "1440p (2K)" => { isNative: false, width: 2560, height: 1440 },
+        "2160p (4K)" => { isNative: false, width: 3840, height: 2160 },
+        "Native / Match Window" => { isNative: true, width: 0, height: 0 }
+    ];
+
+    /** Declarative lookup table mapping lighting quality labels to solar & ambient hex colors. */
+    private static var LIGHTING_PRESETS:Map<String, LightingPreset> = [
+        "Low" => { sunColor: 0xEADBB8, ambientColor: 0x708294 },
+        "Medium" => { sunColor: 0xFFECC8, ambientColor: 0x869BB0 },
+        "High" => { sunColor: 0xFFF2D6, ambientColor: 0x9EB4C8 },
+        "Ultra (RTX/Path)" => { sunColor: 0xFFF9EE, ambientColor: 0xB2C8DC }
+    ];
+
+    /** Active user graphics quality configuration record. */
     public var settings:GraphicsSettings;
 
-    /** Reference to the Heaps 3D scene instance. */
+    /** Target 3D scene instance. */
     var s3d:Scene;
 
-    /** Reference to the Heaps 2D scene instance for UI scaling. */
+    /** Target 2D UI scene instance. */
     var s2d:h2d.Scene;
 
-    /** Reference to the primary directional sunlight in the scene. */
+    /** Primary solar directional light source. */
     var light:DirLight;
 
-    /** Reference to the post-processing 3D renderer. */
+    /** Post-processing offscreen forward renderer. */
     var postRenderer:PostProcessRenderer;
 
     /**
-     * Initializes the graphics manager singleton and immediately applies active settings.
+     * Initializes the GraphicsManager singleton and commits initial hardware preferences.
      *
-     * @param s3d Target 3D scene instance.
-     * @param s2d Target 2D UI scene instance.
-     * @param light Primary directional sunlight instance.
-     * @param initialSettings Initial graphics profile loaded from storage or defaults.
-     * @param post Optional post-processing renderer instance.
+     * @param {Scene} s3d Active 3D scene graph.
+     * @param {h2d.Scene} s2d Active 2D UI scene graph.
+     * @param {DirLight} light Primary solar directional light.
+     * @param {GraphicsSettings} initialSettings Loaded or default graphics configuration.
+     * @param {Null<PostProcessRenderer>} [post] Optional post-process renderer override.
      */
     public function new(s3d:Scene, s2d:h2d.Scene, light:DirLight, initialSettings:GraphicsSettings, ?post:PostProcessRenderer) {
         inst = this;
@@ -49,9 +95,11 @@ class GraphicsManager {
     }
 
     /**
-     * Re-applies all graphics sub-pipelines (render scale, UI resolution, shadows, and lighting).
+     * Commits all graphics sub-pipelines simultaneously.
+     *
+     * @returns {Void}
      */
-    public function applyAll() {
+    public function applyAll():Void {
         applyRenderScale();
         applyUIResolution();
         applyShadows();
@@ -60,10 +108,11 @@ class GraphicsManager {
     }
 
     /**
-     * Re-scales the 3D scene offscreen rendering target to the desired resolution multiplier
-     * independently from the 2D UI without degrading font or 2D HUD crispness.
+     * Updates 3D offscreen render buffer resolution scaling independently of native UI clarity.
+     *
+     * @returns {Void}
      */
-    public function applyRenderScale() {
+    public function applyRenderScale():Void {
         if (postRenderer != null) {
             postRenderer.renderScale = settings.renderScale;
         }
@@ -71,79 +120,61 @@ class GraphicsManager {
         var engine = Engine.getCurrent();
         var win = hxd.Window.getInstance();
         if (engine != null && win != null) {
-            // Guarantee backbuffer matches native window resolution so 2D UI stays crisp
             engine.resize(win.width, win.height);
         }
         #end
     }
 
     /**
-     * Scales the 2D UI independently to the user's selected UI Resolution target.
-     * Configures the 2D Scene scaleMode to AutoZoom to the chosen virtual baseline resolution,
-     * or Resize (1:1 native pixel mapping).
+     * Applies UI resolution preset to the 2D Scene `scaleMode`.
+     *
+     * @returns {Void}
      */
-    public function applyUIResolution() {
+    public function applyUIResolution():Void {
         if (s2d == null) return;
-        switch (settings.uiResolution) {
-            case "720p (HD)":
-                s2d.scaleMode = AutoZoom(1280, 720, false);
-            case "1080p (FHD)":
-                s2d.scaleMode = AutoZoom(1920, 1080, false);
-            case "1440p (2K)":
-                s2d.scaleMode = AutoZoom(2560, 1440, false);
-            case "2160p (4K)":
-                s2d.scaleMode = AutoZoom(3840, 2160, false);
-            case "Native / Match Window":
-                s2d.scaleMode = Resize;
-            default:
-                s2d.scaleMode = AutoZoom(1280, 720, false);
+        var preset = UI_RES_PRESETS.get(settings.uiResolution);
+        if (preset == null) preset = UI_RES_PRESETS.get("720p (HD)");
+        s2d.scaleMode = preset.isNative ? Resize : AutoZoom(preset.width, preset.height, false);
+        @:privateAccess {
+            s2d.offsetX = 0;
+            s2d.offsetY = 0;
         }
         s2d.checkResize();
     }
 
     /**
-     * Configures shadow map rendering passes and specular highlights on the directional light.
+     * Enables or disables specular highlights and shadow map behavior based on shadow tier.
+     *
+     * @returns {Void}
      */
-    public function applyShadows() {
+    public function applyShadows():Void {
         if (light == null) return;
-        if (settings.shadowLevel == "Off") {
-            light.enableSpecular = false;
-        } else {
-            light.enableSpecular = true;
-        }
+        light.enableSpecular = (settings.shadowLevel != "Off");
     }
 
     /**
-     * Adjusts primary directional sunlight color temperature and ambient illumination intensity.
-     * In v1.0.0, ambient lighting across all quality tiers is boosted to create soft, realistic
-     * shadows and eliminate harsh pitch-black contrast across tracks and terrain hills.
+     * Applies solar beam temperature and ambient fill intensity from lighting tier presets.
+     *
+     * @returns {Void}
      */
-    public function applyLighting() {
+    public function applyLighting():Void {
         if (light == null) return;
         var fwd = (s3d != null && s3d.lightSystem != null) ? Std.downcast(s3d.lightSystem, h3d.scene.fwd.LightSystem) : null;
-        switch (settings.lightingLevel) {
-            case "Low":
-                light.color.setColor(0xEADBB8);
-                if (fwd != null) fwd.ambientLight.setColor(0x708294);
-            case "Medium":
-                light.color.setColor(0xFFECC8);
-                if (fwd != null) fwd.ambientLight.setColor(0x869BB0);
-            case "High":
-                light.color.setColor(0xFFF2D6);
-                if (fwd != null) fwd.ambientLight.setColor(0x9EB4C8);
-            case "Ultra (RTX/Path)":
-                light.color.setColor(0xFFF9EE);
-                if (fwd != null) fwd.ambientLight.setColor(0xB2C8DC);
-            default:
-                light.color.setColor(0xFFECC8);
-                if (fwd != null) fwd.ambientLight.setColor(0x869BB0);
+        var preset = LIGHTING_PRESETS.get(settings.lightingLevel);
+        if (preset == null) preset = LIGHTING_PRESETS.get("Medium");
+
+        light.color.setColor(preset.sunColor);
+        if (fwd != null) {
+            fwd.ambientLight.setColor(preset.ambientColor);
         }
     }
 
     /**
-     * Configures hardware multi-sampling antialiasing.
+     * Configures MSAA multi-sampling anti-aliasing buffer samples.
+     *
+     * @returns {Void}
      */
-    public function applyTexturesAndFiltering() {
+    public function applyTexturesAndFiltering():Void {
         Engine.ANTIALIASING = (settings.aaType != "None") ? settings.aaLevel : 0;
     }
 }

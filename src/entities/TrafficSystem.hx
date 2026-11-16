@@ -1,5 +1,6 @@
 package entities;
 
+import config.WorldConfig;
 import h3d.scene.Object;
 import h3d.Vector;
 import physics.CarPhysics;
@@ -90,6 +91,10 @@ class TrafficCar {
  * Multi-agent traffic simulation, autonomous spacing AI, and collision resolution system.
  * Simulates highway traffic streams flowing in both directions, enforces two-car follow buffers,
  * handles player-to-traffic vehicular impacts with impulse exchange, and bounds vehicles to track rails.
+ *
+ * @class TrafficSystem
+ * @extends h3d.scene.Object
+ * @module entities/TrafficSystem
  */
 class TrafficSystem extends Object {
     /** Collection of active traffic vehicle agents in the world. */
@@ -98,52 +103,57 @@ class TrafficSystem extends Object {
     /** Reference to circuit centerline waypoint spline coordinates. */
     var trackWaypoints:Array<Vector>;
 
+    /** Active traffic simulation configuration parameters. */
+    public var config:config.WorldConfig.TrafficConfig;
+
     /** Reusable scratch direction vector to eliminate per-frame allocations during track clamping. */
     var scratchFromCenter:Vector = new Vector();
+    var scratchFwd:Vector = new Vector();
+    var scratchRight:Vector = new Vector();
 
-    /** Half-width threshold of the roadway before collision contact with outer Armco rails. */
+    /** Half-width threshold of the roadway before collision contact with outer Armco rails. @default 9.7 */
     public static inline var ACTIVE_HALF_WIDTH:Float = 9.7;
 
-    /** Maximum speed clamp in m/s to prevent out-of-bounds clipping. */
+    /** Maximum speed clamp in m/s to prevent out-of-bounds clipping. @default 95.0 */
     static inline var MAX_SPEED_CAP:Float = 95.0;
 
-    /** Bounding cylinder collision radius of player race vehicle in meters. */
+    /** Bounding cylinder collision radius of player race vehicle in meters. @default 1.6 */
     static inline var PLAYER_RADIUS:Float = 1.6;
 
-    /** Bounding cylinder collision radius of civilian traffic vehicle in meters. */
+    /** Bounding cylinder collision radius of civilian traffic vehicle in meters. @default 1.5 */
     static inline var TRAFFIC_RADIUS:Float = 1.5;
 
-    /** Combined radial distance threshold triggering player-traffic collision. */
+    /** Combined radial distance threshold triggering player-traffic collision. @default 3.1 */
     static inline var HIT_THRESHOLD:Float = PLAYER_RADIUS + TRAFFIC_RADIUS;
 
-    /** Radial distance threshold triggering mutual traffic-to-traffic collision. */
+    /** Radial distance threshold triggering mutual traffic-to-traffic collision. @default 3.0 */
     static inline var TRAFFIC_HIT_THRESHOLD:Float = TRAFFIC_RADIUS * 2.0;
 
-    /** Forward distance in meters where trailing vehicles detect lead cars and brake. */
+    /** Forward distance in meters where trailing vehicles detect lead cars and brake. @default 10.0 */
     static inline var TRAFFIC_FOLLOW_BUFFER:Float = 10.0;
-
-    /** Friction velocity conservation multiplier applied when player scrapes guardrails. */
-    static inline var WALL_STICKINESS:Float = 0.94;
 
     /**
      * Initializes the traffic system and populates the highway circuit with civilian vehicles.
      *
-     * @param trackWaypoints Array of circuit spline waypoints.
-     * @param parent Optional parent 3D scene graph node.
+     * @param {Array<Vector>} trackWaypoints Array of circuit spline waypoints.
+     * @param {Null<Object>} [parent] Optional parent 3D scene graph node.
+     * @param {Null<config.WorldConfig.TrafficConfig>} [config] Optional traffic configuration overrides.
      */
-    public function new(trackWaypoints:Array<Vector>, ?parent:Object) {
+    public function new(trackWaypoints:Array<Vector>, ?parent:Object, ?config:config.WorldConfig.TrafficConfig) {
         super(parent);
         this.trackWaypoints = trackWaypoints;
+        this.config = config != null ? config : WorldConfig.getDefaultTraffic();
         spawnTrafficFleet();
     }
 
     /**
      * Populates the circuit with alternating same-direction and oncoming traffic vehicles.
-     * Positions cars along left (-4.8m) and right (+4.8m) highway lane corridors.
+     *
+     * @returns {Void}
      */
-    function spawnTrafficFleet() {
-        var carColors = [0x2A52BE, 0x8B7355, 0x2E6F40, 0x8B2500, 0xD0D7DE];
-        var spacing = 24; // Waypoint stride between successive traffic vehicles
+    function spawnTrafficFleet():Void {
+        var carColors = config.paintPalette;
+        var spacing = 24;
         var total = Math.floor(trackWaypoints.length / spacing);
 
         for (i in 0...total) {
@@ -153,37 +163,81 @@ class TrafficSystem extends Object {
 
             var visual = new TrafficCarMesh(carColors[i % carColors.length], this);
             var tc = new TrafficCar(visual, wpIdx, oncoming, baseSpeed);
-
-            var wp = trackWaypoints[wpIdx];
-            var nextWp = trackWaypoints[(wpIdx + 1) % trackWaypoints.length];
-            var fwd = nextWp.sub(wp);
-            fwd.z = 0;
-            fwd.normalize();
-            var right = new Vector(-fwd.y, fwd.x, 0);
-
-            // Left-hand traffic offset rule: Same-direction = left (-4.8m), Oncoming = right (+4.8m)
-            var offset = oncoming ? 4.8 : -4.8;
-            tc.laneOffset = offset;
-            tc.currentLaneOffset = offset;
-            tc.pos.set(wp.x + right.x * offset, wp.y + right.y * offset, wp.z);
-            tc.yaw = Math.atan2(fwd.y, fwd.x) + (oncoming ? Math.PI : 0.0);
-
+            placeTrafficAgentAtWaypoint(tc, wpIdx, oncoming);
             trafficList.push(tc);
         }
     }
 
     /**
-     * Updates traffic AI heading tracking, autonomous headway spacing, inter-traffic separation,
-     * solid player collisions with impulse transfer, and track boundary constraint clamping.
+     * Resets all traffic vehicles back to their starting grid spline intervals and nominal cruise speeds.
      *
-     * @param dt Delta time elapsed since last frame in seconds.
-     * @param playerPhysics Active player vehicle physics instance.
-     * @param chaseCam Active chase camera instance for trauma shake injection.
+     * @returns {Void}
      */
-    public function update(dt:Float, playerPhysics:CarPhysics, chaseCam:ChaseCamera) {
-        var numWaypoints = trackWaypoints.length;
+    public function resetPositions():Void {
+        var spacing = 24;
+        for (i in 0...trafficList.length) {
+            var tc = trafficList[i];
+            var wpIdx = (i * spacing + 10) % trackWaypoints.length;
+            var oncoming = (i % 2 == 1);
+            tc.waypointIdx = wpIdx;
+            tc.isOncoming = oncoming;
+            tc.currentSpeed = tc.cruiseSpeed;
+            placeTrafficAgentAtWaypoint(tc, wpIdx, oncoming);
+        }
+    }
 
-        // 1. Autonomous Traffic Spacing AI & Follow-Distance Deceleration
+    /**
+     * Positions a traffic vehicle onto its assigned highway lane at a waypoint index.
+     *
+     * @param {TrafficCar} tc Target traffic agent.
+     * @param {Int} wpIdx Spline waypoint index.
+     * @param {Bool} oncoming True when running reverse against player direction.
+     * @returns {Void}
+     */
+    private function placeTrafficAgentAtWaypoint(tc:TrafficCar, wpIdx:Int, oncoming:Bool):Void {
+        var wp = trackWaypoints[wpIdx];
+        var nextWp = trackWaypoints[(wpIdx + 1) % trackWaypoints.length];
+        scratchFwd.set(nextWp.x - wp.x, nextWp.y - wp.y, 0);
+        scratchFwd.normalize();
+        scratchRight.set(-scratchFwd.y, scratchFwd.x, 0);
+
+        var offset = oncoming ? 4.8 : -4.8;
+        tc.laneOffset = offset;
+        tc.currentLaneOffset = offset;
+        tc.pos.set(wp.x + scratchRight.x * offset, wp.y + scratchRight.y * offset, wp.z + world.Track.ROAD_LIFT);
+        tc.yaw = Math.atan2(scratchFwd.y, scratchFwd.x) + (oncoming ? Math.PI : 0.0);
+        if (tc.carMesh != null) {
+            tc.carMesh.x = tc.pos.x;
+            tc.carMesh.y = tc.pos.y;
+            tc.carMesh.z = tc.pos.z;
+            tc.carMesh.setRotation(0, 0, tc.yaw - 1.5707963);
+        }
+    }
+
+    /**
+     * Updates traffic AI speed modulation, lane obstacle avoidance, traffic-traffic separation,
+     * and player collision impulse resolution.
+     *
+     * @param {Float} dt Delta time elapsed since last frame in seconds.
+     * @param {CarPhysics} playerPhysics Active player vehicle physics instance.
+     * @param {ChaseCamera} chaseCam Active chase camera instance for trauma shake injection.
+     * @returns {Void}
+     */
+    public function update(dt:Float, playerPhysics:CarPhysics, chaseCam:ChaseCamera):Void {
+        updateSpeedControl(dt);
+        updateSteeringAndAvoidance(dt, playerPhysics);
+        resolveTrafficMutualCollisions();
+        resolvePlayerCollisions(playerPhysics, chaseCam);
+    }
+
+    /**
+     * Evaluates two-car headway braking within each traffic flow stream.
+     *
+     * @param {Float} dt Step duration in seconds.
+     * @returns {Void}
+     */
+    private function updateSpeedControl(dt:Float):Void {
+        var followBuf = TRAFFIC_FOLLOW_BUFFER * config.defaultSpacingMultiplier;
         for (i in 0...trafficList.length) {
             var tc = trafficList[i];
             var targetSpeed = tc.cruiseSpeed;
@@ -193,77 +247,74 @@ class TrafficSystem extends Object {
             for (j in 0...trafficList.length) {
                 if (i == j) continue;
                 var other = trafficList[j];
-                // Only consider traffic travelling in the exact same flow direction
                 if (other.isOncoming != tc.isOncoming) continue;
 
                 var dx = other.pos.x - tc.pos.x;
                 var dy = other.pos.y - tc.pos.y;
                 var dist = Math.sqrt(dx * dx + dy * dy);
-
-                // Detect lead car directly ahead within buffer distance
-                if (dist < TRAFFIC_FOLLOW_BUFFER && dist > 0.001) {
+                if (dist < followBuf && dist > 0.001) {
                     var dot = (dx * fwdX + dy * fwdY) / dist;
                     if (dot > 0.7) {
-                        var headway = dist / TRAFFIC_FOLLOW_BUFFER;
+                        var headway = dist / followBuf;
                         targetSpeed = Math.min(targetSpeed, other.currentSpeed * (headway * 0.8));
                     }
                 }
             }
 
-            // Smoothly adapt current vehicle speed towards target speed
             tc.currentSpeed += (targetSpeed - tc.currentSpeed) * 5.0 * dt;
             if (tc.currentSpeed < 0) tc.currentSpeed = 0;
         }
+    }
 
-        // 2. Traffic Movement along Assigned Lanes with Obstacle & Player Avoidance
+    /**
+     * Steers traffic cars along waypoints while dynamically swerving around player and peer traffic.
+     *
+     * @param {Float} dt Step duration in seconds.
+     * @param {CarPhysics} playerPhysics Active player physics state.
+     * @returns {Void}
+     */
+    private function updateSteeringAndAvoidance(dt:Float, playerPhysics:CarPhysics):Void {
+        var numWaypoints = trackWaypoints.length;
+        var maxOffset = config.activeHalfWidth - 2.0;
+
         for (tc in trafficList) {
             var targetIdx = tc.isOncoming ? (tc.waypointIdx - 1 + numWaypoints) % numWaypoints : (tc.waypointIdx + 1) % numWaypoints;
             var targetWp = trackWaypoints[targetIdx];
             var nextWp = tc.isOncoming ? trackWaypoints[(targetIdx - 1 + numWaypoints) % numWaypoints] : trackWaypoints[(targetIdx + 1) % numWaypoints];
-            var fwd = nextWp.sub(targetWp);
-            fwd.z = 0;
-            fwd.normalize();
-            var right = new Vector(-fwd.y, fwd.x, 0);
+
+            scratchFwd.set(nextWp.x - targetWp.x, nextWp.y - targetWp.y, 0);
+            scratchFwd.normalize();
+            scratchRight.set(-scratchFwd.y, scratchFwd.x, 0);
 
             var desiredOffset = tc.laneOffset;
+            var fwdX = Math.cos(tc.yaw);
+            var fwdY = Math.sin(tc.yaw);
 
-            // Avoid player vehicle (detect oncoming or trailing player within sensor cone)
+            // Avoid oncoming or lagging player ahead within sensor cone
             var dxP = playerPhysics.pos.x - tc.pos.x;
             var dyP = playerPhysics.pos.y - tc.pos.y;
             var distP = Math.sqrt(dxP * dxP + dyP * dyP);
             if (distP < 32.0 && distP > 0.001) {
-                var fwdX = Math.cos(tc.yaw);
-                var fwdY = Math.sin(tc.yaw);
                 var dotP = (dxP * fwdX + dyP * fwdY) / distP;
-                if (dotP > 0.25) { // Player is ahead of traffic car
-                    var rX = -fwdY;
-                    var rY = fwdX;
-                    var sideDot = (dxP * rX + dyP * rY);
-                    // Veers away from player toward opposite shoulder
-                    if (sideDot > 0.0) {
-                        desiredOffset -= 2.5;
-                    } else {
-                        desiredOffset += 2.5;
-                    }
+                if (dotP > 0.25) {
+                    var sideDot = (dxP * (-fwdY) + dyP * fwdX);
+                    desiredOffset += (sideDot > 0.0 ? -2.5 : 2.5);
                     if (distP < 18.0) {
                         tc.currentSpeed = Math.max(4.0, tc.currentSpeed - 14.0 * dt);
                     }
                 }
             }
 
-            // Avoid other traffic vehicles
+            // Avoid peer civilian traffic
             for (other in trafficList) {
                 if (other == tc) continue;
                 var dxO = other.pos.x - tc.pos.x;
                 var dyO = other.pos.y - tc.pos.y;
                 var distO = Math.sqrt(dxO * dxO + dyO * dyO);
                 if (distO < 16.0 && distO > 0.001) {
-                    var fwdX = Math.cos(tc.yaw);
-                    var fwdY = Math.sin(tc.yaw);
                     var dotO = (dxO * fwdX + dyO * fwdY) / distO;
                     if (dotO > 0.5) {
                         if (other.isOncoming != tc.isOncoming) {
-                            // Oncoming conflict: steer toward respective outer shoulder
                             desiredOffset += (tc.isOncoming ? 2.0 : -2.0);
                         } else {
                             tc.currentSpeed = Math.min(tc.currentSpeed, other.currentSpeed * 0.85);
@@ -272,21 +323,18 @@ class TrafficSystem extends Object {
                 }
             }
 
-            var maxOffset = ACTIVE_HALF_WIDTH - 2.0;
             desiredOffset = Math.max(-maxOffset, Math.min(maxOffset, desiredOffset));
             tc.currentLaneOffset += (desiredOffset - tc.currentLaneOffset) * Math.min(1.0, 4.0 * dt);
 
-            var targetX = targetWp.x + right.x * tc.currentLaneOffset;
-            var targetY = targetWp.y + right.y * tc.currentLaneOffset;
+            var targetX = targetWp.x + scratchRight.x * tc.currentLaneOffset;
+            var targetY = targetWp.y + scratchRight.y * tc.currentLaneOffset;
             var targetZ = targetWp.z + world.Track.ROAD_LIFT;
 
             var toTargetX = targetX - tc.pos.x;
             var toTargetY = targetY - tc.pos.y;
             var distToTarget = Math.sqrt(toTargetX * toTargetX + toTargetY * toTargetY);
 
-            // Advance target waypoint index upon proximity arrival
             if (distToTarget < 9.0) tc.waypointIdx = targetIdx;
-
             if (distToTarget > 0.001) {
                 toTargetX /= distToTarget;
                 toTargetY /= distToTarget;
@@ -303,21 +351,27 @@ class TrafficSystem extends Object {
             tc.pos.y += Math.sin(tc.yaw) * moveDist;
             tc.pos.z = targetZ;
 
-            clampToTrack(tc.pos, ACTIVE_HALF_WIDTH - 0.5);
+            clampToTrack(tc.pos, config.activeHalfWidth - 0.5);
 
-            // Synchronize visual 3D mesh transform (TrafficCarMesh faces +Y at rotZ = 0, and Heaps +Z rotation is CCW)
-            tc.carMesh.x = tc.pos.x;
-            tc.carMesh.y = tc.pos.y;
-            tc.carMesh.z = tc.pos.z;
-            tc.carMesh.setRotation(0, 0, tc.yaw - 1.5707963);
+            if (tc.carMesh != null) {
+                tc.carMesh.x = tc.pos.x;
+                tc.carMesh.y = tc.pos.y;
+                tc.carMesh.z = tc.pos.z;
+                tc.carMesh.setRotation(0, 0, tc.yaw - 1.5707963);
+            }
         }
+    }
 
-        // 3. Traffic-to-Traffic Mutual Separation Hard Body Collisions
+    /**
+     * Separates overlapping civilian traffic cars and dampens relative speed.
+     *
+     * @returns {Void}
+     */
+    private function resolveTrafficMutualCollisions():Void {
         for (i in 0...trafficList.length) {
             var carA = trafficList[i];
             for (j in (i + 1)...trafficList.length) {
                 var carB = trafficList[j];
-
                 var dx = carB.pos.x - carA.pos.x;
                 var dy = carB.pos.y - carA.pos.y;
                 var distSq = dx * dx + dy * dy;
@@ -328,7 +382,6 @@ class TrafficSystem extends Object {
                     var nx = dx / dist;
                     var ny = dy / dist;
 
-                    // Push overlapping vehicles symmetrically apart
                     carA.pos.x -= nx * overlap * 0.5;
                     carA.pos.y -= ny * overlap * 0.5;
                     carB.pos.x += nx * overlap * 0.5;
@@ -340,8 +393,16 @@ class TrafficSystem extends Object {
                 }
             }
         }
+    }
 
-        // 4. Solid Player-to-Traffic Vehicular Impacts
+    /**
+     * Resolves player-to-traffic solid body overlaps and transfers impulse and camera shake.
+     *
+     * @param {CarPhysics} playerPhysics Active player vehicle dynamics.
+     * @param {ChaseCamera} chaseCam Target camera receiving trauma feedback.
+     * @returns {Void}
+     */
+    private function resolvePlayerCollisions(playerPhysics:CarPhysics, chaseCam:ChaseCamera):Void {
         var playerSyncNeeded = false;
         for (tc in trafficList) {
             var dx = tc.pos.x - playerPhysics.pos.x;
@@ -354,22 +415,14 @@ class TrafficSystem extends Object {
                 var ny = dy / dist;
                 var overlap = HIT_THRESHOLD - dist;
 
-                // Push player and traffic apart according to relative mass distribution
                 playerPhysics.pos.x -= nx * overlap * 0.6;
                 playerPhysics.pos.y -= ny * overlap * 0.6;
                 tc.pos.x += nx * overlap * 0.4;
                 tc.pos.y += ny * overlap * 0.4;
 
-                var pFwdX = Math.sin(playerPhysics.yaw);
-                var pFwdY = Math.cos(playerPhysics.yaw);
-                var dotApproach = pFwdX * nx + pFwdY * ny;
-
-                // Unified impulse collision response: Front and rear traffic impacts both use the
-                // responsive bump and momentum transfer logic (0.75x player speed retention,
-                // dynamic velocity transfer to traffic vehicle, and controlled 0.35 camera trauma).
-                playerPhysics.forwardSpeed *= 0.75;
+                playerPhysics.forwardSpeed *= config.collisionSpeedRetention;
                 tc.currentSpeed = Math.max(tc.currentSpeed, Math.abs(playerPhysics.forwardSpeed) * 0.9);
-                chaseCam.addTrauma(0.35);
+                chaseCam.addTrauma(config.collisionTrauma);
                 playerSyncNeeded = true;
             }
         }

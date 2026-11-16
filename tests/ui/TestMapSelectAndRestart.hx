@@ -35,9 +35,11 @@ class TestMapSelectAndRestart extends Test {
     public function testMainMenuFirstItemIsPlaySingleplayer() {
         ui.showMainMenu();
         Assert.equals(UIState.MainMenu, ui.currentState);
-        Assert.equals(5, ui.builder.mainMenuView.rows.length);
+        Assert.equals(6, ui.builder.mainMenuView.rows.length);
         Assert.equals("PLAY SINGLEPLAYER", ui.builder.mainMenuView.rows[0].labelTxt.text);
+        Assert.equals("MULTIPLAYER LOBBY", ui.builder.mainMenuView.rows[2].labelTxt.text);
         Assert.equals(MenuAction.OpenMapSelect, MainMenuView.ACTIONS[0]);
+        Assert.equals(MenuAction.OpenMultiplayer, MainMenuView.ACTIONS[2]);
     }
 
     public function testPlaySingleplayerOpensMapSelect() {

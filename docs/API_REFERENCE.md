@@ -1,6 +1,6 @@
 # M.O.B. // MOTORS ON BOOST — API & Function Reference Manual
 
-**Application Release:** `v0.4.4` (Build `0010`)  
+**Application Release:** `v0.6.1` (Build `0014`)  
 **Language Target:** Haxe 4.3.7 / Heaps.io 2.1.0 (WebGL 2.0 / JavaScript PWA)  
 **Author:** Gerard "Jamie" (Jagofr) Francis  
 **Publisher:** RvL // ROGUE  
@@ -135,13 +135,13 @@
 **Description:** Centralized single source of truth for semantic versioning, build compilation counters, release channel designations, and build timestamps.
 
 #### Static Properties:
-- `NUMBER:String = "0.3.0"` — Semantic version string (`Major.Minor.Patch`).
-- `BUILD:Int = 5` — Monotonically increasing compilation counter tallied from 0 for the milestone.
-- `BUILD_STRING:String = "0005"` — Build counter formatted in zero-padded 4-digit (`0000`) format.
+- `NUMBER:String = "0.6.1"` — Semantic version string (`Major.Minor.Patch`).
+- `BUILD:Int = 14` — Monotonically increasing compilation counter tallied from 0 for the milestone.
+- `BUILD_STRING:String = "0014"` — Build counter formatted in zero-padded 4-digit (`0000`) format.
 - `CHANNEL:String = "Alpha"` — Release maturity designation.
-- `DISPLAY:String = "v0.3.0 (Build 0005)"` — Full formatted display badge for title screens and disclaimers.
-- `SHORT:String = "v0.3.0"` — Abbreviated version string.
-- `BUILD_DATE:String = "2026-10-11"` — Release compilation date.
+- `DISPLAY:String = "v0.6.1 (Build 0014)"` — Full formatted display badge for title screens and disclaimers.
+- `SHORT:String = "v0.6.1"` — Abbreviated version string.
+- `BUILD_DATE:String = "2026-11-15"` — Release compilation date.
 
 ---
 
@@ -149,65 +149,40 @@
 
 ### `CarPhysics`
 **Location:** [`src/physics/CarPhysics.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/physics/CarPhysics.hx)  
-**Description:** High-performance hybrid vehicle dynamics simulator combining an OimoPhysics 3D rigid body backbone for mass, inertia, world collisions, and restitution, driven by analytical multi-link raycast suspension, Pacejka slip-angle tire adhesion, and Criterion-style (*Need for Speed: Most Wanted 2012*) arcade drift mechanics. Designed with zero runtime allocations in frame update loops.
+**Description:** Fixed 240Hz sub-stepped 4-wheel raycast vehicle physics engine synchronized with an OimoPhysics `World` and `RigidBody` collider hull. Delegates terrain strut sensing (`SuspensionSolver`), multi-gear torque & nitrous delivery (`DrivetrainSolver`), and Pacejka/Ackermann/Friction-Circle traction (`TireSlipSolver`).
 
-#### Enums:
-- `WheelIndex`:
-  - `FrontLeft = 0` — Front-left suspension strut.
-  - `FrontRight = 1` — Front-right suspension strut.
-  - `RearLeft = 2` — Rear-left suspension strut.
-  - `RearRight = 3` — Rear-right suspension strut.
-- `Gear`:
-  - `Reverse = -1`, `Neutral = 0`, `First = 1` through `Sixth = 6`.
-
-#### Runtime Tunable Properties:
-- `tireSlipBias:Float` (Range `[-1.0 .. 1.0]`) — Front vs rear tire slip bias. Negative induces oversteer/drift; positive induces understeer; 0.0 is neutral.
-- `driftTriggerAngle:Float` (Default `0.22 rad` / `~12.6°`) — Chassis slip angle threshold that triggers arcade drift physics.
-- `bodyRollScale:Float` (Default `1.0`) — Centrifugal chassis lean multiplier affecting suspension compression.
-- `groundFriction:Float` (Default `1.0`) — Global contact scalar for tire grip, braking, and rolling drag.
-- `wheelspinAmount:Float` (Default `1.2`) — Wheelspin burnout multiplier during launches and harsh power corners.
-- `baseAcceleration:Float` — Engine torque delivery rate in m/s².
-- `boostAcceleration:Float` — Nitrous oxide augmented acceleration rate in m/s².
-
-#### Telemetry & State Fields:
-- `physicsWorld:oimo.dynamics.World` — Underlying OimoPhysics rigid body simulation world (gravity: $Z = -9.81\text{ m/s}^2$).
-- `chassisBody:oimo.dynamics.rigidbody.RigidBody` — 3D inertial rigid body representing vehicle chassis and collision hull.
-- `pos:Vector` — World coordinates of vehicle chassis center point.
-- `yaw:Float`, `pitch:Float`, `roll:Float` — Chassis rotational orientation in radians.
-- `forwardSpeed:Float`, `lateralVelocity:Float`, `verticalVelocity:Float` — Longitudinal, lateral, and vertical velocity vectors in m/s.
-- `isDrifting:Bool`, `driftDirection:Float`, `driftAngle:Float` — Active drift slide flags and visual slip angles.
-- `currentGear:Int`, `engineRPM:Float`, `isShifting:Bool` — Drivetrain state.
-- `boostFuel:Float` (Range `[0.0, 1.0]`), `isBoosting:Bool` — Nitrous fuel capacity and active burn state.
-- `suspLength:Array<Float>`, `suspCompression:Array<Float>`, `wheelOnGround:Array<Bool>` — 4-wheel suspension travel arrays.
-- `wheelSlipAngles:Array<Float>`, `wheelSpinVelocity:Array<Float>` — Wheel kinematics.
+#### State & Telemetry Fields:
+- `physicsWorld:oimo.dynamics.World` — Underlying OimoPhysics world hosting static wall/prop colliders and dynamic bodies.
+- `chassisBody:oimo.dynamics.rigidbody.RigidBody` — Dynamic Oimo rigid body aligned with `pos + (0, 0, cogHeight)` with wheel-clearance collision box.
+- `config:VehicleConfigData`, `groundProvider:IGroundProvider` — Active clamped configuration and last ground surface provider.
+- `pos:Vector` — World position anchored at bottom-of-wheels ground plane (`Track.ROAD_LIFT` on circuit).
+- `yaw:Float`, `pitch:Float`, `roll:Float`, `driftAngle:Float` — 3D chassis attitude in radians (`yaw < 0` = Left/-X, `yaw > 0` = Right/+X, `pitch > 0` = Nose Up, `roll > 0` = Lean Right).
+- `forwardSpeed:Float`, `lateralVelocity:Float`, `verticalVelocity:Float` — Chassis velocity projections in m/s.
+- `yawRate:Float`, `pitchRate:Float`, `rollRate:Float` — 6-DOF rotational rates in rad/s.
+- `isGrounded:Bool`, `groundedWheelCount:Int`, `isDrifting:Bool`, `isBoosting:Bool` — Contact, drift, and nitrous activity flags.
+- `currentGear:Int` (`-1` Reverse, `1..6` Forward), `engineRPM:Float`, `boostFuel:Float` — Drivetrain and boost reserve telemetry.
+- `suspLength:Array<Float>`, `wheelNormalLoads:Array<Float>`, `wheelFriction:Array<Float>`, `wheelSpinVelocity:Array<Float>` — Per-wheel `[FL, FR, RL, RR]` telemetry arrays.
 
 #### Methods:
-- `new(startX:Float, startY:Float, startZ:Float, ?initialConfig:VehicleConfigData)` — Constructs simulator, allocates OimoPhysics rigid body (`BoxGeometry(0.94, 2.15, 0.22)` aligned with `CarMesh`), and initializes spring resting lengths.
-- `setConfig(newConfig:VehicleConfigData):Void` — Replaces active physics configuration at runtime.
-- `resetState(startX:Float, startY:Float, startZ:Float, newYaw:Float = 0.0):Void` — Resets vehicle transform, velocities, transmission, and Oimo rigid body (default `yaw = 0.0` facing `+Y` forward).
-- `syncToOimoBody():Void` — Synchronizes `pos`, `yaw`, `forwardSpeed`, `lateralVelocity`, and `verticalVelocity` directly into the underlying Oimo `chassisBody` after external traffic or boundary impacts.
-- `update(dt:Float, input:InputController, ?waypoints:Array<Vector>, ?groundProvider:world.IGroundProvider):Void` — Master physics integration step executing suspension raycasts, drivetrain shifts, acceleration/braking, lateral slip, and stepping Oimo rigid body dynamics.
-- `updateLateralAndDrift(dt:Float, input:InputController, fwdX:Float, fwdY:Float, rightX:Float, rightY:Float):Void` — Evaluates slip angles, Pacejka-like grip curves, handbrake rear traction breakaway, drift counter-steer assist, and forward velocity momentum biasing.
-- `updateChassisAttitude(dt:Float, input:InputController):Void` — Calculates centrifugal body roll lean (clamped on flat surfaces) and acceleration squat / braking dive pitch.
+- `new(x:Float = 0.0, y:Float = 0.0, z:Float = 0.0, ?initialConfig:VehicleConfigData, ?worldConfig:PhysicsWorldConfig)` — Constructs physics world, dynamic collider, and sub-solvers.
+- `setConfig(newConfig:VehicleConfigData):Void` — Validates, clamps, and swaps active vehicle tuning at runtime.
+- `resetState(x:Float, y:Float, z:Float, yawAngle:Float = 0.0):Void` — Resets position, attitude, velocities, solver relaxation states, and Oimo `chassisBody`.
+- `syncToOimoBody():Void` / `syncFromOimoBody():Void` — Bidirectional transform/velocity sync between `CarPhysics` state and Oimo `chassisBody`.
+- `update(dt:Float, input:InputController, ?waypoints:Array<Vector>, ?ground:IGroundProvider):Void` — Executes 240Hz fixed sub-steps, Oimo obstacle overlap resolution, and `IGroundProvider` barrier containment.
+
+---
+
+### `SuspensionSolver`, `DrivetrainSolver` & `TireSlipSolver`
+**Locations:**
+- [`src/physics/SuspensionSolver.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/physics/SuspensionSolver.hx) — Evaluates `[FL, FR, RL, RR]` wheel raycasts against `IGroundProvider` and non-self Oimo colliders (`WheelRayCallback`), computing asymmetric bump/rebound spring forces, front/rear Anti-Roll Bar load transfer, and chassis pitch/roll restoring torques.
+- [`src/physics/DrivetrainSolver.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/physics/DrivetrainSolver.hx) — 6-speed + reverse sequential automatic transmission with RPM hysteresis, bell-shaped engine torque delivery, foot/engine braking, and nitrous boost fuel/thrust simulation.
+- [`src/physics/TireSlipSolver.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/physics/TireSlipSolver.hx) — Speed-blended Ackermann wheel angles, axle weight transfer, relaxation-filtered slip angles, Pacejka lateral curves, combined Friction Circle clamping (`|F| <= mu * F_z`), and low-speed static stiction holding.
 
 ---
 
 ### `CarConfig`
 **Location:** [`src/physics/CarConfig.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/physics/CarConfig.hx)  
-**Description:** Strongly typed vehicle specification configuration data structure with JSON import/export round-trip capability.
-
-#### Typedefs:
-- `VehicleConfigData`: Encompasses `mass`, `baseTopSpeed`, `boostTopSpeed`, `reverseTopSpeed`, `baseAcceleration`, `boostAcceleration`, `brakeDecel`, `suspension`, `tires`, `drift`, `drivetrain`, and `aero`.
-- `SuspensionConfig`: `restLength`, `springRate`, `damping`, `antiRollStiffness`, `bodyRollScale`, `minTravel`, `maxTravel`.
-- `TireConfig`: `baseLateralStiffness`, `peakSlipAngle`, `tireSlipBias`, `groundFriction`, `wheelspinAmount`, `rollingResistance`.
-- `DriftConfig`: `driftTriggerAngle`, `lateralStiffnessScale`, `counterSteerTorque`, `forwardBiasRate`, `driftYawRate`, `minDriftSpeed`, `driftExitSpeed`.
-- `DrivetrainConfig`: `idleRPM`, `redlineRPM`, `shiftUpRPM`, `shiftDownRPM`, `shiftDelay`, `gearRatios`, `finalDrive`, `reverseRatio`, `lsdLockRatio`.
-- `AeroConfig`: `dragCoeff`, `downforceCoeff`.
-
-#### Methods:
-- `getDefault():VehicleConfigData` — Returns default balanced arcade sports vehicle specification.
-- `toJson(cfg:VehicleConfigData):String` — Serializes vehicle configuration into human-readable JSON string.
-- `fromJson(jsonStr:String):VehicleConfigData` — Parses JSON string into strongly typed `VehicleConfigData` with fallback validation.
+**Description:** Static vehicle geometry constants (`TIRE_RADIUS=0.36`, `TIRE_WIDTH=0.30`, `CHASSIS_WIDTH=1.88`, `CHASSIS_LENGTH=4.30`, `COG_HEIGHT=0.48`, `WHEELBASE=2.70`, `TRACK_WIDTH=1.96`), nested typedefs (`ChassisConfig`, `SuspensionConfig`, `DrivetrainConfig`, `TireConfig`, `BoostConfig`, `VehicleConfigData`), safe `clamp()`, `getDefault()`, and JSON helpers (`toJson`, `fromJson`).
 
 ---
 
@@ -229,25 +204,17 @@
 
 ### `ChaseCamera`
 **Location:** [`src/camera/ChaseCamera.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/camera/ChaseCamera.hx)  
-**Description:** Third-person spring-damped chase camera. Features controlled acceleration pull-back (+0.55m max), velocity feedforward (0.65), speed-dependent dynamic FOV expansion (65.0° - 77.0°, +3.5° boost, bounded to prevent fisheye distortion), and softened collision trauma screen shake with rapid exponential decay (`3.8 * dt`). Zero heap allocations in update loops.
+**Description:** Velocity-aligned third-person chase camera using critically-damped `SmoothDamp` tracking, speed/boost dynamic FOV scaling, subtle bounded lateral-G roll banking, terrain clearance floor protection, and quadratic trauma shake decay.
 
-#### Constants:
-- `BASE_DISTANCE:Float = 7.5` — Base follow distance behind chassis in meters.
-- `BASE_HEIGHT:Float = 2.8` — Base vertical elevation above chassis in meters.
-- `LOOK_AHEAD_DIST:Float = 6.2` — Distance ahead of vehicle along heading for focal point in meters.
-- `LOOK_AHEAD_HEIGHT:Float = 1.0` — Vertical look-ahead offset in meters.
-- `BASE_FOV:Float = 65.0` — Base field of view angle in degrees at rest.
-- `MAX_SPEED_FOV:Float = 77.0` — Maximum cruising FOV angle in degrees at top speed.
-- `BOOST_FOV_EXTRA:Float = 3.5` — Additional FOV expansion in degrees under nitrous oxide.
-- `MAX_TRAUMA_CEILING:Float = 0.55` — Maximum trauma intensity ceiling.
-- `TRAUMA_DECAY_RATE:Float = 3.8` — Exponential trauma settling rate per second.
+#### Constants & Fields:
+- `BASE_DISTANCE:Float = 6.8`, `BASE_HEIGHT:Float = 2.55`, `BASE_FOV:Float = 65.0`, `SPEED_FOV_BONUS:Float = 10.5`, `BOOST_FOV_BONUS:Float = 11.5`, `MAX_BANK_RAD:Float = 0.055`, `MIN_GROUND_CLEARANCE:Float = 0.95`.
+- `trauma:Float` — Normalized shake intensity `[0.0, 1.0]`.
 
 #### Methods:
-- `new(camera:Camera, startX:Float, startY:Float, startZ:Float)` — Constructs chase camera tracker.
-- `getPos():Vector` — Returns current camera eye position vector in world space.
-- `getTarget():Vector` — Returns current focal target vector in world space.
-- `addTrauma(amount:Float):Void` — Injects impact impulse softened by 50% and clamped to `MAX_TRAUMA_CEILING`.
-- `update(dt:Float, carPhysics:CarPhysics, isNitroActive:Bool):Void` — Updates spring-arm position, dynamic FOV interpolation (`pow(speedRatio, 1.25)`), acceleration pull-back, velocity feedforward, and trauma shake translations.
+- `new(camera:Camera, startX:Float, startY:Float, startZ:Float)` — Constructs chase camera bound to active scene `h3d.Camera`.
+- `snapBehind(carPhysics:CarPhysics):Void` — Snaps camera position and velocity cleanly behind vehicle heading.
+- `addTrauma(amount:Float):Void` — Injects trauma impulse scaled by `0.5` and clamped `[0, 1]`.
+- `update(dt:Float, carPhysics:CarPhysics, isBoosting:Bool):Void` — Updates velocity-blended direction, `SmoothDamp` eye position, look-ahead target, FOV, banking, terrain clearance, and trauma decay.
 
 ---
 
@@ -255,30 +222,16 @@
 
 ### `InputController`
 **Location:** [`src/input/InputController.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/input/InputController.hx)  
-**Description:** Centralized input coordinator aggregating desktop keyboard keystrokes, gamepad controller buttons/axes (via Heaps `hxd.Pad`), and mobile virtual touch inputs. Features dynamic key remapping, device isolation modes, deadzone filtering, and granular steering sensitivity scaling.
+**Description:** Unified multi-device input coordinator normalizing desktop keyboard, analog gamepad thumbsticks/triggers/D-pad (`hxd.Pad`), and mobile multi-touch virtual joystick/pedals under a single consistent coordinate sign convention (`- = Left`, `+ = Right`).
 
-#### Enums:
-- `InputAction`: `SteerLeft`, `SteerRight`, `Throttle`, `Brake`, `Handbrake`, `Boost`.
-- `ExclusiveDevice`: `Both`, `KeyboardOnly`, `GamepadOnly`.
-- `ControllerLayout`: `StandardXbox`, `NintendoBayX`.
-
-#### Driving Registers:
-- `steer:Float` — Normalized steering deflection in range `[-1.0 .. 1.0]`.
-- `throttle:Float` — Normalized forward acceleration demand in range `[0.0 .. 1.0]`.
-- `brake:Float` — Normalized service braking demand in range `[0.0 .. 1.0]`.
-- `handbrake:Bool` — Handbrake actuation state.
-- `boost:Bool` — Nitrous oxide injection request state.
-- `steerSensitivity:Float` (Range `[0.0, 1.0]`, default `1.0`) — Steering sensitivity multiplier adjustable in 2% steps.
-
-#### Touch Driving Direct Registers:
+#### Enums & Registers:
+- `InputAction`, `ExclusiveDevice` (`Both`, `KeyboardOnly`, `GamepadOnly`), `ControllerLayout`.
+- `steer:Float` (`[-1.0, +1.0]`), `throttle:Float`, `brake:Float`, `handbrake:Bool`, `boost:Bool`, `steerSensitivity:Float` (`[0.1, 1.0]` applied exclusively to final combined output without mutating `rawDigitalSteer`).
 - `touchSteer:Float`, `touchThrottle:Float`, `touchBrake:Float`, `touchHandbrake:Bool`, `touchBoost:Bool`, `isTouchActive:Bool`.
 
 #### Methods:
-- `update(dt:Float):Void` — Polls keyboard and gamepad hardware, resolves remapping listening states, applies deadzones and sensitivity multipliers, and updates edge-trigger flags.
-- `startListening(action:InputAction, onDone:Void->Void):Void` — Puts controller into remapping capture mode for the specified action.
-- `flushInputs():Void` — Clears edge-trigger navigation flags and resets analog input registers.
-- `getKeyName(code:Int):String` — Converts keyboard scan-code integer into user-friendly display string.
-- `getGamepadBtnName(btn:Int, layout:ControllerLayout):String` — Converts gamepad button index into layout-specific name.
+- `update(dt:Float):Void` — Polls keyboard, deadzone-rescaled analog gamepad (`pow(norm, 1.35)`), D-pad, and rescaled touch joystick; merges inputs cleanly without state cross-corruption.
+- `flushInputs():Void` — Resets UI edge triggers and clears `rawDigitalSteer`.
 
 ---
 
@@ -438,8 +391,8 @@
 ## 10. User Interface & Touch Controls Layer (`src/ui/`)
 
 ### `UIManager & UIBuilder`
-**Location:** [`src/ui/UIManager.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/UIManager.hx), [`src/ui/UIBuilder.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/UIBuilder.hx), [`src/ui/views/mapselect/MapSelectView.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/views/mapselect/MapSelectView.hx), & [`src/ui/components/CardBackplate.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/components/CardBackplate.hx)  
-**Description:** Master UI hierarchy and component factory. Manages transitions between `Splash`, `MainMenu`, `MapSelect`, `InGameHUD`, `PauseMenu`, `OptionsMenu`, and `CreditsScreen`. `MainMenuView` consolidates singleplayer map entry under `"PLAY SINGLEPLAYER"` (`MenuAction.OpenMapSelect`), which opens `MapSelectView` (`Highway Circuit` vs. `Sandbox Proving Grounds`). `PauseMenuView` dispatches `MenuAction.RestartRace` via `"RESTART MAP"` to restart whichever map the player selected. `CardBackplate` renders chamfered cyber panels (`drawChamferedBox`), corner brackets, and procedural map preview schematics.
+**Location:** [`src/ui/UIManager.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/UIManager.hx), [`src/ui/UIBuilder.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/UIBuilder.hx), [`src/ui/views/mapselect/MapSelectView.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/views/mapselect/MapSelectView.hx), [`src/ui/views/multiplayer/MultiplayerMenuView.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/views/multiplayer/MultiplayerMenuView.hx), [`src/ui/views/multiplayer/MultiplayerLobbyView.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/views/multiplayer/MultiplayerLobbyView.hx), & [`src/ui/components/CardBackplate.hx`](file:///g:/My%20Drive/Organized/Backup/Documents/Github/project-working-dir/haxe-projs/Haxe/racing-game/src/ui/components/CardBackplate.hx)  
+**Description:** Master UI hierarchy and component factory. Manages transitions between `Splash`, `MainMenu`, `MapSelect`, `MultiplayerMenu` (Host or Join + Invite Code input), `MultiplayerLobby`, `InGameHUD`, `PauseMenu`, `OptionsMenu`, and `CreditsScreen`. `MainMenuView` consolidates singleplayer map entry under `"PLAY SINGLEPLAYER"` (`MenuAction.OpenMapSelect`) and opens `MultiplayerMenuView` under `"MULTIPLAYER LOBBY"` (`MenuAction.OpenMultiplayer`). `PauseMenuView` dispatches `MenuAction.RestartRace` via `"RESTART MAP"` to restart whichever map the player selected. `CardBackplate` renders chamfered cyber panels (`drawChamferedBox`), corner brackets, and procedural map/multiplayer schematics.
 
 ---
 

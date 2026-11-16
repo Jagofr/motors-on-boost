@@ -1,1069 +1,595 @@
 package physics;
 
 import h3d.Vector;
-import input.InputController;
-import physics.CarConfig.VehicleConfigData;
+import oimo.common.Vec3;
+import oimo.collision.geometry.BoxGeometry;
 import oimo.dynamics.World;
 import oimo.dynamics.rigidbody.RigidBody;
 import oimo.dynamics.rigidbody.RigidBodyConfig;
 import oimo.dynamics.rigidbody.RigidBodyType;
 import oimo.dynamics.rigidbody.Shape;
 import oimo.dynamics.rigidbody.ShapeConfig;
-import oimo.collision.geometry.BoxGeometry;
-import oimo.common.Vec3;
-import oimo.common.Mat3;
-import oimo.common.Quat;
+import config.GameConfig.PhysicsWorldConfig;
+import input.InputController;
+import physics.CarConfig;
+import physics.SuspensionSolver;
+import physics.DrivetrainSolver;
+import physics.TireSlipSolver;
+import world.IGroundProvider;
 
 /**
- * Zero-overhead strongly typed enum abstract for four-wheel suspension and contact indexing.
- */
-enum abstract WheelIndex(Int) from Int to Int {
-    /** Front-left wheel index (0). */
-    var FrontLeft = 0;
-
-    /** Front-right wheel index (1). */
-    var FrontRight = 1;
-
-    /** Rear-left wheel index (2). */
-    var RearLeft = 2;
-
-    /** Rear-right wheel index (3). */
-    var RearRight = 3;
-}
-
-/**
- * Zero-overhead strongly typed enum abstract for transmission gear ratios.
- */
-enum abstract Gear(Int) from Int to Int {
-    /** Reverse transmission gear (-1). */
-    var Reverse = -1;
-
-    /** Neutral transmission idle (0). */
-    var Neutral = 0;
-
-    /** First forward transmission gear (1). */
-    var First = 1;
-
-    /** Second forward transmission gear (2). */
-    var Second = 2;
-
-    /** Third forward transmission gear (3). */
-    var Third = 3;
-
-    /** Fourth forward transmission gear (4). */
-    var Fourth = 4;
-
-    /** Fifth forward transmission gear (5). */
-    var Fifth = 5;
-
-    /** Sixth forward transmission gear (6). */
-    var Sixth = 6;
-}
-
-/**
- * High-performance hybrid vehicle dynamics simulator combining an OimoPhysics 3D rigid body
- * backbone for mass, inertia, world collisions, and restitution, driven by analytical multi-link
- * raycast suspension, Pacejka slip-angle tire adhesion, and Criterion-style brake-to-drift mechanics.
- * Designed with zero runtime allocations in frame update loops.
+ * Modular 4-wheel raycast vehicle controller integrated with OimoPhysics rigid-body collision boundaries.
+ * Executes fixed 240Hz micro-stepping across asymmetric suspension struts, axle anti-roll bars,
+ * longitudinal weight transfer, speed-blended Ackermann geometry, Pacejka tire curves with combined
+ * Friction Circle clamping, multi-gear drivetrain curves, and low-speed stiction holding.
+ *
+ * World Coordinate Convention (Heaps Z-Up):
+ * - +X: World Right
+ * - +Y: World Forward (yaw = 0)
+ * - +Z: World Up
+ * - Steering Left  (input.steer < 0) -> negative yawRate, yaw decreases, vehicle moves toward -X
+ * - Steering Right (input.steer > 0) -> positive yawRate, yaw increases, vehicle moves toward +X
+ *
+ * @class CarPhysics
+ * @module physics/CarPhysics
  */
 class CarPhysics {
-    /** Underlying OimoPhysics rigid body simulation world. */
+    static inline var FIXED_SUBSTEP:Float = 1.0 / 240.0;
+    static inline var MAX_FRAME_DT:Float = 0.05;
+
+    /** Underlying OimoPhysics world hosting static arena walls and dynamic rigid bodies. */
     public var physicsWorld:World;
 
-    /** 3D inertial rigid body representing vehicle chassis and collision hull. */
+    /** Dynamic Oimo rigid body aligned with the vehicle chassis center of gravity. */
     public var chassisBody:RigidBody;
 
-    /** World position of the vehicle chassis contact center point. */
-    public var pos:Vector = new Vector();
-
-    /** Yaw orientation in radians (rotation about world Z-axis; 0.0 = facing +Y Forward). */
-    public var yaw(default, set):Float = 0.0;
-    function set_yaw(v:Float):Float {
-        yaw = v;
-        if (chassisBody != null) {
-            var m = new Mat3().fromEulerXyz(new Vec3(pitch, roll, -v));
-            chassisBody.setOrientation(m.toQuat());
-        }
-        return v;
-    }
-
-    /** Dynamic chassis pitch in radians (squat on acceleration, dive on braking). */
-    public var pitch:Float = 0.0;
-
-    /** Dynamic chassis roll in radians (lateral centrifugal roll dampened by anti-roll bars). */
-    public var roll:Float = 0.0;
-
-    /** Forward longitudinal velocity along vehicle heading vector in m/s. */
-    public var forwardSpeed(default, set):Float = 0.0;
-    function set_forwardSpeed(v:Float):Float {
-        forwardSpeed = v;
-        if (chassisBody != null) {
-            var cosY = Math.cos(yaw);
-            var sinY = Math.sin(yaw);
-            var curVel = chassisBody.getLinearVelocity();
-            chassisBody.setLinearVelocity(new Vec3(sinY * v, cosY * v, curVel.z));
-        }
-        return v;
-    }
-
-    /** Lateral slip velocity perpendicular to vehicle forward heading in m/s. */
-    public var lateralVelocity:Float = 0.0;
-
-    /** Vertical chassis velocity in m/s. */
-    public var verticalVelocity:Float = 0.0;
-
-    /** Flag indicating whether the vehicle has ground contact on at least 2 wheels. */
-    public var isGrounded:Bool = true;
-
-    /** Ground contact state in the previous physics frame for transition buffering. */
-    public var wasGrounded:Bool = true;
-
-    /** Flag indicating whether the rear tires have broken traction into an active drift slide. */
-    public var isDrifting:Bool = false;
-
-    /** Sign multiplier of active drift direction (-1.0 for leftward yaw bias, +1.0 for rightward yaw bias). */
-    public var driftDirection:Float = 0.0;
-
-    /** Visual vehicle body slip angle offset relative to velocity direction in radians. */
-    public var driftAngle:Float = 0.0;
-
-    /** Current transmission gear index (-1 = Reverse, 0 = Neutral, 1..6 = Forward gears). */
-    public var currentGear:Int = 1;
-
-    /** Current engine rotational speed in revolutions per minute. */
-    public var engineRPM:Float = 1000.0;
-
-    /** Active shift disengagement timer in seconds. */
-    public var shiftTimer:Float = 0.0;
-
-    /** Whether transmission is currently disengaged during a gear transition. */
-    public var isShifting:Bool = false;
-
-    /** Remaining nitrous boost fuel capacity in range [0.0, 1.0]. */
-    public var boostFuel:Float = 1.0;
-
-    /** Nitrous fuel burn consumption rate per second while boosting (4.0s full duration). */
-    public static inline var BOOST_DRAIN_RATE:Float = 0.25;
-
-    /** Nitrous fuel automatic regeneration recovery rate per second (10.0s to full tank). */
-    public static inline var BOOST_RECHARGE_RATE:Float = 0.10;
-
-    /** Whether the vehicle is actively consuming nitrous oxide thrust this frame. */
-    public var isBoosting:Bool = false;
-
-    /** Active vehicle performance and dynamics tuning configuration. */
+    /** Active validated vehicle configuration profile. */
     public var config:VehicleConfigData;
 
-    // =========================================================================
-    // FOUR-WHEEL SUSPENSION STATE & CONTACT ARRAYS
-    // Wheel order: 0 = Front-Left (FL), 1 = Front-Right (FR), 2 = Rear-Left (RL), 3 = Rear-Right (RR)
-    // =========================================================================
+    /** Last queried ground provider (exposed read-only for terrain-aware camera clearance). */
+    public var groundProvider:IGroundProvider = null;
 
-    /** Local chassis offset coordinates for each wheel attachment point [X, Y]. */
-    public static var WHEEL_OFFSETS(default, never):Array<{x:Float, y:Float}> = [
-        { x: -0.98, y:  1.35 }, // 0: FL
-        { x:  0.98, y:  1.35 }, // 1: FR
-        { x: -0.98, y: -1.35 }, // 2: RL
-        { x:  0.98, y: -1.35 }  // 3: RR
-    ];
+    /** Vehicle world position anchored at wheel-bottom contact elevation (m). */
+    public var pos:Vector;
 
-    /** Current suspension spring extension length in meters for each wheel. */
-    public var suspLength:Array<Float> = [0.45, 0.45, 0.45, 0.45];
+    /** Vehicle heading angle in radians (0 = +Y, negative = Left/-X, positive = Right/+X). */
+    public var yaw:Float = 0.0;
 
-    /** Previous frame suspension spring length for velocity differentiation. */
-    public var prevSuspLength:Array<Float> = [0.45, 0.45, 0.45, 0.45];
+    /** Chassis pitch angle in radians (+ = Nose Up). */
+    public var pitch:Float = 0.0;
 
-    /** Normalized suspension compression ratio [0.0 = full droop, 1.0 = bottomed out]. */
-    public var suspCompression:Array<Float> = [0.0, 0.0, 0.0, 0.0];
+    /** Chassis roll angle in radians (+ = Lean Right). */
+    public var roll:Float = 0.0;
 
-    /** Ground contact flag for each wheel. */
-    public var wheelOnGround:Array<Bool> = [true, true, true, true];
+    /** Visual slip offset angle in radians (kept 0 so mesh matches exact physical yaw). */
+    public var driftAngle:Float = 0.0;
 
-    /** Wheel surface contact normal vectors in world coordinates. */
-    public var wheelNormals:Array<Vector> = [
-        new Vector(0, 0, 1),
-        new Vector(0, 0, 1),
-        new Vector(0, 0, 1),
-        new Vector(0, 0, 1)
-    ];
+    /** Longitudinal velocity projected along vehicle horizontal forward vector (m/s). */
+    public var forwardSpeed:Float = 0.0;
 
-    /** Tire slip angle in radians for each wheel. */
-    public var wheelSlipAngles:Array<Float> = [0.0, 0.0, 0.0, 0.0];
+    /** Lateral velocity projected along vehicle horizontal right vector (m/s). */
+    public var lateralVelocity:Float = 0.0;
 
-    /** Rotational angular velocity in rad/s for each wheel. */
-    public var wheelSpinVelocity:Array<Float> = [0.0, 0.0, 0.0, 0.0];
+    /** World vertical velocity along +Z (m/s). */
+    public var verticalVelocity:Float = 0.0;
 
-    /** Ground contact elevation in meters beneath each wheel. */
-    public var wheelGroundZ:Array<Float> = [0.0, 0.0, 0.0, 0.0];
+    /** Current heading angular velocity in rad/s (+ = turning Right). */
+    public var yawRate:Float = 0.0;
 
-    var scratchGroundNormal:Vector = new Vector(0, 0, 1);
+    /** Current pitch angular velocity in rad/s (+ = pitching Nose Up). */
+    public var pitchRate:Float = 0.0;
 
-    // =========================================================================
-    // EASILY TUNABLE DRIVING PHYSICS RUNTIME PROPERTIES
-    // =========================================================================
+    /** Current roll angular velocity in rad/s (+ = leaning Right). */
+    public var rollRate:Float = 0.0;
 
-    /** Front vs rear tire slip bias [-1.0 .. 1.0]. Negative = rear bias / oversteer, Positive = front bias / understeer, 0.0 = neutral. */
-    public var tireSlipBias(get, set):Float;
-    inline function get_tireSlipBias():Float return config.tires.tireSlipBias;
-    inline function set_tireSlipBias(v:Float):Float return config.tires.tireSlipBias = Math.max(-1.0, Math.min(1.0, v));
+    /** True when at least one wheel strut maintains surface contact. */
+    public var isGrounded:Bool = true;
 
-    /** Vehicle body slip angle threshold in radians required to trigger active drift physics. */
-    public var driftTriggerAngle(get, set):Float;
-    inline function get_driftTriggerAngle():Float return config.drift.driftTriggerAngle;
-    inline function set_driftTriggerAngle(v:Float):Float return config.drift.driftTriggerAngle = Math.max(0.05, v);
+    /** Number of currently grounded wheels [0..4]. */
+    public var groundedWheelCount:Int = 4;
 
-    /** Dynamic chassis roll multiplier affecting suspension lean and spring compression. */
-    public var bodyRollScale(get, set):Float;
-    inline function get_bodyRollScale():Float return config.suspension.bodyRollScale;
-    inline function set_bodyRollScale(v:Float):Float return config.suspension.bodyRollScale = Math.max(0.0, v);
+    /** True when rear tire slip angle or handbrake slide crosses drifting threshold. */
+    public var isDrifting:Bool = false;
 
-    /** Global ground contact friction scalar multiplying tire adhesion and braking. */
-    public var groundFriction(get, set):Float;
-    inline function get_groundFriction():Float return config.tires.groundFriction;
-    inline function set_groundFriction(v:Float):Float return config.tires.groundFriction = Math.max(0.1, v);
+    /** True while nitrous boost injection is actively firing. */
+    public var isBoosting:Bool = false;
 
-    /** Burnout wheelspin multiplier during standstill launches or full-throttle power corners. */
-    public var wheelspinAmount(get, set):Float;
-    inline function get_wheelspinAmount():Float return config.tires.wheelspinAmount;
-    inline function set_wheelspinAmount(v:Float):Float return config.tires.wheelspinAmount = Math.max(0.0, v);
+    /** Active automatic gearbox gear (-1 = Reverse, 1..6 = Forward). */
+    public var currentGear:Int = 1;
 
-    /** Standard engine acceleration rate in m/s². */
-    public var baseAcceleration(get, set):Float;
-    inline function get_baseAcceleration():Float return config.baseAcceleration;
-    inline function set_baseAcceleration(v:Float):Float return config.baseAcceleration = v;
+    /** Current simulated engine crankshaft speed (RPM). */
+    public var engineRPM:Float = 950.0;
 
-    /** Nitrous oxide augmented acceleration rate in m/s². */
-    public var boostAcceleration(get, set):Float;
-    inline function get_boostAcceleration():Float return config.boostAcceleration;
-    inline function set_boostAcceleration(v:Float):Float return config.boostAcceleration = v;
+    /** Normalized remaining nitrous boost reserve [0.0, maxFuel]. */
+    public var boostFuel:Float = 1.0;
 
-    // Static fallback constants matching configuration defaults for backwards compatibility
-    public static inline var TOP_SPEED:Float = 68.0;
-    public static inline var BOOST_TOP_SPEED:Float = 88.0;
-    public static inline var ACCELERATION:Float = 28.0;
-    public static inline var BOOST_ACCEL:Float = 48.0;
-    public static inline var BRAKING:Float = 38.0;
-    public static inline var REVERSE_TOP_SPEED:Float = 18.0;
-    public static inline var DRAG_COEFF:Float = 0.0032;
-    public static inline var ROLLING_RESISTANCE:Float = 2.0;
+    /** Live compressed suspension strut lengths [FL, FR, RL, RR] in meters. */
+    public var suspLength:Array<Float>;
 
-    // =========================================================================
-    // HYBRID SIM-CADE HANDLING CONSTANTS (SKLL.md)
-    // =========================================================================
-    public static inline var FAKE_DOWNFORCE_COEFF:Float = 0.45;
-    public static inline var LATERAL_GRIP_COEFF:Float = 12.0;
-    public static inline var YAW_DAMPING:Float = 8.5;
-    public static inline var SIGMA_REDIRECT:Float = 0.25;
-    public static inline var AIR_LEVELING_STIFFNESS:Float = 40.0;
-    public static inline var AIR_DAMPING:Float = 5.0;
-    public static inline var AFTERTOUCH_STIFFNESS:Float = 15.0;
-    public static inline var LANDING_ABSORB_RATIO:Float = 0.30;
+    /** Live vertical normal load per wheel [FL, FR, RL, RR] in Newtons. */
+    public var wheelNormalLoads:Array<Float>;
 
-    // Pre-allocated scratch objects for zero GC churn in frame loops
-    var scratchVec3A:Vec3 = new Vec3();
-    var scratchVec3B:Vec3 = new Vec3();
-    var scratchVec3C:Vec3 = new Vec3();
-    var scratchMat3:Mat3 = new Mat3();
-    var scratchWheelWorld:Vector = new Vector();
+    /** Surface friction coefficient sampled at each wheel [FL, FR, RL, RR]. */
+    public var wheelFriction:Array<Float>;
+
+    /** Visual rear wheel slip angular velocity offset [FL, FR, RL, RR] in rad/s. */
+    public var wheelSpinVelocity:Array<Float>;
+
+    /** Effective inner/center front wheel steer angle in radians (- = Left, + = Right). */
+    public var frontSteerAngle:Float = 0.0;
+
+    var gravityZ:Float = -9.81;
+    var maxDt:Float = MAX_FRAME_DT;
+    var worldVx:Float = 0.0;
+    var worldVy:Float = 0.0;
+    var worldVz:Float = 0.0;
+    var lastLongAccel:Float = 0.0;
+    var prevSteerInput:Float = 0.0;
+
+    var suspensionSolver:SuspensionSolver;
+    var drivetrainSolver:DrivetrainSolver;
+    var tireSlipSolver:TireSlipSolver;
+    var oimoPosScratch:Vec3;
+    var oimoVelScratch:Vec3;
 
     /**
-     * Constructs a new vehicle dynamics simulation instance backed by OimoPhysics.
+     * Initializes a new 4-wheel raycast vehicle physics instance and Oimo collision world.
      *
-     * @param startX Initial world X position coordinate.
-     * @param startY Initial world Y position coordinate.
-     * @param startZ Initial world Z position coordinate.
-     * @param initialConfig Optional vehicle performance configuration (defaults to `CarConfig.getDefault()`).
+     * @param {Float} x Initial world X position (m).
+     * @param {Float} y Initial world Y position (m).
+     * @param {Float} z Initial world Z ground contact elevation (m).
+     * @param {VehicleConfigData} initialConfig Optional vehicle tuning override (uses CarConfig default if null).
+     * @param {PhysicsWorldConfig} worldConfig Optional world gravity/dt bounds.
      */
-    public function new(startX:Float = 0.0, startY:Float = 0.0, startZ:Float = 0.0, ?initialConfig:VehicleConfigData) {
-        pos.set(startX, startY, startZ);
-        this.config = (initialConfig != null) ? initialConfig : CarConfig.getDefault();
-        engineRPM = config.drivetrain.idleRPM;
-
-        var rest = config.suspension.restLength;
-        for (i in 0...4) {
-            suspLength[i] = rest;
-            prevSuspLength[i] = rest;
+    public function new(
+        x:Float = 0.0,
+        y:Float = 0.0,
+        z:Float = 0.0,
+        ?initialConfig:VehicleConfigData,
+        ?worldConfig:PhysicsWorldConfig
+    ) {
+        config = CarConfig.clamp(initialConfig);
+        if (worldConfig != null) {
+            gravityZ = worldConfig.gravityZ < -1.0 ? worldConfig.gravityZ : -9.81;
+            maxDt = worldConfig.maxDt > 0.005 ? worldConfig.maxDt : MAX_FRAME_DT;
         }
 
-        initOimoPhysics(startX, startY, startZ);
-    }
+        pos = new Vector(x, y, z);
+        suspLength = [config.suspension.restLength, config.suspension.restLength, config.suspension.restLength, config.suspension.restLength];
+        wheelNormalLoads = [0.0, 0.0, 0.0, 0.0];
+        wheelFriction = [1.0, 1.0, 1.0, 1.0];
+        wheelSpinVelocity = [0.0, 0.0, 0.0, 0.0];
+        boostFuel = config.boost.maxFuel;
+        engineRPM = config.drivetrain.idleRPM;
 
-    /**
-     * Allocates and initializes the OimoPhysics rigid body world, inertia tensor, and chassis collision box.
-     */
-    function initOimoPhysics(startX:Float, startY:Float, startZ:Float) {
+        suspensionSolver = new SuspensionSolver();
+        drivetrainSolver = new DrivetrainSolver();
+        tireSlipSolver = new TireSlipSolver();
+        oimoPosScratch = new Vec3();
+        oimoVelScratch = new Vec3();
+
         physicsWorld = new World();
-        physicsWorld.setGravity(new Vec3(0, 0, -9.81));
+        physicsWorld.setGravity(new Vec3(0.0, 0.0, gravityZ));
 
-        var rbConfig = new RigidBodyConfig();
-        rbConfig.type = RigidBodyType.DYNAMIC;
-        rbConfig.position = new Vec3(startX, startY, startZ + 0.35);
-        chassisBody = new RigidBody(rbConfig);
+        // Create dynamic chassis rigid body with collider raised clear of tire ground contact
+        var rbCfg = new RigidBodyConfig();
+        rbCfg.type = RigidBodyType.DYNAMIC;
+        rbCfg.position = new Vec3(x, y, z + config.chassis.cogHeight);
+        chassisBody = new RigidBody(rbCfg);
 
-        var shapeConfig = new ShapeConfig();
-        // Half-extents: 0.94m width, 2.15m length, 0.22m height (Total: 1.88 x 4.30 x 0.44m matching full CarMesh bounds)
-        shapeConfig.geometry = new BoxGeometry(new Vec3(0.94, 2.15, 0.22));
-        shapeConfig.density = config.mass / (1.88 * 4.30 * 0.44);
-        // Zero-Friction Rule (SKLL.md): Decouple rigid body friction from custom sim-cade mechanics
-        shapeConfig.friction = 0.0;
-        shapeConfig.restitution = 0.0;
-        chassisBody.addShape(new Shape(shapeConfig));
-
-        var initialRot = new Mat3().fromEulerXyz(new Vec3(0, 0, -yaw));
-        chassisBody.setOrientation(initialRot.toQuat());
-
+        var shapeCfg = new ShapeConfig();
+        shapeCfg.geometry = new BoxGeometry(new Vec3(
+            CarConfig.CHASSIS_WIDTH * 0.46,
+            CarConfig.CHASSIS_LENGTH * 0.46,
+            0.34
+        ));
+        // Bottom of Oimo hull stays safely above TIRE_RADIUS so hills/ramps never snag the belly
+        shapeCfg.position = new Vec3(0.0, 0.0, 0.24);
+        shapeCfg.restitution = 0.2;
+        shapeCfg.friction = 0.2;
+        chassisBody.addShape(new Shape(shapeCfg));
         physicsWorld.addRigidBody(chassisBody);
+
+        resetState(x, y, z, 0.0);
     }
 
     /**
-     * Replaces the active vehicle configuration profile dynamically at runtime.
+     * Replaces active vehicle configuration at runtime and clamps parameters safely.
      *
-     * @param newConfig Updated vehicle configuration data structure.
+     * @param {VehicleConfigData} newConfig Updated vehicle config struct.
      */
-    public function setConfig(newConfig:VehicleConfigData) {
-        if (newConfig == null) return;
-        this.config = newConfig;
+    public function setConfig(newConfig:VehicleConfigData):Void {
+        config = CarConfig.clamp(newConfig);
+        boostFuel = Math.min(boostFuel, config.boost.maxFuel);
     }
 
     /**
-     * Resets the vehicle transform, velocities, transmission, and Oimo rigid body.
+     * Teleports the vehicle to a clean stationary state at the specified world coordinates and heading.
+     *
+     * @param {Float} x Target world X coordinate (m).
+     * @param {Float} y Target world Y coordinate (m).
+     * @param {Float} z Target wheel-bottom ground elevation (m).
+     * @param {Float} yawAngle Initial heading angle in radians (0 = +Y).
      */
-    public function resetState(startX:Float, startY:Float, startZ:Float, newYaw:Float = 0.0):Void {
-        pos.set(startX, startY, startZ);
-        yaw = newYaw;
+    public function resetState(x:Float, y:Float, z:Float, yawAngle:Float = 0.0):Void {
+        pos.set(x, y, z);
+        yaw = yawAngle;
         pitch = 0.0;
         roll = 0.0;
+        driftAngle = 0.0;
+
         forwardSpeed = 0.0;
         lateralVelocity = 0.0;
         verticalVelocity = 0.0;
+        worldVx = 0.0;
+        worldVy = 0.0;
+        worldVz = 0.0;
+        yawRate = 0.0;
+        pitchRate = 0.0;
+        rollRate = 0.0;
+        lastLongAccel = 0.0;
+
         isGrounded = true;
-        wasGrounded = true;
+        groundedWheelCount = 4;
         isDrifting = false;
-        driftDirection = 0.0;
-        driftAngle = 0.0;
+        isBoosting = false;
         currentGear = 1;
         engineRPM = config.drivetrain.idleRPM;
-        boostFuel = 1.0;
-        isBoosting = false;
+        boostFuel = config.boost.maxFuel;
+        frontSteerAngle = 0.0;
+        prevSteerInput = 0.0;
 
-        var rest = config.suspension.restLength;
+        var staticComp = config.suspension.unloadedLength - config.suspension.restLength;
+        suspensionSolver.resetHistory(staticComp);
+        drivetrainSolver.reset();
+        tireSlipSolver.reset();
+
+        var staticWheelLoad = (config.chassis.massKg * Math.abs(gravityZ)) * 0.25;
         for (i in 0...4) {
-            suspLength[i] = rest;
-            prevSuspLength[i] = rest;
-            suspCompression[i] = 0.0;
-            wheelOnGround[i] = true;
+            suspLength[i] = config.suspension.restLength;
+            wheelNormalLoads[i] = staticWheelLoad;
+            wheelFriction[i] = 1.0;
             wheelSpinVelocity[i] = 0.0;
         }
 
-        if (chassisBody != null) {
-            chassisBody.setPosition(new Vec3(startX, startY, startZ + 0.35));
-            var m = new Mat3().fromEulerXyz(new Vec3(0, 0, -newYaw));
-            chassisBody.setOrientation(m.toQuat());
-            chassisBody.setLinearVelocity(new Vec3(0, 0, 0));
-            chassisBody.setAngularVelocity(new Vec3(0, 0, 0));
-        }
+        syncToOimoBody();
     }
 
     /**
-     * Synchronizes the OimoPhysics chassis rigid body directly from external position/velocity mutations
-     * (such as traffic collisions or guardrail clamping).
+     * Synchronizes current pos, heading, and velocity state directly into Oimo's RigidBody transform.
      */
     public function syncToOimoBody():Void {
+        var sy = Math.sin(yaw);
+        var cy = Math.cos(yaw);
+        worldVx = forwardSpeed * sy + lateralVelocity * cy;
+        worldVy = forwardSpeed * cy - lateralVelocity * sy;
+        worldVz = verticalVelocity;
+
         if (chassisBody == null) return;
-        chassisBody.setPosition(new Vec3(pos.x, pos.y, pos.z + 0.35));
-        var m = new Mat3().fromEulerXyz(new Vec3(pitch, roll, -yaw));
-        chassisBody.setOrientation(m.toQuat());
-        var fwdX = Math.sin(yaw);
-        var fwdY = Math.cos(yaw);
-        var rightX = Math.cos(yaw);
-        var rightY = -Math.sin(yaw);
-        chassisBody.setLinearVelocity(new Vec3(
-            fwdX * forwardSpeed + rightX * lateralVelocity,
-            fwdY * forwardSpeed + rightY * lateralVelocity,
-            verticalVelocity
-        ));
+        oimoPosScratch.init(pos.x, pos.y, pos.z + config.chassis.cogHeight);
+        chassisBody.setPosition(oimoPosScratch);
+        oimoVelScratch.init(worldVx, worldVy, worldVz);
+        chassisBody.setLinearVelocity(oimoVelScratch);
+        oimoVelScratch.init(0.0, 0.0, 0.0);
+        chassisBody.setAngularVelocity(oimoVelScratch);
     }
 
     /**
-     * Populates out vector with vehicle unit forward heading (+Y is forward at yaw = 0).
+     * Reads back world position and linear velocity from Oimo's RigidBody after world steps/contacts.
      */
-    public function getForwardVector(?out:Vector):Vector {
-        if (out == null) out = new Vector();
-        out.set(Math.sin(yaw), Math.cos(yaw), 0);
-        return out;
+    public function syncFromOimoBody():Void {
+        if (chassisBody == null) return;
+        var p = chassisBody.getPosition();
+        var v = chassisBody.getLinearVelocity();
+        pos.x = p.x;
+        pos.y = p.y;
+        pos.z = p.z - config.chassis.cogHeight;
+        worldVx = v.x;
+        worldVy = v.y;
+        worldVz = v.z;
+        projectHorizontalVelocities();
+        verticalVelocity = worldVz;
     }
 
     /**
-     * Populates out vector with vehicle unit rightward vector (+X is right at yaw = 0).
-     */
-    public function getRightVector(?out:Vector):Vector {
-        if (out == null) out = new Vector();
-        out.set(Math.cos(yaw), -Math.sin(yaw), 0);
-        return out;
-    }
-
-    /**
-     * Advances the vehicle dynamics simulation by a delta time step.
-     * Integrates raycast suspension, anti-roll bars, slip-angle tire forces,
-     * arcade drift dynamics, powertrain RPM simulation, and chassis orientation.
+     * Advances vehicle simulation over variable frame delta dt using deterministic 240Hz sub-stepping.
      *
-     * @param dt Delta time elapsed since last frame in seconds.
-     * @param input Controller or touch input readings.
-     * @param waypoints Optional track spline waypoints for raycast ground sampling.
-     * @param groundProvider Optional IGroundProvider implementing terrain elevation and boundaries.
+     * @param {Float} dt Elapsed frame time in seconds.
+     * @param {InputController} input Conditioned multi-device input state.
+     * @param {Array<Vector>} waypoints Optional spline waypoints (passed by circuit world mode).
+     * @param {IGroundProvider} ground Terrain height, normal, material friction, and boundary provider.
      */
-    public function update(dt:Float, input:InputController, ?waypoints:Array<Vector>, ?groundProvider:world.IGroundProvider) {
-        if (dt <= 0.0) return;
-        var clampedDt = Math.min(dt, 0.05);
-
-        // Extract orientation matrix and basis vectors from Oimo chassis body
-        var bRot = chassisBody.getRotation();
-        var bPos = chassisBody.getPosition();
-        var bLinVel = chassisBody.getLinearVelocity();
-
-        // Column 1 is vehicle local forward (+Y): (e01, e11, e21)
-        var fwdX = bRot.e01;
-        var fwdY = bRot.e11;
-        var fwdZ = bRot.e21;
-
-        // Column 0 is vehicle local right (+X): (e00, e10, e20)
-        var rightX = bRot.e00;
-        var rightY = bRot.e10;
-        var rightZ = bRot.e20;
-
-        // Column 2 is vehicle local up (+Z): (e02, e12, e22)
-        var upX = bRot.e02;
-        var upY = bRot.e12;
-        var upZ = bRot.e22;
-
-        // Project linear velocity onto chassis local axes
-        forwardSpeed = bLinVel.x * fwdX + bLinVel.y * fwdY + bLinVel.z * fwdZ;
-        lateralVelocity = bLinVel.x * rightX + bLinVel.y * rightY + bLinVel.z * rightZ;
-        verticalVelocity = bLinVel.z;
-
-        // 1. Raycast Suspension & Anti-Roll Bar Force Simulation
-        updateSuspension(clampedDt, bPos, bRot, bLinVel, fwdX, fwdY, rightX, rightY, upX, upY, upZ, waypoints, groundProvider);
-
-        // Landing Transition Check (CRASH / LANDING BUFFER pipeline per SKLL.md)
-        if (!wasGrounded && isGrounded) {
-            var curVel = chassisBody.getLinearVelocity();
-            if (curVel.z < -1.0) {
-                var downwardSpeed = Math.min(10.0, Math.abs(curVel.z));
-                var forwardBoost = downwardSpeed * LANDING_ABSORB_RATIO;
-                forwardSpeed += forwardBoost;
-                scratchVec3A.init(
-                    curVel.x + fwdX * forwardBoost,
-                    curVel.y + fwdY * forwardBoost,
-                    curVel.z * 0.25
-                );
-                chassisBody.setLinearVelocity(scratchVec3A);
-            }
-        }
-        wasGrounded = isGrounded;
-
-        // 2. Nitrous Oxide Fuel Depletion & Regeneration Simulation
-        if (input.boost && boostFuel > 0.0) {
-            boostFuel = Math.max(0.0, boostFuel - BOOST_DRAIN_RATE * clampedDt);
-            isBoosting = (boostFuel > 0.0);
-        } else {
-            isBoosting = false;
-            if (boostFuel < 1.0) {
-                boostFuel = Math.min(1.0, boostFuel + BOOST_RECHARGE_RATE * clampedDt);
-            }
-        }
-
-        // 3. Drivetrain, Engine RPM & Automatic Transmission Shifting
-        updateDrivetrain(clampedDt, input);
-
-        if (isGrounded) {
-            // =================================================================
-            // GROUND STATE: MID-GEN NEED FOR SPEED "GLUED TO GROUND" STYLE
-            // =================================================================
-
-            // A. Aerodynamic Downforce: (mass * gNormal * 0.15) + (cFakeDownforce * speedForward^2) + aero downforce
-            var speedFwdSq = forwardSpeed * forwardSpeed;
-            var downforceMag = (config.mass * 9.81 * 0.15) + (FAKE_DOWNFORCE_COEFF * speedFwdSq) + (0.5 * 1.225 * speedFwdSq * config.aero.downforceCoeff);
-            scratchVec3A.init(-upX * downforceMag, -upY * downforceMag, -upZ * downforceMag);
-            chassisBody.applyForceToCenter(scratchVec3A);
-
-            // B. Longitudinal Acceleration, Service Braking & Drag Force
-            var netLongForce = computeLongitudinalForce(clampedDt, input, groundProvider);
-            scratchVec3A.init(fwdX * netLongForce, fwdY * netLongForce, fwdZ * netLongForce);
-            chassisBody.applyForceToCenter(scratchVec3A);
-
-            // C. Lateral Tire Cornering, Pacejka Slip Curves, Handbrake & Drift Moments
-            updateLateralAndDrift(clampedDt, input, fwdX, fwdY, rightX, rightY, rightZ, upX, upY, upZ, downforceMag, groundProvider);
-
-            // D. Rigid Yaw Gyroscopic Stabilization
-            // Damps uncommanded yaw spin while steering is controlled by Ackermann rack authority
-            var curAngVel = chassisBody.getAngularVelocity();
-            var wYaw = curAngVel.x * upX + curAngVel.y * upY + curAngVel.z * upZ;
-            var gyroscopicDamping = -wYaw * YAW_DAMPING * config.yawInertia * 0.006;
-            scratchVec3A.init(upX * gyroscopicDamping, upY * gyroscopicDamping, upZ * gyroscopicDamping);
-            chassisBody.applyTorque(scratchVec3A);
-
-            // Slope terrain conformity: align chassis local up with average contact normal
-            // Evaluated in vehicle local pitch/roll axes to ensure consistent behavior across all yaw angles
-            var avgNx = (wheelNormals[0].x + wheelNormals[1].x + wheelNormals[2].x + wheelNormals[3].x) * 0.25;
-            var avgNy = (wheelNormals[0].y + wheelNormals[1].y + wheelNormals[2].y + wheelNormals[3].y) * 0.25;
-            var avgNz = (wheelNormals[0].z + wheelNormals[1].z + wheelNormals[2].z + wheelNormals[3].z) * 0.25;
-            var errX = upY * avgNz - upZ * avgNy;
-            var errY = upZ * avgNx - upX * avgNz;
-            var errZ = upX * avgNy - upY * avgNx;
-            var pitchErr = errX * rightX + errY * rightY + errZ * rightZ;
-            var rollErr = errX * fwdX + errY * fwdY + errZ * fwdZ;
-            var pitchAngVel = curAngVel.x * rightX + curAngVel.y * rightY + curAngVel.z * rightZ;
-            var rollAngVel = curAngVel.x * fwdX + curAngVel.y * fwdY + curAngVel.z * fwdZ;
-            var tPitch = (pitchErr * 12.0 * config.pitchInertia) - (pitchAngVel * 2.0 * config.pitchInertia);
-            var tRoll = (rollErr * 12.0 * config.rollInertia) - (rollAngVel * 2.0 * config.rollInertia);
-            scratchVec3A.init(
-                rightX * tPitch + fwdX * tRoll,
-                rightY * tPitch + fwdY * tRoll,
-                rightZ * tPitch + fwdZ * tRoll
-            );
-            chassisBody.applyTorque(scratchVec3A);
-
-            // E. Energy Redirection (SKLL.md):
-            // Redirect fraction of lateral slide speed back into forward acceleration force
-            var absVLateral = Math.abs(lateralVelocity);
-            var speedAbs = Math.abs(forwardSpeed);
-            if (speedAbs > 2.0 && absVLateral > 0.25) {
-                var redirectMag = absVLateral * SIGMA_REDIRECT * config.mass * 2.0;
-                scratchVec3A.init(fwdX * redirectMag, fwdY * redirectMag, 0.0);
-                chassisBody.applyForceToCenter(scratchVec3A);
-            }
-
-            // F. Standstill clamping and pitch/roll damping to eliminate stopped chatter
-            if (speedAbs < 0.25 && absVLateral < 0.25 && input.throttle == 0.0 && input.brake == 0.0) {
-                var curLinV = chassisBody.getLinearVelocity();
-                scratchVec3A.init(curLinV.x * 0.85, curLinV.y * 0.85, curLinV.z);
-                chassisBody.setLinearVelocity(scratchVec3A);
-                forwardSpeed = 0.0;
-                lateralVelocity = 0.0;
-                scratchVec3B.init(curAngVel.x * 0.50, curAngVel.y * 0.50, curAngVel.z * 0.50);
-                chassisBody.setAngularVelocity(scratchVec3B);
-            } else {
-                scratchVec3B.init(curAngVel.x * 0.85, curAngVel.y * 0.85, curAngVel.z);
-                chassisBody.setAngularVelocity(scratchVec3B);
-            }
-
-        } else {
-            // =================================================================
-            // AIRTIME STATE: BURNOUT "CINEMATIC ARC" STYLE
-            // =================================================================
-
-            // A. Dynamic Gravity Scaling: natural fall rate on ascent, crisp landing settling on descent
-            var vVertical = bLinVel.z;
-            var gravityMod = (vVertical > 0.0) ? 1.05 : 1.45;
-            var deltaGravityZ = -config.mass * 9.81 * (gravityMod - 1.0);
-            scratchVec3A.init(0, 0, deltaGravityZ);
-            chassisBody.applyForceToCenter(scratchVec3A);
-
-            // B. Automatic Gyroscopic Wheel Leveler:
-            var curAngVel = chassisBody.getAngularVelocity();
-            var tStabilizeX = upY * (config.pitchInertia * 0.015 * AIR_LEVELING_STIFFNESS) - curAngVel.x * (config.pitchInertia * 0.02 * AIR_DAMPING);
-            var tStabilizeY = -upX * (config.rollInertia * 0.015 * AIR_LEVELING_STIFFNESS) - curAngVel.y * (config.rollInertia * 0.02 * AIR_DAMPING);
-            scratchVec3A.init(tStabilizeX, tStabilizeY, 0);
-            chassisBody.applyTorque(scratchVec3A);
-
-            // C. Burnout Airborne Aftertouch Control:
-            if (input.steer != 0.0) {
-                var tAftertouch = -input.steer * config.yawInertia * AFTERTOUCH_STIFFNESS * 0.35;
-                scratchVec3A.init(upX * tAftertouch, upY * tAftertouch, upZ * tAftertouch);
-                chassisBody.applyTorque(scratchVec3A);
-            }
-
-            driftAngle += (0.0 - driftAngle) * 4.0 * clampedDt;
-        }
-
-        // 7. Advance OimoPhysics Rigid Body Dynamics
-        physicsWorld.step(clampedDt);
-
-        // 8. Synchronize State Back from Simulated Rigid Body
-        bPos = chassisBody.getPosition();
-        bRot = chassisBody.getRotation();
-        bLinVel = chassisBody.getLinearVelocity();
-
-        pos.x = bPos.x;
-        pos.y = bPos.y;
-        pos.z = bPos.z - 0.35;
-
-        fwdX = bRot.e01; fwdY = bRot.e11; fwdZ = bRot.e21;
-        rightX = bRot.e00; rightY = bRot.e10; rightZ = bRot.e20;
-
-        forwardSpeed = bLinVel.x * fwdX + bLinVel.y * fwdY + bLinVel.z * fwdZ;
-        lateralVelocity = bLinVel.x * rightX + bLinVel.y * rightY + bLinVel.z * rightZ;
-        verticalVelocity = bLinVel.z;
-
-        var euler = bRot.toEulerXyz();
-        pitch = Math.max(-1.15, Math.min(1.15, euler.x));
-        roll = Math.max(-0.85, Math.min(0.85, euler.y));
-        yaw = -euler.z;
-
-        // Dampen excessive roll angular velocity while preserving natural hill climb pitch
-        var angVel = chassisBody.getAngularVelocity();
-        chassisBody.setAngularVelocity(new Vec3(angVel.x * 0.94, angVel.y * 0.88, angVel.z));
-
-        // 9. Boundary Constraints and Physical Floor Penetration Guard
-        if (groundProvider != null) {
-            var prevX = pos.x;
-            var prevY = pos.y;
-            var bRes = groundProvider.enforceBoundaries(pos, forwardSpeed, lateralVelocity);
-            if (bRes.hitWall) {
-                var dispX = pos.x - prevX;
-                var dispY = pos.y - prevY;
-                var dispLen = Math.sqrt(dispX * dispX + dispY * dispY);
-
-                if (dispLen > 0.0001) {
-                    var inNormX = dispX / dispLen;
-                    var inNormY = dispY / dispLen;
-                    var wallNormX = -inNormX;
-                    var wallNormY = -inNormY;
-                    var wallTangX = -wallNormY;
-                    var wallTangY = wallNormX;
-
-                    var curLinV = chassisBody.getLinearVelocity();
-                    var vIntoWall = curLinV.x * wallNormX + curLinV.y * wallNormY;
-                    var vTang = curLinV.x * wallTangX + curLinV.y * wallTangY;
-
-                    var reboundV = (vIntoWall > 0.0) ? -0.30 * vIntoWall : 0.0;
-                    var newTangV = vTang * 0.985;
-
-                    var newVx = wallTangX * newTangV + inNormX * Math.abs(reboundV);
-                    var newVy = wallTangY * newTangV + inNormY * Math.abs(reboundV);
-
-                    var dotFwdIntoWall = fwdX * wallNormX + fwdY * wallNormY;
-                    if (dotFwdIntoWall > 0.05) {
-                        var alignSign = (newTangV >= 0.0) ? 1.0 : -1.0;
-                        var targetTangYaw = Math.atan2(wallTangX * alignSign, wallTangY * alignSign);
-                        var yawDiff = targetTangYaw - yaw;
-                        while (yawDiff > Math.PI) yawDiff -= Math.PI * 2.0;
-                        while (yawDiff < -Math.PI) yawDiff += Math.PI * 2.0;
-                        yaw += yawDiff * Math.min(1.0, 6.0 * clampedDt);
-                        var newRot = new Mat3().fromEulerXyz(new Vec3(pitch, roll, -yaw));
-                        chassisBody.setOrientation(newRot.toQuat());
-                        fwdX = newRot.e01; fwdY = newRot.e11; fwdZ = newRot.e21;
-                        rightX = newRot.e00; rightY = newRot.e10; rightZ = newRot.e20;
-                    }
-
-                    forwardSpeed = newVx * fwdX + newVy * fwdY;
-                    lateralVelocity = newVx * rightX + newVy * rightY;
-                    chassisBody.setPosition(new Vec3(pos.x, pos.y, bPos.z));
-                    scratchVec3A.init(newVx, newVy, curLinV.z * 0.5);
-                    chassisBody.setLinearVelocity(scratchVec3A);
-                } else {
-                    forwardSpeed *= bRes.speedMult;
-                    lateralVelocity *= bRes.latMult;
-                    chassisBody.setPosition(new Vec3(pos.x, pos.y, bPos.z));
-                    scratchVec3A.init(fwdX * forwardSpeed + rightX * lateralVelocity, fwdY * forwardSpeed + rightY * lateralVelocity, verticalVelocity * 0.5);
-                    chassisBody.setLinearVelocity(scratchVec3A);
-                }
-            }
-
-            // Physical Chassis Belly Contact Guard:
-            // Prevents subterranean chassis penetration on steep impacts or bottoming out
-            var groundZ = groundProvider.getGroundElevation(bPos.x, bPos.y);
-            var minChassisZ = groundZ + 0.22 * Math.max(0.2, upZ);
-            if (bPos.z < minChassisZ) {
-                var pen = minChassisZ - bPos.z;
-                bPos.z = minChassisZ;
-                chassisBody.setPosition(bPos);
-                pos.z = bPos.z;
-
-                var curV = chassisBody.getLinearVelocity();
-                if (curV.z < 0.0) {
-                    curV.z = 0.0;
-                    chassisBody.setLinearVelocity(curV);
-                }
-
-                groundProvider.getGroundNormal(bPos.x, bPos.y, scratchGroundNormal);
-                var bounceForce = pen * config.mass * 250.0;
-                scratchVec3A.init(scratchGroundNormal.x * bounceForce, scratchGroundNormal.y * bounceForce, scratchGroundNormal.z * bounceForce);
-                chassisBody.applyForceToCenter(scratchVec3A);
-            }
-        }
-    }
-
-    /**
-     * Evaluates independent raycast spring-damper suspension for all 4 wheels.
-     * Calculates contact normals and applies upward spring-damper reaction forces to the Oimo chassis.
-     */
-    function updateSuspension(
+    public function update(
         dt:Float,
-        bPos:Vec3,
-        bRot:Mat3,
-        bLinVel:Vec3,
-        fwdX:Float,
-        fwdY:Float,
-        rightX:Float,
-        rightY:Float,
-        upX:Float,
-        upY:Float,
-        upZ:Float,
-        waypoints:Array<Vector>,
-        ?groundProvider:world.IGroundProvider
-    ) {
-        var susp = config.suspension;
-        var restLen = susp.restLength;
-        var k = susp.springRate;
-        var c = susp.damping;
-        var arbK = susp.antiRollStiffness;
+        input:InputController,
+        ?waypoints:Array<Vector>,
+        ?ground:IGroundProvider
+    ):Void {
+        if (dt <= 0.0 || Math.isNaN(dt)) return;
+        groundProvider = ground;
 
-        var groundContacts = 0;
+        var frameDt = dt > maxDt ? maxDt : dt;
+        var steps = Math.ceil(frameDt / FIXED_SUBSTEP);
+        if (steps < 1) steps = 1;
+        var subDt = frameDt / steps;
 
+        var steerIn = input != null ? clampF(input.steer, -1.0, 1.0) : 0.0;
+        var throttleIn = input != null ? clampF(input.throttle, 0.0, 1.0) : 0.0;
+        var brakeIn = input != null ? clampF(input.brake, 0.0, 1.0) : 0.0;
+        var handbrakeIn = input != null ? input.handbrake : false;
+        var boostIn = input != null ? input.boost : false;
+
+        for (step in 0...steps) {
+            stepSubstep(subDt, steerIn, throttleIn, brakeIn, handbrakeIn, boostIn, ground);
+        }
+
+        // Sync canonical 1D/local velocity scalars immediately after sub-step integration
+        projectHorizontalVelocities();
+        verticalVelocity = worldVz;
+
+        // Resolve any static Oimo obstacle overlap without double-integrating linear velocity
+        if (physicsWorld != null && ground != null && chassisBody != null) {
+            oimoPosScratch.init(pos.x, pos.y, pos.z + config.chassis.cogHeight);
+            chassisBody.setPosition(oimoPosScratch);
+            oimoVelScratch.init(0.0, 0.0, 0.0);
+            chassisBody.setLinearVelocity(oimoVelScratch);
+            chassisBody.setAngularVelocity(oimoVelScratch);
+            chassisBody.setGravityScale(0.0);
+            physicsWorld.step(frameDt);
+            var oimoPos = chassisBody.getPosition();
+            pos.x = oimoPos.x;
+            pos.y = oimoPos.y;
+        }
+
+        // Enforce IGroundProvider track barriers / arena bounds on final position & velocity
+        if (ground != null) {
+            var hit = ground.enforceBoundaries(pos, forwardSpeed, lateralVelocity);
+            if (hit.hitWall) {
+                forwardSpeed *= hit.speedMult;
+                lateralVelocity *= hit.latMult;
+                yawRate *= 0.35;
+            }
+        }
+
+        syncToOimoBody();
+        prevSteerInput = steerIn;
+    }
+
+    function stepSubstep(
+        dt:Float,
+        steerIn:Float,
+        throttleIn:Float,
+        brakeIn:Float,
+        handbrakeIn:Bool,
+        boostIn:Bool,
+        ground:IGroundProvider
+    ):Void {
+        var mass = config.chassis.massKg;
+        var gMag = Math.abs(gravityZ);
+        var sy = Math.sin(yaw);
+        var cy = Math.cos(yaw);
+
+        // Project world horizontal velocity onto current vehicle heading axes
+        var vLong = worldVx * sy + worldVy * cy;
+        var vLat = worldVx * cy - worldVy * sy;
+
+        // 1. Evaluate 4-wheel raycast struts + spring-damper + axle Anti-Roll Bars
+        var susp = suspensionSolver.solve(
+            dt,
+            config,
+            pos,
+            worldVz,
+            yaw,
+            pitch,
+            roll,
+            pitchRate,
+            rollRate,
+            ground,
+            physicsWorld,
+            chassisBody
+        );
+
+        groundedWheelCount = susp.groundedCount;
+        isGrounded = susp.groundedCount > 0;
         for (i in 0...4) {
-            var offset = WHEEL_OFFSETS[i];
+            var w = susp.wheels[i];
+            suspLength[i] = w.suspLength;
+            wheelNormalLoads[i] = w.normalLoad;
+            wheelFriction[i] = w.mu;
+        }
 
-            // Transform suspension mount point into world 3D space using full chassis orientation
-            var relX = rightX * offset.x + fwdX * offset.y;
-            var relY = rightY * offset.x + fwdY * offset.y;
-            var relZ = bRot.e20 * offset.x + bRot.e21 * offset.y;
-            var attachX = bPos.x + relX;
-            var attachY = bPos.y + relY;
-            var attachZ = bPos.z + relZ;
+        // Build orthonormal terrain-tangent forward & right vectors from average ground normal
+        var nx = susp.avgNormalX;
+        var ny = susp.avgNormalY;
+        var nz = susp.avgNormalZ;
 
-            scratchWheelWorld.set(attachX, attachY, attachZ);
+        // Horizontal forward dot normal = slope sine along forward direction (negative = facing uphill)
+        var fwdDotN = sy * nx + cy * ny;
+        var rightDotN = cy * nx - sy * ny;
 
-            var groundZ = 0.0;
-            var nx = 0.0;
-            var ny = 0.0;
-            var nz = 1.0;
+        var tFwdX = sy - fwdDotN * nx;
+        var tFwdY = cy - fwdDotN * ny;
+        var tFwdZ = -fwdDotN * nz;
+        var tfLen = Math.sqrt(tFwdX * tFwdX + tFwdY * tFwdY + tFwdZ * tFwdZ);
+        if (tfLen > 0.001) {
+            tFwdX /= tfLen;
+            tFwdY /= tfLen;
+            tFwdZ /= tfLen;
+        } else {
+            tFwdX = sy;
+            tFwdY = cy;
+            tFwdZ = 0.0;
+        }
 
-            if (groundProvider != null) {
-                groundZ = groundProvider.getGroundElevation(attachX, attachY);
-                groundProvider.getGroundNormal(attachX, attachY, scratchGroundNormal);
-                nx = scratchGroundNormal.x;
-                ny = scratchGroundNormal.y;
-                nz = scratchGroundNormal.z;
-            } else if (waypoints != null && waypoints.length > 0) {
-                var proj = SplineMath.getClosestSegment(scratchWheelWorld, waypoints);
-                groundZ = proj.z + world.Track.ROAD_LIFT;
-                nx = -proj.segDirY * 0.04;
-                ny =  proj.segDirX * 0.04;
-                nz = Math.sqrt(Math.max(0.01, 1.0 - (nx * nx + ny * ny)));
-            } else {
-                groundZ = 0.0;
-            }
+        var tRightX = cy - rightDotN * nx;
+        var tRightY = -sy - rightDotN * ny;
+        var tRightZ = -rightDotN * nz;
+        var trLen = Math.sqrt(tRightX * tRightX + tRightY * tRightY + tRightZ * tRightZ);
+        if (trLen > 0.001) {
+            tRightX /= trLen;
+            tRightY /= trLen;
+            tRightZ /= trLen;
+        } else {
+            tRightX = cy;
+            tRightY = -sy;
+            tRightZ = 0.0;
+        }
 
-            wheelGroundZ[i] = groundZ;
-            wheelNormals[i].set(nx, ny, nz);
+        // 2. Evaluate drivetrain gearbox, torque delivery, brakes, and nitrous boost
+        var driveRes = drivetrainSolver.solve(
+            dt,
+            config,
+            throttleIn,
+            brakeIn,
+            handbrakeIn,
+            boostIn,
+            vLong,
+            currentGear,
+            boostFuel,
+            susp.groundedCount
+        );
 
-            // Raycast distance along vehicle local down axis
-            var currentLen = (attachZ - groundZ) / Math.max(0.3, upZ);
-            prevSuspLength[i] = suspLength[i];
+        currentGear = driveRes.currentGear;
+        engineRPM = driveRes.engineRPM;
+        boostFuel = driveRes.boostFuel;
+        isBoosting = driveRes.isBoosting;
+        for (i in 0...4) {
+            wheelSpinVelocity[i] = (i >= 2) ? driveRes.rearWheelSpinDelta : 0.0;
+        }
 
-            if (currentLen <= restLen) {
-                wheelOnGround[i] = true;
-                groundContacts++;
-                suspLength[i] = Math.max(susp.minTravel, Math.min(restLen, currentLen));
-                suspCompression[i] = Math.max(0.0, (restLen - suspLength[i]) / (restLen - susp.minTravel));
+        // 3. Evaluate tire slip angles, Pacejka lateral curves, Friction Circle, and stiction
+        // Uphill slope sine > 0 when facing uphill (-fwdDotN)
+        var slopeFwdSin = -fwdDotN;
+        var slopeRightSin = -rightDotN;
 
-                // Linear spring-damper: compression velocity is positive when compressing
-                var compressionDelta = restLen - currentLen;
-                var suspVelocity = (prevSuspLength[i] - currentLen) / dt;
-                var springForce = (k * compressionDelta + c * suspVelocity);
+        var tireRes = tireSlipSolver.solve(
+            dt,
+            config,
+            susp.wheels,
+            vLong,
+            vLat,
+            yawRate,
+            steerIn,
+            driveRes.driveForce,
+            driveRes.brakeForce,
+            handbrakeIn,
+            lastLongAccel,
+            slopeFwdSin,
+            slopeRightSin,
+            gMag
+        );
 
-                // Progressive bump-stop elastomer when compressed beyond minTravel
-                if (currentLen < susp.minTravel) {
-                    var bumpDelta = susp.minTravel - currentLen;
-                    springForce += bumpDelta * k * 0.5;
-                }
-                if (springForce < 0.0) springForce = 0.0;
-                var maxWheelForce = (config.mass * 9.81 * 0.25) * 2.5;
-                if (springForce > maxWheelForce) springForce = maxWheelForce;
+        frontSteerAngle = tireRes.frontSteerAngle;
 
-                // Apply upward physical suspension force to Oimo rigid body along contact normal
-                scratchVec3A.init(nx * springForce, ny * springForce, nz * springForce);
-                scratchVec3B.init(attachX, attachY, attachZ);
-                chassisBody.applyForce(scratchVec3A, scratchVec3B);
-            } else {
-                // Wheel is airborne in full droop
-                wheelOnGround[i] = false;
-                suspLength[i] = Math.min(susp.maxTravel, currentLen);
-                suspCompression[i] = 0.0;
+        // 4. Sum 3D world Newtonian forces (Gravity + Normal Suspension + Tangential Tire Forces + Downforce)
+        var speedSq = worldVx * worldVx + worldVy * worldVy;
+        var aeroDown = susp.groundedCount > 0 ? config.chassis.aeroDownforce * speedSq : 0.0;
+
+        var totalFx = susp.totalNormalZForce > 0.0 ? (susp.avgNormalX * (susp.totalNormalZForce / Math.max(0.35, susp.avgNormalZ))) : 0.0;
+        var totalFy = susp.totalNormalZForce > 0.0 ? (susp.avgNormalY * (susp.totalNormalZForce / Math.max(0.35, susp.avgNormalZ))) : 0.0;
+        var totalFz = susp.totalNormalZForce + mass * gravityZ - aeroDown;
+
+        // Add tire drive/cornering forces projected cleanly along sloped terrain tangent axes
+        if (susp.groundedCount > 0) {
+            var netFwd = tireRes.forceFwd + driveRes.nitroThrust;
+            totalFx += netFwd * tFwdX + tireRes.forceRight * tRightX;
+            totalFy += netFwd * tFwdY + tireRes.forceRight * tRightY;
+            totalFz += netFwd * tFwdZ + tireRes.forceRight * tRightZ;
+        } else if (driveRes.nitroThrust > 0.0) {
+            totalFx += driveRes.nitroThrust * tFwdX;
+            totalFy += driveRes.nitroThrust * tFwdY;
+        }
+
+        var prevVLong = vLong;
+        worldVx += (totalFx / mass) * dt;
+        worldVy += (totalFy / mass) * dt;
+        worldVz += (totalFz / mass) * dt;
+
+        // Clamp residual creep velocities cleanly while static friction holds the parked vehicle
+        if (tireRes.isStictionActive) {
+            var vDecay = Math.exp(-20.0 * dt);
+            worldVx *= vDecay;
+            worldVy *= vDecay;
+            if (Math.abs(worldVx) < 0.005) worldVx = 0.0;
+            if (Math.abs(worldVy) < 0.005) worldVy = 0.0;
+            yawRate *= vDecay;
+            if (Math.abs(yawRate) < 0.002) yawRate = 0.0;
+        }
+
+        // Track longitudinal acceleration smoothed gently for weight transfer on next sub-step
+        var newVLong = worldVx * sy + worldVy * cy;
+        var instAccel = (newVLong - prevVLong) / dt;
+        if (instAccel > 25.0) instAccel = 25.0;
+        else if (instAccel < -30.0) instAccel = -30.0;
+        lastLongAccel += (instAccel - lastLongAccel) * Math.min(1.0, dt * 18.0);
+
+        // Integrate linear world position
+        pos.x += worldVx * dt;
+        pos.y += worldVy * dt;
+        pos.z += worldVz * dt;
+
+        // Hard bump-stop floor guard only if an individual wheel crushes past its hardstop limit
+        // (lifts vertically out of ground crush and removes inward normal speed without catapult bounce)
+        if (susp.groundedCount > 0 && susp.maxBottomOutPenetration > 0.0) {
+            pos.z += susp.maxBottomOutPenetration / Math.max(0.5, nz);
+            var vn = worldVx * nx + worldVy * ny + worldVz * nz;
+            if (vn < 0.0) {
+                worldVx -= vn * nx;
+                worldVy -= vn * ny;
+                worldVz -= vn * nz;
             }
         }
 
-        // Vehicle is grounded if at least 2 wheels maintain contact
-        isGrounded = (groundContacts >= 2);
+        // 5. Integrate yaw angular dynamics
+        var yawAccel = tireRes.yawTorque / config.chassis.yawInertia;
+        // Subtle natural yaw-rate self-aligning stabilization at speed (prevents tank-slapper instability)
+        var yawDamp = Math.exp(-(handbrakeIn ? 2.2 : 3.6) * dt);
+        yawRate = yawRate * yawDamp + yawAccel * dt;
+        if (Math.abs(yawRate) > 4.2) yawRate = yawRate > 0 ? 4.2 : -4.2;
+        yaw += yawRate * dt;
 
-        // Anti-roll bar torque across opposing wheel pairs:
-        // Front axle: FL (0) vs FR (1)
-        var frontTravelDiff = (restLen - suspLength[0]) - (restLen - suspLength[1]);
-        var frontArbForce = frontTravelDiff * arbK;
+        // Wrap yaw cleanly to [-PI, +PI] without discontinuities near 0
+        if (yaw > Math.PI * 2.0) yaw -= Math.PI * 2.0;
+        else if (yaw < -Math.PI * 2.0) yaw += Math.PI * 2.0;
 
-        // Rear axle: RL (2) vs RR (3)
-        var rearTravelDiff = (restLen - suspLength[2]) - (restLen - suspLength[3]);
-        var rearArbForce = rearTravelDiff * arbK;
+        // 6. Integrate real 6-DOF pitch and roll dynamics (suspension restoring + dynamic weight shift)
+        var cog = config.chassis.cogHeight;
+        var dynamicPitchMoment = tireRes.forceFwd * cog * 0.42;
+        var dynamicRollMoment = -tireRes.forceRight * cog * 0.55;
 
-        // Apply opposing anti-roll moments to chassis
-        var arbRollMoment = (frontArbForce + rearArbForce) * 0.5;
-        scratchVec3A.init(0, -arbRollMoment * 0.1, 0);
-        chassisBody.applyTorque(scratchVec3A);
+        if (susp.groundedCount > 0) {
+            var pitchAccel = (susp.pitchTorque + dynamicPitchMoment) / config.chassis.pitchInertia;
+            var rollAccel = (susp.rollTorque + dynamicRollMoment) / config.chassis.rollInertia;
+            pitchRate = pitchRate * Math.exp(-3.2 * dt) + pitchAccel * dt;
+            rollRate = rollRate * Math.exp(-3.8 * dt) + rollAccel * dt;
+        } else {
+            // Subtle mid-air aerodynamic attitude settling prevents wild pitch/roll spinning on jumps
+            pitchRate = pitchRate * Math.exp(-2.4 * dt) - pitch * 1.4 * dt;
+            rollRate = rollRate * Math.exp(-2.8 * dt) - roll * 1.8 * dt;
+        }
+
+        pitch = clampF(pitch + pitchRate * dt, -0.65, 0.65);
+        roll = clampF(roll + rollRate * dt, -0.60, 0.60);
+        driftAngle = 0.0;
+
+        // Update drifting telemetry flag cleanly
+        var newVLat = worldVx * cosY(yaw) - worldVy * sinY(yaw);
+        isDrifting = isGrounded
+            && Math.abs(newVLong) > 6.5
+            && (tireRes.lateralSlipAngle > config.tires.driftSlipThreshold || (handbrakeIn && Math.abs(newVLat) > 2.2));
     }
 
-    /**
-     * Simulates engine flywheel RPM, progressive gear ratios, automatic shifting,
-     * and simulated limited-slip differential power distribution.
-     */
-    function updateDrivetrain(dt:Float, input:InputController) {
-        var dtCfg = config.drivetrain;
-
-        // Shifting disengagement latency cooldown
-        if (shiftTimer > 0.0) {
-            shiftTimer -= dt;
-            if (shiftTimer <= 0.0) {
-                isShifting = false;
-            }
-        }
-
-        var speedAbs = Math.abs(forwardSpeed);
-        var tireRadius = 0.36; // 36cm sports tire radius
-        var wheelCircumference = 2.0 * Math.PI * tireRadius;
-        var wheelRPM = (speedAbs / wheelCircumference) * 60.0;
-
-        // Select current effective gear ratio
-        var gearRatio = 1.0;
-        if (forwardSpeed < -0.5) {
-            currentGear = -1;
-            gearRatio = Math.abs(dtCfg.reverseRatio);
-        } else {
-            if (currentGear < 1) currentGear = 1;
-            var gearIdx = Math.min(currentGear - 1, dtCfg.gearRatios.length - 1);
-            gearRatio = dtCfg.gearRatios[Math.floor(gearIdx)];
-        }
-
-        // Calculate theoretical engine RPM connected through transmission and final drive
-        var targetRPM = dtCfg.idleRPM + (wheelRPM * gearRatio * dtCfg.finalDrive * 0.42);
-
-        // Add throttle flare when clutching / shifting or revving at low wheel speed
-        if (isShifting || (speedAbs < 1.0 && input.throttle > 0.0)) {
-            targetRPM = Math.max(targetRPM, dtCfg.idleRPM + (input.throttle * 4500.0));
-        }
-
-        targetRPM = Math.max(dtCfg.idleRPM, Math.min(dtCfg.redlineRPM, targetRPM));
-
-        // Smooth RPM needle response
-        engineRPM += (targetRPM - engineRPM) * Math.min(1.0, 14.0 * dt);
-
-        // Automatic Transmission Shift Logic
-        if (currentGear > 0 && !isShifting) {
-            var numGears = dtCfg.gearRatios.length;
-            if (engineRPM > dtCfg.shiftUpRPM && currentGear < numGears && speedAbs > 8.0) {
-                // Shift Up
-                currentGear++;
-                isShifting = true;
-                shiftTimer = dtCfg.shiftDelay;
-                engineRPM *= 0.72; // RPM drop on upshift
-            } else if (engineRPM < dtCfg.shiftDownRPM && currentGear > 1 && speedAbs < (TOP_SPEED * (currentGear / numGears) * 0.75)) {
-                // Shift Down
-                currentGear--;
-                isShifting = true;
-                shiftTimer = dtCfg.shiftDelay;
-                engineRPM = Math.min(dtCfg.redlineRPM, engineRPM * 1.35); // RPM blip on downshift
-            }
-        }
-
-        // Simulated Limited-Slip Differential (LSD):
-        // Balances wheel spin velocities between driven rear wheels (index 2 = RL, 3 = RR)
-        var rearAvgSpin = (wheelSpinVelocity[2] + wheelSpinVelocity[3]) * 0.5;
-        var lsdLock = dtCfg.lsdLockRatio;
-        wheelSpinVelocity[2] += (rearAvgSpin - wheelSpinVelocity[2]) * lsdLock * Math.min(1.0, 15.0 * dt);
-        wheelSpinVelocity[3] += (rearAvgSpin - wheelSpinVelocity[3]) * lsdLock * Math.min(1.0, 15.0 * dt);
+    inline function projectHorizontalVelocities():Void {
+        var sy = Math.sin(yaw);
+        var cy = Math.cos(yaw);
+        forwardSpeed = worldVx * sy + worldVy * cy;
+        lateralVelocity = worldVx * cy - worldVy * sy;
     }
 
-    /**
-     * Calculates net longitudinal force in Newtons from engine throttle, braking, rolling resistance, and aerodynamic drag.
-     */
-    function computeLongitudinalForce(dt:Float, input:InputController, ?groundProvider:world.IGroundProvider):Float {
-        var surfaceFriction = (groundProvider != null) ? groundProvider.getGroundFriction(pos.x, pos.y) : 1.0;
-        var mu = config.tires.groundFriction * surfaceFriction;
-        var maxSpeed = isBoosting ? config.boostTopSpeed : config.baseTopSpeed;
-        var accelRate = (isBoosting ? config.boostAcceleration : config.baseAcceleration) * mu;
+    static inline function sinY(a:Float):Float return Math.sin(a);
+    static inline function cosY(a:Float):Float return Math.cos(a);
 
-        // Drivetrain torque delivery scaled by shift disengagement
-        var throttleEff = isShifting ? (input.throttle * 0.25) : input.throttle;
-        var speedAbs = Math.abs(forwardSpeed);
-
-        // Standstill or low-speed launch burnout wheelspin
-        var isBurnoutLaunch = (speedAbs < 8.0 && throttleEff > 0.75);
-        if (isBurnoutLaunch) {
-            var burnoutRatio = (1.0 - speedAbs / 8.0) * throttleEff * config.tires.wheelspinAmount;
-            wheelSpinVelocity[2] += burnoutRatio * 140.0 * dt;
-            wheelSpinVelocity[3] += burnoutRatio * 140.0 * dt;
-            accelRate *= Math.max(0.65, 1.0 - burnoutRatio * 0.35);
-        }
-
-        var netForce = 0.0;
-        if (throttleEff > 0.0) {
-            if (forwardSpeed < maxSpeed) {
-                netForce = accelRate * throttleEff * config.mass;
-            }
-        } else if (input.brake > 0.0) {
-            if (forwardSpeed > 0.5) {
-                netForce = -config.brakeDecel * mu * input.brake * config.mass;
-            } else {
-                netForce = -(config.baseAcceleration * 0.5) * mu * input.brake * config.mass;
-            }
-        } else {
-            if (speedAbs < 0.35) {
-                // Smoothly damp creeping velocity to a clean standstill without sign-flip chatter
-                netForce = 0.0;
-                forwardSpeed *= Math.max(0.0, 1.0 - 20.0 * dt);
-                if (Math.abs(forwardSpeed) < 0.01) forwardSpeed = 0.0;
-            } else {
-                var sign = forwardSpeed > 0 ? 1.0 : -1.0;
-                var decelForce = (config.tires.rollingResistance * mu + (forwardSpeed * forwardSpeed * config.aero.dragCoeff)) * config.mass;
-                netForce = -sign * decelForce;
-            }
-        }
-
-        return netForce;
-    }
-
-    /**
-     * Simulates tire slip angle adhesion curves, lateral cornering grip, front/rear slip bias,
-     * handbrake traction breakaway, drift state transitions, counter-steer torque injection,
-     * cornering wheelspin, and forward momentum biasing with zero heap allocations.
-     */
-    function updateLateralAndDrift(dt:Float, input:InputController, fwdX:Float, fwdY:Float, rightX:Float, rightY:Float, rightZ:Float, upX:Float, upY:Float, upZ:Float, downforceMag:Float, ?groundProvider:world.IGroundProvider) {
-        var driftCfg = config.drift;
-        var tireCfg = config.tires;
-        var surfaceFriction = (groundProvider != null) ? groundProvider.getGroundFriction(pos.x, pos.y) : 1.0;
-        var effectiveFriction = tireCfg.groundFriction * surfaceFriction;
-        var speedAbs = Math.abs(forwardSpeed);
-        var speedRatio = Math.min(1.0, speedAbs / config.baseTopSpeed);
-
-        // 1. Slip Angle Calculation: alpha = atan2(vLateral, |vForward|)
-        var slipAngle = Math.atan2(lateralVelocity, Math.max(0.5, speedAbs));
-
-        // Evaluate normalized lateral grip curve
-        var normalizedAlpha = slipAngle / tireCfg.peakSlipAngle;
-        // Arcade Pacejka-like grip saturation curve: 2 * x / (1 + x^2)
-        var gripFactor = (2.0 * normalizedAlpha) / (1.0 + (normalizedAlpha * normalizedAlpha));
-        gripFactor = Math.max(-1.0, Math.min(1.0, gripFactor));
-
-        // 2. Front vs Rear Tire Slip Bias:
-        var bias = tireCfg.tireSlipBias;
-        var frontGripMult = (1.0 - bias * 0.40) * effectiveFriction;
-        var rearGripMult = (1.0 + bias * 0.40) * effectiveFriction;
-
-        // 3. Proper Handbrake Function (SKLL.md De-grip rear end dynamically):
-        if (input.handbrake) {
-            rearGripMult *= 0.15; // De-grip rear end dynamically per SKLL.md
-
-            // Handbrake drag on longitudinal forward motion
-            if (speedAbs > 0.5) {
-                var hbForce = 14.0 * effectiveFriction * config.mass * (forwardSpeed > 0 ? -1.0 : 1.0);
-                scratchVec3A.init(fwdX * hbForce, fwdY * hbForce, 0);
-                chassisBody.applyForceToCenter(scratchVec3A);
-            }
-
-            // Induce yaw rotation into the turn if steering or sliding
-            if (speedAbs > 2.0) {
-                var yawSteer = input.steer != 0.0 ? -input.steer : (lateralVelocity < 0 ? 0.8 : -0.8);
-                var hbTorque = yawSteer * 3.2 * config.yawInertia * 4.0;
-                scratchVec3A.init(0, 0, hbTorque);
-                chassisBody.applyTorque(scratchVec3A);
-            }
-        }
-
-        // 4. Power Oversteer & Wheelspin:
-        var isPowerTurn = (Math.abs(input.steer) > 0.25 && input.throttle > 0.75 && speedAbs > 4.0);
-        if (isPowerTurn) {
-            var spinKick = input.throttle * tireCfg.wheelspinAmount;
-            wheelSpinVelocity[2] += spinKick * 60.0 * dt;
-            wheelSpinVelocity[3] += spinKick * 60.0 * dt;
-            rearGripMult *= Math.max(0.25, 1.0 - (tireCfg.wheelspinAmount * 0.35));
-            var pwrTorque = -input.steer * 1.8 * tireCfg.wheelspinAmount * config.yawInertia * 3.0;
-            scratchVec3A.init(0, 0, pwrTorque);
-            chassisBody.applyTorque(scratchVec3A);
-        }
-
-        // 5. Vehicle Chassis Slip Angle & Drift Trigger Evaluation:
-        var carSlipAngle = Math.atan2(Math.abs(lateralVelocity), Math.max(1.0, speedAbs));
-        var triggerAngle = driftCfg.driftTriggerAngle;
-
-        var driftInitiatedByHandbrake = input.handbrake && Math.abs(input.steer) > 0.15;
-        var driftInitiatedByAngle = (carSlipAngle >= triggerAngle && Math.abs(input.steer) > 0.18);
-        var driftInitiatedByBrakeFlick = (input.brake > 0.2 && input.throttle > 0.1 && Math.abs(input.steer) > 0.22);
-
-        if (!isDrifting && (driftInitiatedByHandbrake || driftInitiatedByAngle || driftInitiatedByBrakeFlick) && speedAbs > driftCfg.minDriftSpeed) {
-            isDrifting = true;
-            driftDirection = (input.steer != 0.0) ? (input.steer > 0.0 ? 1.0 : -1.0) : (lateralVelocity > 0.0 ? 1.0 : -1.0);
-        }
-
-        if (isDrifting) {
-            var counterSteeringOut = (driftDirection > 0 && input.steer < -0.70) || (driftDirection < 0 && input.steer > 0.70);
-            var isStraightenedOut = (carSlipAngle < (triggerAngle * 0.35) && !input.handbrake && Math.abs(input.steer) < 0.10);
-            if (speedAbs < driftCfg.driftExitSpeed || counterSteeringOut || isStraightenedOut) {
-                isDrifting = false;
-            }
-        }
-
-        // 6. Lateral Cornering & Drift Yaw Simulation
-        var fLateralMax = effectiveFriction * downforceMag;
-
-        if (isDrifting) {
-            var targetAngle = driftDirection * 0.45;
-            driftAngle += (targetAngle - driftAngle) * 5.5 * dt;
-
-            // Lateral tire stiffness is scaled down during drift (scaled with rear grip)
-            var latGripScale = driftCfg.lateralStiffnessScale * rearGripMult;
-            var latForceRaw = -lateralVelocity * tireCfg.baseLateralStiffness * latGripScale * config.mass * 0.15;
-            var latForce = Math.max(-fLateralMax, Math.min(fLateralMax, latForceRaw));
-            scratchVec3A.init(rightX * latForce, rightY * latForce, rightZ * latForce);
-            chassisBody.applyForceToCenter(scratchVec3A);
-
-            // Counter-steering stabilizes slide angle, steering with slide tightens yaw
-            var counterSteerFactor = (input.steer * driftDirection < 0) ? driftCfg.counterSteerTorque : 1.5;
-            var targetYawRate = (-driftDirection * driftCfg.driftYawRate * 0.35 - input.steer * counterSteerFactor * 0.35);
-            var curAngVel = chassisBody.getAngularVelocity();
-            var curYawVel = curAngVel.x * upX + curAngVel.y * upY + curAngVel.z * upZ;
-            var yawTorque = (targetYawRate - curYawVel) * config.yawInertia * 10.0;
-            scratchVec3A.init(upX * yawTorque, upY * yawTorque, upZ * yawTorque);
-            chassisBody.applyTorque(scratchVec3A);
-
-            // Forward Velocity Biasing: Criterion-style momentum assist aligning velocity vector with forward heading
-            var biasFactor = Math.min(1.0, driftCfg.forwardBiasRate * dt);
-            var linV = chassisBody.getLinearVelocity();
-            var currentHorizSpeed = Math.sqrt(linV.x * linV.x + linV.y * linV.y);
-            var targetVx = fwdX * currentHorizSpeed;
-            var targetVy = fwdY * currentHorizSpeed;
-            var fwdBiasForceX = (targetVx - linV.x) * config.mass * biasFactor * 2.5;
-            var fwdBiasForceY = (targetVy - linV.y) * config.mass * biasFactor * 2.5;
-            scratchVec3A.init(fwdBiasForceX, fwdBiasForceY, 0.0);
-            chassisBody.applyForceToCenter(scratchVec3A);
-        } else {
-            driftAngle += (0.0 - driftAngle) * 10.0 * dt;
-
-            // Normal cornering: standard lateral grip restoring velocity towards zero clamped by normal load
-            if (speedAbs < 0.35 && Math.abs(lateralVelocity) < 0.35) {
-                lateralVelocity *= Math.max(0.0, 1.0 - 20.0 * dt);
-                if (Math.abs(lateralVelocity) < 0.01) lateralVelocity = 0.0;
-            } else {
-                var latForceRaw = -lateralVelocity * tireCfg.baseLateralStiffness * frontGripMult * config.mass * 0.25;
-                var latForce = Math.max(-fLateralMax, Math.min(fLateralMax, latForceRaw));
-                scratchVec3A.init(rightX * latForce, rightY * latForce, rightZ * latForce);
-                chassisBody.applyForceToCenter(scratchVec3A);
-            }
-
-            // Standard Ackermann steering rack cornering authority scaled with speed & front grip
-            // Steering authority applied around vehicle local UP axis to prevent roll cross-coupling on slopes
-            if (speedAbs > 0.25) {
-                var steerAuthority = 2.4 * Math.min(1.0, speedRatio + 0.35) * frontGripMult;
-                var fwdSign = forwardSpeed >= 0 ? 1.0 : -1.0;
-                var targetYawRate = -input.steer * steerAuthority * fwdSign * 0.70;
-                var curAngVel = chassisBody.getAngularVelocity();
-                var curYawVel = curAngVel.x * upX + curAngVel.y * upY + curAngVel.z * upZ;
-                var steerTorque = (targetYawRate - curYawVel) * config.yawInertia * 8.0;
-                scratchVec3A.init(upX * steerTorque, upY * steerTorque, upZ * steerTorque);
-                chassisBody.applyTorque(scratchVec3A);
-            } else {
-                var curAngVel = chassisBody.getAngularVelocity();
-                scratchVec3A.init(curAngVel.x * 0.8, curAngVel.y * 0.8, curAngVel.z * 0.5);
-                chassisBody.setAngularVelocity(scratchVec3A);
-            }
-        }
+    static inline function clampF(v:Float, lo:Float, hi:Float):Float {
+        return v < lo ? lo : (v > hi ? hi : v);
     }
 }

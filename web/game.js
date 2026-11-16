@@ -124,27 +124,12 @@ Lambda.array = function(it) {
 	while(i.hasNext()) a.push(i.next());
 	return a;
 };
-var IntroState = $hxEnums["IntroState"] = { __ename__:true,__constructs__:null
-	,None: {_hx_name:"None",_hx_index:0,__enum__:"IntroState",toString:$estr}
-	,Studio: {_hx_name:"Studio",_hx_index:1,__enum__:"IntroState",toString:$estr}
-	,Engine: {_hx_name:"Engine",_hx_index:2,__enum__:"IntroState",toString:$estr}
-	,Disclaimer: {_hx_name:"Disclaimer",_hx_index:3,__enum__:"IntroState",toString:$estr}
-	,Complete: {_hx_name:"Complete",_hx_index:4,__enum__:"IntroState",toString:$estr}
-};
-IntroState.__constructs__ = [IntroState.None,IntroState.Studio,IntroState.Engine,IntroState.Disclaimer,IntroState.Complete];
-IntroState.__empty_constructs__ = [IntroState.None,IntroState.Studio,IntroState.Engine,IntroState.Disclaimer,IntroState.Complete];
 var AppState = $hxEnums["AppState"] = { __ename__:true,__constructs__:null
 	,IntroSequence: {_hx_name:"IntroSequence",_hx_index:0,__enum__:"AppState",toString:$estr}
 	,InGameUI: {_hx_name:"InGameUI",_hx_index:1,__enum__:"AppState",toString:$estr}
 };
 AppState.__constructs__ = [AppState.IntroSequence,AppState.InGameUI];
 AppState.__empty_constructs__ = [AppState.IntroSequence,AppState.InGameUI];
-var MapMode = $hxEnums["MapMode"] = { __ename__:true,__constructs__:null
-	,Circuit: {_hx_name:"Circuit",_hx_index:0,__enum__:"MapMode",toString:$estr}
-	,Sandbox: {_hx_name:"Sandbox",_hx_index:1,__enum__:"MapMode",toString:$estr}
-};
-MapMode.__constructs__ = [MapMode.Circuit,MapMode.Sandbox];
-MapMode.__empty_constructs__ = [MapMode.Circuit,MapMode.Sandbox];
 var h3d_IDrawable = function() { };
 $hxClasses["h3d.IDrawable"] = h3d_IDrawable;
 h3d_IDrawable.__name__ = "h3d.IDrawable";
@@ -246,421 +231,290 @@ var Main = function() {
 	this.totalLaps = 3;
 	this.currentLap = 1;
 	this.raceTimer = 0.0;
-	this.showcaseAngle = 0.0;
-	this.rearWheelSpinAngle = 0.0;
-	this.wheelSpinAngle = 0.0;
-	this.disclaimerMinDuration = 5.5;
-	this.isLoadingComplete = false;
-	this.isLoadingStarted = false;
-	this.discLogos = [];
-	this.isShowcaseFadingIn = false;
-	this.showcaseFadeDuration = 1.2;
-	this.showcaseFadeTimer = 0.0;
-	this.isFadingOut = false;
-	this.introAlpha = 0.0;
+	this.pausedByOrientation = false;
+	this.systemsInitialized = false;
+	this.syncedIntroTimer = 0.0;
 	this.introTimer = 0.0;
-	this.currentMapMode = MapMode.Circuit;
-	this.introState = IntroState.Studio;
+	this.currentMapMode = world_MapMode.Circuit;
+	this.introState = core_IntroState.Studio;
 	this.appState = AppState.IntroSequence;
 	hxd_App.call(this);
 };
 $hxClasses["Main"] = Main;
 Main.__name__ = "Main";
 Main.main = function() {
-	window.onload = function() {
+	var startApp = function() {
+		if(Boolean(window.__mobPortraitBlocked)) {
+			window.addEventListener("mob-orientation-unlocked",function(_) {
+				if(!window.app && !window.__mobPortraitBlocked) {
+					new Main();
+				}
+			},{ once : true});
+			return;
+		}
 		new Main();
 	};
+	var readyState = window.document.readyState;
+	if(readyState == "complete") {
+		startApp();
+	} else {
+		window.addEventListener("load",function(_) {
+			startApp();
+		},{ once : true});
+	}
 };
 Main.__super__ = hxd_App;
 Main.prototype = $extend(hxd_App.prototype,{
 	init: function() {
+		var _gthis = this;
 		hxd_App.prototype.init.call(this);
+		this.config = config_GameConfig.getDefault();
+		window.app = this;
+		window.IntroState = core_IntroState;
+		window.MapMode = world_MapMode;
+		this.syncOrientationPauseFromHost();
+		this.s2d.set_scaleMode(h2d_ScaleMode.AutoZoom(this.config.resolution.baseWidth,this.config.resolution.baseHeight,false));
 		this.engine.backgroundColor = 0;
 		hxd_Res.set_loader(new hxd_res_Loader(new hxd_fs_EmbedFileSystem(haxe_Unserializer.run("oy5:iconsoy9:brake.pngty13:gas-pedal.pngty8:burn.pngty14:hand-brake.pngtgy6:assetsoy3:caroy23:no_mirrors_corradon.pngty17:bump_corradon.pngty7:car.DAEty10:car__A.avity19:normal_corradon.pngty40:Kopie%20von%20Kopie%20von%20corradon.pngty7:vw5.maxty12:corradon.pngty7:car.3DSty7:vw6.maxty7:car.objtgy10:Car%20Packoy3:FBXoy17:SimpleCarHigh.fbxty8:Taxi.fbxty18:SimpleCarShort.fbxty12:BasicCar.fbxty11:RaceCar.fbxty10:CopCar.fbxtgy3:OBJoy17:SimpleCarHigh.mtlty12:BasicCar.mtlty17:SimpleCarHigh.objty10:CopCar.objty8:Taxi.mtlty10:CopCar.mtlty11:RaceCar.mtlty11:RaceCar.objty12:BasicCar.objty18:SimpleCarShort.objty18:SimpleCarShort.mtlty8:Taxi.objtgy6:Blendsoy14:BasicCar.blendty20:SimpleCarShort.blendty10:Taxi.blendty13:RaceCar.blendty12:CopCar.blendty19:SimpleCarHigh.blendty14:CopTexture.pngty14:CarTexture.pngty18:RaceCarTexture.pngty15:TaxiTexture.pngtgggy5:introoR0oy15:logo_webgl.webpty14:logo_haxe.webpty15:logo_heaps.webptgy22:heaps-haxe-splash.webpty11:unoptimizedoR0oy13:logo_haxe.pngty14:logo_webgl.pngty14:logo_heaps.pngtgy20:jagofr-rvl-spash.jpgty21:heaps-haxe-splash.jpgtgy22:jagofr-rvl-splash.webptgy5:fontsoy14:stack_sans.ttfty11:symbols.ttftgg"))));
 		ui_FontManager.init();
-		this.input = new input_InputController();
-		this.s2d.set_scaleMode(h2d_ScaleMode.AutoZoom(1280,720,false));
-		this.buildIntroScreens();
-		this.setIntroScreen(IntroState.Studio);
-		window.app = this;
-		window.IntroState = IntroState;
-		window.MapMode = MapMode;
-	}
-	,loadWebpTile: function(path,onLoaded) {
-		var img = new Image();
-		img.onload = function(_) {
-			var w = img.naturalWidth;
-			var h = img.naturalHeight;
-			var canvas = window.document.createElement("canvas");
-			canvas.width = w;
-			canvas.height = h;
-			var ctx = canvas.getContext("2d",null);
-			ctx.drawImage(img,0,0);
-			var imgData = ctx.getImageData(0,0,w,h);
-			var bytes = haxe_io_Bytes.ofData(imgData.data.buffer);
-			var bmp = new hxd_BitmapData(w,h);
-			bmp.setPixels(new hxd_Pixels(w,h,bytes,hxd_PixelFormat.RGBA));
-			var tile = h2d_Tile.fromTexture(h3d_mat_Texture.fromBitmap(bmp));
-			onLoaded(tile);
+		this.input = new input_InputController(this.config.input);
+		this.preloader = new core_AssetPreloader(this.config.intro);
+		this.introController = new core_IntroController(this.s2d,this.preloader,this.config.intro);
+		this.introController.onAssetsBound = $bind(this,this.syncIntroFacade);
+		this.introController.onStateChanged = function(_) {
+			_gthis.syncIntroFacade();
 		};
-		img.onerror = function(err) {
-			haxe_Log.trace("WebP load failure for: " + path,{ fileName : "src/Main.hx", lineNumber : 212, className : "Main", methodName : "loadWebpTile"});
-		};
-		img.src = path;
+		this.introController.onIntroComplete = $bind(this,this.activateMainSplash);
+		this.introController.setScreen(core_IntroState.Studio);
+		this.syncIntroFacade();
+		this.preloader.start($bind(this,this.ensureDeferredSystemsInitialized));
 	}
-	,buildIntroScreens: function() {
+	,ensureDeferredSystemsInitialized: function() {
 		var _gthis = this;
-		this.introContainer = new h2d_Object(this.s2d);
-		this.introBg = new h2d_Bitmap(h2d_Tile.fromColor(0,1,1,1.0),this.introContainer);
-		this.screenStudio = new h2d_Object(this.introContainer);
-		this.loadWebpTile("intro/jagofr-rvl-splash.webp",function(tile) {
-			_gthis.studioSplashBmp = new h2d_Bitmap(tile,_gthis.screenStudio);
-			_gthis.layoutIntro();
-		});
-		this.screenEngine = new h2d_Object(this.introContainer);
-		this.loadWebpTile("intro/heaps-haxe-splash.webp",function(tile) {
-			_gthis.engineSplashBmp = new h2d_Bitmap(tile,_gthis.screenEngine);
-			_gthis.layoutIntro();
-		});
-		this.screenDisclaimer = new h2d_Object(this.introContainer);
-		this.discGraphics = new h2d_Graphics(this.screenDisclaimer);
-		this.discHeader = new h2d_Text(ui_FontManager.titleFont,this.screenDisclaimer);
-		this.discHeader.set_text("TRADEMARK & LEGAL DISCLOSURES");
-		this.discHeader.set_textColor(58879);
-		this.discHeader.set_textAlign(h2d_Align.Center);
-		this.discBody = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
-		this.discBody.set_textColor(12767712);
-		this.discBody.set_textAlign(h2d_Align.Center);
-		this.discBody.set_lineSpacing(5.0);
-		this.discBody.set_text("M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" + "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" + "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" + "are the intellectual property of their respective creators. All rights reserved.\n\n" + "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" + "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" + "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" + "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" + "Please play in a well-lit environment and take a 15-minute break for every hour of play.");
-		this.discVersion = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
-		this.discVersion.set_text("v" + "0.4.4" + " (Build " + "0010" + ")");
-		this.discVersion.set_textColor(5927822);
-		this.discVersion.set_textAlign(h2d_Align.Center);
-		this.logoRow = new h2d_Object(this.screenDisclaimer);
-		var logoPaths = ["intro/icons/logo_haxe.webp","intro/icons/logo_heaps.webp","intro/icons/logo_webgl.webp"];
-		var _g = 0;
-		while(_g < logoPaths.length) this.loadWebpTile(logoPaths[_g++],function(tile) {
-			var bmp = new h2d_Bitmap(tile,_gthis.logoRow);
-			_gthis.discLogos.push(bmp);
-			_gthis.layoutIntro();
-		});
-		this.layoutIntro();
-	}
-	,setIntroScreen: function(target) {
-		this.introState = target;
-		this.introTimer = 0.0;
-		this.introAlpha = 0.0;
-		this.isFadingOut = false;
-		this.screenStudio.set_visible(this.introState == IntroState.Studio);
-		this.screenEngine.set_visible(this.introState == IntroState.Engine);
-		this.screenDisclaimer.set_visible(this.introState == IntroState.Disclaimer);
-		this.screenStudio.alpha = 0.0;
-		this.screenEngine.alpha = 0.0;
-		this.screenDisclaimer.alpha = 0.0;
-		if(this.introState == IntroState.Disclaimer && !this.isLoadingStarted) {
-			this.startBackgroundLoading();
+		if(this.systemsInitialized) {
+			return;
 		}
-		this.layoutIntro();
-	}
-	,updateIntro: function(dt) {
-		this.introTimer += dt;
-		if((this.introState == IntroState.Studio || this.introState == IntroState.Engine) && this.input.anyKeyPressed && !this.isFadingOut) {
-			this.input.flushInputs();
-			this.isFadingOut = true;
-			this.introTimer = Math.max(this.introTimer,2.5);
-		}
-		switch(this.introState._hx_index) {
-		case 1:case 2:
-			if(this.introTimer < 0.8) {
-				this.introAlpha = this.introTimer / 0.8;
-			} else if(this.introTimer < 2.4) {
-				this.introAlpha = 1.0;
-			} else if(this.introTimer < 3.2) {
-				this.introAlpha = 1.0 - (this.introTimer - 2.4) / 0.80000000000000027;
-			} else {
-				this.introAlpha = 0.0;
-				this.setIntroScreen(this.introState == IntroState.Studio ? IntroState.Engine : IntroState.Disclaimer);
-				return;
-			}
-			(this.introState == IntroState.Studio ? this.screenStudio : this.screenEngine).alpha = Math.max(0.0,Math.min(1.0,this.introAlpha));
-			break;
-		case 3:
-			if(this.introTimer < 1.0) {
-				this.introAlpha = this.introTimer / 1.0;
-				this.screenDisclaimer.alpha = this.introAlpha;
-			} else if(this.introTimer < this.disclaimerMinDuration || !this.isLoadingComplete) {
-				this.introAlpha = 1.0;
-				this.screenDisclaimer.alpha = 1.0;
-			} else if(this.introTimer < this.disclaimerMinDuration + 1.0) {
-				this.introAlpha = 1.0 - Math.min(1.0,(this.introTimer - this.disclaimerMinDuration) / 1.0);
-				this.screenDisclaimer.alpha = this.introAlpha;
-				this.introBg.alpha = 1.0;
-			} else {
-				this.finishIntroSequence();
-				return;
-			}
-			break;
-		default:
-		}
-	}
-	,finishIntroSequence: function() {
-		if(!this.isLoadingStarted) {
-			this.startBackgroundLoading();
-		}
-		this.introState = IntroState.Complete;
-		this.appState = AppState.InGameUI;
-		var _this = this.introContainer;
-		if(_this != null && _this.parent != null) {
-			_this.parent.removeChild(_this);
-		}
-		this.input.flushInputs();
-		this.engine.backgroundColor = 1711910;
-		this.isShowcaseFadingIn = true;
-		this.showcaseFadeTimer = 0.0;
-		this.showcaseCurtain = new h2d_Bitmap(h2d_Tile.fromColor(0,1,1,1.0),this.s2d);
-		var _this = this.showcaseCurtain;
-		_this.posChanged = true;
-		_this.scaleX = this.s2d.width;
-		var _this = this.showcaseCurtain;
-		_this.posChanged = true;
-		_this.scaleY = this.s2d.height;
-		if(this.ui != null) {
-			this.ui.set_visible(true);
-			this.ui.alpha = 0.0;
-			this.ui.showSplash();
-		}
-	}
-	,startBackgroundLoading: function() {
-		this.isLoadingStarted = true;
+		this.systemsInitialized = true;
 		this.saveData = save_SaveSystem.load();
-		this.input.steerSensitivity = this.saveData.steerSensitivity != null && this.saveData.steerSensitivity > 0.0 ? this.saveData.steerSensitivity : 1.0;
-		this.audio = new audio_AudioManager();
+		this.input.loadFromSave(this.saveData);
+		this.audio = new audio_AudioManager(this.config.audio);
 		this.audio.masterVolume = this.saveData.masterVol;
 		this.audio.musicVolume = this.saveData.musicVol;
 		this.audio.sfxVolume = this.saveData.sfxVol;
-		this.carPhysics = new physics_CarPhysics(0.0,0.0,0.0);
-		this.chaseCam = new camera_ChaseCamera(this.s3d.camera,0.0,-10.0,4.0);
-		this.postRenderer = new graphics_PostProcessRenderer();
-		this.s3d.set_renderer(this.postRenderer);
-		this.s3d.camera.zFar = 1500.0;
-		this.skybox = new world_Skybox(this.s3d);
-		this.fpsText = new h2d_Text(ui_FontManager.regularFont,this.s2d);
-		this.fpsText.set_textColor(16772608);
-		var _this = this.fpsText;
-		_this.posChanged = true;
-		_this.x = 14;
-		var _this = this.fpsText;
-		_this.posChanged = true;
-		_this.y = 14;
-		this.fpsText.set_visible(false);
-		this.speedText = new h2d_Text(ui_FontManager.regularFont,this.s2d);
-		this.speedText.set_textColor(58879);
-		var _this = this.speedText;
-		_this.posChanged = true;
-		_this.x = 14;
-		var _this = this.speedText;
-		_this.posChanged = true;
-		_this.y = 36;
-		this.speedText.set_visible(false);
-		var sunDir = new h3d_VectorImpl(-0.55,0.78,-0.32);
-		var _this = sunDir;
-		var k = _this.x * _this.x + _this.y * _this.y + _this.z * _this.z;
-		if(k < 1e-20) {
-			k = 0;
-		} else {
-			k = 1. / Math.sqrt(k);
-		}
-		_this.x *= k;
-		_this.y *= k;
-		_this.z *= k;
-		this.dirLight = new h3d_scene_fwd_DirLight(sunDir,this.s3d);
-		var _this = this.dirLight;
-		_this.x = 350.0;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		_this.y = -250.0;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		_this.z = 140.0;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		var _this = this.dirLight.get_color();
-		_this.x = 1.;
-		_this.y = 0.94901960784313721;
-		_this.z = 0.85098039215686272;
-		var fillDir = new h3d_VectorImpl(0.55,-0.78,0.45);
-		var _this = fillDir;
-		var k = _this.x * _this.x + _this.y * _this.y + _this.z * _this.z;
-		if(k < 1e-20) {
-			k = 0;
-		} else {
-			k = 1. / Math.sqrt(k);
-		}
-		_this.x *= k;
-		_this.y *= k;
-		_this.z *= k;
-		this.fillLight = new h3d_scene_fwd_DirLight(fillDir,this.s3d);
-		var _this = this.fillLight.get_color();
-		_this.x = 0.47058823529411764;
-		_this.y = 0.54509803921568623;
-		_this.z = 0.61960784313725492;
-		this.fillLight.set_enableSpecular(false);
-		this.gfx = new graphics_GraphicsManager(this.s3d,this.s2d,this.dirLight,this.saveData.graphics,this.postRenderer);
-		var terrainPrim = new h3d_prim_Cube(800.0,800.0,0.4,true);
-		terrainPrim.unindex();
-		terrainPrim.addNormals();
-		this.terrainGround = new h3d_scene_Mesh(terrainPrim,null,this.s3d);
-		var _this = this.terrainGround.material.mshader.color__;
-		_this.x = 0.066666666666666666;
-		_this.y = 0.0784313725490196;
-		_this.z = 0.094117647058823528;
-		_this.w = 0.;
-		var _this = this.terrainGround;
-		_this.x = 110.0;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		var _this = this.terrainGround;
-		_this.y = 90.0;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		var _this = this.terrainGround;
-		_this.z = -2.5;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		this.track = new world_Track(this.s3d);
-		this.sandboxMap = new world_SandboxMap(this.s3d);
-		this.sandboxMap.flags &= -3;
-		this.traffic = new entities_TrafficSystem(this.track.waypoints,this.s3d);
-		this.playerMesh = new entities_CarMesh(this.s3d);
-		this.ui = new ui_UIManager(this.input,this.saveData.graphics,this.saveData.hasActiveRun,this.s2d);
+		this.world = new world_WorldManager(this.s3d,this.config);
+		this.gfx = new graphics_GraphicsManager(this.s3d,this.s2d,this.world.dirLight,this.saveData.graphics);
+		this.gfx.applyAll();
+		this.multiplayer = new net_MultiplayerManager(new net_WebSocketTransport());
+		this.ui = new ui_UIManager(this.input,this.saveData.graphics,this.saveData.hasActiveRun,this.s2d,this.multiplayer);
 		this.ui.set_visible(false);
 		this.ui.onMenuAction = $bind(this,this.handleMenuAction);
-		this.loadMap(MapMode.Circuit);
-		this.resetCarToStartLine();
-		this.isLoadingComplete = true;
+		this.ui.onPauseRequested = $bind(this,this.pauseActiveGame);
+		this.ui.builder.optionsView.controlsPanel.getSaveData = function() {
+			return _gthis.saveData;
+		};
+		this.ui.builder.optionsView.controlsPanel.onSaveDataUpdated = function(updated) {
+			_gthis.saveData = updated;
+		};
+		this.ui.builder.touchControlsHUD.getTouchSettings = function() {
+			if(_gthis.saveData != null) {
+				return _gthis.saveData.touchSettings;
+			} else {
+				return null;
+			}
+		};
+		this.multiplayer.onLobbyChanged = function() {
+			if(_gthis.ui != null && _gthis.ui.builder != null && _gthis.ui.builder.multiplayerLobbyView != null) {
+				_gthis.ui.builder.multiplayerLobbyView.refreshFromManager();
+				if(_gthis.ui.currentState == ui_components_UIState.MultiplayerLobby) {
+					_gthis.ui.layout();
+				}
+			}
+		};
+		this.multiplayer.onMatchStart = function(mode,mySpawn,roster) {
+			_gthis.loadMap(mode);
+			if(_gthis.world != null) {
+				_gthis.world.clearRemoteCars();
+				_gthis.world.setTrafficEnabled(false);
+				_gthis.world.spawnPlayerAt(mySpawn.x,mySpawn.y,mySpawn.z,mySpawn.yaw);
+				var _g = 0;
+				while(_g < roster.length) {
+					var p = roster[_g];
+					++_g;
+					if(p.peerId == _gthis.multiplayer.localPeerId) {
+						_gthis.world.setPlayerPaintColor(p.colorHex);
+					}
+				}
+			}
+			if(_gthis.ui != null) {
+				_gthis.ui.builder.inGameHUDView.remotePeerMarkers = [];
+				_gthis.raceTimer = 0.0;
+				_gthis.currentLap = 1;
+				_gthis.appState = AppState.InGameUI;
+				_gthis.ui.set_visible(true);
+				_gthis.ui.alpha = 1.0;
+				_gthis.ui.showInGame();
+			}
+		};
+		this.multiplayer.onReturnToLobby = function() {
+			if(_gthis.world != null) {
+				_gthis.world.clearRemoteCars();
+				_gthis.world.setTrafficEnabled(true);
+			}
+			if(_gthis.ui != null) {
+				_gthis.ui.builder.inGameHUDView.remotePeerMarkers = [];
+				_gthis.ui.showMultiplayerLobby();
+			}
+		};
+		this.multiplayer.onHostDisconnected = function() {
+			if(_gthis.world != null) {
+				_gthis.world.clearRemoteCars();
+				_gthis.world.setTrafficEnabled(true);
+			}
+			if(_gthis.ui != null) {
+				_gthis.ui.builder.inGameHUDView.remotePeerMarkers = [];
+			}
+		};
+		this.syncWorldFacade();
+		this.syncHUDMapBounds();
+		if(this.appState == AppState.IntroSequence) {
+			if(this.engine != null) {
+				this.engine.backgroundColor = 0;
+			}
+			this.layoutIntro();
+		}
+	}
+	,activateMainSplash: function() {
+		this.ensureDeferredSystemsInitialized();
+		this.syncIntroFacade();
+		this.appState = AppState.InGameUI;
+		this.engine.backgroundColor = 1711910;
+		this.input.flushInputs();
+		if(this.ui != null) {
+			this.ui.set_visible(true);
+			var inviteRoom = net_MultiplayerManager.detectInviteRoomFromUrl();
+			if(inviteRoom != null && this.multiplayer != null) {
+				this.ui.alpha = 1.0;
+				this.multiplayer.joinRoom(inviteRoom,"GUEST");
+				this.ui.showMultiplayerLobby();
+			} else {
+				this.ui.alpha = 0.0;
+				this.ui.showSplash();
+			}
+		}
+	}
+	,syncIntroFacade: function() {
+		if(this.introController == null) {
+			return;
+		}
+		this.introState = this.introController.state;
+		this.introTimer = this.introController.timer;
+		this.syncedIntroTimer = this.introTimer;
+		this.introContainer = this.introController.introContainer;
+		this.introBg = this.introController.introBg;
+		this.screenStudio = this.introController.screenStudio;
+		this.screenEngine = this.introController.screenEngine;
+		this.screenDisclaimer = this.introController.screenDisclaimer;
+		this.studioSplashBmp = this.introController.studioSplashBmp;
+		this.engineSplashBmp = this.introController.engineSplashBmp;
+		this.discHeader = this.introController.discHeader;
+	}
+	,syncWorldFacade: function() {
+		if(this.world == null) {
+			return;
+		}
+		this.currentMapMode = this.world.currentMapMode;
+		this.track = this.world.track;
+		this.sandboxMap = this.world.sandboxMap;
+		this.traffic = this.world.traffic;
+		this.playerMesh = this.world.playerMesh;
+		this.carPhysics = this.world.carPhysics;
+		this.chaseCam = this.world.chaseCam;
+	}
+	,syncHUDMapBounds: function() {
+		if(this.ui == null || this.ui.builder.inGameHUDView == null || this.world == null) {
+			return;
+		}
+		if(this.world.currentMapMode == world_MapMode.Circuit && this.world.track != null) {
+			this.ui.builder.inGameHUDView.initWaypoints(this.world.track.waypoints);
+		} else if(this.world.currentMapMode == world_MapMode.Sandbox) {
+			this.ui.builder.inGameHUDView.initSandboxBounds(195.0);
+		}
+	}
+	,setIntroScreen: function(target) {
+		if(this.introController != null) {
+			this.introController.setScreen(target);
+			this.syncIntroFacade();
+		}
+	}
+	,layoutIntro: function() {
+		if(this.introController != null) {
+			this.introController.layout();
+		}
+	}
+	,finishIntroSequence: function() {
+		this.ensureDeferredSystemsInitialized();
+		if(this.introController != null) {
+			this.introController.finishSequence();
+		} else {
+			this.activateMainSplash();
+		}
 	}
 	,loadMap: function(mode) {
-		this.currentMapMode = mode;
-		if(this.skybox != null) {
-			this.skybox.flags |= 2;
+		if(this.world == null) {
+			return;
 		}
-		if(mode == MapMode.Circuit) {
-			if(this.sandboxMap != null && this.carPhysics != null) {
-				this.sandboxMap.unregisterPhysicsColliders(this.carPhysics.physicsWorld);
+		this.world.loadMap(mode);
+		this.syncWorldFacade();
+		this.syncHUDMapBounds();
+		if(this.appState == AppState.IntroSequence) {
+			if(this.engine != null) {
+				this.engine.backgroundColor = 0;
 			}
-			if(this.track != null && this.carPhysics != null) {
-				this.track.registerPhysicsColliders(this.carPhysics.physicsWorld);
-			}
-			if(this.track != null) {
-				this.track.flags |= 2;
-			}
-			if(this.terrainGround != null) {
-				this.terrainGround.flags |= 2;
-			}
-			if(this.sandboxMap != null) {
-				this.sandboxMap.flags &= -3;
-			}
-			if(this.traffic != null) {
-				this.traffic.flags |= 2;
-			}
-			if(this.ui != null && this.ui.builder.inGameHUDView != null && this.track != null) {
-				this.ui.builder.inGameHUDView.initWaypoints(this.track.waypoints);
-			}
-		} else {
-			if(this.track != null && this.carPhysics != null) {
-				this.track.unregisterPhysicsColliders(this.carPhysics.physicsWorld);
-			}
-			if(this.sandboxMap != null && this.carPhysics != null) {
-				this.sandboxMap.registerPhysicsColliders(this.carPhysics.physicsWorld);
-			}
-			if(this.track != null) {
-				this.track.flags &= -3;
-			}
-			if(this.terrainGround != null) {
-				this.terrainGround.flags &= -3;
-			}
-			if(this.sandboxMap != null) {
-				this.sandboxMap.flags |= 2;
-			}
-			if(this.traffic != null) {
-				this.traffic.flags &= -3;
-			}
-			if(this.ui != null && this.ui.builder.inGameHUDView != null) {
-				this.ui.builder.inGameHUDView.initSandboxBounds(195.0);
-			}
+			this.layoutIntro();
 		}
 	}
 	,resetCarToSandboxCenter: function() {
-		this.carPhysics.resetState(0.0,0.0,0.05,0.0);
-		var _this = this.playerMesh;
-		_this.x = 0.0;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
+		if(this.world != null) {
+			this.world.resetCarToSandboxCenter();
 		}
-		var _this = this.playerMesh;
-		_this.y = 0.0;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		var _this = this.playerMesh;
-		_this.z = 0.05;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		this.playerMesh.setRotation(0,0,0.0);
 	}
 	,resetCarToStartLine: function() {
-		this.carPhysics.resetState(0.0,0.0,0.06,0.0);
-		var _this = this.playerMesh;
-		_this.x = 0.0;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
+		if(this.world != null) {
+			this.world.resetCarToStartLine();
 		}
-		var _this = this.playerMesh;
-		_this.y = 0.0;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		var _this = this.playerMesh;
-		_this.z = 0.06;
-		_this.flags |= 1;
-		if((_this.flags & 131072) != 0) {
-			_this.flags |= 262144;
-		}
-		this.playerMesh.setRotation(0,0,0.0);
 	}
 	,saveCurrentRun: function() {
+		if(this.multiplayer != null && this.multiplayer.status == net_LobbyStatus.InMatch) {
+			return;
+		}
+		if(this.saveData == null || this.carPhysics == null || this.world == null) {
+			return;
+		}
 		this.saveData.hasActiveRun = true;
-		this.saveData.playerState = { posX : this.carPhysics.pos.x, posY : this.carPhysics.pos.y, posZ : this.carPhysics.pos.z, yaw : this.carPhysics.yaw, forwardSpeed : this.carPhysics.forwardSpeed, mapMode : this.currentMapMode == MapMode.Sandbox ? "Sandbox" : "Circuit"};
-		this.saveData.masterVol = this.audio.masterVolume;
-		this.saveData.musicVol = this.audio.musicVolume;
-		this.saveData.sfxVol = this.audio.sfxVolume;
-		this.saveData.steerSensitivity = this.input.steerSensitivity;
-		this.saveData.graphics = this.ui.gfxSettings;
+		this.saveData.playerState = { posX : this.carPhysics.pos.x, posY : this.carPhysics.pos.y, posZ : this.carPhysics.pos.z, yaw : this.carPhysics.yaw, forwardSpeed : this.carPhysics.forwardSpeed, mapMode : this.world.currentMapMode == world_MapMode.Sandbox ? "Sandbox" : "Circuit"};
+		if(this.audio != null) {
+			this.saveData.masterVol = this.audio.masterVolume;
+			this.saveData.musicVol = this.audio.musicVolume;
+			this.saveData.sfxVol = this.audio.sfxVolume;
+		}
+		this.input.exportToSave(this.saveData);
+		if(this.ui != null) {
+			this.saveData.graphics = this.ui.gfxSettings;
+		}
 		save_SaveSystem.save(this.saveData);
-		this.ui.setHasActiveSave(true);
+		if(this.ui != null) {
+			this.ui.setHasActiveSave(true);
+		}
+	}
+	,pauseActiveGame: function() {
+		this.input.flushInputs();
+		if(this.world != null) {
+			this.world.clearPostEffects();
+		}
+		this.saveCurrentRun();
+		if(this.ui != null) {
+			this.ui.showPause();
+		}
 	}
 	,handleMenuAction: function(action) {
 		this.input.flushInputs();
@@ -669,222 +523,102 @@ Main.prototype = $extend(hxd_App.prototype,{
 			this.ui.showMapSelect();
 			break;
 		case 1:
-			this.loadMap(MapMode.Circuit);
-			this.resetCarToStartLine();
-			this.raceTimer = 0.0;
-			this.currentLap = 1;
-			this.ui.showInGame();
+			this.ui.showMultiplayerMenu();
 			break;
 		case 2:
-			this.loadMap(MapMode.Sandbox);
-			this.resetCarToSandboxCenter();
+			if(this.multiplayer != null && this.multiplayer.role != net_NetworkRole.None) {
+				this.multiplayer.leaveRoom();
+			}
+			if(this.world != null) {
+				this.world.clearRemoteCars();
+				this.world.setTrafficEnabled(true);
+			}
+			this.ui.builder.inGameHUDView.remotePeerMarkers = [];
+			this.loadMap(world_MapMode.Circuit);
+			this.resetCarToStartLine();
+			if(this.traffic != null) {
+				this.traffic.resetPositions();
+			}
 			this.raceTimer = 0.0;
 			this.currentLap = 1;
 			this.ui.showInGame();
 			break;
 		case 3:
-			if(this.currentMapMode == MapMode.Sandbox) {
-				this.loadMap(MapMode.Sandbox);
-				this.resetCarToSandboxCenter();
-			} else {
-				this.loadMap(MapMode.Circuit);
-				this.resetCarToStartLine();
+			if(this.multiplayer != null && this.multiplayer.role != net_NetworkRole.None) {
+				this.multiplayer.leaveRoom();
 			}
+			if(this.world != null) {
+				this.world.clearRemoteCars();
+				this.world.setTrafficEnabled(true);
+			}
+			this.ui.builder.inGameHUDView.remotePeerMarkers = [];
+			this.loadMap(world_MapMode.Sandbox);
+			this.resetCarToSandboxCenter();
 			this.raceTimer = 0.0;
 			this.currentLap = 1;
 			this.ui.showInGame();
 			break;
 		case 4:
-			if(this.saveData.hasActiveRun) {
-				if(this.saveData.playerState.mapMode == "Sandbox") {
-					this.loadMap(MapMode.Sandbox);
-				} else if(this.saveData.playerState.mapMode == "Circuit") {
-					this.loadMap(MapMode.Circuit);
+			if(this.multiplayer != null && this.multiplayer.status == net_LobbyStatus.InMatch && this.multiplayer.localSpawnSlot != null) {
+				if(this.world != null) {
+					this.world.spawnPlayerAt(this.multiplayer.localSpawnSlot.x,this.multiplayer.localSpawnSlot.y,this.multiplayer.localSpawnSlot.z,this.multiplayer.localSpawnSlot.yaw);
 				}
-				this.carPhysics.resetState(this.saveData.playerState.posX,this.saveData.playerState.posY,this.saveData.playerState.posZ,this.saveData.playerState.yaw);
-				this.carPhysics.set_forwardSpeed(this.saveData.playerState.forwardSpeed);
+				this.ui.showInGame();
+				return;
 			}
+			if(this.world != null) {
+				this.world.reloadCurrentMap();
+				this.syncWorldFacade();
+				this.syncHUDMapBounds();
+			}
+			this.raceTimer = 0.0;
+			this.currentLap = 1;
 			this.ui.showInGame();
 			break;
 		case 5:
+			if(this.multiplayer != null && this.multiplayer.role != net_NetworkRole.None && this.multiplayer.status != net_LobbyStatus.InMatch) {
+				this.multiplayer.leaveRoom();
+			}
+			if(this.multiplayer != null && this.multiplayer.status == net_LobbyStatus.InMatch) {
+				this.ui.showInGame();
+				return;
+			}
+			if(this.saveData != null && this.saveData.hasActiveRun && this.carPhysics != null) {
+				if(this.world != null) {
+					this.world.clearRemoteCars();
+					this.world.setTrafficEnabled(true);
+				}
+				this.ui.builder.inGameHUDView.remotePeerMarkers = [];
+				this.loadMap(this.saveData.playerState.mapMode == "Sandbox" ? world_MapMode.Sandbox : world_MapMode.Circuit);
+				this.carPhysics.resetState(this.saveData.playerState.posX,this.saveData.playerState.posY,this.saveData.playerState.posZ,this.saveData.playerState.yaw);
+				this.carPhysics.forwardSpeed = this.saveData.playerState.forwardSpeed;
+			}
+			this.ui.showInGame();
 			break;
 		case 6:
-			this.ui.showCredits();
+			this.ui.openOptions(false);
 			break;
 		case 7:
+			this.ui.showCredits();
+			break;
+		case 8:
+			if(this.multiplayer != null && this.multiplayer.status == net_LobbyStatus.InMatch) {
+				if(this.multiplayer.role == net_NetworkRole.Host) {
+					this.multiplayer.returnToLobby();
+				} else {
+					this.multiplayer.leaveRoom();
+					if(this.world != null) {
+						this.world.clearRemoteCars();
+						this.world.setTrafficEnabled(true);
+					}
+					this.ui.builder.inGameHUDView.remotePeerMarkers = [];
+					this.ui.showMainMenu();
+				}
+				return;
+			}
 			this.saveCurrentRun();
 			this.ui.showMainMenu();
 			break;
-		}
-	}
-	,scaleAndCenterSplash: function(bmp,sw,sh) {
-		if(bmp == null || bmp.tile == null) {
-			return;
-		}
-		var naturalW = bmp.tile.width;
-		var naturalH = bmp.tile.height;
-		var scale = Math.max(sw / naturalW,sh / naturalH);
-		bmp.posChanged = true;
-		bmp.scaleX = scale;
-		bmp.posChanged = true;
-		bmp.scaleY = scale;
-		bmp.posChanged = true;
-		bmp.x = (sw - naturalW * scale) * 0.5;
-		bmp.posChanged = true;
-		bmp.y = (sh - naturalH * scale) * 0.5;
-	}
-	,layoutIntro: function() {
-		var sw = this.s2d != null ? this.s2d.width : hxd_Window.getInstance().get_width();
-		var sh = this.s2d != null ? this.s2d.height : hxd_Window.getInstance().get_height();
-		if(this.introBg != null) {
-			var _this = this.introBg;
-			_this.posChanged = true;
-			_this.scaleX = sw;
-			var _this = this.introBg;
-			_this.posChanged = true;
-			_this.scaleY = sh;
-		}
-		if(this.studioSplashBmp != null) {
-			this.scaleAndCenterSplash(this.studioSplashBmp,sw,sh);
-		}
-		if(this.engineSplashBmp != null) {
-			this.scaleAndCenterSplash(this.engineSplashBmp,sw,sh);
-		}
-		if(this.discHeader != null && this.discBody != null) {
-			if(this.discGraphics != null) {
-				this.discGraphics.clear();
-				var frameW = Math.max(200.0,sw - 56.);
-				var frameH = Math.max(200.0,sh - 56.);
-				this.discGraphics.beginFill(395792,0.90);
-				this.discGraphics.lineStyle(1.5,58879,0.35);
-				this.discGraphics.drawRoundedRect(28.0,28.0,frameW,frameH,12.0);
-				this.discGraphics.endFill();
-				this.discGraphics.lineStyle(3.0,58879,0.85);
-				var _this = this.discGraphics;
-				_this.flush();
-				_this.addVertex(28.0,50.,_this.curR,_this.curG,_this.curB,_this.curA,28.0 * _this.ma + 50. * _this.mc + _this.mx,28.0 * _this.mb + 50. * _this.md + _this.my);
-				var _this = this.discGraphics;
-				_this.addVertex(28.0,28.0,_this.curR,_this.curG,_this.curB,_this.curA,28.0 * _this.ma + 28.0 * _this.mc + _this.mx,28.0 * _this.mb + 28.0 * _this.md + _this.my);
-				var _this = this.discGraphics;
-				_this.addVertex(50.,28.0,_this.curR,_this.curG,_this.curB,_this.curA,50. * _this.ma + 28.0 * _this.mc + _this.mx,50. * _this.mb + 28.0 * _this.md + _this.my);
-				var _this = this.discGraphics;
-				var x = 28.0 + frameW - 22.0;
-				_this.flush();
-				_this.addVertex(x,28.0,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + 28.0 * _this.mc + _this.mx,x * _this.mb + 28.0 * _this.md + _this.my);
-				var _this = this.discGraphics;
-				var x = 28.0 + frameW;
-				_this.addVertex(x,28.0,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + 28.0 * _this.mc + _this.mx,x * _this.mb + 28.0 * _this.md + _this.my);
-				var _this = this.discGraphics;
-				var x = 28.0 + frameW;
-				_this.addVertex(x,50.,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + 50. * _this.mc + _this.mx,x * _this.mb + 50. * _this.md + _this.my);
-				var _this = this.discGraphics;
-				var y = 28.0 + frameH - 22.0;
-				_this.flush();
-				_this.addVertex(28.0,y,_this.curR,_this.curG,_this.curB,_this.curA,28.0 * _this.ma + y * _this.mc + _this.mx,28.0 * _this.mb + y * _this.md + _this.my);
-				var _this = this.discGraphics;
-				var y = 28.0 + frameH;
-				_this.addVertex(28.0,y,_this.curR,_this.curG,_this.curB,_this.curA,28.0 * _this.ma + y * _this.mc + _this.mx,28.0 * _this.mb + y * _this.md + _this.my);
-				var _this = this.discGraphics;
-				var y = 28.0 + frameH;
-				_this.addVertex(50.,y,_this.curR,_this.curG,_this.curB,_this.curA,50. * _this.ma + y * _this.mc + _this.mx,50. * _this.mb + y * _this.md + _this.my);
-				var _this = this.discGraphics;
-				var x = 28.0 + frameW - 22.0;
-				var y = 28.0 + frameH;
-				_this.flush();
-				_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
-				var _this = this.discGraphics;
-				var x = 28.0 + frameW;
-				var y = 28.0 + frameH;
-				_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
-				var _this = this.discGraphics;
-				var x = 28.0 + frameW;
-				var y = 28.0 + frameH - 22.0;
-				_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
-			}
-			var maxTextWidth = Math.min(sw * 0.88,960.0);
-			this.discHeader.set_maxWidth(maxTextWidth);
-			this.discBody.set_maxWidth(maxTextWidth);
-			var targetIconHeight = Math.min(38.0,sh * 0.06);
-			var totalLogoWidth = 0.0;
-			if(this.logoRow != null && this.discLogos.length > 0) {
-				var _g = 0;
-				var _g1 = this.discLogos;
-				while(_g < _g1.length) {
-					var bmp = _g1[_g];
-					++_g;
-					if(bmp.tile != null) {
-						var s = targetIconHeight / bmp.tile.height;
-						bmp.posChanged = true;
-						bmp.scaleX = s;
-						bmp.posChanged = true;
-						bmp.scaleY = s;
-						totalLogoWidth += bmp.tile.width * s;
-					}
-				}
-				totalLogoWidth += 32.0 * (this.discLogos.length - 1);
-			}
-			if(isNaN(totalLogoWidth)) {
-				totalLogoWidth = 0.0;
-			}
-			var hHeight = this.discHeader.get_textHeight();
-			if(isNaN(hHeight) || hHeight <= 0) {
-				hHeight = 36.0;
-			}
-			var bHeight = this.discBody.get_textHeight();
-			if(isNaN(bHeight) || bHeight <= 0) {
-				bHeight = 320.0;
-			}
-			var vHeight = this.discVersion != null ? this.discVersion.get_textHeight() : 0.0;
-			if(isNaN(vHeight)) {
-				vHeight = 20.0;
-			}
-			var totalBlockHeight = hHeight + 16.0 + bHeight + (this.discLogos.length > 0 ? 22.0 + targetIconHeight : 0.0) + (this.discVersion != null ? 14.0 + vHeight : 0.0);
-			if(isNaN(totalBlockHeight) || totalBlockHeight <= 0) {
-				totalBlockHeight = 400.0;
-			}
-			var blockStartY = Math.max(16.0,(sh - totalBlockHeight) * 0.5);
-			if(isNaN(blockStartY)) {
-				blockStartY = 24.0;
-			}
-			var _this = this.discHeader;
-			_this.posChanged = true;
-			_this.x = (sw - maxTextWidth) * 0.5;
-			var _this = this.discHeader;
-			_this.posChanged = true;
-			_this.y = blockStartY;
-			var _this = this.discBody;
-			_this.posChanged = true;
-			_this.x = (sw - maxTextWidth) * 0.5;
-			var _this = this.discBody;
-			_this.posChanged = true;
-			_this.y = this.discHeader.y + hHeight + 16.0;
-			var rowY = this.discBody.y + bHeight + 22.0;
-			if(this.logoRow != null && this.discLogos.length > 0) {
-				var currX = (sw - totalLogoWidth) * 0.5;
-				if(isNaN(currX)) {
-					currX = (sw - 200.0) * 0.5;
-				}
-				var _g = 0;
-				var _g1 = this.discLogos;
-				while(_g < _g1.length) {
-					var bmp = _g1[_g];
-					++_g;
-					bmp.posChanged = true;
-					bmp.x = currX;
-					bmp.posChanged = true;
-					bmp.y = rowY;
-					currX += bmp.tile.width * bmp.scaleX + 32.0;
-				}
-			}
-			if(this.discVersion != null) {
-				this.discVersion.set_maxWidth(maxTextWidth);
-				var _this = this.discVersion;
-				_this.posChanged = true;
-				_this.x = (sw - maxTextWidth) * 0.5;
-				var _this = this.discVersion;
-				_this.posChanged = true;
-				_this.y = this.discLogos.length > 0 ? rowY + targetIconHeight + 14.0 : this.discBody.y + bHeight + 14.0;
-			}
 		}
 	}
 	,onResize: function() {
@@ -895,173 +629,133 @@ Main.prototype = $extend(hxd_App.prototype,{
 		} else if(this.s2d != null) {
 			this.s2d.checkResize();
 		}
-		if(this.showcaseCurtain != null && this.s2d != null) {
-			var _this = this.showcaseCurtain;
-			_this.posChanged = true;
-			_this.scaleX = this.s2d.width;
-			var _this = this.showcaseCurtain;
-			_this.posChanged = true;
-			_this.scaleY = this.s2d.height;
-		}
 		if(this.appState == AppState.IntroSequence) {
 			this.layoutIntro();
-		} else if(this.ui != null) {
-			this.ui.layout();
-		}
-	}
-	,update: function(dt) {
-		this.input.update(dt);
-		if(this.appState == AppState.IntroSequence) {
-			this.updateIntro(dt);
-			return;
-		}
-		if(this.ui == null) {
-			return;
-		}
-		if(this.isShowcaseFadingIn) {
-			this.showcaseFadeTimer += dt;
-			var progress = Math.min(1.0,this.showcaseFadeTimer / this.showcaseFadeDuration);
-			if(this.showcaseCurtain != null) {
-				this.showcaseCurtain.alpha = 1.0 - progress;
+		} else {
+			if(this.introController != null) {
+				this.introController.layout();
 			}
 			if(this.ui != null) {
-				this.ui.alpha = progress;
-			}
-			if(progress >= 1.0) {
-				this.isShowcaseFadingIn = false;
-				if(this.showcaseCurtain != null) {
-					var _this = this.showcaseCurtain;
-					if(_this != null && _this.parent != null) {
-						_this.parent.removeChild(_this);
-					}
-					this.showcaseCurtain = null;
-				}
-				if(this.ui != null) {
-					this.ui.alpha = 1.0;
-				}
+				this.ui.layout();
 			}
 		}
-		this.ui.update(dt,this.input.uiUpPressed,this.input.uiDownPressed,this.input.uiLeftPressed,this.input.uiRightPressed,this.input.uiConfirmPressed,this.input.uiCancelPressed);
-		if(this.skybox != null) {
-			this.skybox.syncCamera(this.s3d.camera.pos);
+	}
+	,setOrientationPaused: function(blocked) {
+		if(this.pausedByOrientation == blocked) {
+			return;
 		}
+		this.pausedByOrientation = blocked;
+		if(this.input != null) {
+			this.input.flushInputs();
+		}
+		if(blocked) {
+			if(this.systemsInitialized && this.ui != null && this.ui.currentState == ui_components_UIState.InGameHUD) {
+				this.pauseActiveGame();
+			} else if(this.world != null) {
+				this.world.clearPostEffects();
+			}
+			if(this.audio != null) {
+				this.audio.suspend();
+			}
+		} else {
+			if(this.audio != null) {
+				this.audio.resume();
+			}
+			this.onResize();
+		}
+	}
+	,syncOrientationPauseFromHost: function() {
+		var blocked = Boolean(window.__mobPortraitBlocked);
+		if(blocked != this.pausedByOrientation) {
+			this.setOrientationPaused(blocked);
+		}
+		return this.pausedByOrientation;
+	}
+	,render: function(e) {
+		if(this.pausedByOrientation) {
+			if(e != null) {
+				e.clear(0,1.0);
+			}
+			return;
+		}
+		if(this.appState == AppState.IntroSequence) {
+			if(e != null) {
+				e.clear(0,1.0);
+			}
+			if(this.s2d != null) {
+				this.s2d.render(e);
+			}
+			return;
+		}
+		hxd_App.prototype.render.call(this,e);
+	}
+	,update: function(dt) {
+		if(this.syncOrientationPauseFromHost()) {
+			return;
+		}
+		this.input.update(dt);
+		if(this.appState == AppState.IntroSequence) {
+			if(this.introController != null) {
+				if(this.introTimer != this.syncedIntroTimer) {
+					this.introController.timer = this.introTimer;
+				}
+				if(this.input.anyKeyPressed || this.input.uiConfirmPressed) {
+					this.introController.trySkip();
+				}
+				this.introController.update(dt);
+				this.introTimer = this.introController.timer;
+				this.syncedIntroTimer = this.introTimer;
+			}
+			return;
+		}
+		if(this.introController != null) {
+			this.introController.updateShowcaseCurtain(dt,this.ui);
+		}
+		if(this.ui == null || this.world == null) {
+			return;
+		}
+		var uiCancel = this.input.uiCancelPressed;
+		if(!uiCancel && !this.ui.isOpenedFromPause && this.input.pausePressed && (this.ui.currentState == ui_components_UIState.MapSelect || this.ui.currentState == ui_components_UIState.MultiplayerMenu || this.ui.currentState == ui_components_UIState.MultiplayerLobby || this.ui.currentState == ui_components_UIState.CreditsScreen || this.ui.currentState == ui_components_UIState.OptionsMenu)) {
+			uiCancel = true;
+		}
+		if(this.multiplayer != null) {
+			this.multiplayer.update(dt);
+		}
+		this.ui.update(dt,this.input.uiUpPressed,this.input.uiDownPressed,this.input.uiLeftPressed,this.input.uiRightPressed,this.input.uiConfirmPressed,uiCancel);
+		this.world.syncSkybox();
 		switch(this.ui.currentState._hx_index) {
-		case 3:
+		case 5:
 			if(this.input.pausePressed) {
-				this.input.flushInputs();
-				if(this.postRenderer != null) {
-					this.postRenderer.blurShader.blurIntensity__ = 0.0;
-				}
-				this.saveCurrentRun();
-				this.ui.showPause();
+				this.pauseActiveGame();
 				return;
 			}
-			var wasDrifting = this.carPhysics.isDrifting;
-			if(this.currentMapMode == MapMode.Circuit) {
-				this.carPhysics.update(dt,this.input,this.track != null ? this.track.waypoints : null,this.track);
-				if(this.traffic != null) {
-					this.traffic.update(dt,this.carPhysics,this.chaseCam);
+			var kmh = this.world.updateDriving(dt,this.input);
+			if(this.multiplayer != null && this.multiplayer.status == net_LobbyStatus.InMatch) {
+				this.multiplayer.updateInMatch(dt,this.world.carPhysics,this.input,this.world.getActiveGround());
+				this.world.syncRemoteCars(dt,this.multiplayer.remoteStates);
+				var markers = [];
+				var h = this.multiplayer.remoteStates.h;
+				var st_keys = Object.keys(h);
+				var st_length = st_keys.length;
+				var st_current = 0;
+				while(st_current < st_length) {
+					var st = h[st_keys[st_current++]];
+					markers.push({ x : st.x, y : st.y, colorHex : st.colorHex});
 				}
-			} else {
-				this.carPhysics.update(dt,this.input,null,this.sandboxMap);
+				this.ui.builder.inGameHUDView.remotePeerMarkers = markers;
 			}
-			if(!wasDrifting && this.carPhysics.isDrifting) {
-				this.chaseCam.addTrauma(0.35);
-			}
-			if(this.input.boost && this.carPhysics.forwardSpeed > 20.0) {
-				this.chaseCam.addTrauma(0.12 * dt * 60.0);
-			}
-			var kmh = Math.round(Math.abs(this.carPhysics.forwardSpeed) * 3.6);
-			var blurIntensity = 0.0;
-			if(kmh > 140.0) {
-				blurIntensity = Math.min(0.065,(kmh - 140.0) / 180.0 * 0.055);
-			}
-			if(this.input.boost && kmh > 70) {
-				blurIntensity = Math.min(0.08,blurIntensity + 0.025);
-			}
-			if(this.postRenderer != null) {
-				this.postRenderer.blurShader.blurIntensity__ = blurIntensity;
-			}
-			var _this = this.playerMesh;
-			_this.x = this.carPhysics.pos.x;
-			_this.flags |= 1;
-			if((_this.flags & 131072) != 0) {
-				_this.flags |= 262144;
-			}
-			var _this = this.playerMesh;
-			_this.y = this.carPhysics.pos.y;
-			_this.flags |= 1;
-			if((_this.flags & 131072) != 0) {
-				_this.flags |= 262144;
-			}
-			var _this = this.playerMesh;
-			_this.z = this.carPhysics.pos.z;
-			_this.flags |= 1;
-			if((_this.flags & 131072) != 0) {
-				_this.flags |= 262144;
-			}
-			this.playerMesh.setRotation(this.carPhysics.pitch,this.carPhysics.roll,0);
-			this.playerMesh.rotate(0,0,-(this.carPhysics.yaw + this.carPhysics.driftAngle));
-			this.wheelSpinAngle += this.carPhysics.forwardSpeed * dt / 0.36;
-			this.rearWheelSpinAngle += (this.carPhysics.forwardSpeed / 0.36 + this.carPhysics.wheelSpinVelocity[2]) * dt;
-			var currentSteer = -this.input.steer * 0.55;
-			var restLen = this.carPhysics.config.suspension.restLength;
-			if(this.playerMesh.wheels.length >= 4) {
-				this.playerMesh.updateWheelTransform(0,restLen - this.carPhysics.suspLength[0],this.wheelSpinAngle,currentSteer);
-				this.playerMesh.updateWheelTransform(1,restLen - this.carPhysics.suspLength[1],this.wheelSpinAngle,currentSteer);
-				this.playerMesh.updateWheelTransform(2,restLen - this.carPhysics.suspLength[2],this.rearWheelSpinAngle,0.0);
-				this.playerMesh.updateWheelTransform(3,restLen - this.carPhysics.suspLength[3],this.rearWheelSpinAngle,0.0);
-			}
-			this.chaseCam.update(dt,this.carPhysics,this.carPhysics.isBoosting);
 			this.raceTimer += dt;
-			this.ui.builder.inGameHUDView.updateTelemetry(dt,this.carPhysics,kmh,this.carPhysics.isBoosting,this.raceTimer,this.currentLap,this.totalLaps);
+			this.ui.builder.inGameHUDView.updateTelemetry(dt,this.world.carPhysics,kmh,this.world.carPhysics.isBoosting,this.raceTimer,this.currentLap,this.totalLaps);
 			break;
-		case 4:case 5:
-			if(this.postRenderer != null) {
-				this.postRenderer.blurShader.blurIntensity__ = 0.0;
-			}
-			if(this.ui.isOpenedFromPause && this.input.pausePressed && !this.input.isListeningForRemap) {
+		case 6:case 7:
+			this.world.clearPostEffects();
+			if((this.ui.currentState == ui_components_UIState.PauseMenu || this.ui.isOpenedFromPause) && this.input.pausePressed && !this.input.isListeningForRemap) {
 				this.input.flushInputs();
 				this.ui.showInGame();
 			}
 			break;
-		case 0:case 1:case 2:case 6:
-			if(this.postRenderer != null) {
-				this.postRenderer.blurShader.blurIntensity__ = 0.0;
-			}
-			this.showcaseAngle += 0.35 * dt;
-			var _this = this.s3d.camera.pos;
-			var x = this.carPhysics.pos.x + Math.sin(this.showcaseAngle) * 11.0;
-			var y = this.carPhysics.pos.y - Math.cos(this.showcaseAngle) * 11.0;
-			var z = this.carPhysics.pos.z + 4.2;
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = z;
-			var _this = this.s3d.camera.target;
-			var x = this.carPhysics.pos.x;
-			var y = this.carPhysics.pos.y;
-			var z = this.carPhysics.pos.z + 1.2;
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = z;
+		case 0:case 1:case 2:case 3:case 4:case 8:
+			this.world.updateShowcaseCamera(dt);
 			break;
 		}
 	}
@@ -1507,11 +1201,15 @@ Xml.prototype = {
 	}
 	,__class__: Xml
 };
-var audio_AudioManager = function() {
+var audio_AudioManager = function(config) {
 	this.sfxVolume = 0.9;
 	this.musicVolume = 0.7;
 	this.masterVolume = 0.8;
 	audio_AudioManager.inst = this;
+	this.config = config != null ? config : config_GameConfig.getDefault().audio;
+	this.masterVolume = this.config.defaultMaster;
+	this.musicVolume = this.config.defaultMusic;
+	this.sfxVolume = this.config.defaultSfx;
 	try {
 		var w = window;
 		if(w != null) {
@@ -1545,7 +1243,7 @@ audio_AudioManager.prototype = {
 			var gain = this.audioCtx.createGain();
 			osc.type = "sine";
 			osc.frequency.setValueAtTime(freq,this.audioCtx.currentTime);
-			gain.gain.setValueAtTime(this.masterVolume * this.sfxVolume * 0.15,this.audioCtx.currentTime);
+			gain.gain.setValueAtTime(this.masterVolume * this.sfxVolume * this.config.beepGainScale,this.audioCtx.currentTime);
 			gain.gain.exponentialRampToValueAtTime(0.0001,this.audioCtx.currentTime + duration);
 			osc.connect(gain);
 			gain.connect(this.audioCtx.destination);
@@ -1554,25 +1252,38 @@ audio_AudioManager.prototype = {
 		} catch( _g ) {
 		}
 	}
+	,suspend: function() {
+		if(this.audioCtx == null) {
+			return;
+		}
+		try {
+			if(this.audioCtx.state == "running") {
+				this.audioCtx.suspend();
+			}
+		} catch( _g ) {
+		}
+	}
+	,resume: function() {
+		if(this.audioCtx == null) {
+			return;
+		}
+		try {
+			if(this.audioCtx.state == "suspended") {
+				this.audioCtx.resume();
+			}
+		} catch( _g ) {
+		}
+	}
 	,__class__: audio_AudioManager
 };
 var camera_ChaseCamera = function(camera,startX,startY,startZ) {
-	if(startZ == null) {
-		startZ = 4.0;
-	}
-	if(startY == null) {
-		startY = -10.0;
-	}
-	if(startX == null) {
-		startX = 0.0;
-	}
-	this.accelPullBack = 0.0;
-	this.prevSpeed = 0.0;
+	this.shakePhase = 0.0;
+	this.currentBank = 0.0;
+	this.currentFov = 65.0;
+	this.chaseDirY = 1.0;
+	this.chaseDirX = 0.0;
 	this.trauma = 0.0;
-	this.currentTarget = new h3d_VectorImpl(0.,0.,0.);
-	this.currentPos = new h3d_VectorImpl(0.,0.,0.);
 	this.cam = camera;
-	var _this = this.currentPos;
 	var x = startX;
 	var y = startY;
 	var z = startZ;
@@ -1585,95 +1296,114 @@ var camera_ChaseCamera = function(camera,startX,startY,startZ) {
 	if(startX == null) {
 		x = 0.;
 	}
-	_this.x = x;
-	_this.y = y;
-	_this.z = z;
-	var _this = this.currentTarget;
+	this.camPos = new h3d_VectorImpl(x,y,z);
+	this.camVel = new h3d_VectorImpl(0.0,0.0,0.0);
 	var x = startX;
-	var y = startY + 10.0;
+	var y = startY + 6.8;
+	var z = startZ - 1.2;
+	if(z == null) {
+		z = 0.;
+	}
 	if(y == null) {
 		y = 0.;
 	}
 	if(startX == null) {
 		x = 0.;
 	}
-	_this.x = x;
-	_this.y = y;
-	_this.z = 1.0;
-	var _this = this.cam.pos;
-	var v = this.currentPos;
-	_this.x = v.x;
-	_this.y = v.y;
-	_this.z = v.z;
-	var _this = this.cam.target;
-	var v = this.currentTarget;
-	_this.x = v.x;
-	_this.y = v.y;
-	_this.z = v.z;
-	this.cam.fovY = 65.0;
+	this.lookTarget = new h3d_VectorImpl(x,y,z);
+	this.syncToCamera();
 };
 $hxClasses["camera.ChaseCamera"] = camera_ChaseCamera;
 camera_ChaseCamera.__name__ = "camera.ChaseCamera";
 camera_ChaseCamera.prototype = {
 	addTrauma: function(amount) {
-		this.trauma = Math.min(0.55,this.trauma + amount * 0.50);
-	}
-	,update: function(dt,carPhysics,isNitroActive) {
-		if(dt <= 0.0) {
+		if(amount <= 0.0 || isNaN(amount)) {
 			return;
 		}
-		var clampedDt = Math.min(dt,0.05);
-		var speedAbs = Math.abs(carPhysics.forwardSpeed);
-		var speedRatio = Math.min(1.0,speedAbs / 68.0);
-		var targetFov = 65.0 + Math.pow(speedRatio,1.25) * 12.;
-		if(isNitroActive && speedAbs > 10.0) {
-			targetFov += 3.5 * Math.min(1.0,speedAbs / 25.0);
+		this.trauma = Math.min(1.0,this.trauma + amount * 0.5);
+	}
+	,update: function(dt,carPhysics,isBoosting) {
+		if(carPhysics == null || dt <= 0.0 || isNaN(dt)) {
+			return;
 		}
-		this.cam.fovY += (targetFov - this.cam.fovY) * Math.min(1.0,7.0 * clampedDt);
-		var currentAccel = (carPhysics.forwardSpeed - this.prevSpeed) / clampedDt;
-		this.prevSpeed = carPhysics.forwardSpeed;
-		var targetPullBack = 0.0;
-		if(currentAccel > 1.5) {
-			targetPullBack = Math.min(0.55,currentAccel * 0.02);
+		var safeDt = dt > 0.05 ? 0.05 : dt;
+		var fwdX = Math.sin(carPhysics.yaw);
+		var fwdY = Math.cos(carPhysics.yaw);
+		var speed = Math.abs(carPhysics.forwardSpeed);
+		var lat = carPhysics.lateralVelocity;
+		var worldVx = carPhysics.forwardSpeed * fwdX + lat * Math.cos(carPhysics.yaw);
+		var worldVy = carPhysics.forwardSpeed * fwdY + lat * -Math.sin(carPhysics.yaw);
+		var horizSpeed = Math.sqrt(worldVx * worldVx + worldVy * worldVy);
+		var desiredDirX = fwdX;
+		var desiredDirY = fwdY;
+		if(horizSpeed > 3.5 && carPhysics.forwardSpeed > -1.0) {
+			var velBlend = Math.min(0.45,Math.max(0.0,(horizSpeed - 3.5) / 14.0));
+			desiredDirX = fwdX * (1.0 - velBlend) + worldVx / horizSpeed * velBlend;
+			desiredDirY = fwdY * (1.0 - velBlend) + worldVy / horizSpeed * velBlend;
+			var len = Math.sqrt(desiredDirX * desiredDirX + desiredDirY * desiredDirY);
+			if(len > 0.001) {
+				desiredDirX /= len;
+				desiredDirY /= len;
+			}
 		}
-		if(isNitroActive && speedAbs > 10.0) {
-			targetPullBack += 0.35;
+		var dirAlpha = 1.0 - Math.exp(-7.5 * safeDt);
+		this.chaseDirX += (desiredDirX - this.chaseDirX) * dirAlpha;
+		this.chaseDirY += (desiredDirY - this.chaseDirY) * dirAlpha;
+		var cdLen = Math.sqrt(this.chaseDirX * this.chaseDirX + this.chaseDirY * this.chaseDirY);
+		if(cdLen > 0.001) {
+			this.chaseDirX /= cdLen;
+			this.chaseDirY /= cdLen;
 		}
-		this.accelPullBack += (targetPullBack - this.accelPullBack) * Math.min(1.0,5.0 * clampedDt);
-		var effectiveYaw = carPhysics.yaw + carPhysics.driftAngle * 0.35;
-		var fwdX = Math.sin(effectiveYaw);
-		var fwdY = Math.cos(effectiveYaw);
-		var dist = 7.5 + speedRatio * 0.85 + this.accelPullBack;
-		var targetCamX = carPhysics.pos.x - fwdX * dist;
-		var targetCamY = carPhysics.pos.y - fwdY * dist;
-		var targetLookX = carPhysics.pos.x + fwdX * 6.2;
-		var targetLookY = carPhysics.pos.y + fwdY * 6.2;
-		var targetLookZ = carPhysics.pos.z + 1.0;
-		var fwdVelY = Math.cos(carPhysics.yaw) * carPhysics.forwardSpeed;
-		this.currentPos.x += Math.sin(carPhysics.yaw) * carPhysics.forwardSpeed * clampedDt * 0.65;
-		this.currentPos.y += fwdVelY * clampedDt * 0.65;
-		var posStiffness = 15.0 + speedRatio * 4.0;
-		this.currentPos.x += (targetCamX - this.currentPos.x) * Math.min(1.0,posStiffness * clampedDt);
-		this.currentPos.y += (targetCamY - this.currentPos.y) * Math.min(1.0,posStiffness * clampedDt);
-		this.currentPos.z += (carPhysics.pos.z + (2.8 + speedRatio * 0.20) - this.currentPos.z) * Math.min(1.0,posStiffness * clampedDt);
-		this.currentTarget.x += (targetLookX - this.currentTarget.x) * Math.min(1.0,14.0 * clampedDt);
-		this.currentTarget.y += (targetLookY - this.currentTarget.y) * Math.min(1.0,14.0 * clampedDt);
-		this.currentTarget.z += (targetLookZ - this.currentTarget.z) * Math.min(1.0,14.0 * clampedDt);
-		var shakeX = 0.0;
-		var shakeY = 0.0;
-		var shakeZ = 0.0;
-		if(this.trauma > 0.001) {
-			var shakeStrength = this.trauma * this.trauma;
-			var t = hxd_Timer.lastTimeStamp * 48.0;
-			shakeX = Math.sin(t * 1.3) * 0.09 * shakeStrength;
-			shakeY = Math.cos(t * 1.7) * 0.09 * shakeStrength;
-			shakeZ = Math.sin(t * 2.1) * 0.06 * shakeStrength;
-			this.trauma = Math.max(0.0,this.trauma - 3.8 * clampedDt);
+		var targetDist = 6.8 + Math.min(1.5,speed * 0.022) + (isBoosting ? 0.75 : 0.0);
+		var v = -Math.sin(carPhysics.pitch) * 1.1;
+		var idealX = carPhysics.pos.x - this.chaseDirX * targetDist;
+		var idealY = carPhysics.pos.y - this.chaseDirY * targetDist;
+		var idealZ = carPhysics.pos.z + 2.55 + (v < -0.45 ? -0.45 : v > 0.90 ? 0.90 : v);
+		if(carPhysics.groundProvider != null) {
+			var terrainZ = carPhysics.groundProvider.getGroundElevation(idealX,idealY);
+			if(idealZ < terrainZ + 0.95) {
+				idealZ = terrainZ + 0.95;
+			}
 		}
+		this.camPos.x = this.smoothDamp(this.camPos.x,idealX,safeDt,0.09,0);
+		this.camPos.y = this.smoothDamp(this.camPos.y,idealY,safeDt,0.09,1);
+		this.camPos.z = this.smoothDamp(this.camPos.z,idealZ,safeDt,0.11,2);
+		if(carPhysics.groundProvider != null) {
+			var camGroundZ = carPhysics.groundProvider.getGroundElevation(this.camPos.x,this.camPos.y);
+			if(this.camPos.z < camGroundZ + 0.71249999999999991) {
+				this.camPos.z = camGroundZ + 0.71249999999999991;
+			}
+		}
+		var lookAhead = 2.6 + Math.min(3.5,speed * 0.055);
+		var targetZ = carPhysics.pos.z + 1.15 + Math.sin(carPhysics.pitch) * 0.8;
+		var tgtAlpha = 1.0 - Math.exp(-14.0 * safeDt);
+		this.lookTarget.x += (carPhysics.pos.x + this.chaseDirX * lookAhead - this.lookTarget.x) * tgtAlpha;
+		this.lookTarget.y += (carPhysics.pos.y + this.chaseDirY * lookAhead - this.lookTarget.y) * tgtAlpha;
+		this.lookTarget.z += (targetZ - this.lookTarget.z) * tgtAlpha;
+		this.currentFov += (65.0 + Math.min(1.0,speed / 70.0) * 10.5 + (isBoosting ? 11.5 : 0.0) - this.currentFov) * (1.0 - Math.exp(-6.0 * safeDt));
+		var v = -carPhysics.yawRate * 0.032 + carPhysics.roll * 0.18;
+		this.currentBank += ((v < -0.055 ? -0.055 : v > 0.055 ? 0.055 : v) - this.currentBank) * (1.0 - Math.exp(-8.0 * safeDt));
+		this.shakePhase += safeDt * 42.0;
+		var shakeAmp = this.trauma * this.trauma * 0.42;
+		if(this.trauma > 0.0) {
+			this.trauma = Math.max(0.0,this.trauma - safeDt * 1.45);
+		}
+		this.syncToCamera(shakeAmp);
+	}
+	,syncToCamera: function(shakeAmp) {
+		if(shakeAmp == null) {
+			shakeAmp = 0.0;
+		}
+		if(this.cam == null) {
+			return;
+		}
+		var offX = shakeAmp > 0.0001 ? Math.sin(this.shakePhase * 1.37) * shakeAmp : 0.0;
+		var offY = shakeAmp > 0.0001 ? Math.cos(this.shakePhase * 1.91) * shakeAmp * 0.6 : 0.0;
+		var offZ = shakeAmp > 0.0001 ? Math.sin(this.shakePhase * 2.43) * shakeAmp * 0.85 : 0.0;
 		var _this = this.cam.pos;
-		var x = this.currentPos.x + shakeX;
-		var y = this.currentPos.y + shakeY;
-		var z = this.currentPos.z + shakeZ;
+		var x = this.camPos.x + offX;
+		var y = this.camPos.y + offY;
+		var z = this.camPos.z + offZ;
 		if(z == null) {
 			z = 0.;
 		}
@@ -1687,9 +1417,9 @@ camera_ChaseCamera.prototype = {
 		_this.y = y;
 		_this.z = z;
 		var _this = this.cam.target;
-		var x = this.currentTarget.x;
-		var y = this.currentTarget.y;
-		var z = this.currentTarget.z;
+		var x = this.lookTarget.x + offX * 0.4;
+		var y = this.lookTarget.y + offY * 0.4;
+		var z = this.lookTarget.z + offZ * 0.5;
 		if(z == null) {
 			z = 0.;
 		}
@@ -1702,8 +1432,655 @@ camera_ChaseCamera.prototype = {
 		_this.x = x;
 		_this.y = y;
 		_this.z = z;
+		this.cam.fovY = this.currentFov;
+		var sb = Math.sin(this.currentBank);
+		var cb = Math.cos(this.currentBank);
+		var _this = this.cam.up;
+		var x = this.chaseDirY * sb;
+		var y = -this.chaseDirX * sb;
+		var z = cb;
+		if(cb == null) {
+			z = 0.;
+		}
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = z;
+	}
+	,smoothDamp: function(current,target,dt,smoothTime,axisIdx) {
+		var omega = 2.0 / (smoothTime < 0.01 ? 0.01 : smoothTime);
+		var x = omega * dt;
+		var exp = 1.0 / (1.0 + x + 0.48 * x * x + 0.235 * x * x * x);
+		var vel = axisIdx == 0 ? this.camVel.x : axisIdx == 1 ? this.camVel.y : this.camVel.z;
+		var change = current - target;
+		var temp = (vel + omega * change) * dt;
+		vel = (vel - omega * temp) * exp;
+		var output = target + (change + temp) * exp;
+		if(target - current > 0.0 == output > target) {
+			output = target;
+			vel = (target - target) / dt;
+		}
+		if(axisIdx == 0) {
+			this.camVel.x = vel;
+		} else if(axisIdx == 1) {
+			this.camVel.y = vel;
+		} else {
+			this.camVel.z = vel;
+		}
+		return output;
 	}
 	,__class__: camera_ChaseCamera
+};
+var config_GameConfig = function() { };
+$hxClasses["config.GameConfig"] = config_GameConfig;
+config_GameConfig.__name__ = "config.GameConfig";
+config_GameConfig.getDefault = function() {
+	return { resolution : { baseWidth : 1280, baseHeight : 720}, intro : { studioDuration : 3.0, studioFadeDuration : 0.75, engineDuration : 3.0, engineFadeDuration : 0.75, disclaimerMinDuration : 5.5, disclaimerFadeOutDuration : 1.0, showcaseFadeDuration : 1.2, studioSplashPath : "intro/jagofr-rvl-splash.webp", engineSplashPath : "intro/heaps-haxe-splash.webp", engineLogoPaths : ["intro/icons/logo_heaps.webp","intro/icons/logo_haxe.webp","intro/icons/logo_webgl.webp"], touchIconPaths : ["icons/burn.png","icons/gas-pedal.png","icons/brake.png","icons/hand-brake.png"]}, lighting : { sunX : 350.0, sunY : -250.0, sunZ : 140.0, sunDirX : -0.55, sunDirY : 0.78, sunDirZ : -0.32, sunColor : [1.0,0.96,0.90], fillDirX : 0.45, fillDirY : -0.55, fillDirZ : -0.45, fillColor : [0.42,0.50,0.65], ambientColor : [0.30,0.35,0.44]}, camera : { farPlane : 1500.0, baseFov : 65.0, radialBlurThresholdKmh : 140.0, radialBlurMaxKmh : 310.0, radialBlurMaxIntensity : 0.045, showcaseOrbitRadius : 9.5, showcaseOrbitSpeed : 0.28, showcaseOrbitHeight : 3.2, showcaseTargetHeight : 0.8}, physicsWorld : { gravityZ : -9.81, fixedStep : 0.016666666666666666, maxDt : 0.05}, input : { steerSpeed : 4.2, returnSpeed : 6.5, gamepadDeadzone : 0.12, defaultSteerSensitivity : 1.0}, audio : { defaultMaster : 0.8, defaultMusic : 0.7, defaultSfx : 0.9, defaultBeepFreq : 440.0, defaultBeepDuration : 0.06, beepGainScale : 0.15}};
+};
+var config_WorldConfig = function() { };
+$hxClasses["config.WorldConfig"] = config_WorldConfig;
+config_WorldConfig.__name__ = "config.WorldConfig";
+config_WorldConfig.getDefaultSkybox = function() {
+	return { radius : 1400.0, segments : 28, topColor : 1069752, horizonColor : 8045298};
+};
+config_WorldConfig.getDefaultTrack = function() {
+	return { roadWidth : 20.0, halfWidth : 10.0, bedExtraWidth : 4.0, roadLift : 0.06, railHeight : 0.65, railThickness : 0.25, wallStickiness : 0.94, subdivisions : 24, lightSpacing : 6, controlNodes : [[0.0,0.0,0.0],[0.0,85.0,0.0],[30.0,170.0,1.5],[90.0,240.0,3.0],[170.0,260.0,3.0],[250.0,215.0,1.5],[280.0,135.0,0.0],[255.0,45.0,-1.0],[175.0,-25.0,-1.0],[110.0,10.0,0.0],[60.0,-40.0,0.0],[10.0,-60.0,0.0]], foundationHalfSpan : 500.0, terrainWidth : 800.0, terrainHeight : 800.0, terrainZ : -2.5, terrainColor : 1119256, asphaltFriction : 1.0, offroadFriction : 0.50};
+};
+config_WorldConfig.getDefaultSandbox = function() {
+	return { halfSpan : 200.0, wallLimit : 195.0, skidpadRadius : 35.0, hillApexZ : 12.5, rampCrestZ : 3.8, gridDivs : 120, skidpadFriction : 1.05, concreteFeatureFriction : 1.02, turfFriction : 0.78};
+};
+config_WorldConfig.getDefaultTraffic = function() {
+	return { activeHalfWidth : 9.7, playerRadius : 1.6, trafficRadius : 1.5, collisionSpeedRetention : 0.75, collisionTrauma : 0.35, defaultSpacingMultiplier : 1.0, paintPalette : [14540253,2245802,13412898,3385941,6710903,11154227]};
+};
+var core_AssetPreloader = function(config) {
+	this.tileWaiters = new haxe_ds_StringMap();
+	this.warmupExecuted = false;
+	this.openHandles = 0;
+	this.onAllLoaded = null;
+	this.isComplete = false;
+	this.isStarted = false;
+	this.completedTasks = 0;
+	this.totalTasks = 0;
+	this.config = config != null ? config : config_GameConfig.getDefault().intro;
+};
+$hxClasses["core.AssetPreloader"] = core_AssetPreloader;
+core_AssetPreloader.__name__ = "core.AssetPreloader";
+core_AssetPreloader.cacheTile = function(path,tile) {
+	if(tile != null) {
+		core_AssetPreloader.sharedTileCache.h[path] = tile;
+	}
+};
+core_AssetPreloader.tryLoadEmbeddedTile = function(path) {
+	var existing = core_AssetPreloader.sharedTileCache.h[path];
+	if(existing != null) {
+		return existing;
+	}
+	try {
+		var loader = hxd_Res.get_loader();
+		if(loader == null) {
+			return null;
+		}
+		var res = loader.load(path);
+		if(res == null) {
+			return null;
+		}
+		var tile = res.toTile();
+		if(tile != null) {
+			core_AssetPreloader.sharedTileCache.h[path] = tile;
+		}
+		return tile;
+	} catch( _g ) {
+		return null;
+	}
+};
+core_AssetPreloader.prototype = {
+	start: function(worldWarmup) {
+		if(this.isStarted) {
+			return;
+		}
+		this.isStarted = true;
+		this.isComplete = false;
+		this.preloadWebpImage(this.config.studioSplashPath);
+		this.preloadWebpImage(this.config.engineSplashPath);
+		var _g = 0;
+		var _g1 = this.config.engineLogoPaths;
+		while(_g < _g1.length) this.preloadWebpImage(_g1[_g++]);
+		this.warmEmbeddedTouchIcons();
+		if(worldWarmup != null && !this.warmupExecuted) {
+			this.warmupExecuted = true;
+			var done = this.beginExternalTask();
+			window.setTimeout(function() {
+				try {
+					worldWarmup();
+				} catch( _g ) {
+					haxe_Log.trace("[AssetPreloader] World warmup error: " + Std.string(haxe_Exception.caught(_g).unwrap()),{ fileName : "src/core/AssetPreloader.hx", lineNumber : 92, className : "core.AssetPreloader", methodName : "start"});
+				}
+				done();
+			},30);
+		}
+		this.checkCompletion();
+	}
+	,beginExternalTask: function() {
+		var _gthis = this;
+		this.totalTasks++;
+		this.openHandles++;
+		this.isComplete = false;
+		var finished = false;
+		return function() {
+			if(finished) {
+				return;
+			}
+			finished = true;
+			_gthis.completedTasks++;
+			_gthis.openHandles--;
+			if(_gthis.openHandles < 0) {
+				_gthis.openHandles = 0;
+			}
+			_gthis.checkCompletion();
+		};
+	}
+	,onTileReady: function(url,cb) {
+		var cached = core_AssetPreloader.sharedTileCache.h[url];
+		if(cached != null) {
+			cb(cached);
+			return;
+		}
+		var list = this.tileWaiters.h[url];
+		if(list == null) {
+			list = [];
+			this.tileWaiters.h[url] = list;
+		}
+		list.push(cb);
+	}
+	,warmEmbeddedTouchIcons: function() {
+		var _g = 0;
+		var _g1 = this.config.touchIconPaths;
+		while(_g < _g1.length) core_AssetPreloader.tryLoadEmbeddedTile(_g1[_g++]);
+	}
+	,preloadWebpImage: function(url) {
+		var _gthis = this;
+		var cached = core_AssetPreloader.sharedTileCache.h[url];
+		if(cached != null) {
+			this.notifyWaiters(url,cached);
+			return;
+		}
+		var done = this.beginExternalTask();
+		try {
+			var img = new Image();
+			img.onload = function(_) {
+				var tile = null;
+				try {
+					var w = img.naturalWidth > 0 ? img.naturalWidth : img.width;
+					var h = img.naturalHeight > 0 ? img.naturalHeight : img.height;
+					var canvas = window.document.createElement("canvas");
+					canvas.width = w;
+					canvas.height = h;
+					var ctx = canvas.getContext("2d",null);
+					ctx.drawImage(img,0,0);
+					var imageData = ctx.getImageData(0,0,w,h);
+					var bytes = haxe_io_Bytes.ofData(imageData.data.buffer);
+					var bmp = new hxd_BitmapData(w,h);
+					bmp.setPixels(new hxd_Pixels(w,h,bytes,hxd_PixelFormat.RGBA));
+					tile = h2d_Tile.fromTexture(h3d_mat_Texture.fromBitmap(bmp));
+					core_AssetPreloader.cacheTile(url,tile);
+				} catch( _g ) {
+					var _g1 = haxe_Exception.caught(_g).unwrap();
+					haxe_Log.trace("[AssetPreloader] Rasterization error for " + url + ": " + Std.string(_g1),{ fileName : "src/core/AssetPreloader.hx", lineNumber : 242, className : "core.AssetPreloader", methodName : "preloadWebpImage"});
+				}
+				_gthis.notifyWaiters(url,tile);
+				done();
+			};
+			img.onerror = function(_) {
+				haxe_Log.trace("[AssetPreloader] WebP load failure for: " + url,{ fileName : "src/core/AssetPreloader.hx", lineNumber : 248, className : "core.AssetPreloader", methodName : "preloadWebpImage"});
+				_gthis.notifyWaiters(url,null);
+				done();
+			};
+			img.src = url;
+		} catch( _g ) {
+			this.notifyWaiters(url,null);
+			done();
+		}
+	}
+	,notifyWaiters: function(url,tile) {
+		var waiters = this.tileWaiters.h[url];
+		if(waiters != null) {
+			var _this = this.tileWaiters;
+			if(Object.prototype.hasOwnProperty.call(_this.h,url)) {
+				delete(_this.h[url]);
+			}
+			var _g = 0;
+			while(_g < waiters.length) waiters[_g++](tile);
+		}
+	}
+	,checkCompletion: function() {
+		if(this.isStarted && !this.isComplete && this.openHandles <= 0) {
+			this.isComplete = true;
+			if(this.onAllLoaded != null) {
+				this.onAllLoaded();
+			}
+		}
+	}
+	,__class__: core_AssetPreloader
+};
+var core_IntroState = $hxEnums["core.IntroState"] = { __ename__:true,__constructs__:null
+	,None: {_hx_name:"None",_hx_index:0,__enum__:"core.IntroState",toString:$estr}
+	,Studio: {_hx_name:"Studio",_hx_index:1,__enum__:"core.IntroState",toString:$estr}
+	,Engine: {_hx_name:"Engine",_hx_index:2,__enum__:"core.IntroState",toString:$estr}
+	,Disclaimer: {_hx_name:"Disclaimer",_hx_index:3,__enum__:"core.IntroState",toString:$estr}
+	,Complete: {_hx_name:"Complete",_hx_index:4,__enum__:"core.IntroState",toString:$estr}
+};
+core_IntroState.__constructs__ = [core_IntroState.None,core_IntroState.Studio,core_IntroState.Engine,core_IntroState.Disclaimer,core_IntroState.Complete];
+core_IntroState.__empty_constructs__ = [core_IntroState.None,core_IntroState.Studio,core_IntroState.Engine,core_IntroState.Disclaimer,core_IntroState.Complete];
+var core_IntroController = function(s2d,preloader,config) {
+	this.onStateChanged = null;
+	this.onAssetsBound = null;
+	this.onIntroComplete = null;
+	this.showcaseFadeTimer = 0.0;
+	this.isShowcaseFadingIn = false;
+	this.discLogos = [];
+	this.isFadingOut = false;
+	this.alpha = 0.0;
+	this.timer = 0.0;
+	this.state = core_IntroState.None;
+	this.rootLayer = s2d;
+	this.preloader = preloader;
+	this.config = config != null ? config : config_GameConfig.getDefault().intro;
+	this.buildScreens();
+};
+$hxClasses["core.IntroController"] = core_IntroController;
+core_IntroController.__name__ = "core.IntroController";
+core_IntroController.prototype = {
+	buildScreens: function() {
+		var _gthis = this;
+		this.introContainer = new h2d_Object(this.rootLayer);
+		this.introBg = new h2d_Bitmap(h2d_Tile.fromColor(0,1,1,1.0),this.introContainer);
+		this.screenStudio = new h2d_Object(this.introContainer);
+		this.preloader.onTileReady(this.config.studioSplashPath,function(tile) {
+			if(tile != null) {
+				_gthis.studioSplashBmp = new h2d_Bitmap(tile,_gthis.screenStudio);
+				_gthis.layout();
+				if(_gthis.onAssetsBound != null) {
+					_gthis.onAssetsBound();
+				}
+			}
+		});
+		this.screenEngine = new h2d_Object(this.introContainer);
+		this.preloader.onTileReady(this.config.engineSplashPath,function(tile) {
+			if(tile != null) {
+				_gthis.engineSplashBmp = new h2d_Bitmap(tile,_gthis.screenEngine);
+				_gthis.layout();
+				if(_gthis.onAssetsBound != null) {
+					_gthis.onAssetsBound();
+				}
+			}
+		});
+		this.screenDisclaimer = new h2d_Object(this.introContainer);
+		this.discGraphics = new h2d_Graphics(this.screenDisclaimer);
+		this.discHeader = new h2d_Text(ui_FontManager.titleFont,this.screenDisclaimer);
+		this.discHeader.set_text("TRADEMARK & LEGAL DISCLOSURES");
+		this.discHeader.set_textColor(58879);
+		this.discHeader.set_textAlign(h2d_Align.Center);
+		this.discBody = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
+		this.discBody.set_textColor(12767712);
+		this.discBody.set_textAlign(h2d_Align.Center);
+		this.discBody.set_lineSpacing(5.0);
+		this.discBody.set_text("M.O.B. (Motors on Boost) is an original racing simulation prototype.\n" + "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" + "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" + "are the intellectual property of their respective creators. All rights reserved.\n\n" + "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" + "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" + "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" + "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" + "Please play in a well-lit environment and take a 15-minute break for every hour of play.");
+		this.discVersion = new h2d_Text(ui_FontManager.regularFont,this.screenDisclaimer);
+		this.discVersion.set_text("v" + "0.6.1" + " (Build " + "0014" + ")");
+		this.discVersion.set_textColor(5927822);
+		this.discVersion.set_textAlign(h2d_Align.Center);
+		this.logoRow = new h2d_Object(this.screenDisclaimer);
+		var _g = 0;
+		var _g1 = this.config.engineLogoPaths;
+		while(_g < _g1.length) this.preloader.onTileReady(_g1[_g++],function(tile) {
+			if(tile != null) {
+				var bmp = new h2d_Bitmap(tile,_gthis.logoRow);
+				_gthis.discLogos.push(bmp);
+				_gthis.layout();
+			}
+		});
+		this.screenStudio.set_visible(false);
+		this.screenEngine.set_visible(false);
+		this.screenDisclaimer.set_visible(false);
+	}
+	,setScreen: function(target) {
+		this.state = target;
+		this.timer = 0.0;
+		this.alpha = 0.0;
+		this.isFadingOut = false;
+		this.screenStudio.set_visible(this.state == core_IntroState.Studio);
+		this.screenEngine.set_visible(this.state == core_IntroState.Engine);
+		this.screenDisclaimer.set_visible(this.state == core_IntroState.Disclaimer);
+		this.screenStudio.alpha = 0.0;
+		this.screenEngine.alpha = 0.0;
+		this.screenDisclaimer.alpha = 0.0;
+		this.layout();
+		if(this.onStateChanged != null) {
+			this.onStateChanged(this.state);
+		}
+	}
+	,update: function(dt) {
+		var _gthis = this;
+		if(this.state != core_IntroState.Complete) {
+			this.timer += dt;
+			if(this.isFadingOut) {
+				this.alpha -= dt * 2.5;
+				if(this.alpha <= 0.0) {
+					this.alpha = 0.0;
+					this.isFadingOut = false;
+					if(this.state == core_IntroState.Studio) {
+						this.setScreen(core_IntroState.Engine);
+					} else if(this.state == core_IntroState.Engine) {
+						this.setScreen(core_IntroState.Disclaimer);
+					}
+					return;
+				}
+				this.applyActiveAlpha();
+				return;
+			}
+			switch(this.state._hx_index) {
+			case 1:
+				this.updateFadeHoldFade(this.config.studioDuration,this.config.studioFadeDuration,function() {
+					_gthis.setScreen(core_IntroState.Engine);
+				});
+				break;
+			case 2:
+				this.updateFadeHoldFade(this.config.engineDuration,this.config.engineFadeDuration,function() {
+					_gthis.setScreen(core_IntroState.Disclaimer);
+				});
+				break;
+			case 3:
+				var fadeOutDur = this.config.disclaimerFadeOutDuration;
+				if(this.timer < 1.0) {
+					this.alpha = this.timer / 1.0;
+					this.screenDisclaimer.alpha = this.alpha;
+				} else if(this.timer < this.config.disclaimerMinDuration || !this.preloader.isComplete) {
+					this.alpha = 1.0;
+					this.screenDisclaimer.alpha = 1.0;
+					if(this.timer >= this.config.disclaimerMinDuration) {
+						this.timer = this.config.disclaimerMinDuration;
+					}
+				} else if(this.timer < this.config.disclaimerMinDuration + fadeOutDur) {
+					this.alpha = 1.0 - (this.timer - this.config.disclaimerMinDuration) / fadeOutDur;
+					this.screenDisclaimer.alpha = this.alpha;
+				} else {
+					this.finishSequence();
+				}
+				break;
+			default:
+			}
+		}
+	}
+	,updateShowcaseCurtain: function(dt,uiRoot) {
+		if(!this.isShowcaseFadingIn) {
+			return;
+		}
+		this.showcaseFadeTimer += dt;
+		var progress = Math.min(1.0,this.showcaseFadeTimer / this.config.showcaseFadeDuration);
+		if(this.showcaseCurtain != null) {
+			this.showcaseCurtain.alpha = 1.0 - progress;
+		}
+		if(uiRoot != null) {
+			uiRoot.alpha = progress;
+		}
+		if(progress >= 1.0) {
+			this.isShowcaseFadingIn = false;
+			if(this.showcaseCurtain != null) {
+				var _this = this.showcaseCurtain;
+				if(_this != null && _this.parent != null) {
+					_this.parent.removeChild(_this);
+				}
+				this.showcaseCurtain = null;
+			}
+			if(uiRoot != null) {
+				uiRoot.alpha = 1.0;
+			}
+		}
+	}
+	,trySkip: function() {
+		if((this.state == core_IntroState.Studio || this.state == core_IntroState.Engine) && !this.isFadingOut) {
+			this.isFadingOut = true;
+			return true;
+		}
+		return false;
+	}
+	,finishSequence: function() {
+		if(this.state == core_IntroState.Complete) {
+			return;
+		}
+		this.state = core_IntroState.Complete;
+		if(this.onStateChanged != null) {
+			this.onStateChanged(this.state);
+		}
+		if(this.introContainer != null) {
+			this.introContainer.removeChildren();
+			var _this = this.introContainer;
+			if(_this != null && _this.parent != null) {
+				_this.parent.removeChild(_this);
+			}
+			this.introContainer = null;
+		}
+		if(this.showcaseCurtain == null && this.rootLayer != null) {
+			var sw = this.rootLayer.width > 0 ? this.rootLayer.width | 0 : 1280;
+			var sh = this.rootLayer.height > 0 ? this.rootLayer.height | 0 : 720;
+			this.showcaseCurtain = new h2d_Bitmap(h2d_Tile.fromColor(0,1,1,1.0),this.rootLayer);
+			var _this = this.showcaseCurtain;
+			_this.posChanged = true;
+			_this.scaleX = sw;
+			var _this = this.showcaseCurtain;
+			_this.posChanged = true;
+			_this.scaleY = sh;
+			this.showcaseCurtain.alpha = 1.0;
+			this.isShowcaseFadingIn = true;
+			this.showcaseFadeTimer = 0.0;
+		}
+		if(this.onIntroComplete != null) {
+			this.onIntroComplete();
+		}
+	}
+	,layout: function() {
+		var sw = this.rootLayer != null && this.rootLayer.width > 0 ? this.rootLayer.width : 1280.0;
+		var sh = this.rootLayer != null && this.rootLayer.height > 0 ? this.rootLayer.height : 720.0;
+		if(this.introBg != null) {
+			var _this = this.introBg;
+			_this.posChanged = true;
+			_this.scaleX = sw;
+			var _this = this.introBg;
+			_this.posChanged = true;
+			_this.scaleY = sh;
+		}
+		if(this.showcaseCurtain != null) {
+			var _this = this.showcaseCurtain;
+			_this.posChanged = true;
+			_this.scaleX = sw;
+			var _this = this.showcaseCurtain;
+			_this.posChanged = true;
+			_this.scaleY = sh;
+		}
+		this.scaleAndCenterSplash(this.studioSplashBmp,sw,sh);
+		this.scaleAndCenterSplash(this.engineSplashBmp,sw,sh);
+		if(this.discHeader != null && this.discBody != null) {
+			if(this.discGraphics != null) {
+				this.discGraphics.clear();
+				var frameW = Math.max(200.0,sw - 56.);
+				var frameH = Math.max(200.0,sh - 56.);
+				this.discGraphics.beginFill(395792,0.90);
+				this.discGraphics.lineStyle(1.5,58879,0.35);
+				this.discGraphics.drawRoundedRect(28.0,28.0,frameW,frameH,12.0);
+				this.discGraphics.endFill();
+				this.discGraphics.lineStyle(3.0,58879,0.85);
+				var _this = this.discGraphics;
+				_this.flush();
+				_this.addVertex(28.0,50.,_this.curR,_this.curG,_this.curB,_this.curA,28.0 * _this.ma + 50. * _this.mc + _this.mx,28.0 * _this.mb + 50. * _this.md + _this.my);
+				var _this = this.discGraphics;
+				_this.addVertex(28.0,28.0,_this.curR,_this.curG,_this.curB,_this.curA,28.0 * _this.ma + 28.0 * _this.mc + _this.mx,28.0 * _this.mb + 28.0 * _this.md + _this.my);
+				var _this = this.discGraphics;
+				_this.addVertex(50.,28.0,_this.curR,_this.curG,_this.curB,_this.curA,50. * _this.ma + 28.0 * _this.mc + _this.mx,50. * _this.mb + 28.0 * _this.md + _this.my);
+				var _this = this.discGraphics;
+				var x = 28.0 + frameW - 22.0;
+				_this.flush();
+				_this.addVertex(x,28.0,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + 28.0 * _this.mc + _this.mx,x * _this.mb + 28.0 * _this.md + _this.my);
+				var _this = this.discGraphics;
+				var x = 28.0 + frameW;
+				_this.addVertex(x,28.0,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + 28.0 * _this.mc + _this.mx,x * _this.mb + 28.0 * _this.md + _this.my);
+				var _this = this.discGraphics;
+				var x = 28.0 + frameW;
+				_this.addVertex(x,50.,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + 50. * _this.mc + _this.mx,x * _this.mb + 50. * _this.md + _this.my);
+				var _this = this.discGraphics;
+				var y = 28.0 + frameH - 22.0;
+				_this.flush();
+				_this.addVertex(28.0,y,_this.curR,_this.curG,_this.curB,_this.curA,28.0 * _this.ma + y * _this.mc + _this.mx,28.0 * _this.mb + y * _this.md + _this.my);
+				var _this = this.discGraphics;
+				var y = 28.0 + frameH;
+				_this.addVertex(28.0,y,_this.curR,_this.curG,_this.curB,_this.curA,28.0 * _this.ma + y * _this.mc + _this.mx,28.0 * _this.mb + y * _this.md + _this.my);
+				var _this = this.discGraphics;
+				var y = 28.0 + frameH;
+				_this.addVertex(50.,y,_this.curR,_this.curG,_this.curB,_this.curA,50. * _this.ma + y * _this.mc + _this.mx,50. * _this.mb + y * _this.md + _this.my);
+				var _this = this.discGraphics;
+				var x = 28.0 + frameW - 22.0;
+				var y = 28.0 + frameH;
+				_this.flush();
+				_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+				var _this = this.discGraphics;
+				var x = 28.0 + frameW;
+				var y = 28.0 + frameH;
+				_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+				var _this = this.discGraphics;
+				var x = 28.0 + frameW;
+				var y = 28.0 + frameH - 22.0;
+				_this.addVertex(x,y,_this.curR,_this.curG,_this.curB,_this.curA,x * _this.ma + y * _this.mc + _this.mx,x * _this.mb + y * _this.md + _this.my);
+			}
+			var maxTextWidth = Math.min(sw * 0.88,960.0);
+			this.discHeader.set_maxWidth(maxTextWidth);
+			this.discBody.set_maxWidth(maxTextWidth);
+			var targetIconHeight = Math.min(38.0,sh * 0.06);
+			var totalLogoWidth = 0.0;
+			if(this.logoRow != null && this.discLogos.length > 0) {
+				var _g = 0;
+				var _g1 = this.discLogos;
+				while(_g < _g1.length) {
+					var bmp = _g1[_g];
+					++_g;
+					if(bmp.tile != null && bmp.tile.height > 0) {
+						var s = targetIconHeight / bmp.tile.height;
+						bmp.posChanged = true;
+						bmp.scaleX = s;
+						bmp.posChanged = true;
+						bmp.scaleY = s;
+						totalLogoWidth += bmp.tile.width * s;
+					}
+				}
+				totalLogoWidth += 32.0 * (this.discLogos.length - 1);
+			}
+			if(isNaN(totalLogoWidth)) {
+				totalLogoWidth = 0.0;
+			}
+			var hHeight = this.discHeader.get_textHeight();
+			if(isNaN(hHeight) || hHeight <= 0) {
+				hHeight = 36.0;
+			}
+			var bHeight = this.discBody.get_textHeight();
+			if(isNaN(bHeight) || bHeight <= 0) {
+				bHeight = 320.0;
+			}
+			var vHeight = this.discVersion != null ? this.discVersion.get_textHeight() : 0.0;
+			if(isNaN(vHeight)) {
+				vHeight = 20.0;
+			}
+			var totalBlockHeight = hHeight + 16.0 + bHeight + (this.discLogos.length > 0 ? 22.0 + targetIconHeight : 0.0) + (this.discVersion != null ? 14.0 + vHeight : 0.0);
+			if(isNaN(totalBlockHeight) || totalBlockHeight <= 0) {
+				totalBlockHeight = 400.0;
+			}
+			var blockStartY = Math.max(16.0,(sh - totalBlockHeight) * 0.5);
+			if(isNaN(blockStartY)) {
+				blockStartY = 24.0;
+			}
+			var _this = this.discHeader;
+			_this.posChanged = true;
+			_this.x = (sw - maxTextWidth) * 0.5;
+			var _this = this.discHeader;
+			_this.posChanged = true;
+			_this.y = blockStartY;
+			var _this = this.discBody;
+			_this.posChanged = true;
+			_this.x = (sw - maxTextWidth) * 0.5;
+			var _this = this.discBody;
+			_this.posChanged = true;
+			_this.y = this.discHeader.y + hHeight + 16.0;
+			var rowY = this.discBody.y + bHeight + 22.0;
+			if(this.logoRow != null && this.discLogos.length > 0) {
+				var currX = (sw - totalLogoWidth) * 0.5;
+				if(isNaN(currX)) {
+					currX = (sw - 200.0) * 0.5;
+				}
+				var _g = 0;
+				var _g1 = this.discLogos;
+				while(_g < _g1.length) {
+					var bmp = _g1[_g];
+					++_g;
+					bmp.posChanged = true;
+					bmp.x = currX;
+					bmp.posChanged = true;
+					bmp.y = rowY;
+					currX += bmp.tile.width * bmp.scaleX + 32.0;
+				}
+			}
+			if(this.discVersion != null) {
+				this.discVersion.set_maxWidth(maxTextWidth);
+				var _this = this.discVersion;
+				_this.posChanged = true;
+				_this.x = (sw - maxTextWidth) * 0.5;
+				var _this = this.discVersion;
+				_this.posChanged = true;
+				_this.y = this.discLogos.length > 0 ? rowY + targetIconHeight + 14.0 : this.discBody.y + bHeight + 14.0;
+			}
+		}
+	}
+	,scaleAndCenterSplash: function(bmp,sw,sh) {
+		if(bmp == null || bmp.tile == null || bmp.tile.width <= 0 || bmp.tile.height <= 0) {
+			return;
+		}
+		var naturalW = bmp.tile.width;
+		var naturalH = bmp.tile.height;
+		var scale = Math.max(sw / naturalW,sh / naturalH);
+		bmp.posChanged = true;
+		bmp.scaleX = scale;
+		bmp.posChanged = true;
+		bmp.scaleY = scale;
+		bmp.posChanged = true;
+		bmp.x = (sw - naturalW * scale) * 0.5;
+		bmp.posChanged = true;
+		bmp.y = (sh - naturalH * scale) * 0.5;
+	}
+	,updateFadeHoldFade: function(totalDur,fadeDur,onFinish) {
+		var holdEnd = totalDur - fadeDur;
+		if(this.timer < fadeDur) {
+			this.alpha = this.timer / fadeDur;
+		} else if(this.timer < holdEnd) {
+			this.alpha = 1.0;
+		} else if(this.timer < totalDur) {
+			this.alpha = 1.0 - (this.timer - holdEnd) / fadeDur;
+		} else {
+			onFinish();
+			return;
+		}
+		this.applyActiveAlpha();
+	}
+	,applyActiveAlpha: function() {
+		if(this.state == core_IntroState.Studio) {
+			this.screenStudio.alpha = this.alpha;
+		} else if(this.state == core_IntroState.Engine) {
+			this.screenEngine.alpha = this.alpha;
+		} else if(this.state == core_IntroState.Disclaimer) {
+			this.screenDisclaimer.alpha = this.alpha;
+		}
+	}
+	,__class__: core_IntroController
 };
 var h3d_MatrixImpl = function() {
 };
@@ -2986,6 +3363,121 @@ entities_CarMesh.prototype = $extend(h3d_scene_Object.prototype,{
 	}
 	,__class__: entities_CarMesh
 });
+var entities_RemoteCarActor = function(parent,peerId,name,colorHex) {
+	this.hasInitialized = false;
+	this.targetState = null;
+	this.currentRoll = 0.0;
+	this.currentPitch = 0.0;
+	this.currentYaw = 0.0;
+	this.currentZ = 0.0;
+	this.currentY = 0.0;
+	this.currentX = 0.0;
+	this.peerId = peerId;
+	this.name = name;
+	this.colorHex = colorHex;
+	this.mesh = new entities_CarMesh(parent);
+	this.applyPaintColor(colorHex);
+};
+$hxClasses["entities.RemoteCarActor"] = entities_RemoteCarActor;
+entities_RemoteCarActor.__name__ = "entities.RemoteCarActor";
+entities_RemoteCarActor.prototype = {
+	applyPaintColor: function(hex) {
+		this.colorHex = hex;
+		if(this.mesh != null) {
+			if(this.mesh.bodyMesh != null && this.mesh.bodyMesh.material != null) {
+				var _this = this.mesh.bodyMesh.material.mshader.color__;
+				_this.x = (hex >> 16 & 255) / 255;
+				_this.y = (hex >> 8 & 255) / 255;
+				_this.z = (hex & 255) / 255;
+				_this.w = (hex >>> 24) / 255;
+			}
+			if(this.mesh.hoodMesh != null && this.mesh.hoodMesh.material != null) {
+				var _this = this.mesh.hoodMesh.material.mshader.color__;
+				_this.x = (hex >> 16 & 255) / 255;
+				_this.y = (hex >> 8 & 255) / 255;
+				_this.z = (hex & 255) / 255;
+				_this.w = (hex >>> 24) / 255;
+			}
+		}
+	}
+	,applyTargetState: function(st) {
+		if(st == null) {
+			return;
+		}
+		if(st.colorHex != this.colorHex) {
+			this.applyPaintColor(st.colorHex);
+		}
+		this.name = st.name;
+		this.targetState = st;
+		if(!this.hasInitialized) {
+			this.hasInitialized = true;
+			this.currentX = st.x;
+			this.currentY = st.y;
+			this.currentZ = st.z;
+			this.currentYaw = st.yaw;
+			this.currentPitch = st.pitch;
+			this.currentRoll = st.roll;
+			this.syncMesh(st);
+		}
+	}
+	,update: function(dt) {
+		if(this.targetState == null || this.mesh == null) {
+			return;
+		}
+		var lerpAlpha = Math.min(1.0,Math.max(0.0,dt * 16.0));
+		this.currentX += (this.targetState.x - this.currentX) * lerpAlpha;
+		this.currentY += (this.targetState.y - this.currentY) * lerpAlpha;
+		this.currentZ += (this.targetState.z - this.currentZ) * lerpAlpha;
+		this.currentPitch += (this.targetState.pitch - this.currentPitch) * lerpAlpha;
+		this.currentRoll += (this.targetState.roll - this.currentRoll) * lerpAlpha;
+		var dyaw = this.wrapAngle(this.targetState.yaw - this.currentYaw);
+		this.currentYaw = this.wrapAngle(this.currentYaw + dyaw * lerpAlpha);
+		this.syncMesh(this.targetState);
+	}
+	,syncMesh: function(st) {
+		var _this = this.mesh;
+		_this.x = this.currentX;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.mesh;
+		_this.y = this.currentY;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.mesh;
+		_this.z = this.currentZ;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		this.mesh.setRotation(this.currentPitch,this.currentRoll,0);
+		this.mesh.rotate(0,0,-this.currentYaw);
+		if(this.mesh.wheels.length >= 4) {
+			this.mesh.updateWheelTransform(0,0.0,st.wheelSpinAngle,st.steerAngle);
+			this.mesh.updateWheelTransform(1,0.0,st.wheelSpinAngle,st.steerAngle);
+			this.mesh.updateWheelTransform(2,0.0,st.wheelSpinAngle,0.0);
+			this.mesh.updateWheelTransform(3,0.0,st.wheelSpinAngle,0.0);
+		}
+	}
+	,wrapAngle: function(a) {
+		while(a > Math.PI) a -= Math.PI * 2.0;
+		while(a < -Math.PI) a += Math.PI * 2.0;
+		return a;
+	}
+	,destroy: function() {
+		if(this.mesh != null) {
+			var _this = this.mesh;
+			if(_this != null && _this.parent != null) {
+				_this.parent.removeChild(_this);
+			}
+			this.mesh = null;
+		}
+	}
+	,__class__: entities_RemoteCarActor
+};
 var entities_TrafficCarMesh = function(colorHex,parent) {
 	this.wheels = [];
 	h3d_scene_Object.call(this,parent);
@@ -3157,11 +3649,14 @@ entities_TrafficCar.__name__ = "entities.TrafficCar";
 entities_TrafficCar.prototype = {
 	__class__: entities_TrafficCar
 };
-var entities_TrafficSystem = function(trackWaypoints,parent) {
+var entities_TrafficSystem = function(trackWaypoints,parent,config) {
+	this.scratchRight = new h3d_VectorImpl(0.,0.,0.);
+	this.scratchFwd = new h3d_VectorImpl(0.,0.,0.);
 	this.scratchFromCenter = new h3d_VectorImpl(0.,0.,0.);
 	this.trafficList = [];
 	h3d_scene_Object.call(this,parent);
 	this.trackWaypoints = trackWaypoints;
+	this.config = config != null ? config : config_WorldConfig.getDefaultTraffic();
 	this.spawnTrafficFleet();
 };
 $hxClasses["entities.TrafficSystem"] = entities_TrafficSystem;
@@ -3169,7 +3664,7 @@ entities_TrafficSystem.__name__ = "entities.TrafficSystem";
 entities_TrafficSystem.__super__ = h3d_scene_Object;
 entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 	spawnTrafficFleet: function() {
-		var carColors = [2773694,9139029,3043136,9118976,13686750];
+		var carColors = this.config.paintPalette;
 		var total = Math.floor(this.trackWaypoints.length / 24);
 		var _g = 0;
 		while(_g < total) {
@@ -3177,85 +3672,111 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 			var wpIdx = (i * 24 + 10) % this.trackWaypoints.length;
 			var oncoming = i % 2 == 1;
 			var tc = new entities_TrafficCar(new entities_TrafficCarMesh(carColors[i % carColors.length],this),wpIdx,oncoming,oncoming ? 17.5 : 16.0);
-			var wp = this.trackWaypoints[wpIdx];
-			var nextWp = this.trackWaypoints[(wpIdx + 1) % this.trackWaypoints.length];
-			var x = nextWp.x - wp.x;
-			var y = nextWp.y - wp.y;
-			var z = nextWp.z - wp.z;
-			if(z == null) {
-				z = 0.;
-			}
-			if(y == null) {
-				y = 0.;
-			}
-			if(x == null) {
-				x = 0.;
-			}
-			var x1 = x;
-			var y1 = y;
-			var z1 = z;
-			if(z1 == null) {
-				z1 = 0.;
-			}
-			if(y1 == null) {
-				y1 = 0.;
-			}
-			if(x1 == null) {
-				x1 = 0.;
-			}
-			var _this_x = x1;
-			var _this_y = y1;
-			var _this_z = z1;
-			_this_z = 0;
-			var k = _this_x * _this_x + _this_y * _this_y + _this_z * _this_z;
-			if(k < 1e-20) {
-				k = 0;
-			} else {
-				k = 1. / Math.sqrt(k);
-			}
-			_this_x *= k;
-			_this_y *= k;
-			var x2 = -_this_y;
-			var y2 = _this_x;
-			if(y2 == null) {
-				y2 = 0.;
-			}
-			if(x2 == null) {
-				x2 = 0.;
-			}
-			var x3 = x2;
-			var y3 = y2;
-			if(y3 == null) {
-				y3 = 0.;
-			}
-			if(x3 == null) {
-				x3 = 0.;
-			}
-			var offset = oncoming ? 4.8 : -4.8;
-			tc.laneOffset = offset;
-			tc.currentLaneOffset = offset;
-			var _this = tc.pos;
-			var x4 = wp.x + x3 * offset;
-			var y4 = wp.y + y3 * offset;
-			var z2 = wp.z;
-			if(z2 == null) {
-				z2 = 0.;
-			}
-			if(y4 == null) {
-				y4 = 0.;
-			}
-			if(x4 == null) {
-				x4 = 0.;
-			}
-			_this.x = x4;
-			_this.y = y4;
-			_this.z = z2;
-			tc.yaw = Math.atan2(_this_y,_this_x) + (oncoming ? Math.PI : 0.0);
+			this.placeTrafficAgentAtWaypoint(tc,wpIdx,oncoming);
 			this.trafficList.push(tc);
 		}
 	}
+	,resetPositions: function() {
+		var _g = 0;
+		var _g1 = this.trafficList.length;
+		while(_g < _g1) {
+			var i = _g++;
+			var tc = this.trafficList[i];
+			var wpIdx = (i * 24 + 10) % this.trackWaypoints.length;
+			var oncoming = i % 2 == 1;
+			tc.waypointIdx = wpIdx;
+			tc.isOncoming = oncoming;
+			tc.currentSpeed = tc.cruiseSpeed;
+			this.placeTrafficAgentAtWaypoint(tc,wpIdx,oncoming);
+		}
+	}
+	,placeTrafficAgentAtWaypoint: function(tc,wpIdx,oncoming) {
+		var wp = this.trackWaypoints[wpIdx];
+		var nextWp = this.trackWaypoints[(wpIdx + 1) % this.trackWaypoints.length];
+		var _this = this.scratchFwd;
+		var x = nextWp.x - wp.x;
+		var y = nextWp.y - wp.y;
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = 0;
+		var _this = this.scratchFwd;
+		var k = _this.x * _this.x + _this.y * _this.y + _this.z * _this.z;
+		if(k < 1e-20) {
+			k = 0;
+		} else {
+			k = 1. / Math.sqrt(k);
+		}
+		_this.x *= k;
+		_this.y *= k;
+		_this.z *= k;
+		var _this = this.scratchRight;
+		var x = -this.scratchFwd.y;
+		var y = this.scratchFwd.x;
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = 0;
+		var offset = oncoming ? 4.8 : -4.8;
+		tc.laneOffset = offset;
+		tc.currentLaneOffset = offset;
+		var _this = tc.pos;
+		var x = wp.x + this.scratchRight.x * offset;
+		var y = wp.y + this.scratchRight.y * offset;
+		var z = wp.z + 0.06;
+		if(z == null) {
+			z = 0.;
+		}
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = z;
+		tc.yaw = Math.atan2(this.scratchFwd.y,this.scratchFwd.x) + (oncoming ? Math.PI : 0.0);
+		if(tc.carMesh != null) {
+			var _this = tc.carMesh;
+			_this.x = tc.pos.x;
+			_this.flags |= 1;
+			if((_this.flags & 131072) != 0) {
+				_this.flags |= 262144;
+			}
+			var _this = tc.carMesh;
+			_this.y = tc.pos.y;
+			_this.flags |= 1;
+			if((_this.flags & 131072) != 0) {
+				_this.flags |= 262144;
+			}
+			var _this = tc.carMesh;
+			_this.z = tc.pos.z;
+			_this.flags |= 1;
+			if((_this.flags & 131072) != 0) {
+				_this.flags |= 262144;
+			}
+			tc.carMesh.setRotation(0,0,tc.yaw - 1.5707963);
+		}
+	}
 	,update: function(dt,playerPhysics,chaseCam) {
-		var numWaypoints = this.trackWaypoints.length;
+		this.updateSpeedControl(dt);
+		this.updateSteeringAndAvoidance(dt,playerPhysics);
+		this.resolveTrafficMutualCollisions();
+		this.resolvePlayerCollisions(playerPhysics,chaseCam);
+	}
+	,updateSpeedControl: function(dt) {
+		var followBuf = 10.0 * this.config.defaultSpacingMultiplier;
 		var _g = 0;
 		var _g1 = this.trafficList.length;
 		while(_g < _g1) {
@@ -3278,9 +3799,9 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 				var dx = other.pos.x - tc.pos.x;
 				var dy = other.pos.y - tc.pos.y;
 				var dist = Math.sqrt(dx * dx + dy * dy);
-				if(dist < 10.0 && dist > 0.001) {
+				if(dist < followBuf && dist > 0.001) {
 					if((dx * fwdX + dy * fwdY) / dist > 0.7) {
-						targetSpeed = Math.min(targetSpeed,other.currentSpeed * (dist / 10.0 * 0.8));
+						targetSpeed = Math.min(targetSpeed,other.currentSpeed * (dist / followBuf * 0.8));
 					}
 				}
 			}
@@ -3289,6 +3810,10 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 				tc.currentSpeed = 0;
 			}
 		}
+	}
+	,updateSteeringAndAvoidance: function(dt,playerPhysics) {
+		var numWaypoints = this.trackWaypoints.length;
+		var maxOffset = this.config.activeHalfWidth - 2.0;
 		var _g = 0;
 		var _g1 = this.trafficList;
 		while(_g < _g1.length) {
@@ -3297,73 +3822,49 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 			var targetIdx = tc.isOncoming ? (tc.waypointIdx - 1 + numWaypoints) % numWaypoints : (tc.waypointIdx + 1) % numWaypoints;
 			var targetWp = this.trackWaypoints[targetIdx];
 			var nextWp = tc.isOncoming ? this.trackWaypoints[(targetIdx - 1 + numWaypoints) % numWaypoints] : this.trackWaypoints[(targetIdx + 1) % numWaypoints];
+			var _this = this.scratchFwd;
 			var x = nextWp.x - targetWp.x;
 			var y = nextWp.y - targetWp.y;
-			var z = nextWp.z - targetWp.z;
-			if(z == null) {
-				z = 0.;
-			}
 			if(y == null) {
 				y = 0.;
 			}
 			if(x == null) {
 				x = 0.;
 			}
-			var x1 = x;
-			var y1 = y;
-			var z1 = z;
-			if(z1 == null) {
-				z1 = 0.;
+			_this.x = x;
+			_this.y = y;
+			_this.z = 0;
+			var _this1 = this.scratchFwd;
+			var k = _this1.x * _this1.x + _this1.y * _this1.y + _this1.z * _this1.z;
+			if(k < 1e-20) {
+				k = 0;
+			} else {
+				k = 1. / Math.sqrt(k);
 			}
+			_this1.x *= k;
+			_this1.y *= k;
+			_this1.z *= k;
+			var _this2 = this.scratchRight;
+			var x1 = -this.scratchFwd.y;
+			var y1 = this.scratchFwd.x;
 			if(y1 == null) {
 				y1 = 0.;
 			}
 			if(x1 == null) {
 				x1 = 0.;
 			}
-			var _this_x = x1;
-			var _this_y = y1;
-			var _this_z = z1;
-			_this_z = 0;
-			var k = _this_x * _this_x + _this_y * _this_y + _this_z * _this_z;
-			if(k < 1e-20) {
-				k = 0;
-			} else {
-				k = 1. / Math.sqrt(k);
-			}
-			_this_x *= k;
-			_this_y *= k;
-			var x2 = -_this_y;
-			var y2 = _this_x;
-			if(y2 == null) {
-				y2 = 0.;
-			}
-			if(x2 == null) {
-				x2 = 0.;
-			}
-			var x3 = x2;
-			var y3 = y2;
-			if(y3 == null) {
-				y3 = 0.;
-			}
-			if(x3 == null) {
-				x3 = 0.;
-			}
-			var right_x = x3;
-			var right_y = y3;
+			_this2.x = x1;
+			_this2.y = y1;
+			_this2.z = 0;
 			var desiredOffset = tc.laneOffset;
+			var fwdX = Math.cos(tc.yaw);
+			var fwdY = Math.sin(tc.yaw);
 			var dxP = playerPhysics.pos.x - tc.pos.x;
 			var dyP = playerPhysics.pos.y - tc.pos.y;
 			var distP = Math.sqrt(dxP * dxP + dyP * dyP);
 			if(distP < 32.0 && distP > 0.001) {
-				var fwdX = Math.cos(tc.yaw);
-				var fwdY = Math.sin(tc.yaw);
 				if((dxP * fwdX + dyP * fwdY) / distP > 0.25) {
-					if(dxP * -fwdY + dyP * fwdX > 0.0) {
-						desiredOffset -= 2.5;
-					} else {
-						desiredOffset += 2.5;
-					}
+					desiredOffset += dxP * -fwdY + dyP * fwdX > 0.0 ? -2.5 : 2.5;
 					if(distP < 18.0) {
 						tc.currentSpeed = Math.max(4.0,tc.currentSpeed - 14.0 * dt);
 					}
@@ -3381,7 +3882,7 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 				var dyO = other.pos.y - tc.pos.y;
 				var distO = Math.sqrt(dxO * dxO + dyO * dyO);
 				if(distO < 16.0 && distO > 0.001) {
-					if((dxO * Math.cos(tc.yaw) + dyO * Math.sin(tc.yaw)) / distO > 0.5) {
+					if((dxO * fwdX + dyO * fwdY) / distO > 0.5) {
 						if(other.isOncoming != tc.isOncoming) {
 							desiredOffset += tc.isOncoming ? 2.0 : -2.0;
 						} else {
@@ -3390,11 +3891,11 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 					}
 				}
 			}
-			desiredOffset = Math.max(-7.6999999999999993,Math.min(7.6999999999999993,desiredOffset));
+			desiredOffset = Math.max(-maxOffset,Math.min(maxOffset,desiredOffset));
 			tc.currentLaneOffset += (desiredOffset - tc.currentLaneOffset) * Math.min(1.0,4.0 * dt);
 			var targetZ = targetWp.z + 0.06;
-			var toTargetX = targetWp.x + right_x * tc.currentLaneOffset - tc.pos.x;
-			var toTargetY = targetWp.y + right_y * tc.currentLaneOffset - tc.pos.y;
+			var toTargetX = targetWp.x + this.scratchRight.x * tc.currentLaneOffset - tc.pos.x;
+			var toTargetY = targetWp.y + this.scratchRight.y * tc.currentLaneOffset - tc.pos.y;
 			var distToTarget = Math.sqrt(toTargetX * toTargetX + toTargetY * toTargetY);
 			if(distToTarget < 9.0) {
 				tc.waypointIdx = targetIdx;
@@ -3411,27 +3912,31 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 			tc.pos.x += Math.cos(tc.yaw) * moveDist;
 			tc.pos.y += Math.sin(tc.yaw) * moveDist;
 			tc.pos.z = targetZ;
-			this.clampToTrack(tc.pos,9.2);
-			var _this = tc.carMesh;
-			_this.x = tc.pos.x;
-			_this.flags |= 1;
-			if((_this.flags & 131072) != 0) {
-				_this.flags |= 262144;
+			this.clampToTrack(tc.pos,this.config.activeHalfWidth - 0.5);
+			if(tc.carMesh != null) {
+				var _this3 = tc.carMesh;
+				_this3.x = tc.pos.x;
+				_this3.flags |= 1;
+				if((_this3.flags & 131072) != 0) {
+					_this3.flags |= 262144;
+				}
+				var _this4 = tc.carMesh;
+				_this4.y = tc.pos.y;
+				_this4.flags |= 1;
+				if((_this4.flags & 131072) != 0) {
+					_this4.flags |= 262144;
+				}
+				var _this5 = tc.carMesh;
+				_this5.z = tc.pos.z;
+				_this5.flags |= 1;
+				if((_this5.flags & 131072) != 0) {
+					_this5.flags |= 262144;
+				}
+				tc.carMesh.setRotation(0,0,tc.yaw - 1.5707963);
 			}
-			var _this1 = tc.carMesh;
-			_this1.y = tc.pos.y;
-			_this1.flags |= 1;
-			if((_this1.flags & 131072) != 0) {
-				_this1.flags |= 262144;
-			}
-			var _this2 = tc.carMesh;
-			_this2.z = tc.pos.z;
-			_this2.flags |= 1;
-			if((_this2.flags & 131072) != 0) {
-				_this2.flags |= 262144;
-			}
-			tc.carMesh.setRotation(0,0,tc.yaw - 1.5707963);
 		}
+	}
+	,resolveTrafficMutualCollisions: function() {
 		var _g = 0;
 		var _g1 = this.trafficList.length;
 		while(_g < _g1) {
@@ -3459,6 +3964,8 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 				}
 			}
 		}
+	}
+	,resolvePlayerCollisions: function(playerPhysics,chaseCam) {
 		var playerSyncNeeded = false;
 		var _g = 0;
 		var _g1 = this.trafficList;
@@ -3477,9 +3984,9 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 				playerPhysics.pos.y -= ny * overlap * 0.6;
 				tc.pos.x += nx * overlap * 0.4;
 				tc.pos.y += ny * overlap * 0.4;
-				playerPhysics.set_forwardSpeed(playerPhysics.forwardSpeed * 0.75);
+				playerPhysics.forwardSpeed *= this.config.collisionSpeedRetention;
 				tc.currentSpeed = Math.max(tc.currentSpeed,Math.abs(playerPhysics.forwardSpeed) * 0.9);
-				chaseCam.addTrauma(0.35);
+				chaseCam.addTrauma(this.config.collisionTrauma);
 				playerSyncNeeded = true;
 			}
 		}
@@ -3487,7 +3994,7 @@ entities_TrafficSystem.prototype = $extend(h3d_scene_Object.prototype,{
 			playerPhysics.syncToOimoBody();
 		}
 		if(Math.abs(playerPhysics.forwardSpeed) > 95.0) {
-			playerPhysics.set_forwardSpeed((playerPhysics.forwardSpeed > 0 ? 1 : -1) * 95.0);
+			playerPhysics.forwardSpeed = (playerPhysics.forwardSpeed > 0 ? 1 : -1) * 95.0;
 		}
 	}
 	,clampToTrack: function(point,maxHalfWidth) {
@@ -5458,36 +5965,20 @@ graphics_GraphicsManager.prototype = {
 		if(this.s2d == null) {
 			return;
 		}
-		switch(this.settings.uiResolution) {
-		case "1080p (FHD)":
-			this.s2d.set_scaleMode(h2d_ScaleMode.AutoZoom(1920,1080,false));
-			break;
-		case "1440p (2K)":
-			this.s2d.set_scaleMode(h2d_ScaleMode.AutoZoom(2560,1440,false));
-			break;
-		case "2160p (4K)":
-			this.s2d.set_scaleMode(h2d_ScaleMode.AutoZoom(3840,2160,false));
-			break;
-		case "720p (HD)":
-			this.s2d.set_scaleMode(h2d_ScaleMode.AutoZoom(1280,720,false));
-			break;
-		case "Native / Match Window":
-			this.s2d.set_scaleMode(h2d_ScaleMode.Resize);
-			break;
-		default:
-			this.s2d.set_scaleMode(h2d_ScaleMode.AutoZoom(1280,720,false));
+		var preset = graphics_GraphicsManager.UI_RES_PRESETS.h[this.settings.uiResolution];
+		if(preset == null) {
+			preset = graphics_GraphicsManager.UI_RES_PRESETS.h["720p (HD)"];
 		}
+		this.s2d.set_scaleMode(preset.isNative ? h2d_ScaleMode.Resize : h2d_ScaleMode.AutoZoom(preset.width,preset.height,false));
+		this.s2d.offsetX = 0;
+		this.s2d.offsetY = 0;
 		this.s2d.checkResize();
 	}
 	,applyShadows: function() {
 		if(this.light == null) {
 			return;
 		}
-		if(this.settings.shadowLevel == "Off") {
-			this.light.set_enableSpecular(false);
-		} else {
-			this.light.set_enableSpecular(true);
-		}
+		this.light.set_enableSpecular(this.settings.shadowLevel != "Off");
 	}
 	,applyLighting: function() {
 		if(this.light == null) {
@@ -5500,66 +5991,21 @@ graphics_GraphicsManager.prototype = {
 		} else {
 			fwd = null;
 		}
-		switch(this.settings.lightingLevel) {
-		case "High":
-			var _this = this.light.get_color();
-			_this.x = 1.;
-			_this.y = 0.94901960784313721;
-			_this.z = 0.83921568627450982;
-			if(fwd != null) {
-				var _this = fwd.ambientLight;
-				_this.x = 0.61960784313725492;
-				_this.y = 0.70588235294117652;
-				_this.z = 0.78431372549019607;
-			}
-			break;
-		case "Low":
-			var _this = this.light.get_color();
-			_this.x = 0.91764705882352937;
-			_this.y = 0.85882352941176465;
-			_this.z = 0.72156862745098038;
-			if(fwd != null) {
-				var _this = fwd.ambientLight;
-				_this.x = 0.4392156862745098;
-				_this.y = 0.50980392156862742;
-				_this.z = 0.58039215686274515;
-			}
-			break;
-		case "Medium":
-			var _this = this.light.get_color();
-			_this.x = 1.;
-			_this.y = 0.92549019607843142;
-			_this.z = 0.78431372549019607;
-			if(fwd != null) {
-				var _this = fwd.ambientLight;
-				_this.x = 0.52549019607843139;
-				_this.y = 0.60784313725490191;
-				_this.z = 0.69019607843137254;
-			}
-			break;
-		case "Ultra (RTX/Path)":
-			var _this = this.light.get_color();
-			_this.x = 1.;
-			_this.y = 0.97647058823529409;
-			_this.z = 0.93333333333333335;
-			if(fwd != null) {
-				var _this = fwd.ambientLight;
-				_this.x = 0.69803921568627447;
-				_this.y = 0.78431372549019607;
-				_this.z = 0.86274509803921573;
-			}
-			break;
-		default:
-			var _this = this.light.get_color();
-			_this.x = 1.;
-			_this.y = 0.92549019607843142;
-			_this.z = 0.78431372549019607;
-			if(fwd != null) {
-				var _this = fwd.ambientLight;
-				_this.x = 0.52549019607843139;
-				_this.y = 0.60784313725490191;
-				_this.z = 0.69019607843137254;
-			}
+		var preset = graphics_GraphicsManager.LIGHTING_PRESETS.h[this.settings.lightingLevel];
+		if(preset == null) {
+			preset = graphics_GraphicsManager.LIGHTING_PRESETS.h["Medium"];
+		}
+		var _this = this.light.get_color();
+		var c = preset.sunColor;
+		_this.x = (c >> 16 & 255) / 255;
+		_this.y = (c >> 8 & 255) / 255;
+		_this.z = (c & 255) / 255;
+		if(fwd != null) {
+			var _this = fwd.ambientLight;
+			var c = preset.ambientColor;
+			_this.x = (c >> 16 & 255) / 255;
+			_this.y = (c >> 8 & 255) / 255;
+			_this.z = (c & 255) / 255;
 		}
 	}
 	,applyTexturesAndFiltering: function() {
@@ -12352,6 +12798,15 @@ h2d_Tile.prototype = {
 			dx = 0.;
 		}
 		return new h2d_Tile(this.innerTex,this.x + x,this.y + y,w,h,dx,dy);
+	}
+	,clone: function() {
+		var t = new h2d_Tile(null,this.x,this.y,this.width,this.height,this.dx,this.dy);
+		t.innerTex = this.innerTex;
+		t.u = this.u;
+		t.u2 = this.u2;
+		t.v = this.v;
+		t.v2 = this.v2;
+		return t;
 	}
 	,__class__: h2d_Tile
 };
@@ -31378,9 +31833,6 @@ hxd_Pixels.prototype = {
 var hxd_Res = function() { };
 $hxClasses["hxd.Res"] = hxd_Res;
 hxd_Res.__name__ = "hxd.Res";
-hxd_Res.load = function(name) {
-	return hxd_Res.get_loader().load(name);
-};
 hxd_Res.get_loader = function() {
 	var l = hxd_res_Loader.currentInstance;
 	if(l == null) {
@@ -51629,7 +52081,7 @@ input_InputBindings.prototype = {
 	}
 	,__class__: input_InputBindings
 };
-var input_InputController = function() {
+var input_InputController = function(config) {
 	this.steerSensitivity = 1.0;
 	this.isTouchActive = false;
 	this.touchBoost = false;
@@ -51668,72 +52120,92 @@ var input_InputController = function() {
 	this.handbrake = false;
 	this.brake = 0.0;
 	this.throttle = 0.0;
+	this.rawDigitalSteer = 0.0;
 	this.steer = 0.0;
+	this.config = config != null ? config : config_GameConfig.getDefault().input;
+	this.steerSensitivity = this.config.defaultSteerSensitivity;
 	hxd_Pad.wait($bind(this,this.onPadConnected));
 	this.initTouchDetection();
 };
 $hxClasses["input.InputController"] = input_InputController;
 input_InputController.__name__ = "input.InputController";
 input_InputController.getKeyName = function(k) {
-	switch(k) {
-	case 13:
-		return "ENTER";
-	case 16:
-		return "L-SHIFT";
-	case 17:
-		return "CTRL";
-	case 18:
-		return "ALT";
-	case 32:
-		return "SPACE";
-	case 37:
-		return "LEFT ARROW";
-	case 38:
-		return "UP ARROW";
-	case 39:
-		return "RIGHT ARROW";
-	case 40:
-		return "DOWN ARROW";
-	default:
+	var named = input_InputController.KEY_NAMES.h[k];
+	if(named != null) {
+		return named;
+	} else {
 		return String.fromCodePoint(k);
 	}
 };
 input_InputController.getGamepadBtnName = function(btn) {
-	switch(btn) {
-	case 0:
-		return "A (Bottom)";
-	case 1:
-		return "B (Right)";
-	case 2:
-		return "X (Left)";
-	case 3:
-		return "Y (Top)";
-	case 4:
-		return "LB";
-	case 5:
-		return "RB";
-	case 6:
-		return "LT";
-	case 7:
-		return "RT";
-	case 8:
-		return "Select";
-	case 9:
-		return "Start";
-	case 12:
-		return "D-Pad Up";
-	case 13:
-		return "D-Pad Down";
-	case 14:
-		return "D-Pad Left";
-	case 15:
-		return "D-Pad Right";
-	default:
+	var named = input_InputController.PAD_BTN_NAMES.h[btn];
+	if(named != null) {
+		return named;
+	} else {
 		return "Btn " + btn;
 	}
 };
 input_InputController.prototype = {
-	initTouchDetection: function() {
+	loadFromSave: function(data) {
+		if(data == null) {
+			return;
+		}
+		if(data.steerSensitivity != null) {
+			this.steerSensitivity = data.steerSensitivity;
+		}
+		if(data.bindings != null) {
+			this.bindings.keyLeft = data.bindings.keyLeft;
+			this.bindings.keyRight = data.bindings.keyRight;
+			this.bindings.keyGas = data.bindings.keyGas;
+			this.bindings.keyBrake = data.bindings.keyBrake;
+			this.bindings.keyHandbrake = data.bindings.keyHandbrake;
+			this.bindings.keyBoost = data.bindings.keyBoost;
+			this.bindings.padGas = data.bindings.padGas;
+			this.bindings.padBrake = data.bindings.padBrake;
+			this.bindings.padHandbrake = data.bindings.padHandbrake;
+			this.bindings.padBoost = data.bindings.padBoost;
+		}
+		if(data.exclusiveDevice != null) {
+			var _g = data.exclusiveDevice;
+			var tmp;
+			if(_g == null) {
+				tmp = input_ExclusiveDevice.Both;
+			} else {
+				switch(_g) {
+				case "GamepadOnly":
+					tmp = input_ExclusiveDevice.GamepadOnly;
+					break;
+				case "KeyboardOnly":
+					tmp = input_ExclusiveDevice.KeyboardOnly;
+					break;
+				default:
+					tmp = input_ExclusiveDevice.Both;
+				}
+			}
+			this.exclusiveDevice = tmp;
+		}
+	}
+	,exportToSave: function(data) {
+		if(data == null) {
+			return;
+		}
+		data.steerSensitivity = this.steerSensitivity;
+		data.bindings = { keyLeft : this.bindings.keyLeft, keyRight : this.bindings.keyRight, keyGas : this.bindings.keyGas, keyBrake : this.bindings.keyBrake, keyHandbrake : this.bindings.keyHandbrake, keyBoost : this.bindings.keyBoost, padGas : this.bindings.padGas, padBrake : this.bindings.padBrake, padHandbrake : this.bindings.padHandbrake, padBoost : this.bindings.padBoost};
+		var tmp;
+		switch(this.exclusiveDevice._hx_index) {
+		case 0:
+			tmp = "Both";
+			break;
+		case 1:
+			tmp = "KeyboardOnly";
+			break;
+		case 2:
+			tmp = "GamepadOnly";
+			break;
+		}
+		data.exclusiveDevice = tmp;
+	}
+	,initTouchDetection: function() {
 		var _gthis = this;
 		try {
 			var w = window;
@@ -51771,6 +52243,7 @@ input_InputController.prototype = {
 		this.tabPrevPressed = false;
 		this.tabNextPressed = false;
 		this.anyKeyPressed = false;
+		this.rawDigitalSteer = 0.0;
 		this.inputCooldown = 0.22;
 	}
 	,startListening: function(action,isGamepad) {
@@ -51832,40 +52305,49 @@ input_InputController.prototype = {
 			}
 		}
 		var allowKeyboard = this.exclusiveDevice == input_ExclusiveDevice.Both || this.exclusiveDevice == input_ExclusiveDevice.KeyboardOnly;
-		var keyLeft = allowKeyboard && (hxd_Key.isDown(this.bindings.keyLeft) || hxd_Key.isDown(37));
-		var keyRight = allowKeyboard && (hxd_Key.isDown(this.bindings.keyRight) || hxd_Key.isDown(39));
+		var allowGamepad = this.exclusiveDevice == input_ExclusiveDevice.Both || this.exclusiveDevice == input_ExclusiveDevice.GamepadOnly;
 		var keyGas = allowKeyboard && (hxd_Key.isDown(this.bindings.keyGas) || hxd_Key.isDown(38));
 		var keyReverse = allowKeyboard && (hxd_Key.isDown(this.bindings.keyBrake) || hxd_Key.isDown(40));
-		if(keyLeft && !keyRight) {
-			this.digitalSteerTarget = -1.0;
-		} else if(keyRight && !keyLeft) {
+		var steerLeft = allowKeyboard && (hxd_Key.isDown(this.bindings.keyLeft) || hxd_Key.isDown(37)) || allowGamepad && this.pad != null && (this.pad == null || this.pad.buttons == null || 14 >= this.pad.buttons.length ? false : this.pad.buttons[14]);
+		var steerRight = allowKeyboard && (hxd_Key.isDown(this.bindings.keyRight) || hxd_Key.isDown(39)) || allowGamepad && this.pad != null && (this.pad == null || this.pad.buttons == null || 15 >= this.pad.buttons.length ? false : this.pad.buttons[15]);
+		if(steerLeft && !steerRight) {
 			this.digitalSteerTarget = 1.0;
+		} else if(steerRight && !steerLeft) {
+			this.digitalSteerTarget = -1.0;
 		} else {
 			this.digitalSteerTarget = 0.0;
 		}
+		var steerRate = this.config.steerSpeed;
+		var returnRate = this.config.returnSpeed;
+		var padDeadzone = this.config.gamepadDeadzone;
 		if(this.digitalSteerTarget != 0.0) {
-			if(this.steer < this.digitalSteerTarget) {
-				this.steer = Math.min(this.digitalSteerTarget,this.steer + 4.2 * dt);
-			} else if(this.steer > this.digitalSteerTarget) {
-				this.steer = Math.max(this.digitalSteerTarget,this.steer - 4.2 * dt);
+			if(this.rawDigitalSteer < this.digitalSteerTarget) {
+				this.rawDigitalSteer = Math.min(this.digitalSteerTarget,this.rawDigitalSteer + steerRate * dt);
+			} else if(this.rawDigitalSteer > this.digitalSteerTarget) {
+				this.rawDigitalSteer = Math.max(this.digitalSteerTarget,this.rawDigitalSteer - steerRate * dt);
 			}
-		} else if(this.steer > 0.0) {
-			this.steer = Math.max(0.0,this.steer - 6.5 * dt);
-		} else if(this.steer < 0.0) {
-			this.steer = Math.min(0.0,this.steer + 6.5 * dt);
+		} else if(this.rawDigitalSteer > 0.0) {
+			this.rawDigitalSteer = Math.max(0.0,this.rawDigitalSteer - returnRate * dt);
+		} else if(this.rawDigitalSteer < 0.0) {
+			this.rawDigitalSteer = Math.min(0.0,this.rawDigitalSteer + returnRate * dt);
 		}
+		var combinedSteer = this.rawDigitalSteer;
 		this.throttle = keyGas ? 1.0 : 0.0;
 		this.brake = keyReverse ? 1.0 : 0.0;
 		this.handbrake = allowKeyboard && hxd_Key.isDown(this.bindings.keyHandbrake);
 		this.boost = allowKeyboard && hxd_Key.isDown(this.bindings.keyBoost);
-		if((this.exclusiveDevice == input_ExclusiveDevice.Both || this.exclusiveDevice == input_ExclusiveDevice.GamepadOnly) && this.pad != null) {
-			if(Math.abs(stickX) > 0.12) {
-				this.steer = (stickX < 0 ? -1.0 : 1.0) * Math.pow(Math.abs(stickX),1.4);
+		if(allowGamepad && this.pad != null) {
+			var absStick = Math.abs(stickX);
+			if(absStick > padDeadzone && padDeadzone < 0.99) {
+				var padSteer = (stickX < 0.0 ? 1.0 : -1.0) * Math.pow(Math.max(0.0,Math.min(1.0,(absStick - padDeadzone) / (1.0 - padDeadzone))),1.35);
+				if(this.digitalSteerTarget == 0.0 || Math.abs(padSteer) >= Math.abs(combinedSteer)) {
+					combinedSteer = padSteer;
+				}
 			}
 			var idx = this.bindings.padGas;
-			var padThrottle = this.pad == null || this.pad.values == null || idx < 0 || idx >= this.pad.values.length ? 0.0 : this.pad.values[idx];
+			var padThrottle = Math.max(0.0,Math.min(1.0,this.pad == null || this.pad.values == null || idx < 0 || idx >= this.pad.values.length ? 0.0 : this.pad.values[idx]));
 			var idx = this.bindings.padBrake;
-			var padBrakeVal = this.pad == null || this.pad.values == null || idx < 0 || idx >= this.pad.values.length ? 0.0 : this.pad.values[idx];
+			var padBrakeVal = Math.max(0.0,Math.min(1.0,this.pad == null || this.pad.values == null || idx < 0 || idx >= this.pad.values.length ? 0.0 : this.pad.values[idx]));
 			var btnIdx = this.bindings.padGas;
 			if(this.pad == null || this.pad.buttons == null || btnIdx < 0 || btnIdx >= this.pad.buttons.length ? false : this.pad.buttons[btnIdx]) {
 				padThrottle = 1.0;
@@ -51875,10 +52357,10 @@ input_InputController.prototype = {
 				padBrakeVal = 1.0;
 			}
 			if(padThrottle > 0.05) {
-				this.throttle = padThrottle;
+				this.throttle = Math.max(this.throttle,padThrottle);
 			}
 			if(padBrakeVal > 0.05) {
-				this.brake = padBrakeVal;
+				this.brake = Math.max(this.brake,padBrakeVal);
 			}
 			var btnIdx = this.bindings.padHandbrake;
 			if(this.pad == null || this.pad.buttons == null || btnIdx < 0 || btnIdx >= this.pad.buttons.length ? false : this.pad.buttons[btnIdx]) {
@@ -51889,14 +52371,18 @@ input_InputController.prototype = {
 				this.boost = true;
 			}
 		}
-		if(Math.abs(this.touchSteer) > 0.01) {
-			this.steer = this.touchSteer;
+		var absTouchSteer = Math.abs(this.touchSteer);
+		if(absTouchSteer > 0.03) {
+			var touchCurved = (this.touchSteer < 0.0 ? 1.0 : -1.0) * Math.pow(Math.max(0.0,Math.min(1.0,(absTouchSteer - 0.03) / 0.97)),1.15);
+			if(this.digitalSteerTarget == 0.0 || Math.abs(touchCurved) >= Math.abs(combinedSteer)) {
+				combinedSteer = touchCurved;
+			}
 		}
 		if(this.touchThrottle > 0.0) {
-			this.throttle = Math.max(this.throttle,this.touchThrottle);
+			this.throttle = Math.max(this.throttle,Math.min(1.0,this.touchThrottle));
 		}
 		if(this.touchBrake > 0.0) {
-			this.brake = Math.max(this.brake,this.touchBrake);
+			this.brake = Math.max(this.brake,Math.min(1.0,this.touchBrake));
 		}
 		if(this.touchHandbrake) {
 			this.handbrake = true;
@@ -51904,7 +52390,17 @@ input_InputController.prototype = {
 		if(this.touchBoost) {
 			this.boost = true;
 		}
-		this.steer = Math.max(-1.0,Math.min(1.0,this.steer * this.steerSensitivity));
+		this.throttle = Math.max(0.0,Math.min(1.0,this.throttle));
+		this.brake = Math.max(0.0,Math.min(1.0,this.brake));
+		this.steer = Math.max(-1.0,Math.min(1.0,combinedSteer * 1.20 * Math.max(0.1,Math.min(1.0,this.steerSensitivity))));
+	}
+	,finishRemapping: function(bound) {
+		this.isListeningForRemap = false;
+		this.listeningAction = null;
+		this.flushInputs();
+		if(this.onRemapComplete != null) {
+			this.onRemapComplete(bound);
+		}
 	}
 	,handleRemappingCapture: function() {
 		if(!this.listeningForGamepad) {
@@ -51932,9 +52428,7 @@ input_InputController.prototype = {
 						this.bindings.keyBoost = k;
 						break;
 					}
-					this.isListeningForRemap = false;
-					this.listeningAction = null;
-					this.flushInputs();
+					this.finishRemapping(true);
 					return;
 				}
 			}
@@ -51962,17 +52456,13 @@ input_InputController.prototype = {
 						default:
 						}
 					}
-					this.isListeningForRemap = false;
-					this.listeningAction = null;
-					this.flushInputs();
+					this.finishRemapping(true);
 					return;
 				}
 			}
 		}
 		if(hxd_Key.isDown(27) || (this.pad == null || this.pad.buttons == null || 9 >= this.pad.buttons.length ? false : this.pad.buttons[9])) {
-			this.isListeningForRemap = false;
-			this.listeningAction = null;
-			this.flushInputs();
+			this.finishRemapping(false);
 		}
 	}
 	,__class__: input_InputController
@@ -51992,6 +52482,1415 @@ js_html__$CanvasElement_CanvasUtil.getContextWebGL = function(canvas,attribs) {
 	return null;
 };
 Math.__name__ = "Math";
+var net_MultiplayerManager = function(transport) {
+	this.activeGroundProvider = null;
+	this.bgTimerId = null;
+	this.lastHostState = null;
+	this.lastFrameUpdateMs = 0.0;
+	this.joinElapsed = 0.0;
+	this.joinRetryAccum = 0.0;
+	this.pendingJoinRoomId = "";
+	this.elapsedMatchTime = 0.0;
+	this.peerLastPacketTime = new haxe_ds_StringMap();
+	this.localWheelSpinAngle = 0.0;
+	this.syncAccum = 0.0;
+	this.clientInputSeq = 0;
+	this.lastError = "";
+	this.statusMessage = "Host a room to invite friends, or open an invite link.";
+	this.localSpawnSlot = null;
+	this.remoteStates = new haxe_ds_StringMap();
+	this.peers = [];
+	this.selectedMap = world_MapMode.Circuit;
+	this.localCallsign = "DRIVER";
+	this.localPeerId = "";
+	this.roomId = "";
+	this.status = net_LobbyStatus.Disconnected;
+	this.role = net_NetworkRole.None;
+	var _gthis = this;
+	this.transport = transport;
+	this.bindTransportEvents();
+	var hasBrowserDoc = typeof window !== 'undefined' && typeof document !== 'undefined' && typeof window.setInterval === 'function';
+	if(hasBrowserDoc) {
+		this.bgTimerId = window.setInterval(function() {
+			var hidden = Boolean(document.hidden);
+			var nowMs = new Date().getTime();
+			if(hidden || _gthis.lastFrameUpdateMs > 0.0 && nowMs - _gthis.lastFrameUpdateMs > 350.0) {
+				_gthis.update(0.4,true);
+			}
+		},400);
+	}
+};
+$hxClasses["net.MultiplayerManager"] = net_MultiplayerManager;
+net_MultiplayerManager.__name__ = "net.MultiplayerManager";
+net_MultiplayerManager.buildInviteLink = function(targetRoomId) {
+	if(targetRoomId == null || StringTools.trim(targetRoomId) == "") {
+		return "";
+	}
+	var code = StringTools.trim(targetRoomId).toUpperCase();
+	var hasValidLoc = typeof window !== 'undefined' && window.location && typeof window.location.origin === 'string' && window.location.origin !== 'null' && typeof window.location.pathname === 'string';
+	if(hasValidLoc) {
+		var origin = window.location.origin;
+		var pathname = window.location.pathname;
+		return origin + pathname + "?room=" + code;
+	}
+	return "?room=" + code;
+};
+net_MultiplayerManager.detectInviteRoomFromUrl = function() {
+	var hasSearch = typeof window !== 'undefined' && window.location && typeof window.location.search === 'string';
+	if(hasSearch) {
+		var search = window.location.search;
+		if(search != null && search.length > 1) {
+			var _g = 0;
+			var _g1 = HxOverrides.substr(search,1,null).split("&");
+			while(_g < _g1.length) {
+				var pair = _g1[_g];
+				++_g;
+				var eq = pair.indexOf("=");
+				if(eq > 0) {
+					var s = HxOverrides.substr(pair,0,eq);
+					if(decodeURIComponent(s.split("+").join(" ")) == "room") {
+						var s1 = HxOverrides.substr(pair,eq + 1,null);
+						var val = StringTools.trim(decodeURIComponent(s1.split("+").join(" "))).toUpperCase();
+						if(val != "") {
+							return val;
+						}
+					}
+				}
+			}
+		}
+	}
+	return null;
+};
+net_MultiplayerManager.extractRoomCode = function(raw) {
+	if(raw == null) {
+		return "";
+	}
+	var trimmed = StringTools.trim(raw);
+	var idx = trimmed.toLowerCase().indexOf("room=");
+	if(idx >= 0) {
+		var after = HxOverrides.substr(trimmed,idx + 5,null);
+		var amp = after.indexOf("&");
+		if(amp >= 0) {
+			after = HxOverrides.substr(after,0,amp);
+		}
+		var hash = after.indexOf("#");
+		if(hash >= 0) {
+			after = HxOverrides.substr(after,0,hash);
+		}
+		trimmed = after;
+	}
+	var clean_b = "";
+	var _g = 0;
+	var _g1 = trimmed.length;
+	while(_g < _g1) {
+		var c = HxOverrides.cca(trimmed,_g++);
+		if(c >= 48 && c <= 57 || c >= 65 && c <= 90 || c >= 97 && c <= 122 || (c == 95 || c == 45)) {
+			clean_b += String.fromCodePoint(c);
+		}
+	}
+	var res = clean_b.toUpperCase();
+	if(res.length > 12) {
+		res = HxOverrides.substr(res,0,12);
+	}
+	return res;
+};
+net_MultiplayerManager.copyInviteLinkToClipboard = function(link) {
+	try {
+		var hasClip = typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText;
+		if(hasClip && link != null && link != "") {
+			navigator.clipboard.writeText(link);
+		}
+	} catch( _g ) {
+	}
+};
+net_MultiplayerManager.prototype = {
+	sendJoinRequestToHost: function() {
+		this.transport.sendToHost({ type : "join_request", version : "0.6.1", name : this.localCallsign});
+	}
+	,resetJoinTimers: function() {
+		this.pendingJoinRoomId = "";
+		this.joinRetryAccum = 0.0;
+		this.joinElapsed = 0.0;
+	}
+	,bindTransportEvents: function() {
+		var _gthis = this;
+		this.transport.onError = function(err) {
+			_gthis.lastError = err;
+			_gthis.statusMessage = err;
+			_gthis.resetJoinTimers();
+			if(_gthis.status == net_LobbyStatus.Connecting) {
+				_gthis.status = net_LobbyStatus.Disconnected;
+				_gthis.role = net_NetworkRole.None;
+				_gthis.roomId = "";
+			}
+			_gthis.emitLobbyChanged();
+		};
+		this.transport.onRoomHosted = function(rid,cid) {
+			_gthis.resetJoinTimers();
+			_gthis.role = net_NetworkRole.Host;
+			_gthis.status = net_LobbyStatus.WaitingInLobby;
+			_gthis.roomId = rid;
+			_gthis.localPeerId = cid;
+			_gthis.lastError = "";
+			var tmp = _gthis.sanitizeCallsign(_gthis.localCallsign,0,true);
+			_gthis.peers = [{ peerId : cid, name : tmp, slotIndex : 0, colorHex : net_NetworkProtocol.getPaletteColor(0), isHost : true, ready : true}];
+			_gthis.remoteStates.h = Object.create(null);
+			_gthis.statusMessage = "Hosting room " + rid + " (Host validates all peers & physics).";
+			_gthis.emitLobbyChanged();
+		};
+		this.transport.onRoomJoined = function(rid,cid) {
+			_gthis.role = net_NetworkRole.Client;
+			_gthis.status = net_LobbyStatus.Connecting;
+			_gthis.roomId = rid;
+			_gthis.localPeerId = cid;
+			_gthis.joinRetryAccum = 0.0;
+			_gthis.lastError = "";
+			_gthis.statusMessage = "Connected to relay. Waiting for Host validation...";
+			_gthis.emitLobbyChanged();
+			_gthis.sendJoinRequestToHost();
+		};
+		this.transport.onPeerSocketConnected = function(_peerId) {
+		};
+		this.transport.onPeerSocketDisconnected = function(peerId) {
+			if(_gthis.role != net_NetworkRole.Host) {
+				return;
+			}
+			var removed = _gthis.removePeerById(peerId);
+			var _this = _gthis.remoteStates;
+			if(Object.prototype.hasOwnProperty.call(_this.h,peerId)) {
+				delete(_this.h[peerId]);
+			}
+			var _this = _gthis.peerLastPacketTime;
+			if(Object.prototype.hasOwnProperty.call(_this.h,peerId)) {
+				delete(_this.h[peerId]);
+			}
+			if(removed) {
+				_gthis.statusMessage = "Driver left room (" + _gthis.peers.length + "/" + 8 + ").";
+				if(_gthis.status == net_LobbyStatus.WaitingInLobby) {
+					_gthis.broadcastLobbyState();
+				}
+				_gthis.emitLobbyChanged();
+			}
+		};
+		this.transport.onRelayedFromPeer = function(fromId,payload) {
+			if(_gthis.role != net_NetworkRole.Host || payload == null) {
+				return;
+			}
+			var msgType = Std.string(payload.type);
+			if(msgType == "join_request") {
+				_gthis.handlePeerJoinRequest(fromId,payload);
+			} else if(msgType == "client_state") {
+				var prevTime = Object.prototype.hasOwnProperty.call(_gthis.peerLastPacketTime.h,fromId) ? _gthis.peerLastPacketTime.h[fromId] : _gthis.elapsedMatchTime;
+				if(_gthis.validateClientPacket(fromId,payload,_gthis.activeGroundProvider,Math.max(0.016,_gthis.elapsedMatchTime - prevTime)) != null) {
+					_gthis.peerLastPacketTime.h[fromId] = _gthis.elapsedMatchTime;
+					if(_gthis.status == net_LobbyStatus.InMatch && _gthis.lastFrameUpdateMs > 0.0) {
+						if(new Date().getTime() - _gthis.lastFrameUpdateMs > 65.0) {
+							_gthis.elapsedMatchTime += 0.04;
+							_gthis.broadcastHostWorldSnapshot();
+						}
+					}
+				}
+			}
+		};
+		this.transport.onRelayedFromHost = function(payload) {
+			if(_gthis.role != net_NetworkRole.Client || payload == null) {
+				return;
+			}
+			_gthis.handleHostMessage(payload);
+		};
+		this.transport.onHostDisconnected = function() {
+			if(_gthis.role == net_NetworkRole.Client) {
+				_gthis.resetJoinTimers();
+				var wasMatch = _gthis.status == net_LobbyStatus.InMatch;
+				_gthis.role = net_NetworkRole.None;
+				_gthis.status = net_LobbyStatus.Disconnected;
+				_gthis.roomId = "";
+				_gthis.peers = [];
+				_gthis.remoteStates.h = Object.create(null);
+				_gthis.lastError = "Host closed the room.";
+				_gthis.statusMessage = "Host disconnected.";
+				if(_gthis.onHostDisconnected != null) {
+					_gthis.onHostDisconnected();
+				}
+				_gthis.emitLobbyChanged();
+				if(wasMatch && _gthis.onReturnToLobby != null) {
+					_gthis.onReturnToLobby();
+				}
+			}
+		};
+	}
+	,update: function(dt,isBackgroundTick) {
+		if(isBackgroundTick == null) {
+			isBackgroundTick = false;
+		}
+		if(!isBackgroundTick) {
+			this.lastFrameUpdateMs = new Date().getTime();
+		}
+		if(dt <= 0.0) {
+			return;
+		}
+		if(this.role == net_NetworkRole.Client && this.status == net_LobbyStatus.Connecting) {
+			this.joinElapsed += dt;
+			this.joinRetryAccum += dt;
+			if(this.joinElapsed >= 8.0) {
+				var timedOutRoom = this.pendingJoinRoomId != "" ? this.pendingJoinRoomId : this.roomId;
+				this.resetJoinTimers();
+				this.transport.leaveRoom();
+				this.role = net_NetworkRole.None;
+				this.status = net_LobbyStatus.Disconnected;
+				this.roomId = "";
+				this.peers = [];
+				this.lastError = "Room \"" + timedOutRoom + "\" did not respond. Verify the Invite Code and that the Host is in the lobby.";
+				this.statusMessage = this.lastError;
+				this.emitLobbyChanged();
+			} else if(this.joinRetryAccum >= 0.8) {
+				this.joinRetryAccum = 0.0;
+				if(this.roomId != "") {
+					this.sendJoinRequestToHost();
+				}
+			}
+		}
+	}
+	,hostRoom: function(customRoomId,callsign) {
+		if(callsign != null && StringTools.trim(callsign) != "") {
+			this.localCallsign = callsign;
+		}
+		this.resetJoinTimers();
+		this.lastError = "";
+		this.role = net_NetworkRole.Host;
+		this.status = net_LobbyStatus.Connecting;
+		this.peers = [];
+		this.remoteStates.h = Object.create(null);
+		this.statusMessage = "Opening relay room...";
+		this.emitLobbyChanged();
+		this.transport.hostRoom(customRoomId);
+	}
+	,joinRoom: function(targetRoomId,callsign) {
+		var cleanRoom = net_MultiplayerManager.extractRoomCode(targetRoomId);
+		if(cleanRoom == "") {
+			this.lastError = "Enter or open a valid Room Code.";
+			this.statusMessage = this.lastError;
+			this.emitLobbyChanged();
+			return;
+		}
+		if(callsign != null && StringTools.trim(callsign) != "") {
+			this.localCallsign = callsign;
+		}
+		this.lastError = "";
+		this.role = net_NetworkRole.Client;
+		this.status = net_LobbyStatus.Connecting;
+		this.roomId = "";
+		this.pendingJoinRoomId = cleanRoom;
+		this.joinRetryAccum = 0.0;
+		this.joinElapsed = 0.0;
+		this.peers = [];
+		this.remoteStates.h = Object.create(null);
+		this.statusMessage = "Joining room " + cleanRoom + "...";
+		this.emitLobbyChanged();
+		this.transport.joinRoom(cleanRoom);
+	}
+	,handlePeerJoinRequest: function(peerId,payload) {
+		if(this.role != net_NetworkRole.Host) {
+			return false;
+		}
+		if(this.status != net_LobbyStatus.WaitingInLobby) {
+			this.rejectPeer(peerId,"Match already in progress.");
+			return false;
+		}
+		var clientVer = payload != null && payload.version != null ? Std.string(payload.version) : "unknown";
+		if(clientVer != "0.6.1") {
+			this.rejectPeer(peerId,"Version mismatch: Host is v" + "0.6.1" + ", Client is v" + clientVer + ".");
+			return false;
+		}
+		var _g = 0;
+		var _g1 = this.peers;
+		while(_g < _g1.length) if(_g1[_g++].peerId == peerId) {
+			this.transport.sendToPeer(peerId,{ type : "join_accepted", roomId : this.roomId, peerId : peerId, mapId : net_NetworkProtocol.mapModeToId(this.selectedMap), peers : this.peers});
+			return true;
+		}
+		if(this.peers.length >= 8) {
+			this.rejectPeer(peerId,"Room is full (" + 8 + "/" + 8 + ").");
+			return false;
+		}
+		var slotIndex = this.allocateLowestSlotIndex();
+		var cleanName = this.ensureUniqueCallsign(this.sanitizeCallsign(payload != null && payload.name != null ? Std.string(payload.name) : "",slotIndex,false));
+		this.peers.push({ peerId : peerId, name : cleanName, slotIndex : slotIndex, colorHex : net_NetworkProtocol.getPaletteColor(slotIndex), isHost : false, ready : true});
+		this.transport.sendToPeer(peerId,{ type : "join_accepted", roomId : this.roomId, peerId : peerId, mapId : net_NetworkProtocol.mapModeToId(this.selectedMap), peers : this.peers});
+		this.broadcastLobbyState();
+		this.statusMessage = cleanName + " joined (" + this.peers.length + "/" + 8 + ").";
+		this.emitLobbyChanged();
+		return true;
+	}
+	,rejectPeer: function(peerId,reason) {
+		this.transport.sendToPeer(peerId,{ type : "join_rejected", reason : reason});
+	}
+	,setSelectedMap: function(mode) {
+		if(this.role == net_NetworkRole.Client) {
+			return;
+		}
+		this.selectedMap = mode;
+		if(this.role == net_NetworkRole.Host && this.status == net_LobbyStatus.WaitingInLobby) {
+			this.broadcastLobbyState();
+		}
+		this.emitLobbyChanged();
+	}
+	,startMatch: function() {
+		if(this.role != net_NetworkRole.Host || this.status != net_LobbyStatus.WaitingInLobby) {
+			return false;
+		}
+		this.status = net_LobbyStatus.InMatch;
+		this.syncAccum = 0.0;
+		this.elapsedMatchTime = 0.0;
+		this.remoteStates.h = Object.create(null);
+		this.peerLastPacketTime.h = Object.create(null);
+		var spawns = this.computeGridSpawns(this.selectedMap,this.peers);
+		var hostSpawn = spawns[0];
+		var _g = 0;
+		while(_g < spawns.length) {
+			var sp = spawns[_g];
+			++_g;
+			if(sp.peerId == this.localPeerId) {
+				hostSpawn = sp;
+			}
+		}
+		this.localSpawnSlot = hostSpawn;
+		var hostPeer = this.findPeer(this.localPeerId);
+		this.lastHostState = { peerId : this.localPeerId, name : hostPeer != null ? hostPeer.name : this.sanitizeCallsign(this.localCallsign,0,true), slotIndex : 0, colorHex : hostPeer != null ? hostPeer.colorHex : net_NetworkProtocol.getPaletteColor(0), x : hostSpawn.x, y : hostSpawn.y, z : hostSpawn.z, yaw : hostSpawn.yaw, pitch : 0.0, roll : 0.0, forwardSpeed : 0.0, lateralVelocity : 0.0, steerAngle : 0.0, wheelSpinAngle : 0.0, boosting : false};
+		this.initRemoteStatesFromSpawns(spawns);
+		this.transport.broadcastToPeers({ type : "start_match", roomId : this.roomId, mapId : net_NetworkProtocol.mapModeToId(this.selectedMap), spawns : spawns, peers : this.peers});
+		this.emitLobbyChanged();
+		if(this.onMatchStart != null) {
+			this.onMatchStart(this.selectedMap,hostSpawn,this.peers);
+		}
+		return true;
+	}
+	,returnToLobby: function() {
+		this.remoteStates.h = Object.create(null);
+		this.peerLastPacketTime.h = Object.create(null);
+		if(this.role == net_NetworkRole.Host) {
+			this.status = net_LobbyStatus.WaitingInLobby;
+			this.transport.broadcastToPeers({ type : "host_return_to_lobby"});
+			this.broadcastLobbyState();
+			this.statusMessage = "Returned to room " + this.roomId + " lobby.";
+		}
+		this.emitLobbyChanged();
+		if(this.onReturnToLobby != null) {
+			this.onReturnToLobby();
+		}
+	}
+	,leaveRoom: function() {
+		this.resetJoinTimers();
+		this.transport.leaveRoom();
+		this.role = net_NetworkRole.None;
+		this.status = net_LobbyStatus.Disconnected;
+		this.roomId = "";
+		this.localPeerId = "";
+		this.peers = [];
+		this.remoteStates.h = Object.create(null);
+		this.peerLastPacketTime.h = Object.create(null);
+		this.localSpawnSlot = null;
+		this.lastHostState = null;
+		this.lastError = "";
+		this.statusMessage = "Disconnected from multiplayer lobby.";
+		this.emitLobbyChanged();
+	}
+	,broadcastHostWorldSnapshot: function() {
+		var snapshot = [];
+		if(this.lastHostState != null) {
+			snapshot.push(this.lastHostState);
+		}
+		var _g = 0;
+		var _g1 = this.peers;
+		while(_g < _g1.length) {
+			var p = _g1[_g];
+			++_g;
+			if(p.peerId == this.localPeerId) {
+				continue;
+			}
+			var st = this.remoteStates.h[p.peerId];
+			if(st != null) {
+				snapshot.push(st);
+			}
+		}
+		this.transport.broadcastToPeers({ type : "world_snapshot", states : snapshot});
+	}
+	,updateInMatch: function(dt,localCar,input,ground) {
+		if(this.status != net_LobbyStatus.InMatch || localCar == null) {
+			return;
+		}
+		this.activeGroundProvider = ground;
+		this.elapsedMatchTime += dt;
+		this.localWheelSpinAngle += localCar.forwardSpeed * dt / 0.36;
+		this.syncAccum += dt;
+		if(this.syncAccum < 0.04) {
+			return;
+		}
+		this.syncAccum = 0.0;
+		var steerVal = input != null ? input.steer : 0.0;
+		if(this.role == net_NetworkRole.Host) {
+			var hostPeer = this.findPeer(this.localPeerId);
+			var hostColor = hostPeer != null ? hostPeer.colorHex : net_NetworkProtocol.getPaletteColor(0);
+			var hostName = hostPeer != null ? hostPeer.name : this.sanitizeCallsign(this.localCallsign,0,true);
+			this.lastHostState = { peerId : this.localPeerId, name : hostName, slotIndex : 0, colorHex : hostColor, x : localCar.pos.x, y : localCar.pos.y, z : localCar.pos.z, yaw : localCar.yaw + localCar.driftAngle, pitch : localCar.pitch, roll : localCar.roll, forwardSpeed : localCar.forwardSpeed, lateralVelocity : localCar.lateralVelocity, steerAngle : -steerVal * 0.55, wheelSpinAngle : this.localWheelSpinAngle, boosting : localCar.isBoosting};
+			this.broadcastHostWorldSnapshot();
+		} else if(this.role == net_NetworkRole.Client) {
+			this.clientInputSeq++;
+			this.transport.sendToHost({ type : "client_state", peerId : this.localPeerId, seq : this.clientInputSeq, throttle : input != null ? input.throttle : 0.0, brake : input != null ? input.brake : 0.0, steer : steerVal, handbrake : input != null && input.handbrake, boosting : localCar.isBoosting, x : localCar.pos.x, y : localCar.pos.y, z : localCar.pos.z, yaw : localCar.yaw + localCar.driftAngle, pitch : localCar.pitch, roll : localCar.roll, forwardSpeed : localCar.forwardSpeed, lateralVelocity : localCar.lateralVelocity, wheelSpinAngle : this.localWheelSpinAngle});
+		}
+	}
+	,validateClientPacket: function(peerId,pkt,ground,dtWindow) {
+		if(dtWindow == null) {
+			dtWindow = 0.05;
+		}
+		if(this.role != net_NetworkRole.Host || this.status != net_LobbyStatus.InMatch || pkt == null) {
+			return null;
+		}
+		var peer = this.findPeer(peerId);
+		if(peer == null || peer.isHost) {
+			return null;
+		}
+		var px = this.readFinite(pkt.x);
+		var py = this.readFinite(pkt.y);
+		var pz = this.readFinite(pkt.z);
+		var pyaw = this.readFinite(pkt.yaw);
+		var ppitch = this.readFinite(pkt.pitch);
+		var proll = this.readFinite(pkt.roll);
+		var spd = this.readFinite(pkt.forwardSpeed);
+		var lat = this.readFinite(pkt.lateralVelocity);
+		var steer = this.readFinite(pkt.steer);
+		var wheelSpin = this.readFinite(pkt.wheelSpinAngle);
+		if(px == null || py == null || pz == null || pyaw == null || ppitch == null || proll == null || spd == null || lat == null || steer == null || wheelSpin == null) {
+			return null;
+		}
+		var clampedSpeed = spd < -25.0 ? -25.0 : spd > 95.0 ? 95.0 : spd;
+		var clampedLat = lat < -45. ? -45. : lat > 45.0 ? 45.0 : lat;
+		var prev = this.remoteStates.h[peerId];
+		var finalX = px;
+		var finalY = py;
+		if(prev != null) {
+			var dx = px - prev.x;
+			var dy = py - prev.y;
+			var dist = Math.sqrt(dx * dx + dy * dy);
+			var maxAllowedStep = Math.max(15.0,100.0 * Math.max(dtWindow,0.20));
+			if(dist > maxAllowedStep * 3.0) {
+				finalX = prev.x;
+				finalY = prev.y;
+				pz = prev.z;
+			} else if(dist > maxAllowedStep && dist > 0.0001) {
+				var ratio = maxAllowedStep / dist;
+				finalX = prev.x + dx * ratio;
+				finalY = prev.y + dy * ratio;
+			}
+		}
+		var finalZ = pz;
+		if(ground != null) {
+			var x = finalX;
+			var y = finalY;
+			var z = finalZ;
+			if(z == null) {
+				z = 0.;
+			}
+			if(y == null) {
+				y = 0.;
+			}
+			if(x == null) {
+				x = 0.;
+			}
+			var checkPos = new h3d_VectorImpl(x,y,z);
+			ground.enforceBoundaries(checkPos,clampedSpeed,clampedLat);
+			finalX = checkPos.x;
+			finalY = checkPos.y;
+			var groundZ = ground.getGroundElevation(finalX,finalY);
+			if(finalZ < groundZ - 0.35) {
+				finalZ = groundZ;
+			}
+			if(finalZ > groundZ + 35.0) {
+				finalZ = groundZ + 35.0;
+			}
+		}
+		var validated = { peerId : peerId, name : peer.name, slotIndex : peer.slotIndex, colorHex : peer.colorHex, x : finalX, y : finalY, z : finalZ, yaw : pyaw, pitch : ppitch < -0.85 ? -0.85 : ppitch > 0.85 ? 0.85 : ppitch, roll : proll < -0.85 ? -0.85 : proll > 0.85 ? 0.85 : proll, forwardSpeed : clampedSpeed, lateralVelocity : clampedLat, steerAngle : -(steer < -1.0 ? -1.0 : steer > 1.0 ? 1.0 : steer) * 0.55, wheelSpinAngle : wheelSpin, boosting : pkt.boosting == true};
+		this.remoteStates.h[peerId] = validated;
+		return validated;
+	}
+	,computeGridSpawns: function(mode,roster) {
+		var sorted = roster.slice();
+		sorted.sort(function(a,b) {
+			return a.slotIndex - b.slotIndex;
+		});
+		var baseZ = mode == world_MapMode.Circuit ? 0.06 : 0.05;
+		var colOffset = mode == world_MapMode.Circuit ? 2.4 : 3.2;
+		var result = [];
+		var _g = 0;
+		var _g1 = sorted.length;
+		while(_g < _g1) {
+			var i = _g++;
+			result.push({ peerId : sorted[i].peerId, x : sorted.length == 1 ? 0.0 : i % 2 == 0 ? -colOffset : colOffset, y : i == 0 ? 0.0 : -(Math.floor(i / 2) * 7.0 + (i % 2 == 1 ? 3.0 : 0.0)), z : baseZ, yaw : 0.0});
+		}
+		return result;
+	}
+	,handleHostMessage: function(payload) {
+		switch(Std.string(payload.type)) {
+		case "host_return_to_lobby":
+			this.status = net_LobbyStatus.WaitingInLobby;
+			this.remoteStates.h = Object.create(null);
+			this.statusMessage = "Host returned lobby to staging room.";
+			this.emitLobbyChanged();
+			if(this.onReturnToLobby != null) {
+				this.onReturnToLobby();
+			}
+			break;
+		case "join_accepted":
+			this.resetJoinTimers();
+			this.status = net_LobbyStatus.WaitingInLobby;
+			this.lastError = "";
+			if(payload.mapId != null) {
+				this.selectedMap = net_NetworkProtocol.mapIdToMode(Std.string(payload.mapId));
+			}
+			this.applyPeerRoster(payload.peers);
+			this.statusMessage = "Joined room " + this.roomId + " (" + net_NetworkProtocol.getMapDisplayName(this.selectedMap) + ").";
+			this.emitLobbyChanged();
+			break;
+		case "join_rejected":
+			this.resetJoinTimers();
+			var reason = payload.reason != null ? Std.string(payload.reason) : "Join rejected by Host.";
+			this.lastError = reason;
+			this.statusMessage = reason;
+			this.role = net_NetworkRole.None;
+			this.status = net_LobbyStatus.Disconnected;
+			this.roomId = "";
+			this.peers = [];
+			this.transport.leaveRoom();
+			if(this.onJoinRejected != null) {
+				this.onJoinRejected(reason);
+			}
+			this.emitLobbyChanged();
+			break;
+		case "lobby_state":
+			if(payload.mapId != null) {
+				this.selectedMap = net_NetworkProtocol.mapIdToMode(Std.string(payload.mapId));
+			}
+			this.applyPeerRoster(payload.peers);
+			if(this.status != net_LobbyStatus.InMatch) {
+				this.status = net_LobbyStatus.WaitingInLobby;
+			}
+			this.statusMessage = "Host selected " + net_NetworkProtocol.getMapDisplayName(this.selectedMap) + " (" + this.peers.length + " drivers).";
+			this.emitLobbyChanged();
+			break;
+		case "start_match":
+			if(payload.mapId != null) {
+				this.selectedMap = net_NetworkProtocol.mapIdToMode(Std.string(payload.mapId));
+			}
+			if(payload.peers != null) {
+				this.applyPeerRoster(payload.peers);
+			}
+			this.status = net_LobbyStatus.InMatch;
+			this.syncAccum = 0.0;
+			this.elapsedMatchTime = 0.0;
+			this.remoteStates.h = Object.create(null);
+			var spawns = payload.spawns;
+			var mySpawn = { peerId : this.localPeerId, x : 0.0, y : 0.0, z : this.selectedMap == world_MapMode.Circuit ? 0.06 : 0.05, yaw : 0.0};
+			if(spawns != null) {
+				var _g = 0;
+				while(_g < spawns.length) {
+					var sp = spawns[_g];
+					++_g;
+					if(sp.peerId == this.localPeerId) {
+						mySpawn = sp;
+					}
+				}
+				this.initRemoteStatesFromSpawns(spawns);
+			}
+			this.localSpawnSlot = mySpawn;
+			this.emitLobbyChanged();
+			if(this.onMatchStart != null) {
+				this.onMatchStart(this.selectedMap,mySpawn,this.peers);
+			}
+			break;
+		case "world_snapshot":
+			if(this.status != net_LobbyStatus.InMatch || payload.states == null) {
+				return;
+			}
+			var list = payload.states;
+			var activeIds_h = Object.create(null);
+			var _g = 0;
+			while(_g < list.length) {
+				var st = list[_g];
+				++_g;
+				if(st == null || st.peerId == this.localPeerId) {
+					continue;
+				}
+				activeIds_h[st.peerId] = true;
+				this.remoteStates.h[st.peerId] = st;
+			}
+			var existingId_keys = Object.keys(this.remoteStates.h);
+			var existingId_length = existingId_keys.length;
+			var existingId_current = 0;
+			while(existingId_current < existingId_length) {
+				var existingId = existingId_keys[existingId_current++];
+				if(!Object.prototype.hasOwnProperty.call(activeIds_h,existingId)) {
+					var _this = this.remoteStates;
+					if(Object.prototype.hasOwnProperty.call(_this.h,existingId)) {
+						delete(_this.h[existingId]);
+					}
+				}
+			}
+			break;
+		default:
+		}
+	}
+	,initRemoteStatesFromSpawns: function(spawns) {
+		var _g = 0;
+		while(_g < spawns.length) {
+			var sp = spawns[_g];
+			++_g;
+			if(sp.peerId == this.localPeerId) {
+				continue;
+			}
+			var p = this.findPeer(sp.peerId);
+			this.remoteStates.h[sp.peerId] = { peerId : sp.peerId, name : p != null ? p.name : "DRIVER", slotIndex : p != null ? p.slotIndex : 1, colorHex : p != null ? p.colorHex : net_NetworkProtocol.getPaletteColor(1), x : sp.x, y : sp.y, z : sp.z, yaw : sp.yaw, pitch : 0.0, roll : 0.0, forwardSpeed : 0.0, lateralVelocity : 0.0, steerAngle : 0.0, wheelSpinAngle : 0.0, boosting : false};
+		}
+	}
+	,broadcastLobbyState: function() {
+		this.transport.broadcastToPeers({ type : "lobby_state", roomId : this.roomId, mapId : net_NetworkProtocol.mapModeToId(this.selectedMap), status : this.status == net_LobbyStatus.InMatch ? "in_match" : "lobby", hostVersion : "0.6.1", peers : this.peers});
+	}
+	,applyPeerRoster: function(rawPeers) {
+		if(rawPeers == null) {
+			return;
+		}
+		var arr = rawPeers;
+		var next = [];
+		var _g = 0;
+		while(_g < arr.length) {
+			var p = arr[_g];
+			++_g;
+			next.push({ peerId : p.peerId == null ? "null" : "" + p.peerId, name : p.name == null ? "null" : "" + p.name, slotIndex : p.slotIndex | 0, colorHex : p.colorHex | 0, isHost : p.isHost == true, ready : p.ready == true});
+		}
+		this.peers = next;
+	}
+	,findPeer: function(peerId) {
+		var _g = 0;
+		var _g1 = this.peers;
+		while(_g < _g1.length) {
+			var p = _g1[_g];
+			++_g;
+			if(p.peerId == peerId) {
+				return p;
+			}
+		}
+		return null;
+	}
+	,removePeerById: function(peerId) {
+		var _g = 0;
+		var _g1 = this.peers.length;
+		while(_g < _g1) {
+			var i = _g++;
+			if(this.peers[i].peerId == peerId) {
+				this.peers.splice(i,1);
+				return true;
+			}
+		}
+		return false;
+	}
+	,allocateLowestSlotIndex: function() {
+		var _g = 0;
+		while(_g < 8) {
+			var slot = _g++;
+			var taken = false;
+			var _g1 = 0;
+			var _g2 = this.peers;
+			while(_g1 < _g2.length) if(_g2[_g1++].slotIndex == slot) {
+				taken = true;
+				break;
+			}
+			if(!taken) {
+				return slot;
+			}
+		}
+		return this.peers.length;
+	}
+	,sanitizeCallsign: function(raw,slotIndex,isHostUser) {
+		var cleaned = raw != null ? StringTools.trim(raw) : "";
+		var filtered_b = "";
+		var _g = 0;
+		var _g1 = cleaned.length;
+		while(_g < _g1) {
+			var i = _g++;
+			var ch = cleaned.charAt(i);
+			var code = HxOverrides.cca(cleaned,i);
+			if(code >= 48 && code <= 57 || code >= 65 && code <= 90 || code >= 97 && code <= 122 || ch == " " || ch == "-" || ch == "_") {
+				filtered_b += ch == null ? "null" : "" + ch;
+			}
+			if(filtered_b.length >= 14) {
+				break;
+			}
+		}
+		var out = StringTools.trim(filtered_b).toUpperCase();
+		if(out == "") {
+			out = isHostUser ? "HOST" : "DRIVER " + (slotIndex + 1);
+		}
+		return out;
+	}
+	,ensureUniqueCallsign: function(candidate) {
+		var suffix = 2;
+		var cur = candidate;
+		while(true) {
+			var dup = false;
+			var _g = 0;
+			var _g1 = this.peers;
+			while(_g < _g1.length) if(_g1[_g++].name == cur) {
+				dup = true;
+				break;
+			}
+			if(!dup) {
+				return cur;
+			}
+			cur = candidate + " " + suffix;
+			++suffix;
+		}
+	}
+	,readFinite: function(v) {
+		if(v == null) {
+			return null;
+		}
+		var f = parseFloat(Std.string(v));
+		if(!isFinite(f) || isNaN(f)) {
+			return null;
+		}
+		return f;
+	}
+	,emitLobbyChanged: function() {
+		if(this.onLobbyChanged != null) {
+			this.onLobbyChanged();
+		}
+	}
+	,getInviteLink: function() {
+		return net_MultiplayerManager.buildInviteLink(this.roomId);
+	}
+	,__class__: net_MultiplayerManager
+};
+var net_NetworkRole = $hxEnums["net.NetworkRole"] = { __ename__:true,__constructs__:null
+	,None: {_hx_name:"None",_hx_index:0,__enum__:"net.NetworkRole",toString:$estr}
+	,Host: {_hx_name:"Host",_hx_index:1,__enum__:"net.NetworkRole",toString:$estr}
+	,Client: {_hx_name:"Client",_hx_index:2,__enum__:"net.NetworkRole",toString:$estr}
+};
+net_NetworkRole.__constructs__ = [net_NetworkRole.None,net_NetworkRole.Host,net_NetworkRole.Client];
+net_NetworkRole.__empty_constructs__ = [net_NetworkRole.None,net_NetworkRole.Host,net_NetworkRole.Client];
+var net_LobbyStatus = $hxEnums["net.LobbyStatus"] = { __ename__:true,__constructs__:null
+	,Disconnected: {_hx_name:"Disconnected",_hx_index:0,__enum__:"net.LobbyStatus",toString:$estr}
+	,Connecting: {_hx_name:"Connecting",_hx_index:1,__enum__:"net.LobbyStatus",toString:$estr}
+	,WaitingInLobby: {_hx_name:"WaitingInLobby",_hx_index:2,__enum__:"net.LobbyStatus",toString:$estr}
+	,InMatch: {_hx_name:"InMatch",_hx_index:3,__enum__:"net.LobbyStatus",toString:$estr}
+};
+net_LobbyStatus.__constructs__ = [net_LobbyStatus.Disconnected,net_LobbyStatus.Connecting,net_LobbyStatus.WaitingInLobby,net_LobbyStatus.InMatch];
+net_LobbyStatus.__empty_constructs__ = [net_LobbyStatus.Disconnected,net_LobbyStatus.Connecting,net_LobbyStatus.WaitingInLobby,net_LobbyStatus.InMatch];
+var net_NetworkProtocol = function() { };
+$hxClasses["net.NetworkProtocol"] = net_NetworkProtocol;
+net_NetworkProtocol.__name__ = "net.NetworkProtocol";
+net_NetworkProtocol.getPaletteColor = function(slotIndex) {
+	var idx = slotIndex % net_NetworkProtocol.PLAYER_COLORS.length;
+	if(idx < 0) {
+		idx += net_NetworkProtocol.PLAYER_COLORS.length;
+	}
+	return net_NetworkProtocol.PLAYER_COLORS[idx];
+};
+net_NetworkProtocol.mapModeToId = function(mode) {
+	switch(mode._hx_index) {
+	case 0:
+		return "circuit";
+	case 1:
+		return "sandbox";
+	}
+};
+net_NetworkProtocol.mapIdToMode = function(id) {
+	if(id == "sandbox") {
+		return world_MapMode.Sandbox;
+	} else {
+		return world_MapMode.Circuit;
+	}
+};
+net_NetworkProtocol.getMapDisplayName = function(mode) {
+	switch(mode._hx_index) {
+	case 0:
+		return "HIGHWAY CIRCUIT";
+	case 1:
+		return "SANDBOX PROVING GROUNDS";
+	}
+};
+var net_ISocketTransport = function() { };
+$hxClasses["net.ISocketTransport"] = net_ISocketTransport;
+net_ISocketTransport.__name__ = "net.ISocketTransport";
+net_ISocketTransport.__isInterface__ = true;
+net_ISocketTransport.prototype = {
+	__class__: net_ISocketTransport
+};
+var net_WebSocketTransport = function() {
+	this._fallbackTimerId = null;
+	this._pendingAction = null;
+	this._bcJoinTimerId = null;
+	this._bcJoinedAck = false;
+	this._bcPeers = [];
+	this._bc = null;
+	this._useBroadcastFallback = false;
+	this._httpFailures = 0;
+	this._httpPollTimerId = null;
+	this._httpInFlight = false;
+	this._httpOutbox = [];
+	this._useHttpRelay = false;
+	this._welcomeReceived = false;
+	this._wsConnecting = false;
+	this._ws = null;
+	this._explicitUrl = "";
+	this._isHost = false;
+	this._roomId = "";
+	this._connId = "";
+	this._connected = false;
+};
+$hxClasses["net.WebSocketTransport"] = net_WebSocketTransport;
+net_WebSocketTransport.__name__ = "net.WebSocketTransport";
+net_WebSocketTransport.__interfaces__ = [net_ISocketTransport];
+net_WebSocketTransport.prototype = {
+	resolveWsUrl: function(explicitUrl) {
+		if(explicitUrl != null && explicitUrl != "") {
+			return explicitUrl;
+		}
+		var hasWindow = typeof window !== 'undefined' && typeof window.location !== 'undefined';
+		if(hasWindow) {
+			var loc = $global.location;
+			if(loc.protocol == "http:" || loc.protocol == "https:") {
+				var proto = loc.protocol == "https:" ? "wss:" : "ws:";
+				return proto + "//" + loc.host + "/relay.ashx";
+			}
+		}
+		return "ws://127.0.0.1:8090/relay.ashx";
+	}
+	,resolveHttpRelayUrl: function() {
+		if(this._explicitUrl != null && this._explicitUrl != "") {
+			if(StringTools.startsWith(this._explicitUrl,"wss://")) {
+				return "https://" + HxOverrides.substr(this._explicitUrl,6,null);
+			}
+			if(StringTools.startsWith(this._explicitUrl,"ws://")) {
+				return "http://" + HxOverrides.substr(this._explicitUrl,5,null);
+			}
+			return this._explicitUrl;
+		}
+		var hasWindow = typeof window !== 'undefined' && typeof window.location !== 'undefined';
+		if(hasWindow) {
+			var loc = $global.location;
+			if(loc.protocol == "http:" || loc.protocol == "https:") {
+				return loc.protocol + "//" + loc.host + "/relay.ashx";
+			}
+		}
+		return "";
+	}
+	,connect: function(url) {
+		var _gthis = this;
+		var canBrowser = typeof window !== 'undefined';
+		if(!canBrowser) {
+			if(this.onError != null) {
+				this.onError("Relay transport unavailable outside browser runtime.");
+			}
+			return;
+		}
+		if(this._connected || this._wsConnecting || this._useHttpRelay) {
+			return;
+		}
+		this._explicitUrl = url != null ? url : "";
+		this._welcomeReceived = false;
+		this._useHttpRelay = false;
+		this._useBroadcastFallback = false;
+		this._httpOutbox = [];
+		this._httpInFlight = false;
+		this._httpFailures = 0;
+		var hasWs = typeof WebSocket !== 'undefined';
+		var httpUrl = this.resolveHttpRelayUrl();
+		if(!hasWs || httpUrl == "" && this._explicitUrl == "") {
+			if(httpUrl != "") {
+				this.activateHttpRelay();
+			} else {
+				this.activateBroadcastFallback();
+			}
+			return;
+		}
+		var targetUrl = this.resolveWsUrl(url);
+		this._wsConnecting = true;
+		try {
+			var sock = new WebSocket(targetUrl);
+			this._ws = sock;
+			this._fallbackTimerId = window.setTimeout(function() {
+				if(!_gthis._welcomeReceived && !_gthis._useHttpRelay && !_gthis._useBroadcastFallback) {
+					_gthis.closeRawWs();
+					_gthis.activateHttpRelay();
+				}
+			},1000);
+			sock.onopen = function(_ev) {
+			};
+			sock.onmessage = function(ev) {
+				try {
+					var msg = JSON.parse(Std.string(ev.data));
+					_gthis.handleWsEnvelope(msg);
+				} catch( _g ) {
+				}
+			};
+			sock.onerror = function(_ev) {
+				if(!_gthis._welcomeReceived) {
+					_gthis.clearFallbackTimer();
+					_gthis.closeRawWs();
+					_gthis.activateHttpRelay();
+				} else if(_gthis.onError != null) {
+					_gthis.onError("WebSocket transport error.");
+				}
+			};
+			sock.onclose = function(_ev) {
+				_gthis.clearFallbackTimer();
+				var wasWelcome = _gthis._welcomeReceived;
+				_gthis._wsConnecting = false;
+				if(!wasWelcome) {
+					_gthis.closeRawWs();
+					_gthis.activateHttpRelay();
+					return;
+				}
+				_gthis._connected = false;
+				_gthis._roomId = "";
+				_gthis._isHost = false;
+				if(_gthis.onClose != null) {
+					_gthis.onClose("Socket closed.");
+				}
+			};
+		} catch( _g ) {
+			this.clearFallbackTimer();
+			this.closeRawWs();
+			this.activateHttpRelay();
+		}
+	}
+	,closeRawWs: function() {
+		if(this._ws != null) {
+			try {
+				this._ws.onopen = null;
+				this._ws.onmessage = null;
+				this._ws.onerror = null;
+				this._ws.onclose = null;
+				this._ws.close();
+			} catch( _g ) {
+			}
+			this._ws = null;
+		}
+		this._wsConnecting = false;
+	}
+	,clearFallbackTimer: function() {
+		if(this._fallbackTimerId != null) {
+			window.clearTimeout(this._fallbackTimerId);
+			this._fallbackTimerId = null;
+		}
+	}
+	,clearHttpPollTimer: function() {
+		if(this._httpPollTimerId != null) {
+			window.clearInterval(this._httpPollTimerId);
+			this._httpPollTimerId = null;
+		}
+	}
+	,clearBcJoinTimer: function() {
+		if(this._bcJoinTimerId != null) {
+			window.clearTimeout(this._bcJoinTimerId);
+			this._bcJoinTimerId = null;
+		}
+	}
+	,activateHttpRelay: function() {
+		var _gthis = this;
+		if(this._useHttpRelay || this._useBroadcastFallback) {
+			return;
+		}
+		this.clearFallbackTimer();
+		this.closeRawWs();
+		var httpUrl = this.resolveHttpRelayUrl();
+		var hasXhr = typeof XMLHttpRequest !== 'undefined';
+		if(httpUrl == "" || !hasXhr) {
+			this.activateBroadcastFallback();
+			return;
+		}
+		this._useHttpRelay = true;
+		this._httpFailures = 0;
+		this._httpInFlight = false;
+		this.clearHttpPollTimer();
+		this._httpPollTimerId = window.setInterval(function() {
+			if(_gthis._useHttpRelay && !_gthis._httpInFlight) {
+				_gthis.flushHttpRelay(true);
+			}
+		},60);
+		this.flushHttpRelay(true);
+	}
+	,flushHttpRelay: function(allowEmpty) {
+		var _gthis = this;
+		if(!this._useHttpRelay) {
+			return;
+		}
+		if(this._httpInFlight) {
+			return;
+		}
+		if(!allowEmpty && this._httpOutbox.length == 0) {
+			return;
+		}
+		var httpUrl = this.resolveHttpRelayUrl();
+		if(httpUrl == "") {
+			return;
+		}
+		var batch = this._httpOutbox.slice();
+		this._httpOutbox = [];
+		this._httpInFlight = true;
+		try {
+			var xhr = new XMLHttpRequest();
+			xhr.open("POST",httpUrl,true);
+			xhr.timeout = 4500;
+			xhr.setRequestHeader("Content-Type","application/json; charset=utf-8");
+			var handleFailure = function(statusCode) {
+				_gthis._httpInFlight = false;
+				if(!_gthis._useHttpRelay) {
+					return;
+				}
+				_gthis._httpFailures++;
+				if(!_gthis._welcomeReceived && (statusCode == 404 || statusCode == 405 || statusCode == 501 || _gthis._httpFailures >= 2)) {
+					_gthis.clearHttpPollTimer();
+					_gthis._useHttpRelay = false;
+					_gthis._httpOutbox = [];
+					_gthis.activateBroadcastFallback();
+					return;
+				}
+				if(_gthis._welcomeReceived && _gthis._httpFailures >= 25) {
+					_gthis._httpFailures = 0;
+					if(_gthis.onError != null) {
+						_gthis.onError("Connection to multiplayer relay was interrupted.");
+					}
+				}
+			};
+			xhr.onreadystatechange = function() {
+				if(xhr.readyState != 4) {
+					return;
+				}
+				if(!_gthis._useHttpRelay) {
+					_gthis._httpInFlight = false;
+					return;
+				}
+				if(xhr.status >= 200 && xhr.status < 300) {
+					_gthis._httpFailures = 0;
+					_gthis._httpInFlight = false;
+					try {
+						var res = JSON.parse(Std.string(xhr.responseText));
+						if(res != null && res.connId != null && Std.string(res.connId) != "") {
+							_gthis._connId = Std.string(res.connId);
+						}
+						if(res != null && res.events != null) {
+							var evs = res.events;
+							var _g = 0;
+							while(_g < evs.length) _gthis.handleWsEnvelope(evs[_g++]);
+						}
+					} catch( _g ) {
+					}
+					if(_gthis._useHttpRelay && _gthis._httpOutbox.length > 0 && !_gthis._httpInFlight) {
+						_gthis.flushHttpRelay(false);
+					}
+				} else {
+					handleFailure(xhr.status | 0);
+				}
+			};
+			xhr.onerror = function() {
+				handleFailure(0);
+			};
+			xhr.ontimeout = function() {
+				handleFailure(0);
+			};
+			var payload = JSON.stringify({ connId : this._connId, messages : batch});
+			xhr.send(payload);
+		} catch( _g ) {
+			this._httpInFlight = false;
+			this._useHttpRelay = false;
+			this.clearHttpPollTimer();
+			this.activateBroadcastFallback();
+		}
+	}
+	,activateBroadcastFallback: function() {
+		var _gthis = this;
+		if(this._useBroadcastFallback) {
+			return;
+		}
+		this.clearFallbackTimer();
+		this.clearHttpPollTimer();
+		this.closeRawWs();
+		this._useHttpRelay = false;
+		var hasBC = typeof BroadcastChannel !== 'undefined';
+		if(!hasBC) {
+			this._connected = false;
+			if(this.onError != null) {
+				this.onError("Could not connect to multiplayer relay (/relay.ashx).");
+			}
+			return;
+		}
+		this._useBroadcastFallback = true;
+		this._connected = true;
+		if(this._connId == "") {
+			this._connId = "tab_" + Std.string(Math.floor(Math.random() * 900000) + 100000);
+		}
+		this._bc = new BroadcastChannel('mob_p2p_relay');
+		this._bc.onmessage = function(ev) {
+			_gthis.handleBroadcastEnvelope(ev.data);
+		};
+		if(this.onOpen != null) {
+			this.onOpen();
+		}
+		this.flushPendingAction();
+	}
+	,handleWsEnvelope: function(msg) {
+		if(msg == null) {
+			return;
+		}
+		switch(Std.string(msg.type)) {
+		case "host_disconnected":
+			this._roomId = "";
+			this._isHost = false;
+			if(this.onHostDisconnected != null) {
+				this.onHostDisconnected();
+			}
+			break;
+		case "peer_socket_connected":
+			if(this.onPeerSocketConnected != null) {
+				this.onPeerSocketConnected(Std.string(msg.peerId));
+			}
+			break;
+		case "peer_socket_disconnected":
+			if(this.onPeerSocketDisconnected != null) {
+				this.onPeerSocketDisconnected(Std.string(msg.peerId));
+			}
+			break;
+		case "relay_error":
+			if(this.onError != null) {
+				this.onError(Std.string(msg.message));
+			}
+			break;
+		case "relayed_from_host":
+			if(this.onRelayedFromHost != null) {
+				this.onRelayedFromHost(msg.payload);
+			}
+			break;
+		case "relayed_from_peer":
+			if(this.onRelayedFromPeer != null) {
+				this.onRelayedFromPeer(Std.string(msg.fromId),msg.payload);
+			}
+			break;
+		case "room_hosted":
+			this._roomId = Std.string(msg.roomId);
+			this._isHost = true;
+			if(msg.connId != null) {
+				this._connId = Std.string(msg.connId);
+			}
+			if(this.onRoomHosted != null) {
+				this.onRoomHosted(this._roomId,this._connId);
+			}
+			break;
+		case "room_joined":
+			this._roomId = Std.string(msg.roomId);
+			this._isHost = false;
+			if(msg.connId != null) {
+				this._connId = Std.string(msg.connId);
+			}
+			if(this.onRoomJoined != null) {
+				this.onRoomJoined(this._roomId,this._connId);
+			}
+			break;
+		case "welcome":
+			this.clearFallbackTimer();
+			this._welcomeReceived = true;
+			this._wsConnecting = false;
+			this._connected = true;
+			this._connId = Std.string(msg.connId);
+			if(this.onOpen != null) {
+				this.onOpen();
+			}
+			this.flushPendingAction();
+			break;
+		default:
+		}
+	}
+	,handleBroadcastEnvelope: function(msg) {
+		if(msg == null || msg.fromId == this._connId) {
+			return;
+		}
+		var t = Std.string(msg.type);
+		if(this._isHost && this._roomId != "" && msg.roomId == this._roomId) {
+			if(t == "join_room") {
+				var pid = Std.string(msg.fromId);
+				if(this._bcPeers.indexOf(pid) < 0) {
+					this._bcPeers.push(pid);
+				}
+				if(this._bc != null) {
+					this._bc.postMessage({ type : "room_joined", roomId : this._roomId, targetId : pid, fromId : this._connId});
+				}
+				if(this.onPeerSocketConnected != null) {
+					this.onPeerSocketConnected(pid);
+				}
+			} else if(t == "relay_to_host") {
+				if(this.onRelayedFromPeer != null) {
+					this.onRelayedFromPeer(Std.string(msg.fromId),msg.payload);
+				}
+			} else if(t == "leave_room") {
+				var pid = Std.string(msg.fromId);
+				HxOverrides.remove(this._bcPeers,pid);
+				if(this.onPeerSocketDisconnected != null) {
+					this.onPeerSocketDisconnected(pid);
+				}
+			}
+		} else if(!this._isHost && this._roomId != "" && msg.roomId == this._roomId) {
+			if(t == "room_joined" && msg.targetId == this._connId) {
+				this._bcJoinedAck = true;
+				this.clearBcJoinTimer();
+				if(this.onRoomJoined != null) {
+					this.onRoomJoined(this._roomId,this._connId);
+				}
+			} else if(t == "relay_to_peer" && msg.targetId == this._connId) {
+				if(this.onRelayedFromHost != null) {
+					this.onRelayedFromHost(msg.payload);
+				}
+			} else if(t == "relay_broadcast") {
+				if(this.onRelayedFromHost != null) {
+					this.onRelayedFromHost(msg.payload);
+				}
+			} else if(t == "host_disconnected") {
+				this._roomId = "";
+				this._isHost = false;
+				if(this.onHostDisconnected != null) {
+					this.onHostDisconnected();
+				}
+			}
+		}
+	}
+	,flushPendingAction: function() {
+		if(this._pendingAction != null) {
+			var fn = this._pendingAction;
+			this._pendingAction = null;
+			fn();
+		}
+	}
+	,sendRaw: function(obj) {
+		if(this._useHttpRelay && this._welcomeReceived && !this._useBroadcastFallback) {
+			this._httpOutbox.push(obj);
+			this.flushHttpRelay(false);
+			return;
+		}
+		if(this._ws != null && this._welcomeReceived && !this._useBroadcastFallback && !this._useHttpRelay) {
+			try {
+				this._ws.send(JSON.stringify(obj));
+			} catch( _g ) {
+			}
+		}
+	}
+	,hostRoom: function(requestedRoomId) {
+		var _gthis = this;
+		if(!this._connected || !this._useBroadcastFallback && !this._welcomeReceived) {
+			this._pendingAction = function() {
+				_gthis.hostRoom(requestedRoomId);
+			};
+			this.connect();
+			return;
+		}
+		if(this._useBroadcastFallback) {
+			this.clearBcJoinTimer();
+			this._roomId = requestedRoomId != null && StringTools.trim(requestedRoomId) != "" ? StringTools.trim(requestedRoomId).toUpperCase() : this.makeFallbackCode();
+			this._isHost = true;
+			this._bcPeers = [];
+			if(this.onRoomHosted != null) {
+				this.onRoomHosted(this._roomId,this._connId);
+			}
+			return;
+		}
+		this.sendRaw({ type : "host_room", roomId : requestedRoomId});
+	}
+	,joinRoom: function(roomId) {
+		var _gthis = this;
+		var clean = roomId != null ? StringTools.trim(roomId).toUpperCase() : "";
+		if(!this._connected || !this._useBroadcastFallback && !this._welcomeReceived) {
+			this._pendingAction = function() {
+				_gthis.joinRoom(clean);
+			};
+			this.connect();
+			return;
+		}
+		if(this._useBroadcastFallback) {
+			this.clearBcJoinTimer();
+			this._bcJoinedAck = false;
+			this._roomId = clean;
+			this._isHost = false;
+			if(this._bc != null) {
+				this._bc.postMessage({ type : "join_room", roomId : clean, fromId : this._connId});
+			}
+			this._bcJoinTimerId = window.setTimeout(function() {
+				if(_gthis._useBroadcastFallback && !_gthis._isHost && _gthis._roomId == clean && !_gthis._bcJoinedAck) {
+					_gthis._roomId = "";
+					if(_gthis.onError != null) {
+						_gthis.onError("Room \"" + clean + "\" was not found on this browser (local fallback active).");
+					}
+				}
+			},2500);
+			return;
+		}
+		this.sendRaw({ type : "join_room", roomId : clean});
+	}
+	,sendToHost: function(payload) {
+		if(this._useBroadcastFallback) {
+			if(this._bc != null && this._roomId != "") {
+				this._bc.postMessage({ type : "relay_to_host", roomId : this._roomId, fromId : this._connId, payload : payload});
+			}
+			return;
+		}
+		this.sendRaw({ type : "relay_to_host", payload : payload});
+	}
+	,sendToPeer: function(targetId,payload) {
+		if(this._useBroadcastFallback) {
+			if(this._bc != null && this._roomId != "") {
+				this._bc.postMessage({ type : "relay_to_peer", roomId : this._roomId, targetId : targetId, fromId : this._connId, payload : payload});
+			}
+			return;
+		}
+		this.sendRaw({ type : "relay_to_peer", targetId : targetId, payload : payload});
+	}
+	,broadcastToPeers: function(payload) {
+		if(this._useBroadcastFallback) {
+			if(this._bc != null && this._roomId != "") {
+				this._bc.postMessage({ type : "relay_broadcast", roomId : this._roomId, fromId : this._connId, payload : payload});
+			}
+			return;
+		}
+		this.sendRaw({ type : "relay_broadcast", payload : payload});
+	}
+	,leaveRoom: function() {
+		this.clearBcJoinTimer();
+		if(this._useBroadcastFallback) {
+			if(this._bc != null && this._roomId != "") {
+				if(this._isHost) {
+					this._bc.postMessage({ type : "host_disconnected", roomId : this._roomId, fromId : this._connId});
+				} else {
+					this._bc.postMessage({ type : "leave_room", roomId : this._roomId, fromId : this._connId});
+				}
+			}
+			this._roomId = "";
+			this._isHost = false;
+			this._bcPeers = [];
+			return;
+		}
+		if((this._ws != null || this._useHttpRelay) && this._welcomeReceived && this._roomId != "") {
+			this.sendRaw({ type : "leave_room"});
+		}
+		this._roomId = "";
+		this._isHost = false;
+	}
+	,makeFallbackCode: function() {
+		var s = "";
+		s = "" + "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".charAt(Math.floor(Math.random() * "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".length));
+		s += "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".charAt(Math.floor(Math.random() * "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".length));
+		s += "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".charAt(Math.floor(Math.random() * "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".length));
+		s += "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".charAt(Math.floor(Math.random() * "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".length));
+		s += "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".charAt(Math.floor(Math.random() * "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".length));
+		s += "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".charAt(Math.floor(Math.random() * "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".length));
+		return s;
+	}
+	,__class__: net_WebSocketTransport
+};
 var oimo_collision_broadphase_BroadPhase = function(type) {
 	this._type = type;
 	this._numProxies = 0;
@@ -52020,6 +53919,8 @@ oimo_collision_broadphase_BroadPhase.prototype = {
 	}
 	,collectPairs: function() {
 	}
+	,rayCast: function(begin,end,callback) {
+	}
 	,__class__: oimo_collision_broadphase_BroadPhase
 };
 var oimo_collision_geometry_Geometry = function(type) {
@@ -52033,6 +53934,94 @@ oimo_collision_geometry_Geometry.prototype = {
 	}
 	,_computeAabb: function(aabb,tf) {
 	}
+	,_rayCastLocal: function(beginX,beginY,beginZ,endX,endY,endZ,hit) {
+		return false;
+	}
+	,rayCast: function(begin,end,transform,hit) {
+		var beginLocalX;
+		var beginLocalY;
+		var beginLocalZ;
+		var endLocalX;
+		var endLocalY;
+		var endLocalZ;
+		beginLocalX = begin.x;
+		beginLocalY = begin.y;
+		beginLocalZ = begin.z;
+		endLocalX = end.x;
+		endLocalY = end.y;
+		endLocalZ = end.z;
+		beginLocalX -= transform._positionX;
+		beginLocalY -= transform._positionY;
+		beginLocalZ -= transform._positionZ;
+		endLocalX -= transform._positionX;
+		endLocalY -= transform._positionY;
+		endLocalZ -= transform._positionZ;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = transform._rotation00 * beginLocalX + transform._rotation10 * beginLocalY + transform._rotation20 * beginLocalZ;
+		__tmp__Y = transform._rotation01 * beginLocalX + transform._rotation11 * beginLocalY + transform._rotation21 * beginLocalZ;
+		__tmp__Z = transform._rotation02 * beginLocalX + transform._rotation12 * beginLocalY + transform._rotation22 * beginLocalZ;
+		beginLocalX = __tmp__X;
+		beginLocalY = __tmp__Y;
+		beginLocalZ = __tmp__Z;
+		var __tmp__X;
+		var __tmp__Y;
+		var __tmp__Z;
+		__tmp__X = transform._rotation00 * endLocalX + transform._rotation10 * endLocalY + transform._rotation20 * endLocalZ;
+		__tmp__Y = transform._rotation01 * endLocalX + transform._rotation11 * endLocalY + transform._rotation21 * endLocalZ;
+		__tmp__Z = transform._rotation02 * endLocalX + transform._rotation12 * endLocalY + transform._rotation22 * endLocalZ;
+		endLocalX = __tmp__X;
+		endLocalY = __tmp__Y;
+		endLocalZ = __tmp__Z;
+		if(this._rayCastLocal(beginLocalX,beginLocalY,beginLocalZ,endLocalX,endLocalY,endLocalZ,hit)) {
+			var localPosX;
+			var localPosY;
+			var localPosZ;
+			var localNormalX;
+			var localNormalY;
+			var localNormalZ;
+			var v = hit.position;
+			localPosX = v.x;
+			localPosY = v.y;
+			localPosZ = v.z;
+			var v = hit.normal;
+			localNormalX = v.x;
+			localNormalY = v.y;
+			localNormalZ = v.z;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = transform._rotation00 * localPosX + transform._rotation01 * localPosY + transform._rotation02 * localPosZ;
+			__tmp__Y = transform._rotation10 * localPosX + transform._rotation11 * localPosY + transform._rotation12 * localPosZ;
+			__tmp__Z = transform._rotation20 * localPosX + transform._rotation21 * localPosY + transform._rotation22 * localPosZ;
+			localPosX = __tmp__X;
+			localPosY = __tmp__Y;
+			localPosZ = __tmp__Z;
+			var __tmp__X;
+			var __tmp__Y;
+			var __tmp__Z;
+			__tmp__X = transform._rotation00 * localNormalX + transform._rotation01 * localNormalY + transform._rotation02 * localNormalZ;
+			__tmp__Y = transform._rotation10 * localNormalX + transform._rotation11 * localNormalY + transform._rotation12 * localNormalZ;
+			__tmp__Z = transform._rotation20 * localNormalX + transform._rotation21 * localNormalY + transform._rotation22 * localNormalZ;
+			localNormalX = __tmp__X;
+			localNormalY = __tmp__Y;
+			localNormalZ = __tmp__Z;
+			localPosX += transform._positionX;
+			localPosY += transform._positionY;
+			localPosZ += transform._positionZ;
+			var v = hit.position;
+			v.x = localPosX;
+			v.y = localPosY;
+			v.z = localPosZ;
+			var v = hit.normal;
+			v.x = localNormalX;
+			v.y = localNormalY;
+			v.z = localNormalZ;
+			return true;
+		}
+		return false;
+	}
 	,__class__: oimo_collision_geometry_Geometry
 };
 var oimo_collision_geometry_ConvexGeometry = function(type) {
@@ -52045,6 +54034,13 @@ oimo_collision_geometry_ConvexGeometry.__name__ = "oimo.collision.geometry.Conve
 oimo_collision_geometry_ConvexGeometry.__super__ = oimo_collision_geometry_Geometry;
 oimo_collision_geometry_ConvexGeometry.prototype = $extend(oimo_collision_geometry_Geometry.prototype,{
 	computeLocalSupportingVertex: function(dir,out) {
+	}
+	,rayCast: function(begin,end,transform,hit) {
+		if(this._useGjkRayCast) {
+			return oimo_collision_narrowphase_detector_gjkepa_GjkEpa.instance.rayCast(this,transform,begin,end,hit);
+		} else {
+			return oimo_collision_geometry_Geometry.prototype.rayCast.call(this,begin,end,transform,hit);
+		}
 	}
 	,__class__: oimo_collision_geometry_ConvexGeometry
 });
@@ -52088,7 +54084,9 @@ var oimo_collision_broadphase_BroadPhaseProxyCallback = function() {
 $hxClasses["oimo.collision.broadphase.BroadPhaseProxyCallback"] = oimo_collision_broadphase_BroadPhaseProxyCallback;
 oimo_collision_broadphase_BroadPhaseProxyCallback.__name__ = "oimo.collision.broadphase.BroadPhaseProxyCallback";
 oimo_collision_broadphase_BroadPhaseProxyCallback.prototype = {
-	__class__: oimo_collision_broadphase_BroadPhaseProxyCallback
+	process: function(proxy) {
+	}
+	,__class__: oimo_collision_broadphase_BroadPhaseProxyCallback
 };
 var oimo_collision_broadphase_Proxy = function(userData,id) {
 	this.userData = userData;
@@ -52214,6 +54212,73 @@ oimo_collision_broadphase_bruteforce_BruteForceBroadPhase.prototype = $extend(oi
 			p1 = n;
 		}
 	}
+	,rayCast: function(begin,end,callback) {
+		var p1X;
+		var p1Y;
+		var p1Z;
+		var p2X;
+		var p2Y;
+		var p2Z;
+		p1X = begin.x;
+		p1Y = begin.y;
+		p1Z = begin.z;
+		p2X = end.x;
+		p2Y = end.y;
+		p2Z = end.z;
+		var p = this._proxyList;
+		while(p != null) {
+			var n = p._next;
+			var x1 = p1X;
+			var y1 = p1Y;
+			var z1 = p1Z;
+			var x2 = p2X;
+			var y2 = p2Y;
+			var z2 = p2Z;
+			var pminx = p._aabbMinX;
+			var pminy = p._aabbMinY;
+			var pminz = p._aabbMinZ;
+			var pmaxx = p._aabbMaxX;
+			var pmaxy = p._aabbMaxY;
+			var pmaxz = p._aabbMaxZ;
+			var tmp;
+			if(pminx > (x1 > x2 ? x1 : x2) || pmaxx < (x1 < x2 ? x1 : x2) || pminy > (y1 > y2 ? y1 : y2) || pmaxy < (y1 < y2 ? y1 : y2) || pminz > (z1 > z2 ? z1 : z2) || pmaxz < (z1 < z2 ? z1 : z2)) {
+				tmp = false;
+			} else {
+				var dx = x2 - x1;
+				var dy = y2 - y1;
+				var dz = z2 - z1;
+				var adx = dx < 0 ? -dx : dx;
+				var ady = dy < 0 ? -dy : dy;
+				var adz = dz < 0 ? -dz : dz;
+				var pextx = (pmaxx - pminx) * 0.5;
+				var pexty = (pmaxy - pminy) * 0.5;
+				var pextz = (pmaxz - pminz) * 0.5;
+				var cpx = x1 - (pmaxx + pminx) * 0.5;
+				var cpy = y1 - (pmaxy + pminy) * 0.5;
+				var cpz = z1 - (pmaxz + pminz) * 0.5;
+				var tmp1;
+				var tmp2;
+				var x = cpy * dz - cpz * dy;
+				if(!((x < 0 ? -x : x) - (pexty * adz + pextz * ady) > 0)) {
+					var x3 = cpz * dx - cpx * dz;
+					tmp2 = (x3 < 0 ? -x3 : x3) - (pextz * adx + pextx * adz) > 0;
+				} else {
+					tmp2 = true;
+				}
+				if(!tmp2) {
+					var x4 = cpx * dy - cpy * dx;
+					tmp1 = (x4 < 0 ? -x4 : x4) - (pextx * ady + pexty * adx) > 0;
+				} else {
+					tmp1 = true;
+				}
+				tmp = tmp1 ? false : true;
+			}
+			if(tmp) {
+				callback.process(p);
+			}
+			p = n;
+		}
+	}
 	,__class__: oimo_collision_broadphase_bruteforce_BruteForceBroadPhase
 });
 var oimo_collision_broadphase_bvh_BvhBroadPhase = function() {
@@ -52268,6 +54333,62 @@ oimo_collision_broadphase_bvh_BvhBroadPhase.prototype = $extend(oimo_collision_b
 			this.collide(n2._children[0],n1);
 			this.collide(n2._children[1],n1);
 		}
+	}
+	,rayCastRecursive: function(node,_p1X,_p1Y,_p1Z,_p2X,_p2Y,_p2Z,callback) {
+		var x1 = _p1X;
+		var y1 = _p1Y;
+		var z1 = _p1Z;
+		var x2 = _p2X;
+		var y2 = _p2Y;
+		var z2 = _p2Z;
+		var pminx = node._aabbMinX;
+		var pminy = node._aabbMinY;
+		var pminz = node._aabbMinZ;
+		var pmaxx = node._aabbMaxX;
+		var pmaxy = node._aabbMaxY;
+		var pmaxz = node._aabbMaxZ;
+		var tmp;
+		if(pminx > (x1 > x2 ? x1 : x2) || pmaxx < (x1 < x2 ? x1 : x2) || pminy > (y1 > y2 ? y1 : y2) || pmaxy < (y1 < y2 ? y1 : y2) || pminz > (z1 > z2 ? z1 : z2) || pmaxz < (z1 < z2 ? z1 : z2)) {
+			tmp = false;
+		} else {
+			var dx = x2 - x1;
+			var dy = y2 - y1;
+			var dz = z2 - z1;
+			var adx = dx < 0 ? -dx : dx;
+			var ady = dy < 0 ? -dy : dy;
+			var adz = dz < 0 ? -dz : dz;
+			var pextx = (pmaxx - pminx) * 0.5;
+			var pexty = (pmaxy - pminy) * 0.5;
+			var pextz = (pmaxz - pminz) * 0.5;
+			var cpx = x1 - (pmaxx + pminx) * 0.5;
+			var cpy = y1 - (pmaxy + pminy) * 0.5;
+			var cpz = z1 - (pmaxz + pminz) * 0.5;
+			var tmp1;
+			var tmp2;
+			var x = cpy * dz - cpz * dy;
+			if(!((x < 0 ? -x : x) - (pexty * adz + pextz * ady) > 0)) {
+				var x = cpz * dx - cpx * dz;
+				tmp2 = (x < 0 ? -x : x) - (pextz * adx + pextx * adz) > 0;
+			} else {
+				tmp2 = true;
+			}
+			if(!tmp2) {
+				var x = cpx * dy - cpy * dx;
+				tmp1 = (x < 0 ? -x : x) - (pextx * ady + pexty * adx) > 0;
+			} else {
+				tmp1 = true;
+			}
+			tmp = tmp1 ? false : true;
+		}
+		if(!tmp) {
+			return;
+		}
+		if(node._height == 0) {
+			callback.process(node._proxy);
+			return;
+		}
+		this.rayCastRecursive(node._children[0],_p1X,_p1Y,_p1Z,_p2X,_p2Y,_p2Z,callback);
+		this.rayCastRecursive(node._children[1],_p1X,_p1Y,_p1Z,_p2X,_p2Y,_p2Z,callback);
 	}
 	,createProxy: function(userData,aabb) {
 		var p = new oimo_collision_broadphase_bvh_BvhProxy(userData,this._idCount++);
@@ -53367,6 +55488,24 @@ oimo_collision_broadphase_bvh_BvhBroadPhase.prototype = $extend(oimo_collision_b
 		}
 		this.numMovedProxies = 0;
 	}
+	,rayCast: function(begin,end,callback) {
+		if(this._tree._root == null) {
+			return;
+		}
+		var p1X;
+		var p1Y;
+		var p1Z;
+		var p2X;
+		var p2Y;
+		var p2Z;
+		p1X = begin.x;
+		p1Y = begin.y;
+		p1Z = begin.z;
+		p2X = end.x;
+		p2Y = end.y;
+		p2Z = end.z;
+		this.rayCastRecursive(this._tree._root,p1X,p1Y,p1Z,p2X,p2Y,p2Z,callback);
+	}
 	,__class__: oimo_collision_broadphase_bvh_BvhBroadPhase
 });
 var oimo_collision_broadphase_bvh_BvhNode = function() {
@@ -53695,6 +55834,120 @@ oimo_collision_geometry_BoxGeometry.prototype = $extend(oimo_collision_geometry_
 		out.y = dir.y > 0 ? coreExtentsY : -coreExtentsY;
 		out.z = dir.z > 0 ? coreExtentsZ : -coreExtentsZ;
 	}
+	,_rayCastLocal: function(beginX,beginY,beginZ,endX,endY,endZ,hit) {
+		var halfW = this._halfExtentsX;
+		var halfH = this._halfExtentsY;
+		var halfD = this._halfExtentsZ;
+		var dx = endX - beginX;
+		var dy = endY - beginY;
+		var dz = endZ - beginZ;
+		var tminx = 0;
+		var tminy = 0;
+		var tminz = 0;
+		var tmaxx = 1;
+		var tmaxy = 1;
+		var tmaxz = 1;
+		if(dx > -1e-6 && dx < 1e-6) {
+			if(beginX <= -halfW || beginX >= halfW) {
+				return false;
+			}
+		} else {
+			var invDx = 1 / dx;
+			var t1 = (-halfW - beginX) * invDx;
+			var t2 = (halfW - beginX) * invDx;
+			if(t1 > t2) {
+				var tmp = t1;
+				t1 = t2;
+				t2 = tmp;
+			}
+			if(t1 > 0) {
+				tminx = t1;
+			}
+			if(t2 < 1) {
+				tmaxx = t2;
+			}
+		}
+		if(dy > -1e-6 && dy < 1e-6) {
+			if(beginY <= -halfH || beginY >= halfH) {
+				return false;
+			}
+		} else {
+			var invDy = 1 / dy;
+			var t1 = (-halfH - beginY) * invDy;
+			var t2 = (halfH - beginY) * invDy;
+			if(t1 > t2) {
+				var tmp = t1;
+				t1 = t2;
+				t2 = tmp;
+			}
+			if(t1 > 0) {
+				tminy = t1;
+			}
+			if(t2 < 1) {
+				tmaxy = t2;
+			}
+		}
+		if(dz > -1e-6 && dz < 1e-6) {
+			if(beginZ <= -halfD || beginZ >= halfD) {
+				return false;
+			}
+		} else {
+			var invDz = 1 / dz;
+			var t1 = (-halfD - beginZ) * invDz;
+			var t2 = (halfD - beginZ) * invDz;
+			if(t1 > t2) {
+				var tmp = t1;
+				t1 = t2;
+				t2 = tmp;
+			}
+			if(t1 > 0) {
+				tminz = t1;
+			}
+			if(t2 < 1) {
+				tmaxz = t2;
+			}
+		}
+		if(tminx >= 1 || tminy >= 1 || tminz >= 1 || tmaxx <= 0 || tmaxy <= 0 || tmaxz <= 0) {
+			return false;
+		}
+		var min = tminx;
+		var max = tmaxx;
+		var hitDirection = 0;
+		if(tminy > min) {
+			min = tminy;
+			hitDirection = 1;
+		}
+		if(tminz > min) {
+			min = tminz;
+			hitDirection = 2;
+		}
+		if(tmaxy < max) {
+			max = tmaxy;
+		}
+		if(tmaxz < max) {
+			max = tmaxz;
+		}
+		if(min > max) {
+			return false;
+		}
+		if(min == 0) {
+			return false;
+		}
+		switch(hitDirection) {
+		case 0:
+			hit.normal.init(dx > 0 ? -1 : 1,0,0);
+			break;
+		case 1:
+			hit.normal.init(0,dy > 0 ? -1 : 1,0);
+			break;
+		case 2:
+			hit.normal.init(0,0,dz > 0 ? -1 : 1);
+			break;
+		}
+		hit.position.init(beginX + min * dx,beginY + min * dy,beginZ + min * dz);
+		hit.fraction = min;
+		return true;
+	}
 	,__class__: oimo_collision_geometry_BoxGeometry
 });
 var oimo_collision_geometry_CapsuleGeometry = function(radius,halfHeight) {
@@ -53768,6 +56021,110 @@ oimo_collision_geometry_CapsuleGeometry.prototype = $extend(oimo_collision_geome
 			out.init(0,-this._halfHeight,0);
 		}
 	}
+	,_rayCastLocal: function(beginX,beginY,beginZ,endX,endY,endZ,hit) {
+		var halfH = this._halfHeight;
+		var dx = endX - beginX;
+		var dz = endZ - beginZ;
+		var tminxz = 0;
+		var tmaxxz = 1;
+		var a = dx * dx + dz * dz;
+		var b = beginX * dx + beginZ * dz;
+		var c = beginX * beginX + beginZ * beginZ - this._radius * this._radius;
+		var D = b * b - a * c;
+		if(D < 0) {
+			return false;
+		}
+		if(a > 0) {
+			var sqrtD = Math.sqrt(D);
+			tminxz = (-b - sqrtD) / a;
+			tmaxxz = (-b + sqrtD) / a;
+			if(tminxz >= 1 || tmaxxz <= 0) {
+				return false;
+			}
+		} else {
+			if(c >= 0) {
+				return false;
+			}
+			tminxz = 0;
+		}
+		var crossY = beginY + (endY - beginY) * tminxz;
+		var min;
+		if(crossY > -halfH && crossY < halfH) {
+			if(tminxz > 0) {
+				min = tminxz;
+				var _this = hit.normal.init(beginX + dx * min,0,beginZ + dz * min);
+				var invLen = Math.sqrt(_this.x * _this.x + _this.y * _this.y + _this.z * _this.z);
+				if(invLen > 0) {
+					invLen = 1 / invLen;
+				}
+				_this.x *= invLen;
+				_this.y *= invLen;
+				_this.z *= invLen;
+				hit.position.init(beginX + min * dx,crossY,beginZ + min * dz);
+				hit.fraction = min;
+				return true;
+			}
+			return false;
+		}
+		var spherePosX;
+		var spherePosY;
+		var spherePosZ;
+		var sphereToBeginX;
+		var sphereToBeginY;
+		var sphereToBeginZ;
+		spherePosX = 0;
+		spherePosY = crossY < 0 ? -halfH : halfH;
+		spherePosZ = 0;
+		sphereToBeginX = beginX - spherePosX;
+		sphereToBeginY = beginY - spherePosY;
+		sphereToBeginZ = beginZ - spherePosZ;
+		var dX;
+		var dY;
+		var dZ;
+		dX = endX - beginX;
+		dY = endY - beginY;
+		dZ = endZ - beginZ;
+		a = dX * dX + dY * dY + dZ * dZ;
+		b = sphereToBeginX * dX + sphereToBeginY * dY + sphereToBeginZ * dZ;
+		c = sphereToBeginX * sphereToBeginX + sphereToBeginY * sphereToBeginY + sphereToBeginZ * sphereToBeginZ - this._radius * this._radius;
+		D = b * b - a * c;
+		if(D < 0) {
+			return false;
+		}
+		var t = (-b - Math.sqrt(D)) / a;
+		if(t < 0 || t > 1) {
+			return false;
+		}
+		var hitPosX;
+		var hitPosY;
+		var hitPosZ;
+		var hitNormalX;
+		var hitNormalY;
+		var hitNormalZ;
+		hitPosX = sphereToBeginX + dX * t;
+		hitPosY = sphereToBeginY + dY * t;
+		hitPosZ = sphereToBeginZ + dZ * t;
+		var l = hitPosX * hitPosX + hitPosY * hitPosY + hitPosZ * hitPosZ;
+		if(l > 0) {
+			l = 1 / Math.sqrt(l);
+		}
+		hitNormalX = hitPosX * l;
+		hitNormalY = hitPosY * l;
+		hitNormalZ = hitPosZ * l;
+		hitPosX += spherePosX;
+		hitPosY += spherePosY;
+		hitPosZ += spherePosZ;
+		var v = hit.position;
+		v.x = hitPosX;
+		v.y = hitPosY;
+		v.z = hitPosZ;
+		var v = hit.normal;
+		v.x = hitNormalX;
+		v.y = hitNormalY;
+		v.z = hitNormalZ;
+		hit.fraction = t;
+		return true;
+	}
 	,__class__: oimo_collision_geometry_CapsuleGeometry
 });
 var oimo_collision_geometry_RayCastHit = function() {
@@ -53818,6 +56175,50 @@ oimo_collision_geometry_SphereGeometry.prototype = $extend(oimo_collision_geomet
 	}
 	,computeLocalSupportingVertex: function(dir,out) {
 		out.zero();
+	}
+	,_rayCastLocal: function(beginX,beginY,beginZ,endX,endY,endZ,hit) {
+		var dX;
+		var dY;
+		var dZ;
+		dX = endX - beginX;
+		dY = endY - beginY;
+		dZ = endZ - beginZ;
+		var a = dX * dX + dY * dY + dZ * dZ;
+		var b = beginX * dX + beginY * dY + beginZ * dZ;
+		var D = b * b - a * (beginX * beginX + beginY * beginY + beginZ * beginZ - this._radius * this._radius);
+		if(D < 0) {
+			return false;
+		}
+		var t = (-b - Math.sqrt(D)) / a;
+		if(t < 0 || t > 1) {
+			return false;
+		}
+		var hitPosX;
+		var hitPosY;
+		var hitPosZ;
+		var hitNormalX;
+		var hitNormalY;
+		var hitNormalZ;
+		hitPosX = beginX + dX * t;
+		hitPosY = beginY + dY * t;
+		hitPosZ = beginZ + dZ * t;
+		var l = hitPosX * hitPosX + hitPosY * hitPosY + hitPosZ * hitPosZ;
+		if(l > 0) {
+			l = 1 / Math.sqrt(l);
+		}
+		hitNormalX = hitPosX * l;
+		hitNormalY = hitPosY * l;
+		hitNormalZ = hitPosZ * l;
+		var v = hit.position;
+		v.x = hitPosX;
+		v.y = hitPosY;
+		v.z = hitPosZ;
+		var v = hit.normal;
+		v.x = hitNormalX;
+		v.y = hitNormalY;
+		v.z = hitNormalZ;
+		hit.fraction = t;
+		return true;
 	}
 	,__class__: oimo_collision_geometry_SphereGeometry
 });
@@ -58842,6 +61243,1601 @@ oimo_collision_narrowphase_detector_gjkepa_GjkEpa.prototype = {
 		}
 		return 2;
 	}
+	,convexCastImpl: function(c1,c2,tf1,tf2,tl1,tl2,hit) {
+		this.c1 = c1;
+		this.c2 = c2;
+		this.tf1 = tf1;
+		this.tf2 = tf2;
+		var s = this.s;
+		var closest = this.closest;
+		var dir = this.dir;
+		var firstDirX;
+		var firstDirY;
+		var firstDirZ;
+		firstDirX = tf2._positionX - tf1._positionX;
+		firstDirY = tf2._positionY - tf1._positionY;
+		firstDirZ = tf2._positionZ - tf1._positionZ;
+		dir.x = firstDirX;
+		dir.y = firstDirY;
+		dir.z = firstDirZ;
+		if(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z < 1e-6) {
+			dir.init(1,0,0);
+		}
+		this.simplexSize = 0;
+		if(this.c1 != null) {
+			this.computeWitnessPoint1(true);
+		} else {
+			var v = this.w1[this.simplexSize];
+			v.x = this.tf1._positionX;
+			v.y = this.tf1._positionY;
+			v.z = this.tf1._positionZ;
+		}
+		this.computeWitnessPoint2(true);
+		var _this = this.s[this.simplexSize];
+		var v = this.w1[this.simplexSize];
+		_this.x = v.x;
+		_this.y = v.y;
+		_this.z = v.z;
+		var v = this.w2[this.simplexSize];
+		_this.x -= v.x;
+		_this.y -= v.y;
+		_this.z -= v.z;
+		this.simplexSize = 1;
+		var count = 0;
+		var lambda = 0.0;
+		var rayX = this.rayX;
+		var rayR = this.rayR;
+		rayX.zero();
+		rayR.x = tl2.x;
+		rayR.y = tl2.y;
+		rayR.z = tl2.z;
+		rayR.x -= tl1.x;
+		rayR.y -= tl1.y;
+		rayR.z -= tl1.z;
+		while(count < 40) {
+			var v = 0;
+			switch(this.simplexSize) {
+			case 1:
+				var v1 = s[0];
+				closest.x = v1.x;
+				closest.y = v1.y;
+				closest.z = v1.z;
+				v = 1;
+				break;
+			case 2:
+				var v1X;
+				var v1Y;
+				var v1Z;
+				var v2X;
+				var v2Y;
+				var v2Z;
+				var v2 = s[0];
+				v1X = v2.x;
+				v1Y = v2.y;
+				v1Z = v2.z;
+				var v3 = s[1];
+				v2X = v3.x;
+				v2Y = v3.y;
+				v2Z = v3.z;
+				var v12X;
+				var v12Y;
+				var v12Z;
+				v12X = v2X - v1X;
+				v12Y = v2Y - v1Y;
+				v12Z = v2Z - v1Z;
+				var t = v12X * v1X + v12Y * v1Y + v12Z * v1Z;
+				t = -t / (v12X * v12X + v12Y * v12Y + v12Z * v12Z);
+				if(t < 0) {
+					closest.x = v1X;
+					closest.y = v1Y;
+					closest.z = v1Z;
+					v = 1;
+				} else if(t > 1) {
+					closest.x = v2X;
+					closest.y = v2Y;
+					closest.z = v2Z;
+					v = 2;
+				} else {
+					var pX;
+					var pY;
+					var pZ;
+					pX = v1X + v12X * t;
+					pY = v1Y + v12Y * t;
+					pZ = v1Z + v12Z * t;
+					closest.x = pX;
+					closest.y = pY;
+					closest.z = pZ;
+					v = 3;
+				}
+				break;
+			case 3:
+				var vec1 = s[0];
+				var vec2 = s[1];
+				var vec3 = s[2];
+				var v1X1;
+				var v1Y1;
+				var v1Z1;
+				var v2X1;
+				var v2Y1;
+				var v2Z1;
+				var v3X;
+				var v3Y;
+				var v3Z;
+				var v12X1;
+				var v12Y1;
+				var v12Z1;
+				var v23X;
+				var v23Y;
+				var v23Z;
+				var v31X;
+				var v31Y;
+				var v31Z;
+				v1X1 = vec1.x;
+				v1Y1 = vec1.y;
+				v1Z1 = vec1.z;
+				v2X1 = vec2.x;
+				v2Y1 = vec2.y;
+				v2Z1 = vec2.z;
+				v3X = vec3.x;
+				v3Y = vec3.y;
+				v3Z = vec3.z;
+				v12X1 = v2X1 - v1X1;
+				v12Y1 = v2Y1 - v1Y1;
+				v12Z1 = v2Z1 - v1Z1;
+				v23X = v3X - v2X1;
+				v23Y = v3Y - v2Y1;
+				v23Z = v3Z - v2Z1;
+				v31X = v1X1 - v3X;
+				v31Y = v1Y1 - v3Y;
+				v31Z = v1Z1 - v3Z;
+				var nX;
+				var nY;
+				var nZ;
+				nX = v12Y1 * v23Z - v12Z1 * v23Y;
+				nY = v12Z1 * v23X - v12X1 * v23Z;
+				nZ = v12X1 * v23Y - v12Y1 * v23X;
+				var n12X;
+				var n12Y;
+				var n12Z;
+				var n23X;
+				var n23Y;
+				var n23Z;
+				var n31X;
+				var n31Y;
+				var n31Z;
+				n12X = v12Y1 * nZ - v12Z1 * nY;
+				n12Y = v12Z1 * nX - v12X1 * nZ;
+				n12Z = v12X1 * nY - v12Y1 * nX;
+				n23X = v23Y * nZ - v23Z * nY;
+				n23Y = v23Z * nX - v23X * nZ;
+				n23Z = v23X * nY - v23Y * nX;
+				n31X = v31Y * nZ - v31Z * nY;
+				n31Y = v31Z * nX - v31X * nZ;
+				n31Z = v31X * nY - v31Y * nX;
+				var mind = -1;
+				var minvX;
+				var minvY;
+				var minvZ;
+				var mini = 0;
+				minvX = 0;
+				minvY = 0;
+				minvZ = 0;
+				if(v1X1 * n12X + v1Y1 * n12Y + v1Z1 * n12Z < 0) {
+					var v1X2;
+					var v1Y2;
+					var v1Z2;
+					var v2X2;
+					var v2Y2;
+					var v2Z2;
+					v1X2 = vec1.x;
+					v1Y2 = vec1.y;
+					v1Z2 = vec1.z;
+					v2X2 = vec2.x;
+					v2Y2 = vec2.y;
+					v2Z2 = vec2.z;
+					var v12X2;
+					var v12Y2;
+					var v12Z2;
+					v12X2 = v2X2 - v1X2;
+					v12Y2 = v2Y2 - v1Y2;
+					v12Z2 = v2Z2 - v1Z2;
+					var t1 = v12X2 * v1X2 + v12Y2 * v1Y2 + v12Z2 * v1Z2;
+					t1 = -t1 / (v12X2 * v12X2 + v12Y2 * v12Y2 + v12Z2 * v12Z2);
+					var b;
+					if(t1 < 0) {
+						closest.x = v1X2;
+						closest.y = v1Y2;
+						closest.z = v1Z2;
+						b = 1;
+					} else if(t1 > 1) {
+						closest.x = v2X2;
+						closest.y = v2Y2;
+						closest.z = v2Z2;
+						b = 2;
+					} else {
+						var pX1;
+						var pY1;
+						var pZ1;
+						pX1 = v1X2 + v12X2 * t1;
+						pY1 = v1Y2 + v12Y2 * t1;
+						pZ1 = v1Z2 + v12Z2 * t1;
+						closest.x = pX1;
+						closest.y = pY1;
+						closest.z = pZ1;
+						b = 3;
+					}
+					mini = b;
+					mind = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					minvX = closest.x;
+					minvY = closest.y;
+					minvZ = closest.z;
+				}
+				if(v2X1 * n23X + v2Y1 * n23Y + v2Z1 * n23Z < 0) {
+					var v1X3;
+					var v1Y3;
+					var v1Z3;
+					var v2X3;
+					var v2Y3;
+					var v2Z3;
+					v1X3 = vec2.x;
+					v1Y3 = vec2.y;
+					v1Z3 = vec2.z;
+					v2X3 = vec3.x;
+					v2Y3 = vec3.y;
+					v2Z3 = vec3.z;
+					var v12X3;
+					var v12Y3;
+					var v12Z3;
+					v12X3 = v2X3 - v1X3;
+					v12Y3 = v2Y3 - v1Y3;
+					v12Z3 = v2Z3 - v1Z3;
+					var t2 = v12X3 * v1X3 + v12Y3 * v1Y3 + v12Z3 * v1Z3;
+					t2 = -t2 / (v12X3 * v12X3 + v12Y3 * v12Y3 + v12Z3 * v12Z3);
+					var b1;
+					if(t2 < 0) {
+						closest.x = v1X3;
+						closest.y = v1Y3;
+						closest.z = v1Z3;
+						b1 = 1;
+					} else if(t2 > 1) {
+						closest.x = v2X3;
+						closest.y = v2Y3;
+						closest.z = v2Z3;
+						b1 = 2;
+					} else {
+						var pX2;
+						var pY2;
+						var pZ2;
+						pX2 = v1X3 + v12X3 * t2;
+						pY2 = v1Y3 + v12Y3 * t2;
+						pZ2 = v1Z3 + v12Z3 * t2;
+						closest.x = pX2;
+						closest.y = pY2;
+						closest.z = pZ2;
+						b1 = 3;
+					}
+					var d = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind < 0 || d < mind) {
+						mini = b1 << 1;
+						mind = d;
+						minvX = closest.x;
+						minvY = closest.y;
+						minvZ = closest.z;
+					}
+				}
+				if(v3X * n31X + v3Y * n31Y + v3Z * n31Z < 0) {
+					var v1X4;
+					var v1Y4;
+					var v1Z4;
+					var v2X4;
+					var v2Y4;
+					var v2Z4;
+					v1X4 = vec1.x;
+					v1Y4 = vec1.y;
+					v1Z4 = vec1.z;
+					v2X4 = vec3.x;
+					v2Y4 = vec3.y;
+					v2Z4 = vec3.z;
+					var v12X4;
+					var v12Y4;
+					var v12Z4;
+					v12X4 = v2X4 - v1X4;
+					v12Y4 = v2Y4 - v1Y4;
+					v12Z4 = v2Z4 - v1Z4;
+					var t3 = v12X4 * v1X4 + v12Y4 * v1Y4 + v12Z4 * v1Z4;
+					t3 = -t3 / (v12X4 * v12X4 + v12Y4 * v12Y4 + v12Z4 * v12Z4);
+					var b2;
+					if(t3 < 0) {
+						closest.x = v1X4;
+						closest.y = v1Y4;
+						closest.z = v1Z4;
+						b2 = 1;
+					} else if(t3 > 1) {
+						closest.x = v2X4;
+						closest.y = v2Y4;
+						closest.z = v2Z4;
+						b2 = 2;
+					} else {
+						var pX3;
+						var pY3;
+						var pZ3;
+						pX3 = v1X4 + v12X4 * t3;
+						pY3 = v1Y4 + v12Y4 * t3;
+						pZ3 = v1Z4 + v12Z4 * t3;
+						closest.x = pX3;
+						closest.y = pY3;
+						closest.z = pZ3;
+						b2 = 3;
+					}
+					var d1 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind < 0 || d1 < mind) {
+						mini = b2 & 1 | (b2 & 2) << 1;
+						mind = d1;
+						minvX = closest.x;
+						minvY = closest.y;
+						minvZ = closest.z;
+					}
+				}
+				if(mind > 0) {
+					closest.x = minvX;
+					closest.y = minvY;
+					closest.z = minvZ;
+					v = mini;
+				} else {
+					var l = nX * nX + nY * nY + nZ * nZ;
+					if(l > 0) {
+						l = 1 / Math.sqrt(l);
+					}
+					nX *= l;
+					nY *= l;
+					nZ *= l;
+					var l2 = nX * nX + nY * nY + nZ * nZ;
+					l2 = (v1X1 * nX + v1Y1 * nY + v1Z1 * nZ) / l2;
+					minvX = nX * l2;
+					minvY = nY * l2;
+					minvZ = nZ * l2;
+					closest.x = minvX;
+					closest.y = minvY;
+					closest.z = minvZ;
+					v = 7;
+				}
+				break;
+			case 4:
+				var vec11 = s[0];
+				var vec21 = s[1];
+				var vec31 = s[2];
+				var vec4 = s[3];
+				var v1X5;
+				var v1Y5;
+				var v1Z5;
+				var v2X5;
+				var v2Y5;
+				var v2Z5;
+				var v3X1;
+				var v3Y1;
+				var v3Z1;
+				var v4X;
+				var v4Y;
+				var v4Z;
+				var v12X5;
+				var v12Y5;
+				var v12Z5;
+				var v13X;
+				var v13Y;
+				var v13Z;
+				var v14X;
+				var v14Y;
+				var v14Z;
+				var v23X1;
+				var v23Y1;
+				var v23Z1;
+				var v24X;
+				var v24Y;
+				var v24Z;
+				v1X5 = vec11.x;
+				v1Y5 = vec11.y;
+				v1Z5 = vec11.z;
+				v2X5 = vec21.x;
+				v2Y5 = vec21.y;
+				v2Z5 = vec21.z;
+				v3X1 = vec31.x;
+				v3Y1 = vec31.y;
+				v3Z1 = vec31.z;
+				v4X = vec4.x;
+				v4Y = vec4.y;
+				v4Z = vec4.z;
+				v12X5 = v2X5 - v1X5;
+				v12Y5 = v2Y5 - v1Y5;
+				v12Z5 = v2Z5 - v1Z5;
+				v13X = v3X1 - v1X5;
+				v13Y = v3Y1 - v1Y5;
+				v13Z = v3Z1 - v1Z5;
+				v14X = v4X - v1X5;
+				v14Y = v4Y - v1Y5;
+				v14Z = v4Z - v1Z5;
+				v23X1 = v3X1 - v2X5;
+				v23Y1 = v3Y1 - v2Y5;
+				v23Z1 = v3Z1 - v2Z5;
+				v24X = v4X - v2X5;
+				v24Y = v4Y - v2Y5;
+				v24Z = v4Z - v2Z5;
+				var n123X;
+				var n123Y;
+				var n123Z;
+				var n134X;
+				var n134Y;
+				var n134Z;
+				var n142X;
+				var n142Y;
+				var n142Z;
+				var n243X;
+				var n243Y;
+				var n243Z;
+				n123X = v12Y5 * v13Z - v12Z5 * v13Y;
+				n123Y = v12Z5 * v13X - v12X5 * v13Z;
+				n123Z = v12X5 * v13Y - v12Y5 * v13X;
+				n134X = v13Y * v14Z - v13Z * v14Y;
+				n134Y = v13Z * v14X - v13X * v14Z;
+				n134Z = v13X * v14Y - v13Y * v14X;
+				n142X = v14Y * v12Z5 - v14Z * v12Y5;
+				n142Y = v14Z * v12X5 - v14X * v12Z5;
+				n142Z = v14X * v12Y5 - v14Y * v12X5;
+				n243X = v24Y * v23Z1 - v24Z * v23Y1;
+				n243Y = v24Z * v23X1 - v24X * v23Z1;
+				n243Z = v24X * v23Y1 - v24Y * v23X1;
+				var sign = v12X5 * n243X + v12Y5 * n243Y + v12Z5 * n243Z > 0 ? 1 : -1;
+				var mind1 = -1;
+				var minvX1;
+				var minvY1;
+				var minvZ1;
+				var mini1 = 0;
+				minvX1 = 0;
+				minvY1 = 0;
+				minvZ1 = 0;
+				if((v1X5 * n123X + v1Y5 * n123Y + v1Z5 * n123Z) * sign < 0) {
+					var v1X6;
+					var v1Y6;
+					var v1Z6;
+					var v2X6;
+					var v2Y6;
+					var v2Z6;
+					var v3X2;
+					var v3Y2;
+					var v3Z2;
+					var v12X6;
+					var v12Y6;
+					var v12Z6;
+					var v23X2;
+					var v23Y2;
+					var v23Z2;
+					var v31X1;
+					var v31Y1;
+					var v31Z1;
+					v1X6 = vec11.x;
+					v1Y6 = vec11.y;
+					v1Z6 = vec11.z;
+					v2X6 = vec21.x;
+					v2Y6 = vec21.y;
+					v2Z6 = vec21.z;
+					v3X2 = vec31.x;
+					v3Y2 = vec31.y;
+					v3Z2 = vec31.z;
+					v12X6 = v2X6 - v1X6;
+					v12Y6 = v2Y6 - v1Y6;
+					v12Z6 = v2Z6 - v1Z6;
+					v23X2 = v3X2 - v2X6;
+					v23Y2 = v3Y2 - v2Y6;
+					v23Z2 = v3Z2 - v2Z6;
+					v31X1 = v1X6 - v3X2;
+					v31Y1 = v1Y6 - v3Y2;
+					v31Z1 = v1Z6 - v3Z2;
+					var nX1;
+					var nY1;
+					var nZ1;
+					nX1 = v12Y6 * v23Z2 - v12Z6 * v23Y2;
+					nY1 = v12Z6 * v23X2 - v12X6 * v23Z2;
+					nZ1 = v12X6 * v23Y2 - v12Y6 * v23X2;
+					var n12X1;
+					var n12Y1;
+					var n12Z1;
+					var n23X1;
+					var n23Y1;
+					var n23Z1;
+					var n31X1;
+					var n31Y1;
+					var n31Z1;
+					n12X1 = v12Y6 * nZ1 - v12Z6 * nY1;
+					n12Y1 = v12Z6 * nX1 - v12X6 * nZ1;
+					n12Z1 = v12X6 * nY1 - v12Y6 * nX1;
+					n23X1 = v23Y2 * nZ1 - v23Z2 * nY1;
+					n23Y1 = v23Z2 * nX1 - v23X2 * nZ1;
+					n23Z1 = v23X2 * nY1 - v23Y2 * nX1;
+					n31X1 = v31Y1 * nZ1 - v31Z1 * nY1;
+					n31Y1 = v31Z1 * nX1 - v31X1 * nZ1;
+					n31Z1 = v31X1 * nY1 - v31Y1 * nX1;
+					var mind2 = -1;
+					var minvX2;
+					var minvY2;
+					var minvZ2;
+					var mini2 = 0;
+					minvX2 = 0;
+					minvY2 = 0;
+					minvZ2 = 0;
+					if(v1X6 * n12X1 + v1Y6 * n12Y1 + v1Z6 * n12Z1 < 0) {
+						var v1X7;
+						var v1Y7;
+						var v1Z7;
+						var v2X7;
+						var v2Y7;
+						var v2Z7;
+						v1X7 = vec11.x;
+						v1Y7 = vec11.y;
+						v1Z7 = vec11.z;
+						v2X7 = vec21.x;
+						v2Y7 = vec21.y;
+						v2Z7 = vec21.z;
+						var v12X7;
+						var v12Y7;
+						var v12Z7;
+						v12X7 = v2X7 - v1X7;
+						v12Y7 = v2Y7 - v1Y7;
+						v12Z7 = v2Z7 - v1Z7;
+						var t4 = v12X7 * v1X7 + v12Y7 * v1Y7 + v12Z7 * v1Z7;
+						t4 = -t4 / (v12X7 * v12X7 + v12Y7 * v12Y7 + v12Z7 * v12Z7);
+						var b3;
+						if(t4 < 0) {
+							closest.x = v1X7;
+							closest.y = v1Y7;
+							closest.z = v1Z7;
+							b3 = 1;
+						} else if(t4 > 1) {
+							closest.x = v2X7;
+							closest.y = v2Y7;
+							closest.z = v2Z7;
+							b3 = 2;
+						} else {
+							var pX4;
+							var pY4;
+							var pZ4;
+							pX4 = v1X7 + v12X7 * t4;
+							pY4 = v1Y7 + v12Y7 * t4;
+							pZ4 = v1Z7 + v12Z7 * t4;
+							closest.x = pX4;
+							closest.y = pY4;
+							closest.z = pZ4;
+							b3 = 3;
+						}
+						mini2 = b3;
+						mind2 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						minvX2 = closest.x;
+						minvY2 = closest.y;
+						minvZ2 = closest.z;
+					}
+					if(v2X6 * n23X1 + v2Y6 * n23Y1 + v2Z6 * n23Z1 < 0) {
+						var v1X8;
+						var v1Y8;
+						var v1Z8;
+						var v2X8;
+						var v2Y8;
+						var v2Z8;
+						v1X8 = vec21.x;
+						v1Y8 = vec21.y;
+						v1Z8 = vec21.z;
+						v2X8 = vec31.x;
+						v2Y8 = vec31.y;
+						v2Z8 = vec31.z;
+						var v12X8;
+						var v12Y8;
+						var v12Z8;
+						v12X8 = v2X8 - v1X8;
+						v12Y8 = v2Y8 - v1Y8;
+						v12Z8 = v2Z8 - v1Z8;
+						var t5 = v12X8 * v1X8 + v12Y8 * v1Y8 + v12Z8 * v1Z8;
+						t5 = -t5 / (v12X8 * v12X8 + v12Y8 * v12Y8 + v12Z8 * v12Z8);
+						var b4;
+						if(t5 < 0) {
+							closest.x = v1X8;
+							closest.y = v1Y8;
+							closest.z = v1Z8;
+							b4 = 1;
+						} else if(t5 > 1) {
+							closest.x = v2X8;
+							closest.y = v2Y8;
+							closest.z = v2Z8;
+							b4 = 2;
+						} else {
+							var pX5;
+							var pY5;
+							var pZ5;
+							pX5 = v1X8 + v12X8 * t5;
+							pY5 = v1Y8 + v12Y8 * t5;
+							pZ5 = v1Z8 + v12Z8 * t5;
+							closest.x = pX5;
+							closest.y = pY5;
+							closest.z = pZ5;
+							b4 = 3;
+						}
+						var d2 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind2 < 0 || d2 < mind2) {
+							mini2 = b4 << 1;
+							mind2 = d2;
+							minvX2 = closest.x;
+							minvY2 = closest.y;
+							minvZ2 = closest.z;
+						}
+					}
+					if(v3X2 * n31X1 + v3Y2 * n31Y1 + v3Z2 * n31Z1 < 0) {
+						var v1X9;
+						var v1Y9;
+						var v1Z9;
+						var v2X9;
+						var v2Y9;
+						var v2Z9;
+						v1X9 = vec11.x;
+						v1Y9 = vec11.y;
+						v1Z9 = vec11.z;
+						v2X9 = vec31.x;
+						v2Y9 = vec31.y;
+						v2Z9 = vec31.z;
+						var v12X9;
+						var v12Y9;
+						var v12Z9;
+						v12X9 = v2X9 - v1X9;
+						v12Y9 = v2Y9 - v1Y9;
+						v12Z9 = v2Z9 - v1Z9;
+						var t6 = v12X9 * v1X9 + v12Y9 * v1Y9 + v12Z9 * v1Z9;
+						t6 = -t6 / (v12X9 * v12X9 + v12Y9 * v12Y9 + v12Z9 * v12Z9);
+						var b5;
+						if(t6 < 0) {
+							closest.x = v1X9;
+							closest.y = v1Y9;
+							closest.z = v1Z9;
+							b5 = 1;
+						} else if(t6 > 1) {
+							closest.x = v2X9;
+							closest.y = v2Y9;
+							closest.z = v2Z9;
+							b5 = 2;
+						} else {
+							var pX6;
+							var pY6;
+							var pZ6;
+							pX6 = v1X9 + v12X9 * t6;
+							pY6 = v1Y9 + v12Y9 * t6;
+							pZ6 = v1Z9 + v12Z9 * t6;
+							closest.x = pX6;
+							closest.y = pY6;
+							closest.z = pZ6;
+							b5 = 3;
+						}
+						var d3 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind2 < 0 || d3 < mind2) {
+							mini2 = b5 & 1 | (b5 & 2) << 1;
+							mind2 = d3;
+							minvX2 = closest.x;
+							minvY2 = closest.y;
+							minvZ2 = closest.z;
+						}
+					}
+					var b6;
+					if(mind2 > 0) {
+						closest.x = minvX2;
+						closest.y = minvY2;
+						closest.z = minvZ2;
+						b6 = mini2;
+					} else {
+						var l1 = nX1 * nX1 + nY1 * nY1 + nZ1 * nZ1;
+						if(l1 > 0) {
+							l1 = 1 / Math.sqrt(l1);
+						}
+						nX1 *= l1;
+						nY1 *= l1;
+						nZ1 *= l1;
+						var l21 = nX1 * nX1 + nY1 * nY1 + nZ1 * nZ1;
+						l21 = (v1X6 * nX1 + v1Y6 * nY1 + v1Z6 * nZ1) / l21;
+						minvX2 = nX1 * l21;
+						minvY2 = nY1 * l21;
+						minvZ2 = nZ1 * l21;
+						closest.x = minvX2;
+						closest.y = minvY2;
+						closest.z = minvZ2;
+						b6 = 7;
+					}
+					mini1 = b6;
+					mind1 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					minvX1 = closest.x;
+					minvY1 = closest.y;
+					minvZ1 = closest.z;
+				}
+				if((v1X5 * n134X + v1Y5 * n134Y + v1Z5 * n134Z) * sign < 0) {
+					var v1X10;
+					var v1Y10;
+					var v1Z10;
+					var v2X10;
+					var v2Y10;
+					var v2Z10;
+					var v3X3;
+					var v3Y3;
+					var v3Z3;
+					var v12X10;
+					var v12Y10;
+					var v12Z10;
+					var v23X3;
+					var v23Y3;
+					var v23Z3;
+					var v31X2;
+					var v31Y2;
+					var v31Z2;
+					v1X10 = vec11.x;
+					v1Y10 = vec11.y;
+					v1Z10 = vec11.z;
+					v2X10 = vec31.x;
+					v2Y10 = vec31.y;
+					v2Z10 = vec31.z;
+					v3X3 = vec4.x;
+					v3Y3 = vec4.y;
+					v3Z3 = vec4.z;
+					v12X10 = v2X10 - v1X10;
+					v12Y10 = v2Y10 - v1Y10;
+					v12Z10 = v2Z10 - v1Z10;
+					v23X3 = v3X3 - v2X10;
+					v23Y3 = v3Y3 - v2Y10;
+					v23Z3 = v3Z3 - v2Z10;
+					v31X2 = v1X10 - v3X3;
+					v31Y2 = v1Y10 - v3Y3;
+					v31Z2 = v1Z10 - v3Z3;
+					var nX2;
+					var nY2;
+					var nZ2;
+					nX2 = v12Y10 * v23Z3 - v12Z10 * v23Y3;
+					nY2 = v12Z10 * v23X3 - v12X10 * v23Z3;
+					nZ2 = v12X10 * v23Y3 - v12Y10 * v23X3;
+					var n12X2;
+					var n12Y2;
+					var n12Z2;
+					var n23X2;
+					var n23Y2;
+					var n23Z2;
+					var n31X2;
+					var n31Y2;
+					var n31Z2;
+					n12X2 = v12Y10 * nZ2 - v12Z10 * nY2;
+					n12Y2 = v12Z10 * nX2 - v12X10 * nZ2;
+					n12Z2 = v12X10 * nY2 - v12Y10 * nX2;
+					n23X2 = v23Y3 * nZ2 - v23Z3 * nY2;
+					n23Y2 = v23Z3 * nX2 - v23X3 * nZ2;
+					n23Z2 = v23X3 * nY2 - v23Y3 * nX2;
+					n31X2 = v31Y2 * nZ2 - v31Z2 * nY2;
+					n31Y2 = v31Z2 * nX2 - v31X2 * nZ2;
+					n31Z2 = v31X2 * nY2 - v31Y2 * nX2;
+					var mind3 = -1;
+					var minvX3;
+					var minvY3;
+					var minvZ3;
+					var mini3 = 0;
+					minvX3 = 0;
+					minvY3 = 0;
+					minvZ3 = 0;
+					if(v1X10 * n12X2 + v1Y10 * n12Y2 + v1Z10 * n12Z2 < 0) {
+						var v1X11;
+						var v1Y11;
+						var v1Z11;
+						var v2X11;
+						var v2Y11;
+						var v2Z11;
+						v1X11 = vec11.x;
+						v1Y11 = vec11.y;
+						v1Z11 = vec11.z;
+						v2X11 = vec31.x;
+						v2Y11 = vec31.y;
+						v2Z11 = vec31.z;
+						var v12X11;
+						var v12Y11;
+						var v12Z11;
+						v12X11 = v2X11 - v1X11;
+						v12Y11 = v2Y11 - v1Y11;
+						v12Z11 = v2Z11 - v1Z11;
+						var t7 = v12X11 * v1X11 + v12Y11 * v1Y11 + v12Z11 * v1Z11;
+						t7 = -t7 / (v12X11 * v12X11 + v12Y11 * v12Y11 + v12Z11 * v12Z11);
+						var b7;
+						if(t7 < 0) {
+							closest.x = v1X11;
+							closest.y = v1Y11;
+							closest.z = v1Z11;
+							b7 = 1;
+						} else if(t7 > 1) {
+							closest.x = v2X11;
+							closest.y = v2Y11;
+							closest.z = v2Z11;
+							b7 = 2;
+						} else {
+							var pX7;
+							var pY7;
+							var pZ7;
+							pX7 = v1X11 + v12X11 * t7;
+							pY7 = v1Y11 + v12Y11 * t7;
+							pZ7 = v1Z11 + v12Z11 * t7;
+							closest.x = pX7;
+							closest.y = pY7;
+							closest.z = pZ7;
+							b7 = 3;
+						}
+						mini3 = b7;
+						mind3 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						minvX3 = closest.x;
+						minvY3 = closest.y;
+						minvZ3 = closest.z;
+					}
+					if(v2X10 * n23X2 + v2Y10 * n23Y2 + v2Z10 * n23Z2 < 0) {
+						var v1X12;
+						var v1Y12;
+						var v1Z12;
+						var v2X12;
+						var v2Y12;
+						var v2Z12;
+						v1X12 = vec31.x;
+						v1Y12 = vec31.y;
+						v1Z12 = vec31.z;
+						v2X12 = vec4.x;
+						v2Y12 = vec4.y;
+						v2Z12 = vec4.z;
+						var v12X12;
+						var v12Y12;
+						var v12Z12;
+						v12X12 = v2X12 - v1X12;
+						v12Y12 = v2Y12 - v1Y12;
+						v12Z12 = v2Z12 - v1Z12;
+						var t8 = v12X12 * v1X12 + v12Y12 * v1Y12 + v12Z12 * v1Z12;
+						t8 = -t8 / (v12X12 * v12X12 + v12Y12 * v12Y12 + v12Z12 * v12Z12);
+						var b8;
+						if(t8 < 0) {
+							closest.x = v1X12;
+							closest.y = v1Y12;
+							closest.z = v1Z12;
+							b8 = 1;
+						} else if(t8 > 1) {
+							closest.x = v2X12;
+							closest.y = v2Y12;
+							closest.z = v2Z12;
+							b8 = 2;
+						} else {
+							var pX8;
+							var pY8;
+							var pZ8;
+							pX8 = v1X12 + v12X12 * t8;
+							pY8 = v1Y12 + v12Y12 * t8;
+							pZ8 = v1Z12 + v12Z12 * t8;
+							closest.x = pX8;
+							closest.y = pY8;
+							closest.z = pZ8;
+							b8 = 3;
+						}
+						var d4 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind3 < 0 || d4 < mind3) {
+							mini3 = b8 << 1;
+							mind3 = d4;
+							minvX3 = closest.x;
+							minvY3 = closest.y;
+							minvZ3 = closest.z;
+						}
+					}
+					if(v3X3 * n31X2 + v3Y3 * n31Y2 + v3Z3 * n31Z2 < 0) {
+						var v1X13;
+						var v1Y13;
+						var v1Z13;
+						var v2X13;
+						var v2Y13;
+						var v2Z13;
+						v1X13 = vec11.x;
+						v1Y13 = vec11.y;
+						v1Z13 = vec11.z;
+						v2X13 = vec4.x;
+						v2Y13 = vec4.y;
+						v2Z13 = vec4.z;
+						var v12X13;
+						var v12Y13;
+						var v12Z13;
+						v12X13 = v2X13 - v1X13;
+						v12Y13 = v2Y13 - v1Y13;
+						v12Z13 = v2Z13 - v1Z13;
+						var t9 = v12X13 * v1X13 + v12Y13 * v1Y13 + v12Z13 * v1Z13;
+						t9 = -t9 / (v12X13 * v12X13 + v12Y13 * v12Y13 + v12Z13 * v12Z13);
+						var b9;
+						if(t9 < 0) {
+							closest.x = v1X13;
+							closest.y = v1Y13;
+							closest.z = v1Z13;
+							b9 = 1;
+						} else if(t9 > 1) {
+							closest.x = v2X13;
+							closest.y = v2Y13;
+							closest.z = v2Z13;
+							b9 = 2;
+						} else {
+							var pX9;
+							var pY9;
+							var pZ9;
+							pX9 = v1X13 + v12X13 * t9;
+							pY9 = v1Y13 + v12Y13 * t9;
+							pZ9 = v1Z13 + v12Z13 * t9;
+							closest.x = pX9;
+							closest.y = pY9;
+							closest.z = pZ9;
+							b9 = 3;
+						}
+						var d5 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind3 < 0 || d5 < mind3) {
+							mini3 = b9 & 1 | (b9 & 2) << 1;
+							mind3 = d5;
+							minvX3 = closest.x;
+							minvY3 = closest.y;
+							minvZ3 = closest.z;
+						}
+					}
+					var b10;
+					if(mind3 > 0) {
+						closest.x = minvX3;
+						closest.y = minvY3;
+						closest.z = minvZ3;
+						b10 = mini3;
+					} else {
+						var l3 = nX2 * nX2 + nY2 * nY2 + nZ2 * nZ2;
+						if(l3 > 0) {
+							l3 = 1 / Math.sqrt(l3);
+						}
+						nX2 *= l3;
+						nY2 *= l3;
+						nZ2 *= l3;
+						var l22 = nX2 * nX2 + nY2 * nY2 + nZ2 * nZ2;
+						l22 = (v1X10 * nX2 + v1Y10 * nY2 + v1Z10 * nZ2) / l22;
+						minvX3 = nX2 * l22;
+						minvY3 = nY2 * l22;
+						minvZ3 = nZ2 * l22;
+						closest.x = minvX3;
+						closest.y = minvY3;
+						closest.z = minvZ3;
+						b10 = 7;
+					}
+					var d6 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind1 < 0 || d6 < mind1) {
+						mini1 = b10 & 1 | (b10 & 6) << 1;
+						mind1 = d6;
+						minvX1 = closest.x;
+						minvY1 = closest.y;
+						minvZ1 = closest.z;
+					}
+				}
+				if((v1X5 * n142X + v1Y5 * n142Y + v1Z5 * n142Z) * sign < 0) {
+					var v1X14;
+					var v1Y14;
+					var v1Z14;
+					var v2X14;
+					var v2Y14;
+					var v2Z14;
+					var v3X4;
+					var v3Y4;
+					var v3Z4;
+					var v12X14;
+					var v12Y14;
+					var v12Z14;
+					var v23X4;
+					var v23Y4;
+					var v23Z4;
+					var v31X3;
+					var v31Y3;
+					var v31Z3;
+					v1X14 = vec11.x;
+					v1Y14 = vec11.y;
+					v1Z14 = vec11.z;
+					v2X14 = vec21.x;
+					v2Y14 = vec21.y;
+					v2Z14 = vec21.z;
+					v3X4 = vec4.x;
+					v3Y4 = vec4.y;
+					v3Z4 = vec4.z;
+					v12X14 = v2X14 - v1X14;
+					v12Y14 = v2Y14 - v1Y14;
+					v12Z14 = v2Z14 - v1Z14;
+					v23X4 = v3X4 - v2X14;
+					v23Y4 = v3Y4 - v2Y14;
+					v23Z4 = v3Z4 - v2Z14;
+					v31X3 = v1X14 - v3X4;
+					v31Y3 = v1Y14 - v3Y4;
+					v31Z3 = v1Z14 - v3Z4;
+					var nX3;
+					var nY3;
+					var nZ3;
+					nX3 = v12Y14 * v23Z4 - v12Z14 * v23Y4;
+					nY3 = v12Z14 * v23X4 - v12X14 * v23Z4;
+					nZ3 = v12X14 * v23Y4 - v12Y14 * v23X4;
+					var n12X3;
+					var n12Y3;
+					var n12Z3;
+					var n23X3;
+					var n23Y3;
+					var n23Z3;
+					var n31X3;
+					var n31Y3;
+					var n31Z3;
+					n12X3 = v12Y14 * nZ3 - v12Z14 * nY3;
+					n12Y3 = v12Z14 * nX3 - v12X14 * nZ3;
+					n12Z3 = v12X14 * nY3 - v12Y14 * nX3;
+					n23X3 = v23Y4 * nZ3 - v23Z4 * nY3;
+					n23Y3 = v23Z4 * nX3 - v23X4 * nZ3;
+					n23Z3 = v23X4 * nY3 - v23Y4 * nX3;
+					n31X3 = v31Y3 * nZ3 - v31Z3 * nY3;
+					n31Y3 = v31Z3 * nX3 - v31X3 * nZ3;
+					n31Z3 = v31X3 * nY3 - v31Y3 * nX3;
+					var mind4 = -1;
+					var minvX4;
+					var minvY4;
+					var minvZ4;
+					var mini4 = 0;
+					minvX4 = 0;
+					minvY4 = 0;
+					minvZ4 = 0;
+					if(v1X14 * n12X3 + v1Y14 * n12Y3 + v1Z14 * n12Z3 < 0) {
+						var v1X15;
+						var v1Y15;
+						var v1Z15;
+						var v2X15;
+						var v2Y15;
+						var v2Z15;
+						v1X15 = vec11.x;
+						v1Y15 = vec11.y;
+						v1Z15 = vec11.z;
+						v2X15 = vec21.x;
+						v2Y15 = vec21.y;
+						v2Z15 = vec21.z;
+						var v12X15;
+						var v12Y15;
+						var v12Z15;
+						v12X15 = v2X15 - v1X15;
+						v12Y15 = v2Y15 - v1Y15;
+						v12Z15 = v2Z15 - v1Z15;
+						var t10 = v12X15 * v1X15 + v12Y15 * v1Y15 + v12Z15 * v1Z15;
+						t10 = -t10 / (v12X15 * v12X15 + v12Y15 * v12Y15 + v12Z15 * v12Z15);
+						var b11;
+						if(t10 < 0) {
+							closest.x = v1X15;
+							closest.y = v1Y15;
+							closest.z = v1Z15;
+							b11 = 1;
+						} else if(t10 > 1) {
+							closest.x = v2X15;
+							closest.y = v2Y15;
+							closest.z = v2Z15;
+							b11 = 2;
+						} else {
+							var pX10;
+							var pY10;
+							var pZ10;
+							pX10 = v1X15 + v12X15 * t10;
+							pY10 = v1Y15 + v12Y15 * t10;
+							pZ10 = v1Z15 + v12Z15 * t10;
+							closest.x = pX10;
+							closest.y = pY10;
+							closest.z = pZ10;
+							b11 = 3;
+						}
+						mini4 = b11;
+						mind4 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						minvX4 = closest.x;
+						minvY4 = closest.y;
+						minvZ4 = closest.z;
+					}
+					if(v2X14 * n23X3 + v2Y14 * n23Y3 + v2Z14 * n23Z3 < 0) {
+						var v1X16;
+						var v1Y16;
+						var v1Z16;
+						var v2X16;
+						var v2Y16;
+						var v2Z16;
+						v1X16 = vec21.x;
+						v1Y16 = vec21.y;
+						v1Z16 = vec21.z;
+						v2X16 = vec4.x;
+						v2Y16 = vec4.y;
+						v2Z16 = vec4.z;
+						var v12X16;
+						var v12Y16;
+						var v12Z16;
+						v12X16 = v2X16 - v1X16;
+						v12Y16 = v2Y16 - v1Y16;
+						v12Z16 = v2Z16 - v1Z16;
+						var t11 = v12X16 * v1X16 + v12Y16 * v1Y16 + v12Z16 * v1Z16;
+						t11 = -t11 / (v12X16 * v12X16 + v12Y16 * v12Y16 + v12Z16 * v12Z16);
+						var b12;
+						if(t11 < 0) {
+							closest.x = v1X16;
+							closest.y = v1Y16;
+							closest.z = v1Z16;
+							b12 = 1;
+						} else if(t11 > 1) {
+							closest.x = v2X16;
+							closest.y = v2Y16;
+							closest.z = v2Z16;
+							b12 = 2;
+						} else {
+							var pX11;
+							var pY11;
+							var pZ11;
+							pX11 = v1X16 + v12X16 * t11;
+							pY11 = v1Y16 + v12Y16 * t11;
+							pZ11 = v1Z16 + v12Z16 * t11;
+							closest.x = pX11;
+							closest.y = pY11;
+							closest.z = pZ11;
+							b12 = 3;
+						}
+						var d7 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind4 < 0 || d7 < mind4) {
+							mini4 = b12 << 1;
+							mind4 = d7;
+							minvX4 = closest.x;
+							minvY4 = closest.y;
+							minvZ4 = closest.z;
+						}
+					}
+					if(v3X4 * n31X3 + v3Y4 * n31Y3 + v3Z4 * n31Z3 < 0) {
+						var v1X17;
+						var v1Y17;
+						var v1Z17;
+						var v2X17;
+						var v2Y17;
+						var v2Z17;
+						v1X17 = vec11.x;
+						v1Y17 = vec11.y;
+						v1Z17 = vec11.z;
+						v2X17 = vec4.x;
+						v2Y17 = vec4.y;
+						v2Z17 = vec4.z;
+						var v12X17;
+						var v12Y17;
+						var v12Z17;
+						v12X17 = v2X17 - v1X17;
+						v12Y17 = v2Y17 - v1Y17;
+						v12Z17 = v2Z17 - v1Z17;
+						var t12 = v12X17 * v1X17 + v12Y17 * v1Y17 + v12Z17 * v1Z17;
+						t12 = -t12 / (v12X17 * v12X17 + v12Y17 * v12Y17 + v12Z17 * v12Z17);
+						var b13;
+						if(t12 < 0) {
+							closest.x = v1X17;
+							closest.y = v1Y17;
+							closest.z = v1Z17;
+							b13 = 1;
+						} else if(t12 > 1) {
+							closest.x = v2X17;
+							closest.y = v2Y17;
+							closest.z = v2Z17;
+							b13 = 2;
+						} else {
+							var pX12;
+							var pY12;
+							var pZ12;
+							pX12 = v1X17 + v12X17 * t12;
+							pY12 = v1Y17 + v12Y17 * t12;
+							pZ12 = v1Z17 + v12Z17 * t12;
+							closest.x = pX12;
+							closest.y = pY12;
+							closest.z = pZ12;
+							b13 = 3;
+						}
+						var d8 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind4 < 0 || d8 < mind4) {
+							mini4 = b13 & 1 | (b13 & 2) << 1;
+							mind4 = d8;
+							minvX4 = closest.x;
+							minvY4 = closest.y;
+							minvZ4 = closest.z;
+						}
+					}
+					var b14;
+					if(mind4 > 0) {
+						closest.x = minvX4;
+						closest.y = minvY4;
+						closest.z = minvZ4;
+						b14 = mini4;
+					} else {
+						var l4 = nX3 * nX3 + nY3 * nY3 + nZ3 * nZ3;
+						if(l4 > 0) {
+							l4 = 1 / Math.sqrt(l4);
+						}
+						nX3 *= l4;
+						nY3 *= l4;
+						nZ3 *= l4;
+						var l23 = nX3 * nX3 + nY3 * nY3 + nZ3 * nZ3;
+						l23 = (v1X14 * nX3 + v1Y14 * nY3 + v1Z14 * nZ3) / l23;
+						minvX4 = nX3 * l23;
+						minvY4 = nY3 * l23;
+						minvZ4 = nZ3 * l23;
+						closest.x = minvX4;
+						closest.y = minvY4;
+						closest.z = minvZ4;
+						b14 = 7;
+					}
+					var d9 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind1 < 0 || d9 < mind1) {
+						mini1 = b14 & 3 | (b14 & 4) << 1;
+						mind1 = d9;
+						minvX1 = closest.x;
+						minvY1 = closest.y;
+						minvZ1 = closest.z;
+					}
+				}
+				if((v2X5 * n243X + v2Y5 * n243Y + v2Z5 * n243Z) * sign < 0) {
+					var v1X18;
+					var v1Y18;
+					var v1Z18;
+					var v2X18;
+					var v2Y18;
+					var v2Z18;
+					var v3X5;
+					var v3Y5;
+					var v3Z5;
+					var v12X18;
+					var v12Y18;
+					var v12Z18;
+					var v23X5;
+					var v23Y5;
+					var v23Z5;
+					var v31X4;
+					var v31Y4;
+					var v31Z4;
+					v1X18 = vec21.x;
+					v1Y18 = vec21.y;
+					v1Z18 = vec21.z;
+					v2X18 = vec31.x;
+					v2Y18 = vec31.y;
+					v2Z18 = vec31.z;
+					v3X5 = vec4.x;
+					v3Y5 = vec4.y;
+					v3Z5 = vec4.z;
+					v12X18 = v2X18 - v1X18;
+					v12Y18 = v2Y18 - v1Y18;
+					v12Z18 = v2Z18 - v1Z18;
+					v23X5 = v3X5 - v2X18;
+					v23Y5 = v3Y5 - v2Y18;
+					v23Z5 = v3Z5 - v2Z18;
+					v31X4 = v1X18 - v3X5;
+					v31Y4 = v1Y18 - v3Y5;
+					v31Z4 = v1Z18 - v3Z5;
+					var nX4;
+					var nY4;
+					var nZ4;
+					nX4 = v12Y18 * v23Z5 - v12Z18 * v23Y5;
+					nY4 = v12Z18 * v23X5 - v12X18 * v23Z5;
+					nZ4 = v12X18 * v23Y5 - v12Y18 * v23X5;
+					var n12X4;
+					var n12Y4;
+					var n12Z4;
+					var n23X4;
+					var n23Y4;
+					var n23Z4;
+					var n31X4;
+					var n31Y4;
+					var n31Z4;
+					n12X4 = v12Y18 * nZ4 - v12Z18 * nY4;
+					n12Y4 = v12Z18 * nX4 - v12X18 * nZ4;
+					n12Z4 = v12X18 * nY4 - v12Y18 * nX4;
+					n23X4 = v23Y5 * nZ4 - v23Z5 * nY4;
+					n23Y4 = v23Z5 * nX4 - v23X5 * nZ4;
+					n23Z4 = v23X5 * nY4 - v23Y5 * nX4;
+					n31X4 = v31Y4 * nZ4 - v31Z4 * nY4;
+					n31Y4 = v31Z4 * nX4 - v31X4 * nZ4;
+					n31Z4 = v31X4 * nY4 - v31Y4 * nX4;
+					var mind5 = -1;
+					var minvX5;
+					var minvY5;
+					var minvZ5;
+					var mini5 = 0;
+					minvX5 = 0;
+					minvY5 = 0;
+					minvZ5 = 0;
+					if(v1X18 * n12X4 + v1Y18 * n12Y4 + v1Z18 * n12Z4 < 0) {
+						var v1X19;
+						var v1Y19;
+						var v1Z19;
+						var v2X19;
+						var v2Y19;
+						var v2Z19;
+						v1X19 = vec21.x;
+						v1Y19 = vec21.y;
+						v1Z19 = vec21.z;
+						v2X19 = vec31.x;
+						v2Y19 = vec31.y;
+						v2Z19 = vec31.z;
+						var v12X19;
+						var v12Y19;
+						var v12Z19;
+						v12X19 = v2X19 - v1X19;
+						v12Y19 = v2Y19 - v1Y19;
+						v12Z19 = v2Z19 - v1Z19;
+						var t13 = v12X19 * v1X19 + v12Y19 * v1Y19 + v12Z19 * v1Z19;
+						t13 = -t13 / (v12X19 * v12X19 + v12Y19 * v12Y19 + v12Z19 * v12Z19);
+						var b15;
+						if(t13 < 0) {
+							closest.x = v1X19;
+							closest.y = v1Y19;
+							closest.z = v1Z19;
+							b15 = 1;
+						} else if(t13 > 1) {
+							closest.x = v2X19;
+							closest.y = v2Y19;
+							closest.z = v2Z19;
+							b15 = 2;
+						} else {
+							var pX13;
+							var pY13;
+							var pZ13;
+							pX13 = v1X19 + v12X19 * t13;
+							pY13 = v1Y19 + v12Y19 * t13;
+							pZ13 = v1Z19 + v12Z19 * t13;
+							closest.x = pX13;
+							closest.y = pY13;
+							closest.z = pZ13;
+							b15 = 3;
+						}
+						mini5 = b15;
+						mind5 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						minvX5 = closest.x;
+						minvY5 = closest.y;
+						minvZ5 = closest.z;
+					}
+					if(v2X18 * n23X4 + v2Y18 * n23Y4 + v2Z18 * n23Z4 < 0) {
+						var v1X20;
+						var v1Y20;
+						var v1Z20;
+						var v2X20;
+						var v2Y20;
+						var v2Z20;
+						v1X20 = vec31.x;
+						v1Y20 = vec31.y;
+						v1Z20 = vec31.z;
+						v2X20 = vec4.x;
+						v2Y20 = vec4.y;
+						v2Z20 = vec4.z;
+						var v12X20;
+						var v12Y20;
+						var v12Z20;
+						v12X20 = v2X20 - v1X20;
+						v12Y20 = v2Y20 - v1Y20;
+						v12Z20 = v2Z20 - v1Z20;
+						var t14 = v12X20 * v1X20 + v12Y20 * v1Y20 + v12Z20 * v1Z20;
+						t14 = -t14 / (v12X20 * v12X20 + v12Y20 * v12Y20 + v12Z20 * v12Z20);
+						var b16;
+						if(t14 < 0) {
+							closest.x = v1X20;
+							closest.y = v1Y20;
+							closest.z = v1Z20;
+							b16 = 1;
+						} else if(t14 > 1) {
+							closest.x = v2X20;
+							closest.y = v2Y20;
+							closest.z = v2Z20;
+							b16 = 2;
+						} else {
+							var pX14;
+							var pY14;
+							var pZ14;
+							pX14 = v1X20 + v12X20 * t14;
+							pY14 = v1Y20 + v12Y20 * t14;
+							pZ14 = v1Z20 + v12Z20 * t14;
+							closest.x = pX14;
+							closest.y = pY14;
+							closest.z = pZ14;
+							b16 = 3;
+						}
+						var d10 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind5 < 0 || d10 < mind5) {
+							mini5 = b16 << 1;
+							mind5 = d10;
+							minvX5 = closest.x;
+							minvY5 = closest.y;
+							minvZ5 = closest.z;
+						}
+					}
+					if(v3X5 * n31X4 + v3Y5 * n31Y4 + v3Z5 * n31Z4 < 0) {
+						var v1X21;
+						var v1Y21;
+						var v1Z21;
+						var v2X21;
+						var v2Y21;
+						var v2Z21;
+						v1X21 = vec21.x;
+						v1Y21 = vec21.y;
+						v1Z21 = vec21.z;
+						v2X21 = vec4.x;
+						v2Y21 = vec4.y;
+						v2Z21 = vec4.z;
+						var v12X21;
+						var v12Y21;
+						var v12Z21;
+						v12X21 = v2X21 - v1X21;
+						v12Y21 = v2Y21 - v1Y21;
+						v12Z21 = v2Z21 - v1Z21;
+						var t15 = v12X21 * v1X21 + v12Y21 * v1Y21 + v12Z21 * v1Z21;
+						t15 = -t15 / (v12X21 * v12X21 + v12Y21 * v12Y21 + v12Z21 * v12Z21);
+						var b17;
+						if(t15 < 0) {
+							closest.x = v1X21;
+							closest.y = v1Y21;
+							closest.z = v1Z21;
+							b17 = 1;
+						} else if(t15 > 1) {
+							closest.x = v2X21;
+							closest.y = v2Y21;
+							closest.z = v2Z21;
+							b17 = 2;
+						} else {
+							var pX15;
+							var pY15;
+							var pZ15;
+							pX15 = v1X21 + v12X21 * t15;
+							pY15 = v1Y21 + v12Y21 * t15;
+							pZ15 = v1Z21 + v12Z21 * t15;
+							closest.x = pX15;
+							closest.y = pY15;
+							closest.z = pZ15;
+							b17 = 3;
+						}
+						var d11 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+						if(mind5 < 0 || d11 < mind5) {
+							mini5 = b17 & 1 | (b17 & 2) << 1;
+							mind5 = d11;
+							minvX5 = closest.x;
+							minvY5 = closest.y;
+							minvZ5 = closest.z;
+						}
+					}
+					var b18;
+					if(mind5 > 0) {
+						closest.x = minvX5;
+						closest.y = minvY5;
+						closest.z = minvZ5;
+						b18 = mini5;
+					} else {
+						var l5 = nX4 * nX4 + nY4 * nY4 + nZ4 * nZ4;
+						if(l5 > 0) {
+							l5 = 1 / Math.sqrt(l5);
+						}
+						nX4 *= l5;
+						nY4 *= l5;
+						nZ4 *= l5;
+						var l24 = nX4 * nX4 + nY4 * nY4 + nZ4 * nZ4;
+						l24 = (v1X18 * nX4 + v1Y18 * nY4 + v1Z18 * nZ4) / l24;
+						minvX5 = nX4 * l24;
+						minvY5 = nY4 * l24;
+						minvZ5 = nZ4 * l24;
+						closest.x = minvX5;
+						closest.y = minvY5;
+						closest.z = minvZ5;
+						b18 = 7;
+					}
+					var d12 = closest.x * closest.x + closest.y * closest.y + closest.z * closest.z;
+					if(mind1 < 0 || d12 < mind1) {
+						mini1 = b18 << 1;
+						mind1 = d12;
+						minvX1 = closest.x;
+						minvY1 = closest.y;
+						minvZ1 = closest.z;
+					}
+				}
+				if(mind1 > 0) {
+					closest.x = minvX1;
+					closest.y = minvY1;
+					closest.z = minvZ1;
+					v = mini1;
+				} else {
+					closest.zero();
+					v = 15;
+				}
+				break;
+			}
+			this.shrinkSimplex(v);
+			if(closest.x * closest.x + closest.y * closest.y + closest.z * closest.z < 1e-008) {
+				if(lambda == 0 || this.simplexSize == 4) {
+					hit.fraction = lambda;
+					return false;
+				}
+				this.interpolateClosestPoints();
+				hit.fraction = lambda;
+				var _this = hit.normal;
+				_this.x = dir.x;
+				_this.y = dir.y;
+				_this.z = dir.z;
+				var invLen = Math.sqrt(_this.x * _this.x + _this.y * _this.y + _this.z * _this.z);
+				if(invLen > 0) {
+					invLen = 1 / invLen;
+				}
+				_this.x *= invLen;
+				_this.y *= invLen;
+				_this.z *= invLen;
+				var _this1 = hit.position;
+				var v4 = this.closestPoint1;
+				_this1.x = v4.x;
+				_this1.y = v4.y;
+				_this1.z = v4.z;
+				_this1.x += tl1.x * lambda;
+				_this1.y += tl1.y * lambda;
+				_this1.z += tl1.z * lambda;
+				return true;
+			}
+			dir.x = closest.x;
+			dir.y = closest.y;
+			dir.z = closest.z;
+			dir.x = -dir.x;
+			dir.y = -dir.y;
+			dir.z = -dir.z;
+			if(this.c1 != null) {
+				this.computeWitnessPoint1(true);
+			} else {
+				var v5 = this.w1[this.simplexSize];
+				v5.x = this.tf1._positionX;
+				v5.y = this.tf1._positionY;
+				v5.z = this.tf1._positionZ;
+			}
+			this.computeWitnessPoint2(true);
+			var _this2 = this.s[this.simplexSize];
+			var v6 = this.w1[this.simplexSize];
+			_this2.x = v6.x;
+			_this2.y = v6.y;
+			_this2.z = v6.z;
+			var v7 = this.w2[this.simplexSize];
+			_this2.x -= v7.x;
+			_this2.y -= v7.y;
+			_this2.z -= v7.z;
+			var _this3 = s[this.simplexSize];
+			_this3.x -= rayX.x;
+			_this3.y -= rayX.y;
+			_this3.z -= rayX.z;
+			if(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z < 1e-008) {
+				throw new Error("!?");
+			}
+			var p = s[this.simplexSize];
+			var pn = p.x * dir.x + p.y * dir.y + p.z * dir.z;
+			if(pn < 0) {
+				if(rayR.x * dir.x + rayR.y * dir.y + rayR.z * dir.z >= 0) {
+					return false;
+				}
+				var dLambda = pn / (rayR.x * dir.x + rayR.y * dir.y + rayR.z * dir.z);
+				lambda += dLambda;
+				if(lambda >= 1) {
+					return false;
+				}
+				rayX.x += rayR.x * dLambda;
+				rayX.y += rayR.y * dLambda;
+				rayX.z += rayR.z * dLambda;
+				var _g = 0;
+				var _g1 = this.simplexSize + 1;
+				while(_g < _g1) {
+					var _this4 = s[_g++];
+					var s1 = -dLambda;
+					_this4.x += rayR.x * s1;
+					_this4.y += rayR.y * s1;
+					_this4.z += rayR.z * s1;
+				}
+			}
+			var duplicate = false;
+			var _g2 = 0;
+			var _g3 = this.simplexSize;
+			while(_g2 < _g3) {
+				var i = _g2++;
+				var dx = s[i].x - s[this.simplexSize].x;
+				var dy = s[i].y - s[this.simplexSize].y;
+				var dz = s[i].z - s[this.simplexSize].z;
+				if(dx * dx + dy * dy + dz * dz < 1e-008) {
+					duplicate = true;
+					break;
+				}
+			}
+			if(!duplicate) {
+				this.simplexSize++;
+			}
+			++count;
+		}
+		return false;
+	}
 	,interpolateClosestPoints: function() {
 		switch(this.simplexSize) {
 		case 1:
@@ -60007,6 +64003,25 @@ oimo_collision_narrowphase_detector_gjkepa_GjkEpa.prototype = {
 			++count;
 		}
 		return oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_DID_NOT_CONVERGE;
+	}
+	,convexCast: function(c1,c2,tf1,tf2,tl1,tl2,hit) {
+		return this.convexCastImpl(c1,c2,tf1,tf2,tl1,tl2,hit);
+	}
+	,rayCast: function(c,tf,begin,end,hit) {
+		var tf1 = this.tempTransform;
+		tf1._positionX = begin.x;
+		tf1._positionY = begin.y;
+		tf1._positionZ = begin.z;
+		var tl1 = this.tl1;
+		var tl2 = this.tl2;
+		tl1.x = end.x;
+		tl1.y = end.y;
+		tl1.z = end.z;
+		tl1.x -= begin.x;
+		tl1.y -= begin.y;
+		tl1.z -= begin.z;
+		tl2.zero();
+		return this.convexCastImpl(null,c,tf1,tf,tl1,tl2,hit);
 	}
 	,__class__: oimo_collision_narrowphase_detector_gjkepa_GjkEpa
 };
@@ -61502,6 +65517,18 @@ oimo_dynamics_World.prototype = {
 		_this._sleepTime = 0;
 		this._numJoints--;
 	}
+	,rayCast: function(begin,end,callback) {
+		var _this = this._rayCastWrapper.begin;
+		_this.x = begin.x;
+		_this.y = begin.y;
+		_this.z = begin.z;
+		var _this = this._rayCastWrapper.end;
+		_this.x = end.x;
+		_this.y = end.y;
+		_this.z = end.z;
+		this._rayCastWrapper.callback = callback;
+		this._broadPhase.rayCast(begin,end,this._rayCastWrapper);
+	}
 	,__class__: oimo_dynamics_World
 };
 var oimo_dynamics__$World_RayCastWrapper = function() {
@@ -61515,7 +65542,13 @@ $hxClasses["oimo.dynamics._World.RayCastWrapper"] = oimo_dynamics__$World_RayCas
 oimo_dynamics__$World_RayCastWrapper.__name__ = "oimo.dynamics._World.RayCastWrapper";
 oimo_dynamics__$World_RayCastWrapper.__super__ = oimo_collision_broadphase_BroadPhaseProxyCallback;
 oimo_dynamics__$World_RayCastWrapper.prototype = $extend(oimo_collision_broadphase_BroadPhaseProxyCallback.prototype,{
-	__class__: oimo_dynamics__$World_RayCastWrapper
+	process: function(proxy) {
+		var shape = proxy.userData;
+		if(shape._geom.rayCast(this.begin,this.end,shape._transform,this.rayCastHit)) {
+			this.callback.process(shape,this.rayCastHit);
+		}
+	}
+	,__class__: oimo_dynamics__$World_RayCastWrapper
 });
 var oimo_dynamics__$World_ConvexCastWrapper = function() {
 	oimo_collision_broadphase_BroadPhaseProxyCallback.call(this);
@@ -61530,7 +65563,17 @@ $hxClasses["oimo.dynamics._World.ConvexCastWrapper"] = oimo_dynamics__$World_Con
 oimo_dynamics__$World_ConvexCastWrapper.__name__ = "oimo.dynamics._World.ConvexCastWrapper";
 oimo_dynamics__$World_ConvexCastWrapper.__super__ = oimo_collision_broadphase_BroadPhaseProxyCallback;
 oimo_dynamics__$World_ConvexCastWrapper.prototype = $extend(oimo_collision_broadphase_BroadPhaseProxyCallback.prototype,{
-	__class__: oimo_dynamics__$World_ConvexCastWrapper
+	process: function(proxy) {
+		var shape = proxy.userData;
+		var type = shape._geom._type;
+		if(type < 0 || type > 5) {
+			return;
+		}
+		if(oimo_collision_narrowphase_detector_gjkepa_GjkEpa.instance.convexCast(this.convex,shape._geom,this.begin,shape._transform,this.translation,this.zero,this.rayCastHit)) {
+			this.callback.process(shape,this.rayCastHit);
+		}
+	}
+	,__class__: oimo_dynamics__$World_ConvexCastWrapper
 });
 var oimo_dynamics__$World_AabbTestWrapper = function() {
 	oimo_collision_broadphase_BroadPhaseProxyCallback.call(this);
@@ -61541,11 +65584,24 @@ $hxClasses["oimo.dynamics._World.AabbTestWrapper"] = oimo_dynamics__$World_AabbT
 oimo_dynamics__$World_AabbTestWrapper.__name__ = "oimo.dynamics._World.AabbTestWrapper";
 oimo_dynamics__$World_AabbTestWrapper.__super__ = oimo_collision_broadphase_BroadPhaseProxyCallback;
 oimo_dynamics__$World_AabbTestWrapper.prototype = $extend(oimo_collision_broadphase_BroadPhaseProxyCallback.prototype,{
-	__class__: oimo_dynamics__$World_AabbTestWrapper
+	process: function(proxy) {
+		var shape = proxy.userData;
+		var shapeAabb = shape._aabb;
+		if(shapeAabb._minX < this._aabb._maxX && shapeAabb._maxX > this._aabb._minX && shapeAabb._minY < this._aabb._maxY && shapeAabb._maxY > this._aabb._minY && shapeAabb._minZ < this._aabb._maxZ && shapeAabb._maxZ > this._aabb._minZ) {
+			this._callback.process(shape);
+		}
+	}
+	,__class__: oimo_dynamics__$World_AabbTestWrapper
 });
-var oimo_dynamics_callback_AabbTestCallback = function() { };
+var oimo_dynamics_callback_AabbTestCallback = function() {
+};
 $hxClasses["oimo.dynamics.callback.AabbTestCallback"] = oimo_dynamics_callback_AabbTestCallback;
 oimo_dynamics_callback_AabbTestCallback.__name__ = "oimo.dynamics.callback.AabbTestCallback";
+oimo_dynamics_callback_AabbTestCallback.prototype = {
+	process: function(shape) {
+	}
+	,__class__: oimo_dynamics_callback_AabbTestCallback
+};
 var oimo_dynamics_callback_ContactCallback = function() {
 };
 $hxClasses["oimo.dynamics.callback.ContactCallback"] = oimo_dynamics_callback_ContactCallback;
@@ -61561,9 +65617,15 @@ oimo_dynamics_callback_ContactCallback.prototype = {
 	}
 	,__class__: oimo_dynamics_callback_ContactCallback
 };
-var oimo_dynamics_callback_RayCastCallback = function() { };
+var oimo_dynamics_callback_RayCastCallback = function() {
+};
 $hxClasses["oimo.dynamics.callback.RayCastCallback"] = oimo_dynamics_callback_RayCastCallback;
 oimo_dynamics_callback_RayCastCallback.__name__ = "oimo.dynamics.callback.RayCastCallback";
+oimo_dynamics_callback_RayCastCallback.prototype = {
+	process: function(shape,hit) {
+	}
+	,__class__: oimo_dynamics_callback_RayCastCallback
+};
 var oimo_dynamics_common_Performance = function() { };
 $hxClasses["oimo.dynamics.common.Performance"] = oimo_dynamics_common_Performance;
 oimo_dynamics_common_Performance.__name__ = "oimo.dynamics.common.Performance";
@@ -68029,63 +72091,6 @@ oimo_dynamics_rigidbody_RigidBody.prototype = {
 		this._sleeping = false;
 		this._sleepTime = 0;
 	}
-	,applyForce: function(force,positionInWorld) {
-		var iforceX;
-		var iforceY;
-		var iforceZ;
-		iforceX = force.x;
-		iforceY = force.y;
-		iforceZ = force.z;
-		this._forceX += iforceX;
-		this._forceY += iforceY;
-		this._forceZ += iforceZ;
-		var itorqueX;
-		var itorqueY;
-		var itorqueZ;
-		var posX;
-		var posY;
-		var posZ;
-		posX = positionInWorld.x;
-		posY = positionInWorld.y;
-		posZ = positionInWorld.z;
-		posX -= this._transform._positionX;
-		posY -= this._transform._positionY;
-		posZ -= this._transform._positionZ;
-		itorqueX = posY * iforceZ - posZ * iforceY;
-		itorqueY = posZ * iforceX - posX * iforceZ;
-		itorqueZ = posX * iforceY - posY * iforceX;
-		this._torqueX += itorqueX;
-		this._torqueY += itorqueY;
-		this._torqueZ += itorqueZ;
-		this._sleeping = false;
-		this._sleepTime = 0;
-	}
-	,applyForceToCenter: function(force) {
-		var iforceX;
-		var iforceY;
-		var iforceZ;
-		iforceX = force.x;
-		iforceY = force.y;
-		iforceZ = force.z;
-		this._forceX += iforceX;
-		this._forceY += iforceY;
-		this._forceZ += iforceZ;
-		this._sleeping = false;
-		this._sleepTime = 0;
-	}
-	,applyTorque: function(torque) {
-		var itorqueX;
-		var itorqueY;
-		var itorqueZ;
-		itorqueX = torque.x;
-		itorqueY = torque.y;
-		itorqueZ = torque.z;
-		this._torqueX += itorqueX;
-		this._torqueY += itorqueY;
-		this._torqueZ += itorqueZ;
-		this._sleeping = false;
-		this._sleepTime = 0;
-	}
 	,addShape: function(shape) {
 		if(this._shapeList == null) {
 			this._shapeList = shape;
@@ -68333,1318 +72338,345 @@ var physics_CarConfig = function() { };
 $hxClasses["physics.CarConfig"] = physics_CarConfig;
 physics_CarConfig.__name__ = "physics.CarConfig";
 physics_CarConfig.getDefault = function() {
-	return { name : "Apex GT-R Prototype", mass : 1350.0, yawInertia : 1750.0, pitchInertia : 1350.0, rollInertia : 620.0, baseTopSpeed : 68.0, boostTopSpeed : 88.0, baseAcceleration : 28.0, boostAcceleration : 48.0, brakeDecel : 38.0, reverseTopSpeed : 18.0, suspension : { restLength : 0.45, springRate : 32000.0, damping : 2600.0, antiRollStiffness : 9500.0, minTravel : 0.08, maxTravel : 0.52, bodyRollScale : 1.0}, tires : { peakSlipAngle : 0.16, baseLateralStiffness : 34.0, longitudinalGrip : 1.15, rollingResistance : 2.0, tireSlipBias : -0.45, groundFriction : 1.0, wheelspinAmount : 1.2}, drift : { lateralStiffnessScale : 0.35, counterSteerTorque : 3.4, forwardBiasRate : 3.8, minDriftSpeed : 12.0, driftYawRate : 2.8, driftExitSpeed : 8.0, driftTriggerAngle : 0.22}, drivetrain : { gearRatios : [3.40,2.20,1.55,1.18,0.92,0.76], reverseRatio : -3.10, finalDrive : 3.73, idleRPM : 1000.0, redlineRPM : 8000.0, shiftUpRPM : 7200.0, shiftDownRPM : 3400.0, shiftDelay : 0.20, lsdLockRatio : 0.72, maxEngineTorque : 540.0}, aero : { dragCoeff : 0.0032, downforceCoeff : 0.0045}};
+	return { chassis : { massKg : 1450.0, wheelbase : 2.70, trackWidth : 1.96, cogHeight : 0.48, pitchInertia : 2200.0, rollInertia : 780.0, yawInertia : 2450.0, aeroDragArea : 0.36, aeroDownforce : 1.85, rollingResistance : 0.014}, suspension : { restLength : 0.36, unloadedLength : 0.50, minLength : 0.14, springStiffness : 25400.0, bumpDamping : 3950.0, reboundDamping : 5450.0, antiRollStiffness : 14500.0, maxWheelForce : 13500.0}, drivetrain : { idleRPM : 950.0, redlineRPM : 7600.0, peakTorqueNm : 560.0, finalDrive : 3.75, gearRatios : [3.42,2.28,1.65,1.28,1.02,0.84], reverseRatio : -3.15, shiftUpRPM : 6900.0, shiftDownRPM : 2850.0, maxForwardSpeed : 72.0, maxReverseSpeed : 19.0, brakeForce : 19500.0, engineBrakeTorque : 95.0}, tires : { pacejkaB : 9.2, pacejkaC : 1.52, pacejkaD : 1.08, pacejkaE : -0.35, relaxationLength : 0.34, minSlipSpeed : 1.2, stictionSpeed : 0.65, maxSteerAngle : 0.54, highSpeedSteerDamp : 0.026, ackermannFactor : 0.65, handbrakeRearGrip : 0.28, driftSlipThreshold : 0.14}, boost : { maxFuel : 1.0, burnRate : 0.28, regenRate : 0.12, thrustForce : 7800.0, speedBonus : 14.0}};
 };
-var physics_CarPhysics = function(startX,startY,startZ,initialConfig) {
-	if(startZ == null) {
-		startZ = 0.0;
+physics_CarConfig.clamp = function(cfg) {
+	var def = physics_CarConfig.getDefault();
+	if(cfg == null) {
+		return def;
 	}
-	if(startY == null) {
-		startY = 0.0;
+	var c = cfg.chassis != null ? cfg.chassis : def.chassis;
+	var s = cfg.suspension != null ? cfg.suspension : def.suspension;
+	var d = cfg.drivetrain != null ? cfg.drivetrain : def.drivetrain;
+	var t = cfg.tires != null ? cfg.tires : def.tires;
+	var b = cfg.boost != null ? cfg.boost : def.boost;
+	var ratios = d.gearRatios != null && d.gearRatios.length > 0 ? d.gearRatios.slice() : def.drivetrain.gearRatios.slice();
+	var _g = 0;
+	var _g1 = ratios.length;
+	while(_g < _g1) {
+		var i = _g++;
+		var v = ratios[i];
+		var fallback = def.drivetrain.gearRatios[0];
+		ratios[i] = isNaN(v) || !isFinite(v) ? fallback : v < 0.3 ? 0.3 : v > 6.0 ? 6.0 : v;
 	}
-	if(startX == null) {
-		startX = 0.0;
+	var v = s.minLength;
+	var fallback = def.suspension.minLength;
+	var minLen = isNaN(v) || !isFinite(v) ? fallback : v < 0.04 ? 0.04 : v > 0.30 ? 0.30 : v;
+	var v = s.restLength;
+	var minV = minLen + 0.06;
+	var fallback = def.suspension.restLength;
+	var restLen = isNaN(v) || !isFinite(v) ? fallback : v < minV ? minV : v > 0.65 ? 0.65 : v;
+	var v = s.unloadedLength;
+	var minV = restLen + 0.04;
+	var fallback = def.suspension.unloadedLength;
+	var unloadedLen = isNaN(v) || !isFinite(v);
+	var v1 = d.idleRPM;
+	var fallback1 = def.drivetrain.idleRPM;
+	var idle = isNaN(v1) || !isFinite(v1) ? fallback1 : v1 < 500.0 ? 500.0 : v1 > 2500.0 ? 2500.0 : v1;
+	var v1 = d.redlineRPM;
+	var minV1 = idle + 1500.0;
+	var fallback1 = def.drivetrain.redlineRPM;
+	var redline = isNaN(v1) || !isFinite(v1) ? fallback1 : v1 < minV1 ? minV1 : v1 > 12000.0 ? 12000.0 : v1;
+	var v1 = c.massKg;
+	var fallback1 = def.chassis.massKg;
+	var tmp = isNaN(v1) || !isFinite(v1);
+	var v2 = c.wheelbase;
+	var fallback2 = def.chassis.wheelbase;
+	var tmp1 = isNaN(v2) || !isFinite(v2);
+	var v3 = c.trackWidth;
+	var fallback3 = def.chassis.trackWidth;
+	var tmp2 = isNaN(v3) || !isFinite(v3);
+	var v4 = c.cogHeight;
+	var fallback4 = def.chassis.cogHeight;
+	var tmp3 = isNaN(v4) || !isFinite(v4);
+	var v5 = c.pitchInertia;
+	var fallback5 = def.chassis.pitchInertia;
+	var tmp4 = isNaN(v5) || !isFinite(v5);
+	var v6 = c.rollInertia;
+	var fallback6 = def.chassis.rollInertia;
+	var tmp5 = isNaN(v6) || !isFinite(v6);
+	var v7 = c.yawInertia;
+	var fallback7 = def.chassis.yawInertia;
+	var tmp6 = isNaN(v7) || !isFinite(v7);
+	var v8 = c.aeroDragArea;
+	var fallback8 = def.chassis.aeroDragArea;
+	var tmp7 = isNaN(v8) || !isFinite(v8);
+	var v9 = c.aeroDownforce;
+	var fallback9 = def.chassis.aeroDownforce;
+	var tmp8 = isNaN(v9) || !isFinite(v9);
+	var v10 = c.rollingResistance;
+	var fallback10 = def.chassis.rollingResistance;
+	var tmp9 = isNaN(v10) || !isFinite(v10);
+	var v11 = s.springStiffness;
+	var fallback11 = def.suspension.springStiffness;
+	var tmp10 = isNaN(v11) || !isFinite(v11);
+	var v12 = s.bumpDamping;
+	var fallback12 = def.suspension.bumpDamping;
+	var tmp11 = isNaN(v12) || !isFinite(v12);
+	var v13 = s.reboundDamping;
+	var fallback13 = def.suspension.reboundDamping;
+	var tmp12 = isNaN(v13) || !isFinite(v13);
+	var v14 = s.antiRollStiffness;
+	var fallback14 = def.suspension.antiRollStiffness;
+	var tmp13 = isNaN(v14) || !isFinite(v14);
+	var v15 = s.maxWheelForce;
+	var fallback15 = def.suspension.maxWheelForce;
+	var tmp14 = isNaN(v15) || !isFinite(v15);
+	var v16 = d.peakTorqueNm;
+	var fallback16 = def.drivetrain.peakTorqueNm;
+	var tmp15 = isNaN(v16) || !isFinite(v16);
+	var v17 = d.finalDrive;
+	var fallback17 = def.drivetrain.finalDrive;
+	var tmp16 = isNaN(v17) || !isFinite(v17);
+	var v18 = d.reverseRatio;
+	var fallback18 = def.drivetrain.reverseRatio;
+	var tmp17 = isNaN(v18) || !isFinite(v18);
+	var v19 = d.shiftUpRPM;
+	var minV1 = idle + 500.0;
+	var maxV = redline - 100.0;
+	var fallback19 = def.drivetrain.shiftUpRPM;
+	var tmp18 = isNaN(v19) || !isFinite(v19);
+	var v20 = d.shiftDownRPM;
+	var minV2 = idle + 100.0;
+	var maxV1 = redline - 600.0;
+	var fallback20 = def.drivetrain.shiftDownRPM;
+	var tmp19 = isNaN(v20) || !isFinite(v20);
+	var v21 = d.maxForwardSpeed;
+	var fallback21 = def.drivetrain.maxForwardSpeed;
+	var tmp20 = isNaN(v21) || !isFinite(v21);
+	var v22 = d.maxReverseSpeed;
+	var fallback22 = def.drivetrain.maxReverseSpeed;
+	var tmp21 = isNaN(v22) || !isFinite(v22);
+	var v23 = d.brakeForce;
+	var fallback23 = def.drivetrain.brakeForce;
+	var tmp22 = isNaN(v23) || !isFinite(v23);
+	var v24 = d.engineBrakeTorque;
+	var fallback24 = def.drivetrain.engineBrakeTorque;
+	var tmp23 = isNaN(v24) || !isFinite(v24);
+	var v25 = t.pacejkaB;
+	var fallback25 = def.tires.pacejkaB;
+	var tmp24 = isNaN(v25) || !isFinite(v25);
+	var v26 = t.pacejkaC;
+	var fallback26 = def.tires.pacejkaC;
+	var tmp25 = isNaN(v26) || !isFinite(v26);
+	var v27 = t.pacejkaD;
+	var fallback27 = def.tires.pacejkaD;
+	var tmp26 = isNaN(v27) || !isFinite(v27);
+	var v28 = t.pacejkaE;
+	var fallback28 = def.tires.pacejkaE;
+	var tmp27 = isNaN(v28) || !isFinite(v28);
+	var v29 = t.relaxationLength;
+	var fallback29 = def.tires.relaxationLength;
+	var tmp28 = isNaN(v29) || !isFinite(v29);
+	var v30 = t.minSlipSpeed;
+	var fallback30 = def.tires.minSlipSpeed;
+	var tmp29 = isNaN(v30) || !isFinite(v30);
+	var v31 = t.stictionSpeed;
+	var fallback31 = def.tires.stictionSpeed;
+	var tmp30 = isNaN(v31) || !isFinite(v31);
+	var v32 = t.maxSteerAngle;
+	var fallback32 = def.tires.maxSteerAngle;
+	var tmp31 = isNaN(v32) || !isFinite(v32);
+	var v33 = t.highSpeedSteerDamp;
+	var fallback33 = def.tires.highSpeedSteerDamp;
+	var tmp32 = isNaN(v33) || !isFinite(v33);
+	var v34 = t.ackermannFactor;
+	var fallback34 = def.tires.ackermannFactor;
+	var tmp33 = isNaN(v34) || !isFinite(v34);
+	var v35 = t.handbrakeRearGrip;
+	var fallback35 = def.tires.handbrakeRearGrip;
+	var tmp34 = isNaN(v35) || !isFinite(v35);
+	var v36 = t.driftSlipThreshold;
+	var fallback36 = def.tires.driftSlipThreshold;
+	var tmp35 = isNaN(v36) || !isFinite(v36);
+	var v37 = b.maxFuel;
+	var fallback37 = def.boost.maxFuel;
+	var tmp36 = isNaN(v37) || !isFinite(v37);
+	var v38 = b.burnRate;
+	var fallback38 = def.boost.burnRate;
+	var tmp37 = isNaN(v38) || !isFinite(v38);
+	var v39 = b.regenRate;
+	var fallback39 = def.boost.regenRate;
+	var tmp38 = isNaN(v39) || !isFinite(v39);
+	var v40 = b.thrustForce;
+	var fallback40 = def.boost.thrustForce;
+	var tmp39 = isNaN(v40) || !isFinite(v40);
+	var v41 = b.speedBonus;
+	var fallback41 = def.boost.speedBonus;
+	var tmp40 = isNaN(v41) || !isFinite(v41);
+	return { chassis : { massKg : tmp ? fallback1 : v1 < 400.0 ? 400.0 : v1 > 5000.0 ? 5000.0 : v1, wheelbase : tmp1 ? fallback2 : v2 < 1.2 ? 1.2 : v2 > 5.0 ? 5.0 : v2, trackWidth : tmp2 ? fallback3 : v3 < 0.8 ? 0.8 : v3 > 3.0 ? 3.0 : v3, cogHeight : tmp3 ? fallback4 : v4 < 0.20 ? 0.20 : v4 > 1.20 ? 1.20 : v4, pitchInertia : tmp4 ? fallback5 : v5 < 300.0 ? 300.0 : v5 > 12000.0 ? 12000.0 : v5, rollInertia : tmp5 ? fallback6 : v6 < 150.0 ? 150.0 : v6 > 6000.0 ? 6000.0 : v6, yawInertia : tmp6 ? fallback7 : v7 < 300.0 ? 300.0 : v7 > 12000.0 ? 12000.0 : v7, aeroDragArea : tmp7 ? fallback8 : v8 < 0.0 ? 0.0 : v8 > 3.0 ? 3.0 : v8, aeroDownforce : tmp8 ? fallback9 : v9 < 0.0 ? 0.0 : v9 > 10.0 ? 10.0 : v9, rollingResistance : tmp9 ? fallback10 : v10 < 0.001 ? 0.001 : v10 > 0.25 ? 0.25 : v10}, suspension : { restLength : restLen, unloadedLength : unloadedLen ? fallback : v < minV ? minV : v > 0.90 ? 0.90 : v, minLength : minLen, springStiffness : tmp10 ? fallback11 : v11 < 5000.0 ? 5000.0 : v11 > 180000.0 ? 180000.0 : v11, bumpDamping : tmp11 ? fallback12 : v12 < 500.0 ? 500.0 : v12 > 40000.0 ? 40000.0 : v12, reboundDamping : tmp12 ? fallback13 : v13 < 500.0 ? 500.0 : v13 > 40000.0 ? 40000.0 : v13, antiRollStiffness : tmp13 ? fallback14 : v14 < 0.0 ? 0.0 : v14 > 80000.0 ? 80000.0 : v14, maxWheelForce : tmp14 ? fallback15 : v15 < 2000.0 ? 2000.0 : v15 > 60000.0 ? 60000.0 : v15}, drivetrain : { idleRPM : idle, redlineRPM : redline, peakTorqueNm : tmp15 ? fallback16 : v16 < 50.0 ? 50.0 : v16 > 3000.0 ? 3000.0 : v16, finalDrive : tmp16 ? fallback17 : v17 < 1.0 ? 1.0 : v17 > 8.0 ? 8.0 : v17, gearRatios : ratios, reverseRatio : tmp17 ? fallback18 : v18 < -6.0 ? -6.0 : v18 > -0.5 ? -0.5 : v18, shiftUpRPM : tmp18 ? fallback19 : v19 < minV1 ? minV1 : v19 > maxV ? maxV : v19, shiftDownRPM : tmp19 ? fallback20 : v20 < minV2 ? minV2 : v20 > maxV1 ? maxV1 : v20, maxForwardSpeed : tmp20 ? fallback21 : v21 < 10.0 ? 10.0 : v21 > 150.0 ? 150.0 : v21, maxReverseSpeed : tmp21 ? fallback22 : v22 < 5.0 ? 5.0 : v22 > 50.0 ? 50.0 : v22, brakeForce : tmp22 ? fallback23 : v23 < 1000.0 ? 1000.0 : v23 > 80000.0 ? 80000.0 : v23, engineBrakeTorque : tmp23 ? fallback24 : v24 < 0.0 ? 0.0 : v24 > 1000.0 ? 1000.0 : v24}, tires : { pacejkaB : tmp24 ? fallback25 : v25 < 2.0 ? 2.0 : v25 > 25.0 ? 25.0 : v25, pacejkaC : tmp25 ? fallback26 : v26 < 0.5 ? 0.5 : v26 > 2.5 ? 2.5 : v26, pacejkaD : tmp26 ? fallback27 : v27 < 0.3 ? 0.3 : v27 > 2.5 ? 2.5 : v27, pacejkaE : tmp27 ? fallback28 : v28 < -2.0 ? -2.0 : v28 > 1.0 ? 1.0 : v28, relaxationLength : tmp28 ? fallback29 : v29 < 0.05 ? 0.05 : v29 > 2.0 ? 2.0 : v29, minSlipSpeed : tmp29 ? fallback30 : v30 < 0.25 ? 0.25 : v30 > 5.0 ? 5.0 : v30, stictionSpeed : tmp30 ? fallback31 : v31 < 0.05 ? 0.05 : v31 > 2.5 ? 2.5 : v31, maxSteerAngle : tmp31 ? fallback32 : v32 < 0.10 ? 0.10 : v32 > 0.85 ? 0.85 : v32, highSpeedSteerDamp : tmp32 ? fallback33 : v33 < 0.0 ? 0.0 : v33 > 0.15 ? 0.15 : v33, ackermannFactor : tmp33 ? fallback34 : v34 < 0.0 ? 0.0 : v34 > 1.0 ? 1.0 : v34, handbrakeRearGrip : tmp34 ? fallback35 : v35 < 0.05 ? 0.05 : v35 > 1.0 ? 1.0 : v35, driftSlipThreshold : tmp35 ? fallback36 : v36 < 0.05 ? 0.05 : v36 > 0.60 ? 0.60 : v36}, boost : { maxFuel : tmp36 ? fallback37 : v37 < 0.1 ? 0.1 : v37 > 10.0 ? 10.0 : v37, burnRate : tmp37 ? fallback38 : v38 < 0.01 ? 0.01 : v38 > 2.0 ? 2.0 : v38, regenRate : tmp38 ? fallback39 : v39 < 0.0 ? 0.0 : v39 > 2.0 ? 2.0 : v39, thrustForce : tmp39 ? fallback40 : v40 < 0.0 ? 0.0 : v40 > 30000.0 ? 30000.0 : v40, speedBonus : tmp40 ? fallback41 : v41 < 0.0 ? 0.0 : v41 > 50.0 ? 50.0 : v41}};
+};
+var physics_CarPhysics = function(x,y,z,initialConfig,worldConfig) {
+	if(z == null) {
+		z = 0.0;
 	}
-	this.scratchWheelWorld = new h3d_VectorImpl(0.,0.,0.);
-	this.scratchVec3B = new oimo_common_Vec3();
-	this.scratchVec3A = new oimo_common_Vec3();
-	this.scratchGroundNormal = new h3d_VectorImpl(0,0,1);
-	this.wheelGroundZ = [0.0,0.0,0.0,0.0];
-	this.wheelSpinVelocity = [0.0,0.0,0.0,0.0];
-	this.wheelNormals = [new h3d_VectorImpl(0,0,1),new h3d_VectorImpl(0,0,1),new h3d_VectorImpl(0,0,1),new h3d_VectorImpl(0,0,1)];
-	this.wheelOnGround = [true,true,true,true];
-	this.suspCompression = [0.0,0.0,0.0,0.0];
-	this.prevSuspLength = [0.45,0.45,0.45,0.45];
-	this.suspLength = [0.45,0.45,0.45,0.45];
-	this.isBoosting = false;
+	if(y == null) {
+		y = 0.0;
+	}
+	if(x == null) {
+		x = 0.0;
+	}
+	this.prevSteerInput = 0.0;
+	this.lastLongAccel = 0.0;
+	this.worldVz = 0.0;
+	this.worldVy = 0.0;
+	this.worldVx = 0.0;
+	this.maxDt = 0.05;
+	this.gravityZ = -9.81;
+	this.frontSteerAngle = 0.0;
 	this.boostFuel = 1.0;
-	this.isShifting = false;
-	this.shiftTimer = 0.0;
-	this.engineRPM = 1000.0;
+	this.engineRPM = 950.0;
 	this.currentGear = 1;
-	this.driftAngle = 0.0;
-	this.driftDirection = 0.0;
+	this.isBoosting = false;
 	this.isDrifting = false;
-	this.wasGrounded = true;
+	this.groundedWheelCount = 4;
 	this.isGrounded = true;
+	this.rollRate = 0.0;
+	this.pitchRate = 0.0;
+	this.yawRate = 0.0;
 	this.verticalVelocity = 0.0;
 	this.lateralVelocity = 0.0;
 	this.forwardSpeed = 0.0;
+	this.driftAngle = 0.0;
 	this.roll = 0.0;
 	this.pitch = 0.0;
 	this.yaw = 0.0;
-	this.pos = new h3d_VectorImpl(0.,0.,0.);
-	var _this = this.pos;
-	var x = startX;
-	var y = startY;
-	var z = startZ;
-	if(startZ == null) {
-		z = 0.;
+	this.groundProvider = null;
+	this.config = physics_CarConfig.clamp(initialConfig);
+	if(worldConfig != null) {
+		this.gravityZ = worldConfig.gravityZ < -1.0 ? worldConfig.gravityZ : -9.81;
+		this.maxDt = worldConfig.maxDt > 0.005 ? worldConfig.maxDt : 0.05;
 	}
-	if(startY == null) {
-		y = 0.;
+	var x1 = x;
+	var y1 = y;
+	var z1 = z;
+	if(z == null) {
+		z1 = 0.;
 	}
-	if(startX == null) {
-		x = 0.;
+	if(y == null) {
+		y1 = 0.;
 	}
-	_this.x = x;
-	_this.y = y;
-	_this.z = z;
-	this.config = initialConfig != null ? initialConfig : physics_CarConfig.getDefault();
+	if(x == null) {
+		x1 = 0.;
+	}
+	this.pos = new h3d_VectorImpl(x1,y1,z1);
+	this.suspLength = [this.config.suspension.restLength,this.config.suspension.restLength,this.config.suspension.restLength,this.config.suspension.restLength];
+	this.wheelNormalLoads = [0.0,0.0,0.0,0.0];
+	this.wheelFriction = [1.0,1.0,1.0,1.0];
+	this.wheelSpinVelocity = [0.0,0.0,0.0,0.0];
+	this.boostFuel = this.config.boost.maxFuel;
 	this.engineRPM = this.config.drivetrain.idleRPM;
-	var rest = this.config.suspension.restLength;
-	this.suspLength[0] = rest;
-	this.prevSuspLength[0] = rest;
-	this.suspLength[1] = rest;
-	this.prevSuspLength[1] = rest;
-	this.suspLength[2] = rest;
-	this.prevSuspLength[2] = rest;
-	this.suspLength[3] = rest;
-	this.prevSuspLength[3] = rest;
-	this.initOimoPhysics(startX,startY,startZ);
+	this.suspensionSolver = new physics_SuspensionSolver();
+	this.drivetrainSolver = new physics_DrivetrainSolver();
+	this.tireSlipSolver = new physics_TireSlipSolver();
+	this.oimoPosScratch = new oimo_common_Vec3();
+	this.oimoVelScratch = new oimo_common_Vec3();
+	this.physicsWorld = new oimo_dynamics_World();
+	var z1 = this.gravityZ;
+	if(z1 == null) {
+		z1 = 0;
+	}
+	oimo_common_Vec3.numCreations++;
+	var _this = this.physicsWorld._gravity;
+	_this.x = 0.0;
+	_this.y = 0.0;
+	_this.z = z1;
+	var rbCfg = new oimo_dynamics_rigidbody_RigidBodyConfig();
+	rbCfg.type = oimo_dynamics_rigidbody_RigidBodyType.DYNAMIC;
+	rbCfg.position = new oimo_common_Vec3(x,y,z + this.config.chassis.cogHeight);
+	this.chassisBody = new oimo_dynamics_rigidbody_RigidBody(rbCfg);
+	var shapeCfg = new oimo_dynamics_rigidbody_ShapeConfig();
+	shapeCfg.geometry = new oimo_collision_geometry_BoxGeometry(new oimo_common_Vec3(0.8648,1.978,0.34));
+	shapeCfg.position = new oimo_common_Vec3(0.0,0.0,0.24);
+	shapeCfg.restitution = 0.2;
+	shapeCfg.friction = 0.2;
+	this.chassisBody.addShape(new oimo_dynamics_rigidbody_Shape(shapeCfg));
+	this.physicsWorld.addRigidBody(this.chassisBody);
+	this.resetState(x,y,z,0.0);
 };
 $hxClasses["physics.CarPhysics"] = physics_CarPhysics;
 physics_CarPhysics.__name__ = "physics.CarPhysics";
 physics_CarPhysics.prototype = {
-	set_yaw: function(v) {
-		this.yaw = v;
-		if(this.chassisBody != null) {
-			oimo_common_Mat3.numCreations++;
-			var x = this.pitch;
-			var y = this.roll;
-			var z = -v;
-			if(z == null) {
-				z = 0;
-			}
-			if(y == null) {
-				y = 0;
-			}
-			if(x == null) {
-				x = 0;
-			}
-			var eulerAngles_x = x;
-			var eulerAngles_y = y;
-			var eulerAngles_z = z;
-			oimo_common_Vec3.numCreations++;
-			var sx = Math.sin(eulerAngles_x);
-			var sy = Math.sin(eulerAngles_y);
-			var sz = Math.sin(eulerAngles_z);
-			var cx = Math.cos(eulerAngles_x);
-			var cy = Math.cos(eulerAngles_y);
-			var cz = Math.cos(eulerAngles_z);
-			var t01 = -cy * sz;
-			var t10 = cx * sz + cz * sx * sy;
-			var t12 = -cy * sx;
-			var t20 = sx * sz - cx * cz * sy;
-			var t21 = cz * sx + cx * sy * sz;
-			var _this = this.chassisBody;
-			var q_x = 0;
-			var q_y = 0;
-			var q_z = 0;
-			var q_w = 1;
-			oimo_common_Quat.numCreations++;
-			var e00 = cy * cz;
-			var e11 = cx * cz - sx * sy * sz;
-			var e22 = cx * cy;
-			var t = e00 + e11 + e22;
-			var s;
-			if(t > 0) {
-				s = Math.sqrt(t + 1);
-				q_w = 0.5 * s;
-				s = 0.5 / s;
-				q_x = (t21 - t12) * s;
-				q_y = (sy - t20) * s;
-				q_z = (t10 - t01) * s;
-			} else if(e00 > e11) {
-				if(e00 > e22) {
-					s = Math.sqrt(e00 - e11 - e22 + 1);
-					q_x = 0.5 * s;
-					s = 0.5 / s;
-					q_y = (t01 + t10) * s;
-					q_z = (sy + t20) * s;
-					q_w = (t21 - t12) * s;
-				} else {
-					s = Math.sqrt(e22 - e00 - e11 + 1);
-					q_z = 0.5 * s;
-					s = 0.5 / s;
-					q_x = (sy + t20) * s;
-					q_y = (t12 + t21) * s;
-					q_w = (t10 - t01) * s;
-				}
-			} else if(e11 > e22) {
-				s = Math.sqrt(e11 - e22 - e00 + 1);
-				q_y = 0.5 * s;
-				s = 0.5 / s;
-				q_x = (t01 + t10) * s;
-				q_z = (t12 + t21) * s;
-				q_w = (sy - t20) * s;
-			} else {
-				s = Math.sqrt(e22 - e00 - e11 + 1);
-				q_z = 0.5 * s;
-				s = 0.5 / s;
-				q_x = (sy + t20) * s;
-				q_y = (t12 + t21) * s;
-				q_w = (t10 - t01) * s;
-			}
-			var qX;
-			var qY;
-			var qZ;
-			var qW;
-			qX = q_x;
-			qY = q_y;
-			qZ = q_z;
-			qW = q_w;
-			var x = qX;
-			var y = qY;
-			var z = qZ;
-			var w = qW;
-			var x2 = 2 * x;
-			var y2 = 2 * y;
-			var z2 = 2 * z;
-			var xx = x * x2;
-			var yy = y * y2;
-			var zz = z * z2;
-			var xy = x * y2;
-			var yz = y * z2;
-			var xz = x * z2;
-			var wx = w * x2;
-			var wy = w * y2;
-			var wz = w * z2;
-			_this._transform._rotation00 = 1 - yy - zz;
-			_this._transform._rotation01 = xy - wz;
-			_this._transform._rotation02 = xz + wy;
-			_this._transform._rotation10 = xy + wz;
-			_this._transform._rotation11 = 1 - xx - zz;
-			_this._transform._rotation12 = yz - wx;
-			_this._transform._rotation20 = xz - wy;
-			_this._transform._rotation21 = yz + wx;
-			_this._transform._rotation22 = 1 - xx - yy;
-			var __tmp__00;
-			var __tmp__01;
-			var __tmp__02;
-			var __tmp__10;
-			var __tmp__11;
-			var __tmp__12;
-			var __tmp__20;
-			var __tmp__21;
-			var __tmp__22;
-			__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
-			__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
-			__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
-			__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
-			__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
-			__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
-			__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
-			__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
-			__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
-			_this._invInertia00 = __tmp__00;
-			_this._invInertia01 = __tmp__01;
-			_this._invInertia02 = __tmp__02;
-			_this._invInertia10 = __tmp__10;
-			_this._invInertia11 = __tmp__11;
-			_this._invInertia12 = __tmp__12;
-			_this._invInertia20 = __tmp__20;
-			_this._invInertia21 = __tmp__21;
-			_this._invInertia22 = __tmp__22;
-			var __tmp__00;
-			var __tmp__01;
-			var __tmp__02;
-			var __tmp__10;
-			var __tmp__11;
-			var __tmp__12;
-			var __tmp__20;
-			var __tmp__21;
-			var __tmp__22;
-			__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
-			__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
-			__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
-			__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
-			__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
-			__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
-			__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
-			__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
-			__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
-			_this._invInertia00 = __tmp__00;
-			_this._invInertia01 = __tmp__01;
-			_this._invInertia02 = __tmp__02;
-			_this._invInertia10 = __tmp__10;
-			_this._invInertia11 = __tmp__11;
-			_this._invInertia12 = __tmp__12;
-			_this._invInertia20 = __tmp__20;
-			_this._invInertia21 = __tmp__21;
-			_this._invInertia22 = __tmp__22;
-			_this._invInertia00 *= _this._rotFactor.x;
-			_this._invInertia01 *= _this._rotFactor.x;
-			_this._invInertia02 *= _this._rotFactor.x;
-			_this._invInertia10 *= _this._rotFactor.y;
-			_this._invInertia11 *= _this._rotFactor.y;
-			_this._invInertia12 *= _this._rotFactor.y;
-			_this._invInertia20 *= _this._rotFactor.z;
-			_this._invInertia21 *= _this._rotFactor.z;
-			_this._invInertia22 *= _this._rotFactor.z;
-			var dst = _this._ptransform;
-			var src = _this._transform;
-			dst._positionX = src._positionX;
-			dst._positionY = src._positionY;
-			dst._positionZ = src._positionZ;
-			dst._rotation00 = src._rotation00;
-			dst._rotation01 = src._rotation01;
-			dst._rotation02 = src._rotation02;
-			dst._rotation10 = src._rotation10;
-			dst._rotation11 = src._rotation11;
-			dst._rotation12 = src._rotation12;
-			dst._rotation20 = src._rotation20;
-			dst._rotation21 = src._rotation21;
-			dst._rotation22 = src._rotation22;
-			var s = _this._shapeList;
-			while(s != null) {
-				var n = s._next;
-				var tf1 = _this._ptransform;
-				var tf2 = _this._transform;
-				var dst = s._ptransform;
-				var src1 = s._localTransform;
-				var __tmp__00;
-				var __tmp__01;
-				var __tmp__02;
-				var __tmp__10;
-				var __tmp__11;
-				var __tmp__12;
-				var __tmp__20;
-				var __tmp__21;
-				var __tmp__22;
-				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
-				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
-				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
-				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
-				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
-				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
-				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
-				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
-				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
-				dst._rotation00 = __tmp__00;
-				dst._rotation01 = __tmp__01;
-				dst._rotation02 = __tmp__02;
-				dst._rotation10 = __tmp__10;
-				dst._rotation11 = __tmp__11;
-				dst._rotation12 = __tmp__12;
-				dst._rotation20 = __tmp__20;
-				dst._rotation21 = __tmp__21;
-				dst._rotation22 = __tmp__22;
-				var __tmp__X;
-				var __tmp__Y;
-				var __tmp__Z;
-				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
-				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
-				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
-				dst._positionX = __tmp__X;
-				dst._positionY = __tmp__Y;
-				dst._positionZ = __tmp__Z;
-				dst._positionX += tf1._positionX;
-				dst._positionY += tf1._positionY;
-				dst._positionZ += tf1._positionZ;
-				var dst1 = s._transform;
-				var src11 = s._localTransform;
-				var __tmp__001;
-				var __tmp__011;
-				var __tmp__021;
-				var __tmp__101;
-				var __tmp__111;
-				var __tmp__121;
-				var __tmp__201;
-				var __tmp__211;
-				var __tmp__221;
-				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
-				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
-				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
-				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
-				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
-				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
-				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
-				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
-				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
-				dst1._rotation00 = __tmp__001;
-				dst1._rotation01 = __tmp__011;
-				dst1._rotation02 = __tmp__021;
-				dst1._rotation10 = __tmp__101;
-				dst1._rotation11 = __tmp__111;
-				dst1._rotation12 = __tmp__121;
-				dst1._rotation20 = __tmp__201;
-				dst1._rotation21 = __tmp__211;
-				dst1._rotation22 = __tmp__221;
-				var __tmp__X1;
-				var __tmp__Y1;
-				var __tmp__Z1;
-				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
-				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
-				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
-				dst1._positionX = __tmp__X1;
-				dst1._positionY = __tmp__Y1;
-				dst1._positionZ = __tmp__Z1;
-				dst1._positionX += tf2._positionX;
-				dst1._positionY += tf2._positionY;
-				dst1._positionZ += tf2._positionZ;
-				var minX;
-				var minY;
-				var minZ;
-				var maxX;
-				var maxY;
-				var maxZ;
-				s._geom._computeAabb(s._aabb,s._ptransform);
-				minX = s._aabb._minX;
-				minY = s._aabb._minY;
-				minZ = s._aabb._minZ;
-				maxX = s._aabb._maxX;
-				maxY = s._aabb._maxY;
-				maxZ = s._aabb._maxZ;
-				s._geom._computeAabb(s._aabb,s._transform);
-				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
-				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
-				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
-				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
-				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
-				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
-				if(s._proxy != null) {
-					var dX;
-					var dY;
-					var dZ;
-					dX = s._transform._positionX - s._ptransform._positionX;
-					dY = s._transform._positionY - s._ptransform._positionY;
-					dZ = s._transform._positionZ - s._ptransform._positionZ;
-					var v1 = s.displacement;
-					v1.x = dX;
-					v1.y = dY;
-					v1.z = dZ;
-					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
-				}
-				s = n;
-			}
-			_this._sleeping = false;
-			_this._sleepTime = 0;
-		}
-		return v;
-	}
-	,set_forwardSpeed: function(v) {
-		this.forwardSpeed = v;
-		if(this.chassisBody != null) {
-			var cosY = Math.cos(this.yaw);
-			var sinY = Math.sin(this.yaw);
-			var curVel_z = 0;
-			oimo_common_Vec3.numCreations++;
-			curVel_z = this.chassisBody._velZ;
-			var _this = this.chassisBody;
-			var x = sinY * v;
-			var y = cosY * v;
-			var z = curVel_z;
-			if(z == null) {
-				z = 0;
-			}
-			if(y == null) {
-				y = 0;
-			}
-			if(x == null) {
-				x = 0;
-			}
-			oimo_common_Vec3.numCreations++;
-			if(_this._type == 1) {
-				_this._velX = 0;
-				_this._velY = 0;
-				_this._velZ = 0;
-			} else {
-				_this._velX = x;
-				_this._velY = y;
-				_this._velZ = z;
-			}
-			_this._sleeping = false;
-			_this._sleepTime = 0;
-		}
-		return v;
-	}
-	,initOimoPhysics: function(startX,startY,startZ) {
-		this.physicsWorld = new oimo_dynamics_World();
-		oimo_common_Vec3.numCreations++;
-		var _this = this.physicsWorld._gravity;
-		_this.x = 0;
-		_this.y = 0;
-		_this.z = -9.81;
-		var rbConfig = new oimo_dynamics_rigidbody_RigidBodyConfig();
-		rbConfig.type = oimo_dynamics_rigidbody_RigidBodyType.DYNAMIC;
-		rbConfig.position = new oimo_common_Vec3(startX,startY,startZ + 0.35);
-		this.chassisBody = new oimo_dynamics_rigidbody_RigidBody(rbConfig);
-		var shapeConfig = new oimo_dynamics_rigidbody_ShapeConfig();
-		shapeConfig.geometry = new oimo_collision_geometry_BoxGeometry(new oimo_common_Vec3(0.94,2.15,0.22));
-		shapeConfig.density = this.config.mass / 3.5569599999999997;
-		shapeConfig.friction = 0.0;
-		shapeConfig.restitution = 0.0;
-		this.chassisBody.addShape(new oimo_dynamics_rigidbody_Shape(shapeConfig));
-		oimo_common_Mat3.numCreations++;
-		var z = -this.yaw;
-		if(z == null) {
-			z = 0;
-		}
-		var eulerAngles_x = 0;
-		var eulerAngles_y = 0;
-		var eulerAngles_z = z;
-		oimo_common_Vec3.numCreations++;
-		var sx = Math.sin(eulerAngles_x);
-		var sy = Math.sin(eulerAngles_y);
-		var sz = Math.sin(eulerAngles_z);
-		var cx = Math.cos(eulerAngles_x);
-		var cy = Math.cos(eulerAngles_y);
-		var cz = Math.cos(eulerAngles_z);
-		var t01 = -cy * sz;
-		var t10 = cx * sz + cz * sx * sy;
-		var t12 = -cy * sx;
-		var t20 = sx * sz - cx * cz * sy;
-		var t21 = cz * sx + cx * sy * sz;
-		var _this = this.chassisBody;
-		var q_x = 0;
-		var q_y = 0;
-		var q_z = 0;
-		var q_w = 1;
-		oimo_common_Quat.numCreations++;
-		var e00 = cy * cz;
-		var e11 = cx * cz - sx * sy * sz;
-		var e22 = cx * cy;
-		var t = e00 + e11 + e22;
-		var s;
-		if(t > 0) {
-			s = Math.sqrt(t + 1);
-			q_w = 0.5 * s;
-			s = 0.5 / s;
-			q_x = (t21 - t12) * s;
-			q_y = (sy - t20) * s;
-			q_z = (t10 - t01) * s;
-		} else if(e00 > e11) {
-			if(e00 > e22) {
-				s = Math.sqrt(e00 - e11 - e22 + 1);
-				q_x = 0.5 * s;
-				s = 0.5 / s;
-				q_y = (t01 + t10) * s;
-				q_z = (sy + t20) * s;
-				q_w = (t21 - t12) * s;
-			} else {
-				s = Math.sqrt(e22 - e00 - e11 + 1);
-				q_z = 0.5 * s;
-				s = 0.5 / s;
-				q_x = (sy + t20) * s;
-				q_y = (t12 + t21) * s;
-				q_w = (t10 - t01) * s;
-			}
-		} else if(e11 > e22) {
-			s = Math.sqrt(e11 - e22 - e00 + 1);
-			q_y = 0.5 * s;
-			s = 0.5 / s;
-			q_x = (t01 + t10) * s;
-			q_z = (t12 + t21) * s;
-			q_w = (sy - t20) * s;
-		} else {
-			s = Math.sqrt(e22 - e00 - e11 + 1);
-			q_z = 0.5 * s;
-			s = 0.5 / s;
-			q_x = (sy + t20) * s;
-			q_y = (t12 + t21) * s;
-			q_w = (t10 - t01) * s;
-		}
-		var qX;
-		var qY;
-		var qZ;
-		var qW;
-		qX = q_x;
-		qY = q_y;
-		qZ = q_z;
-		qW = q_w;
-		var x = qX;
-		var y = qY;
-		var z = qZ;
-		var w = qW;
-		var x2 = 2 * x;
-		var y2 = 2 * y;
-		var z2 = 2 * z;
-		var xx = x * x2;
-		var yy = y * y2;
-		var zz = z * z2;
-		var xy = x * y2;
-		var yz = y * z2;
-		var xz = x * z2;
-		var wx = w * x2;
-		var wy = w * y2;
-		var wz = w * z2;
-		_this._transform._rotation00 = 1 - yy - zz;
-		_this._transform._rotation01 = xy - wz;
-		_this._transform._rotation02 = xz + wy;
-		_this._transform._rotation10 = xy + wz;
-		_this._transform._rotation11 = 1 - xx - zz;
-		_this._transform._rotation12 = yz - wx;
-		_this._transform._rotation20 = xz - wy;
-		_this._transform._rotation21 = yz + wx;
-		_this._transform._rotation22 = 1 - xx - yy;
-		var __tmp__00;
-		var __tmp__01;
-		var __tmp__02;
-		var __tmp__10;
-		var __tmp__11;
-		var __tmp__12;
-		var __tmp__20;
-		var __tmp__21;
-		var __tmp__22;
-		__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
-		__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
-		__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
-		__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
-		__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
-		__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
-		__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
-		__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
-		__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
-		_this._invInertia00 = __tmp__00;
-		_this._invInertia01 = __tmp__01;
-		_this._invInertia02 = __tmp__02;
-		_this._invInertia10 = __tmp__10;
-		_this._invInertia11 = __tmp__11;
-		_this._invInertia12 = __tmp__12;
-		_this._invInertia20 = __tmp__20;
-		_this._invInertia21 = __tmp__21;
-		_this._invInertia22 = __tmp__22;
-		var __tmp__00;
-		var __tmp__01;
-		var __tmp__02;
-		var __tmp__10;
-		var __tmp__11;
-		var __tmp__12;
-		var __tmp__20;
-		var __tmp__21;
-		var __tmp__22;
-		__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
-		__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
-		__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
-		__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
-		__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
-		__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
-		__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
-		__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
-		__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
-		_this._invInertia00 = __tmp__00;
-		_this._invInertia01 = __tmp__01;
-		_this._invInertia02 = __tmp__02;
-		_this._invInertia10 = __tmp__10;
-		_this._invInertia11 = __tmp__11;
-		_this._invInertia12 = __tmp__12;
-		_this._invInertia20 = __tmp__20;
-		_this._invInertia21 = __tmp__21;
-		_this._invInertia22 = __tmp__22;
-		_this._invInertia00 *= _this._rotFactor.x;
-		_this._invInertia01 *= _this._rotFactor.x;
-		_this._invInertia02 *= _this._rotFactor.x;
-		_this._invInertia10 *= _this._rotFactor.y;
-		_this._invInertia11 *= _this._rotFactor.y;
-		_this._invInertia12 *= _this._rotFactor.y;
-		_this._invInertia20 *= _this._rotFactor.z;
-		_this._invInertia21 *= _this._rotFactor.z;
-		_this._invInertia22 *= _this._rotFactor.z;
-		var dst = _this._ptransform;
-		var src = _this._transform;
-		dst._positionX = src._positionX;
-		dst._positionY = src._positionY;
-		dst._positionZ = src._positionZ;
-		dst._rotation00 = src._rotation00;
-		dst._rotation01 = src._rotation01;
-		dst._rotation02 = src._rotation02;
-		dst._rotation10 = src._rotation10;
-		dst._rotation11 = src._rotation11;
-		dst._rotation12 = src._rotation12;
-		dst._rotation20 = src._rotation20;
-		dst._rotation21 = src._rotation21;
-		dst._rotation22 = src._rotation22;
-		var s = _this._shapeList;
-		while(s != null) {
-			var n = s._next;
-			var tf1 = _this._ptransform;
-			var tf2 = _this._transform;
-			var dst = s._ptransform;
-			var src1 = s._localTransform;
-			var __tmp__00;
-			var __tmp__01;
-			var __tmp__02;
-			var __tmp__10;
-			var __tmp__11;
-			var __tmp__12;
-			var __tmp__20;
-			var __tmp__21;
-			var __tmp__22;
-			__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
-			__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
-			__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
-			__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
-			__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
-			__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
-			__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
-			__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
-			__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
-			dst._rotation00 = __tmp__00;
-			dst._rotation01 = __tmp__01;
-			dst._rotation02 = __tmp__02;
-			dst._rotation10 = __tmp__10;
-			dst._rotation11 = __tmp__11;
-			dst._rotation12 = __tmp__12;
-			dst._rotation20 = __tmp__20;
-			dst._rotation21 = __tmp__21;
-			dst._rotation22 = __tmp__22;
-			var __tmp__X;
-			var __tmp__Y;
-			var __tmp__Z;
-			__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
-			__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
-			__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
-			dst._positionX = __tmp__X;
-			dst._positionY = __tmp__Y;
-			dst._positionZ = __tmp__Z;
-			dst._positionX += tf1._positionX;
-			dst._positionY += tf1._positionY;
-			dst._positionZ += tf1._positionZ;
-			var dst1 = s._transform;
-			var src11 = s._localTransform;
-			var __tmp__001;
-			var __tmp__011;
-			var __tmp__021;
-			var __tmp__101;
-			var __tmp__111;
-			var __tmp__121;
-			var __tmp__201;
-			var __tmp__211;
-			var __tmp__221;
-			__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
-			__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
-			__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
-			__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
-			__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
-			__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
-			__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
-			__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
-			__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
-			dst1._rotation00 = __tmp__001;
-			dst1._rotation01 = __tmp__011;
-			dst1._rotation02 = __tmp__021;
-			dst1._rotation10 = __tmp__101;
-			dst1._rotation11 = __tmp__111;
-			dst1._rotation12 = __tmp__121;
-			dst1._rotation20 = __tmp__201;
-			dst1._rotation21 = __tmp__211;
-			dst1._rotation22 = __tmp__221;
-			var __tmp__X1;
-			var __tmp__Y1;
-			var __tmp__Z1;
-			__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
-			__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
-			__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
-			dst1._positionX = __tmp__X1;
-			dst1._positionY = __tmp__Y1;
-			dst1._positionZ = __tmp__Z1;
-			dst1._positionX += tf2._positionX;
-			dst1._positionY += tf2._positionY;
-			dst1._positionZ += tf2._positionZ;
-			var minX;
-			var minY;
-			var minZ;
-			var maxX;
-			var maxY;
-			var maxZ;
-			s._geom._computeAabb(s._aabb,s._ptransform);
-			minX = s._aabb._minX;
-			minY = s._aabb._minY;
-			minZ = s._aabb._minZ;
-			maxX = s._aabb._maxX;
-			maxY = s._aabb._maxY;
-			maxZ = s._aabb._maxZ;
-			s._geom._computeAabb(s._aabb,s._transform);
-			s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
-			s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
-			s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
-			s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
-			s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
-			s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
-			if(s._proxy != null) {
-				var dX;
-				var dY;
-				var dZ;
-				dX = s._transform._positionX - s._ptransform._positionX;
-				dY = s._transform._positionY - s._ptransform._positionY;
-				dZ = s._transform._positionZ - s._ptransform._positionZ;
-				var v = s.displacement;
-				v.x = dX;
-				v.y = dY;
-				v.z = dZ;
-				s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
-			}
-			s = n;
-		}
-		_this._sleeping = false;
-		_this._sleepTime = 0;
-		this.physicsWorld.addRigidBody(this.chassisBody);
-	}
-	,resetState: function(startX,startY,startZ,newYaw) {
-		if(newYaw == null) {
-			newYaw = 0.0;
+	resetState: function(x,y,z,yawAngle) {
+		if(yawAngle == null) {
+			yawAngle = 0.0;
 		}
 		var _this = this.pos;
-		var x = startX;
-		var y = startY;
-		var z = startZ;
-		if(startZ == null) {
-			z = 0.;
+		var x1 = x;
+		var y1 = y;
+		var z1 = z;
+		if(z == null) {
+			z1 = 0.;
 		}
-		if(startY == null) {
-			y = 0.;
+		if(y == null) {
+			y1 = 0.;
 		}
-		if(startX == null) {
-			x = 0.;
+		if(x == null) {
+			x1 = 0.;
 		}
-		_this.x = x;
-		_this.y = y;
-		_this.z = z;
-		this.set_yaw(newYaw);
+		_this.x = x1;
+		_this.y = y1;
+		_this.z = z1;
+		this.yaw = yawAngle;
 		this.pitch = 0.0;
 		this.roll = 0.0;
-		this.set_forwardSpeed(0.0);
+		this.driftAngle = 0.0;
+		this.forwardSpeed = 0.0;
 		this.lateralVelocity = 0.0;
 		this.verticalVelocity = 0.0;
+		this.worldVx = 0.0;
+		this.worldVy = 0.0;
+		this.worldVz = 0.0;
+		this.yawRate = 0.0;
+		this.pitchRate = 0.0;
+		this.rollRate = 0.0;
+		this.lastLongAccel = 0.0;
 		this.isGrounded = true;
-		this.wasGrounded = true;
+		this.groundedWheelCount = 4;
 		this.isDrifting = false;
-		this.driftDirection = 0.0;
-		this.driftAngle = 0.0;
+		this.isBoosting = false;
 		this.currentGear = 1;
 		this.engineRPM = this.config.drivetrain.idleRPM;
-		this.boostFuel = 1.0;
-		this.isBoosting = false;
-		var rest = this.config.suspension.restLength;
-		this.suspLength[0] = rest;
-		this.prevSuspLength[0] = rest;
-		this.suspCompression[0] = 0.0;
-		this.wheelOnGround[0] = true;
+		this.boostFuel = this.config.boost.maxFuel;
+		this.frontSteerAngle = 0.0;
+		this.prevSteerInput = 0.0;
+		this.suspensionSolver.resetHistory(this.config.suspension.unloadedLength - this.config.suspension.restLength);
+		this.drivetrainSolver.reset();
+		this.tireSlipSolver.reset();
+		var staticWheelLoad = this.config.chassis.massKg * Math.abs(this.gravityZ) * 0.25;
+		this.suspLength[0] = this.config.suspension.restLength;
+		this.wheelNormalLoads[0] = staticWheelLoad;
+		this.wheelFriction[0] = 1.0;
 		this.wheelSpinVelocity[0] = 0.0;
-		this.suspLength[1] = rest;
-		this.prevSuspLength[1] = rest;
-		this.suspCompression[1] = 0.0;
-		this.wheelOnGround[1] = true;
+		this.suspLength[1] = this.config.suspension.restLength;
+		this.wheelNormalLoads[1] = staticWheelLoad;
+		this.wheelFriction[1] = 1.0;
 		this.wheelSpinVelocity[1] = 0.0;
-		this.suspLength[2] = rest;
-		this.prevSuspLength[2] = rest;
-		this.suspCompression[2] = 0.0;
-		this.wheelOnGround[2] = true;
+		this.suspLength[2] = this.config.suspension.restLength;
+		this.wheelNormalLoads[2] = staticWheelLoad;
+		this.wheelFriction[2] = 1.0;
 		this.wheelSpinVelocity[2] = 0.0;
-		this.suspLength[3] = rest;
-		this.prevSuspLength[3] = rest;
-		this.suspCompression[3] = 0.0;
-		this.wheelOnGround[3] = true;
+		this.suspLength[3] = this.config.suspension.restLength;
+		this.wheelNormalLoads[3] = staticWheelLoad;
+		this.wheelFriction[3] = 1.0;
 		this.wheelSpinVelocity[3] = 0.0;
-		if(this.chassisBody != null) {
-			var _this = this.chassisBody;
-			var x = startX;
-			var y = startY;
-			var z = startZ + 0.35;
-			if(z == null) {
-				z = 0;
-			}
-			if(startY == null) {
-				y = 0;
-			}
-			if(startX == null) {
-				x = 0;
-			}
-			oimo_common_Vec3.numCreations++;
-			_this._transform._positionX = x;
-			_this._transform._positionY = y;
-			_this._transform._positionZ = z;
-			var dst = _this._ptransform;
-			var src = _this._transform;
-			dst._positionX = src._positionX;
-			dst._positionY = src._positionY;
-			dst._positionZ = src._positionZ;
-			dst._rotation00 = src._rotation00;
-			dst._rotation01 = src._rotation01;
-			dst._rotation02 = src._rotation02;
-			dst._rotation10 = src._rotation10;
-			dst._rotation11 = src._rotation11;
-			dst._rotation12 = src._rotation12;
-			dst._rotation20 = src._rotation20;
-			dst._rotation21 = src._rotation21;
-			dst._rotation22 = src._rotation22;
-			var s = _this._shapeList;
-			while(s != null) {
-				var n = s._next;
-				var tf1 = _this._ptransform;
-				var tf2 = _this._transform;
-				var dst = s._ptransform;
-				var src1 = s._localTransform;
-				var __tmp__00;
-				var __tmp__01;
-				var __tmp__02;
-				var __tmp__10;
-				var __tmp__11;
-				var __tmp__12;
-				var __tmp__20;
-				var __tmp__21;
-				var __tmp__22;
-				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
-				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
-				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
-				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
-				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
-				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
-				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
-				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
-				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
-				dst._rotation00 = __tmp__00;
-				dst._rotation01 = __tmp__01;
-				dst._rotation02 = __tmp__02;
-				dst._rotation10 = __tmp__10;
-				dst._rotation11 = __tmp__11;
-				dst._rotation12 = __tmp__12;
-				dst._rotation20 = __tmp__20;
-				dst._rotation21 = __tmp__21;
-				dst._rotation22 = __tmp__22;
-				var __tmp__X;
-				var __tmp__Y;
-				var __tmp__Z;
-				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
-				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
-				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
-				dst._positionX = __tmp__X;
-				dst._positionY = __tmp__Y;
-				dst._positionZ = __tmp__Z;
-				dst._positionX += tf1._positionX;
-				dst._positionY += tf1._positionY;
-				dst._positionZ += tf1._positionZ;
-				var dst1 = s._transform;
-				var src11 = s._localTransform;
-				var __tmp__001;
-				var __tmp__011;
-				var __tmp__021;
-				var __tmp__101;
-				var __tmp__111;
-				var __tmp__121;
-				var __tmp__201;
-				var __tmp__211;
-				var __tmp__221;
-				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
-				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
-				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
-				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
-				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
-				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
-				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
-				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
-				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
-				dst1._rotation00 = __tmp__001;
-				dst1._rotation01 = __tmp__011;
-				dst1._rotation02 = __tmp__021;
-				dst1._rotation10 = __tmp__101;
-				dst1._rotation11 = __tmp__111;
-				dst1._rotation12 = __tmp__121;
-				dst1._rotation20 = __tmp__201;
-				dst1._rotation21 = __tmp__211;
-				dst1._rotation22 = __tmp__221;
-				var __tmp__X1;
-				var __tmp__Y1;
-				var __tmp__Z1;
-				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
-				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
-				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
-				dst1._positionX = __tmp__X1;
-				dst1._positionY = __tmp__Y1;
-				dst1._positionZ = __tmp__Z1;
-				dst1._positionX += tf2._positionX;
-				dst1._positionY += tf2._positionY;
-				dst1._positionZ += tf2._positionZ;
-				var minX;
-				var minY;
-				var minZ;
-				var maxX;
-				var maxY;
-				var maxZ;
-				s._geom._computeAabb(s._aabb,s._ptransform);
-				minX = s._aabb._minX;
-				minY = s._aabb._minY;
-				minZ = s._aabb._minZ;
-				maxX = s._aabb._maxX;
-				maxY = s._aabb._maxY;
-				maxZ = s._aabb._maxZ;
-				s._geom._computeAabb(s._aabb,s._transform);
-				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
-				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
-				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
-				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
-				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
-				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
-				if(s._proxy != null) {
-					var dX;
-					var dY;
-					var dZ;
-					dX = s._transform._positionX - s._ptransform._positionX;
-					dY = s._transform._positionY - s._ptransform._positionY;
-					dZ = s._transform._positionZ - s._ptransform._positionZ;
-					var v = s.displacement;
-					v.x = dX;
-					v.y = dY;
-					v.z = dZ;
-					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
-				}
-				s = n;
-			}
-			_this._sleeping = false;
-			_this._sleepTime = 0;
-			oimo_common_Mat3.numCreations++;
-			var z = -newYaw;
-			if(z == null) {
-				z = 0;
-			}
-			var eulerAngles_x = 0;
-			var eulerAngles_y = 0;
-			var eulerAngles_z = z;
-			oimo_common_Vec3.numCreations++;
-			var sx = Math.sin(eulerAngles_x);
-			var sy = Math.sin(eulerAngles_y);
-			var sz = Math.sin(eulerAngles_z);
-			var cx = Math.cos(eulerAngles_x);
-			var cy = Math.cos(eulerAngles_y);
-			var cz = Math.cos(eulerAngles_z);
-			var t01 = -cy * sz;
-			var t10 = cx * sz + cz * sx * sy;
-			var t12 = -cy * sx;
-			var t20 = sx * sz - cx * cz * sy;
-			var t21 = cz * sx + cx * sy * sz;
-			var _this = this.chassisBody;
-			var q_x = 0;
-			var q_y = 0;
-			var q_z = 0;
-			var q_w = 1;
-			oimo_common_Quat.numCreations++;
-			var e00 = cy * cz;
-			var e11 = cx * cz - sx * sy * sz;
-			var e22 = cx * cy;
-			var t = e00 + e11 + e22;
-			var s;
-			if(t > 0) {
-				s = Math.sqrt(t + 1);
-				q_w = 0.5 * s;
-				s = 0.5 / s;
-				q_x = (t21 - t12) * s;
-				q_y = (sy - t20) * s;
-				q_z = (t10 - t01) * s;
-			} else if(e00 > e11) {
-				if(e00 > e22) {
-					s = Math.sqrt(e00 - e11 - e22 + 1);
-					q_x = 0.5 * s;
-					s = 0.5 / s;
-					q_y = (t01 + t10) * s;
-					q_z = (sy + t20) * s;
-					q_w = (t21 - t12) * s;
-				} else {
-					s = Math.sqrt(e22 - e00 - e11 + 1);
-					q_z = 0.5 * s;
-					s = 0.5 / s;
-					q_x = (sy + t20) * s;
-					q_y = (t12 + t21) * s;
-					q_w = (t10 - t01) * s;
-				}
-			} else if(e11 > e22) {
-				s = Math.sqrt(e11 - e22 - e00 + 1);
-				q_y = 0.5 * s;
-				s = 0.5 / s;
-				q_x = (t01 + t10) * s;
-				q_z = (t12 + t21) * s;
-				q_w = (sy - t20) * s;
-			} else {
-				s = Math.sqrt(e22 - e00 - e11 + 1);
-				q_z = 0.5 * s;
-				s = 0.5 / s;
-				q_x = (sy + t20) * s;
-				q_y = (t12 + t21) * s;
-				q_w = (t10 - t01) * s;
-			}
-			var qX;
-			var qY;
-			var qZ;
-			var qW;
-			qX = q_x;
-			qY = q_y;
-			qZ = q_z;
-			qW = q_w;
-			var x = qX;
-			var y = qY;
-			var z = qZ;
-			var w = qW;
-			var x2 = 2 * x;
-			var y2 = 2 * y;
-			var z2 = 2 * z;
-			var xx = x * x2;
-			var yy = y * y2;
-			var zz = z * z2;
-			var xy = x * y2;
-			var yz = y * z2;
-			var xz = x * z2;
-			var wx = w * x2;
-			var wy = w * y2;
-			var wz = w * z2;
-			_this._transform._rotation00 = 1 - yy - zz;
-			_this._transform._rotation01 = xy - wz;
-			_this._transform._rotation02 = xz + wy;
-			_this._transform._rotation10 = xy + wz;
-			_this._transform._rotation11 = 1 - xx - zz;
-			_this._transform._rotation12 = yz - wx;
-			_this._transform._rotation20 = xz - wy;
-			_this._transform._rotation21 = yz + wx;
-			_this._transform._rotation22 = 1 - xx - yy;
-			var __tmp__00;
-			var __tmp__01;
-			var __tmp__02;
-			var __tmp__10;
-			var __tmp__11;
-			var __tmp__12;
-			var __tmp__20;
-			var __tmp__21;
-			var __tmp__22;
-			__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
-			__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
-			__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
-			__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
-			__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
-			__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
-			__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
-			__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
-			__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
-			_this._invInertia00 = __tmp__00;
-			_this._invInertia01 = __tmp__01;
-			_this._invInertia02 = __tmp__02;
-			_this._invInertia10 = __tmp__10;
-			_this._invInertia11 = __tmp__11;
-			_this._invInertia12 = __tmp__12;
-			_this._invInertia20 = __tmp__20;
-			_this._invInertia21 = __tmp__21;
-			_this._invInertia22 = __tmp__22;
-			var __tmp__00;
-			var __tmp__01;
-			var __tmp__02;
-			var __tmp__10;
-			var __tmp__11;
-			var __tmp__12;
-			var __tmp__20;
-			var __tmp__21;
-			var __tmp__22;
-			__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
-			__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
-			__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
-			__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
-			__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
-			__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
-			__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
-			__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
-			__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
-			_this._invInertia00 = __tmp__00;
-			_this._invInertia01 = __tmp__01;
-			_this._invInertia02 = __tmp__02;
-			_this._invInertia10 = __tmp__10;
-			_this._invInertia11 = __tmp__11;
-			_this._invInertia12 = __tmp__12;
-			_this._invInertia20 = __tmp__20;
-			_this._invInertia21 = __tmp__21;
-			_this._invInertia22 = __tmp__22;
-			_this._invInertia00 *= _this._rotFactor.x;
-			_this._invInertia01 *= _this._rotFactor.x;
-			_this._invInertia02 *= _this._rotFactor.x;
-			_this._invInertia10 *= _this._rotFactor.y;
-			_this._invInertia11 *= _this._rotFactor.y;
-			_this._invInertia12 *= _this._rotFactor.y;
-			_this._invInertia20 *= _this._rotFactor.z;
-			_this._invInertia21 *= _this._rotFactor.z;
-			_this._invInertia22 *= _this._rotFactor.z;
-			var dst = _this._ptransform;
-			var src = _this._transform;
-			dst._positionX = src._positionX;
-			dst._positionY = src._positionY;
-			dst._positionZ = src._positionZ;
-			dst._rotation00 = src._rotation00;
-			dst._rotation01 = src._rotation01;
-			dst._rotation02 = src._rotation02;
-			dst._rotation10 = src._rotation10;
-			dst._rotation11 = src._rotation11;
-			dst._rotation12 = src._rotation12;
-			dst._rotation20 = src._rotation20;
-			dst._rotation21 = src._rotation21;
-			dst._rotation22 = src._rotation22;
-			var s = _this._shapeList;
-			while(s != null) {
-				var n = s._next;
-				var tf1 = _this._ptransform;
-				var tf2 = _this._transform;
-				var dst = s._ptransform;
-				var src1 = s._localTransform;
-				var __tmp__00;
-				var __tmp__01;
-				var __tmp__02;
-				var __tmp__10;
-				var __tmp__11;
-				var __tmp__12;
-				var __tmp__20;
-				var __tmp__21;
-				var __tmp__22;
-				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
-				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
-				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
-				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
-				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
-				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
-				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
-				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
-				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
-				dst._rotation00 = __tmp__00;
-				dst._rotation01 = __tmp__01;
-				dst._rotation02 = __tmp__02;
-				dst._rotation10 = __tmp__10;
-				dst._rotation11 = __tmp__11;
-				dst._rotation12 = __tmp__12;
-				dst._rotation20 = __tmp__20;
-				dst._rotation21 = __tmp__21;
-				dst._rotation22 = __tmp__22;
-				var __tmp__X;
-				var __tmp__Y;
-				var __tmp__Z;
-				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
-				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
-				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
-				dst._positionX = __tmp__X;
-				dst._positionY = __tmp__Y;
-				dst._positionZ = __tmp__Z;
-				dst._positionX += tf1._positionX;
-				dst._positionY += tf1._positionY;
-				dst._positionZ += tf1._positionZ;
-				var dst1 = s._transform;
-				var src11 = s._localTransform;
-				var __tmp__001;
-				var __tmp__011;
-				var __tmp__021;
-				var __tmp__101;
-				var __tmp__111;
-				var __tmp__121;
-				var __tmp__201;
-				var __tmp__211;
-				var __tmp__221;
-				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
-				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
-				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
-				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
-				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
-				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
-				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
-				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
-				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
-				dst1._rotation00 = __tmp__001;
-				dst1._rotation01 = __tmp__011;
-				dst1._rotation02 = __tmp__021;
-				dst1._rotation10 = __tmp__101;
-				dst1._rotation11 = __tmp__111;
-				dst1._rotation12 = __tmp__121;
-				dst1._rotation20 = __tmp__201;
-				dst1._rotation21 = __tmp__211;
-				dst1._rotation22 = __tmp__221;
-				var __tmp__X1;
-				var __tmp__Y1;
-				var __tmp__Z1;
-				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
-				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
-				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
-				dst1._positionX = __tmp__X1;
-				dst1._positionY = __tmp__Y1;
-				dst1._positionZ = __tmp__Z1;
-				dst1._positionX += tf2._positionX;
-				dst1._positionY += tf2._positionY;
-				dst1._positionZ += tf2._positionZ;
-				var minX;
-				var minY;
-				var minZ;
-				var maxX;
-				var maxY;
-				var maxZ;
-				s._geom._computeAabb(s._aabb,s._ptransform);
-				minX = s._aabb._minX;
-				minY = s._aabb._minY;
-				minZ = s._aabb._minZ;
-				maxX = s._aabb._maxX;
-				maxY = s._aabb._maxY;
-				maxZ = s._aabb._maxZ;
-				s._geom._computeAabb(s._aabb,s._transform);
-				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
-				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
-				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
-				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
-				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
-				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
-				if(s._proxy != null) {
-					var dX;
-					var dY;
-					var dZ;
-					dX = s._transform._positionX - s._ptransform._positionX;
-					dY = s._transform._positionY - s._ptransform._positionY;
-					dZ = s._transform._positionZ - s._ptransform._positionZ;
-					var v = s.displacement;
-					v.x = dX;
-					v.y = dY;
-					v.z = dZ;
-					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
-				}
-				s = n;
-			}
-			_this._sleeping = false;
-			_this._sleepTime = 0;
-			var _this = this.chassisBody;
-			oimo_common_Vec3.numCreations++;
-			if(_this._type == 1) {
-				_this._velX = 0;
-				_this._velY = 0;
-				_this._velZ = 0;
-			} else {
-				_this._velX = 0;
-				_this._velY = 0;
-				_this._velZ = 0;
-			}
-			_this._sleeping = false;
-			_this._sleepTime = 0;
-			var _this = this.chassisBody;
-			oimo_common_Vec3.numCreations++;
-			if(_this._type == 1) {
-				_this._angVelX = 0;
-				_this._angVelY = 0;
-				_this._angVelZ = 0;
-			} else {
-				_this._angVelX = 0;
-				_this._angVelY = 0;
-				_this._angVelZ = 0;
-			}
-			_this._sleeping = false;
-			_this._sleepTime = 0;
-		}
+		this.syncToOimoBody();
 	}
 	,syncToOimoBody: function() {
+		var sy = Math.sin(this.yaw);
+		var cy = Math.cos(this.yaw);
+		this.worldVx = this.forwardSpeed * sy + this.lateralVelocity * cy;
+		this.worldVy = this.forwardSpeed * cy - this.lateralVelocity * sy;
+		this.worldVz = this.verticalVelocity;
 		if(this.chassisBody == null) {
 			return;
 		}
+		this.oimoPosScratch.init(this.pos.x,this.pos.y,this.pos.z + this.config.chassis.cogHeight);
 		var _this = this.chassisBody;
-		var x = this.pos.x;
-		var y = this.pos.y;
-		var z = this.pos.z + 0.35;
-		if(z == null) {
-			z = 0;
-		}
-		if(y == null) {
-			y = 0;
-		}
-		if(x == null) {
-			x = 0;
-		}
-		oimo_common_Vec3.numCreations++;
-		_this._transform._positionX = x;
-		_this._transform._positionY = y;
-		_this._transform._positionZ = z;
+		var position = this.oimoPosScratch;
+		_this._transform._positionX = position.x;
+		_this._transform._positionY = position.y;
+		_this._transform._positionZ = position.z;
 		var dst = _this._ptransform;
 		var src = _this._transform;
 		dst._positionX = src._positionX;
@@ -69783,1781 +72815,515 @@ physics_CarPhysics.prototype = {
 		}
 		_this._sleeping = false;
 		_this._sleepTime = 0;
-		oimo_common_Mat3.numCreations++;
-		var x = this.pitch;
-		var y = this.roll;
-		var z = -this.yaw;
-		if(z == null) {
-			z = 0;
-		}
-		if(y == null) {
-			y = 0;
-		}
-		if(x == null) {
-			x = 0;
-		}
-		var eulerAngles_x = x;
-		var eulerAngles_y = y;
-		var eulerAngles_z = z;
-		oimo_common_Vec3.numCreations++;
-		var sx = Math.sin(eulerAngles_x);
-		var sy = Math.sin(eulerAngles_y);
-		var sz = Math.sin(eulerAngles_z);
-		var cx = Math.cos(eulerAngles_x);
-		var cy = Math.cos(eulerAngles_y);
-		var cz = Math.cos(eulerAngles_z);
-		var t01 = -cy * sz;
-		var t10 = cx * sz + cz * sx * sy;
-		var t12 = -cy * sx;
-		var t20 = sx * sz - cx * cz * sy;
-		var t21 = cz * sx + cx * sy * sz;
+		this.oimoVelScratch.init(this.worldVx,this.worldVy,this.worldVz);
 		var _this = this.chassisBody;
-		var q_x = 0;
-		var q_y = 0;
-		var q_z = 0;
-		var q_w = 1;
-		oimo_common_Quat.numCreations++;
-		var e00 = cy * cz;
-		var e11 = cx * cz - sx * sy * sz;
-		var e22 = cx * cy;
-		var t = e00 + e11 + e22;
-		var s;
-		if(t > 0) {
-			s = Math.sqrt(t + 1);
-			q_w = 0.5 * s;
-			s = 0.5 / s;
-			q_x = (t21 - t12) * s;
-			q_y = (sy - t20) * s;
-			q_z = (t10 - t01) * s;
-		} else if(e00 > e11) {
-			if(e00 > e22) {
-				s = Math.sqrt(e00 - e11 - e22 + 1);
-				q_x = 0.5 * s;
-				s = 0.5 / s;
-				q_y = (t01 + t10) * s;
-				q_z = (sy + t20) * s;
-				q_w = (t21 - t12) * s;
-			} else {
-				s = Math.sqrt(e22 - e00 - e11 + 1);
-				q_z = 0.5 * s;
-				s = 0.5 / s;
-				q_x = (sy + t20) * s;
-				q_y = (t12 + t21) * s;
-				q_w = (t10 - t01) * s;
-			}
-		} else if(e11 > e22) {
-			s = Math.sqrt(e11 - e22 - e00 + 1);
-			q_y = 0.5 * s;
-			s = 0.5 / s;
-			q_x = (t01 + t10) * s;
-			q_z = (t12 + t21) * s;
-			q_w = (sy - t20) * s;
-		} else {
-			s = Math.sqrt(e22 - e00 - e11 + 1);
-			q_z = 0.5 * s;
-			s = 0.5 / s;
-			q_x = (sy + t20) * s;
-			q_y = (t12 + t21) * s;
-			q_w = (t10 - t01) * s;
-		}
-		var qX;
-		var qY;
-		var qZ;
-		var qW;
-		qX = q_x;
-		qY = q_y;
-		qZ = q_z;
-		qW = q_w;
-		var x = qX;
-		var y = qY;
-		var z = qZ;
-		var w = qW;
-		var x2 = 2 * x;
-		var y2 = 2 * y;
-		var z2 = 2 * z;
-		var xx = x * x2;
-		var yy = y * y2;
-		var zz = z * z2;
-		var xy = x * y2;
-		var yz = y * z2;
-		var xz = x * z2;
-		var wx = w * x2;
-		var wy = w * y2;
-		var wz = w * z2;
-		_this._transform._rotation00 = 1 - yy - zz;
-		_this._transform._rotation01 = xy - wz;
-		_this._transform._rotation02 = xz + wy;
-		_this._transform._rotation10 = xy + wz;
-		_this._transform._rotation11 = 1 - xx - zz;
-		_this._transform._rotation12 = yz - wx;
-		_this._transform._rotation20 = xz - wy;
-		_this._transform._rotation21 = yz + wx;
-		_this._transform._rotation22 = 1 - xx - yy;
-		var __tmp__00;
-		var __tmp__01;
-		var __tmp__02;
-		var __tmp__10;
-		var __tmp__11;
-		var __tmp__12;
-		var __tmp__20;
-		var __tmp__21;
-		var __tmp__22;
-		__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
-		__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
-		__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
-		__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
-		__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
-		__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
-		__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
-		__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
-		__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
-		_this._invInertia00 = __tmp__00;
-		_this._invInertia01 = __tmp__01;
-		_this._invInertia02 = __tmp__02;
-		_this._invInertia10 = __tmp__10;
-		_this._invInertia11 = __tmp__11;
-		_this._invInertia12 = __tmp__12;
-		_this._invInertia20 = __tmp__20;
-		_this._invInertia21 = __tmp__21;
-		_this._invInertia22 = __tmp__22;
-		var __tmp__00;
-		var __tmp__01;
-		var __tmp__02;
-		var __tmp__10;
-		var __tmp__11;
-		var __tmp__12;
-		var __tmp__20;
-		var __tmp__21;
-		var __tmp__22;
-		__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
-		__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
-		__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
-		__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
-		__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
-		__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
-		__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
-		__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
-		__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
-		_this._invInertia00 = __tmp__00;
-		_this._invInertia01 = __tmp__01;
-		_this._invInertia02 = __tmp__02;
-		_this._invInertia10 = __tmp__10;
-		_this._invInertia11 = __tmp__11;
-		_this._invInertia12 = __tmp__12;
-		_this._invInertia20 = __tmp__20;
-		_this._invInertia21 = __tmp__21;
-		_this._invInertia22 = __tmp__22;
-		_this._invInertia00 *= _this._rotFactor.x;
-		_this._invInertia01 *= _this._rotFactor.x;
-		_this._invInertia02 *= _this._rotFactor.x;
-		_this._invInertia10 *= _this._rotFactor.y;
-		_this._invInertia11 *= _this._rotFactor.y;
-		_this._invInertia12 *= _this._rotFactor.y;
-		_this._invInertia20 *= _this._rotFactor.z;
-		_this._invInertia21 *= _this._rotFactor.z;
-		_this._invInertia22 *= _this._rotFactor.z;
-		var dst = _this._ptransform;
-		var src = _this._transform;
-		dst._positionX = src._positionX;
-		dst._positionY = src._positionY;
-		dst._positionZ = src._positionZ;
-		dst._rotation00 = src._rotation00;
-		dst._rotation01 = src._rotation01;
-		dst._rotation02 = src._rotation02;
-		dst._rotation10 = src._rotation10;
-		dst._rotation11 = src._rotation11;
-		dst._rotation12 = src._rotation12;
-		dst._rotation20 = src._rotation20;
-		dst._rotation21 = src._rotation21;
-		dst._rotation22 = src._rotation22;
-		var s = _this._shapeList;
-		while(s != null) {
-			var n = s._next;
-			var tf1 = _this._ptransform;
-			var tf2 = _this._transform;
-			var dst = s._ptransform;
-			var src1 = s._localTransform;
-			var __tmp__00;
-			var __tmp__01;
-			var __tmp__02;
-			var __tmp__10;
-			var __tmp__11;
-			var __tmp__12;
-			var __tmp__20;
-			var __tmp__21;
-			var __tmp__22;
-			__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
-			__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
-			__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
-			__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
-			__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
-			__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
-			__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
-			__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
-			__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
-			dst._rotation00 = __tmp__00;
-			dst._rotation01 = __tmp__01;
-			dst._rotation02 = __tmp__02;
-			dst._rotation10 = __tmp__10;
-			dst._rotation11 = __tmp__11;
-			dst._rotation12 = __tmp__12;
-			dst._rotation20 = __tmp__20;
-			dst._rotation21 = __tmp__21;
-			dst._rotation22 = __tmp__22;
-			var __tmp__X;
-			var __tmp__Y;
-			var __tmp__Z;
-			__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
-			__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
-			__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
-			dst._positionX = __tmp__X;
-			dst._positionY = __tmp__Y;
-			dst._positionZ = __tmp__Z;
-			dst._positionX += tf1._positionX;
-			dst._positionY += tf1._positionY;
-			dst._positionZ += tf1._positionZ;
-			var dst1 = s._transform;
-			var src11 = s._localTransform;
-			var __tmp__001;
-			var __tmp__011;
-			var __tmp__021;
-			var __tmp__101;
-			var __tmp__111;
-			var __tmp__121;
-			var __tmp__201;
-			var __tmp__211;
-			var __tmp__221;
-			__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
-			__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
-			__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
-			__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
-			__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
-			__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
-			__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
-			__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
-			__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
-			dst1._rotation00 = __tmp__001;
-			dst1._rotation01 = __tmp__011;
-			dst1._rotation02 = __tmp__021;
-			dst1._rotation10 = __tmp__101;
-			dst1._rotation11 = __tmp__111;
-			dst1._rotation12 = __tmp__121;
-			dst1._rotation20 = __tmp__201;
-			dst1._rotation21 = __tmp__211;
-			dst1._rotation22 = __tmp__221;
-			var __tmp__X1;
-			var __tmp__Y1;
-			var __tmp__Z1;
-			__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
-			__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
-			__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
-			dst1._positionX = __tmp__X1;
-			dst1._positionY = __tmp__Y1;
-			dst1._positionZ = __tmp__Z1;
-			dst1._positionX += tf2._positionX;
-			dst1._positionY += tf2._positionY;
-			dst1._positionZ += tf2._positionZ;
-			var minX;
-			var minY;
-			var minZ;
-			var maxX;
-			var maxY;
-			var maxZ;
-			s._geom._computeAabb(s._aabb,s._ptransform);
-			minX = s._aabb._minX;
-			minY = s._aabb._minY;
-			minZ = s._aabb._minZ;
-			maxX = s._aabb._maxX;
-			maxY = s._aabb._maxY;
-			maxZ = s._aabb._maxZ;
-			s._geom._computeAabb(s._aabb,s._transform);
-			s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
-			s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
-			s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
-			s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
-			s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
-			s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
-			if(s._proxy != null) {
-				var dX;
-				var dY;
-				var dZ;
-				dX = s._transform._positionX - s._ptransform._positionX;
-				dY = s._transform._positionY - s._ptransform._positionY;
-				dZ = s._transform._positionZ - s._ptransform._positionZ;
-				var v = s.displacement;
-				v.x = dX;
-				v.y = dY;
-				v.z = dZ;
-				s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
-			}
-			s = n;
-		}
-		_this._sleeping = false;
-		_this._sleepTime = 0;
-		var _this = this.chassisBody;
-		var x = Math.sin(this.yaw) * this.forwardSpeed + Math.cos(this.yaw) * this.lateralVelocity;
-		var y = Math.cos(this.yaw) * this.forwardSpeed + -Math.sin(this.yaw) * this.lateralVelocity;
-		var z = this.verticalVelocity;
-		if(z == null) {
-			z = 0;
-		}
-		if(y == null) {
-			y = 0;
-		}
-		if(x == null) {
-			x = 0;
-		}
-		oimo_common_Vec3.numCreations++;
+		var linearVelocity = this.oimoVelScratch;
 		if(_this._type == 1) {
 			_this._velX = 0;
 			_this._velY = 0;
 			_this._velZ = 0;
 		} else {
-			_this._velX = x;
-			_this._velY = y;
-			_this._velZ = z;
+			_this._velX = linearVelocity.x;
+			_this._velY = linearVelocity.y;
+			_this._velZ = linearVelocity.z;
 		}
 		_this._sleeping = false;
 		_this._sleepTime = 0;
-	}
-	,update: function(dt,input,waypoints,groundProvider) {
-		if(dt <= 0.0) {
-			return;
-		}
-		var clampedDt = Math.min(dt,0.05);
+		this.oimoVelScratch.init(0.0,0.0,0.0);
 		var _this = this.chassisBody;
-		var m = new oimo_common_Mat3();
-		m.e00 = _this._transform._rotation00;
-		m.e01 = _this._transform._rotation01;
-		m.e02 = _this._transform._rotation02;
-		m.e10 = _this._transform._rotation10;
-		m.e11 = _this._transform._rotation11;
-		m.e12 = _this._transform._rotation12;
-		m.e20 = _this._transform._rotation20;
-		m.e21 = _this._transform._rotation21;
-		m.e22 = _this._transform._rotation22;
-		var _this = this.chassisBody;
-		var v = new oimo_common_Vec3();
-		v.x = _this._transform._positionX;
-		v.y = _this._transform._positionY;
-		v.z = _this._transform._positionZ;
-		var _this = this.chassisBody;
-		var v1 = new oimo_common_Vec3();
-		v1.x = _this._velX;
-		v1.y = _this._velY;
-		v1.z = _this._velZ;
-		var fwdX = m.e01;
-		var fwdY = m.e11;
-		var fwdZ = m.e21;
-		var rightX = m.e00;
-		var rightY = m.e10;
-		var rightZ = m.e20;
-		var upX = m.e02;
-		var upY = m.e12;
-		var upZ = m.e22;
-		this.set_forwardSpeed(v1.x * fwdX + v1.y * fwdY + v1.z * fwdZ);
-		this.lateralVelocity = v1.x * rightX + v1.y * rightY + v1.z * rightZ;
-		this.verticalVelocity = v1.z;
-		this.updateSuspension(clampedDt,v,m,v1,fwdX,fwdY,rightX,rightY,upX,upY,upZ,waypoints,groundProvider);
-		if(!this.wasGrounded && this.isGrounded) {
-			var _this = this.chassisBody;
-			var curVel_x = 0;
-			var curVel_y = 0;
-			var curVel_z = 0;
-			oimo_common_Vec3.numCreations++;
-			curVel_x = _this._velX;
-			curVel_y = _this._velY;
-			curVel_z = _this._velZ;
-			if(curVel_z < -1.0) {
-				var forwardBoost = Math.min(10.0,Math.abs(curVel_z)) * 0.30;
-				this.set_forwardSpeed(this.forwardSpeed + forwardBoost);
-				this.scratchVec3A.init(curVel_x + fwdX * forwardBoost,curVel_y + fwdY * forwardBoost,curVel_z * 0.25);
-				var _this = this.chassisBody;
-				var linearVelocity = this.scratchVec3A;
-				if(_this._type == 1) {
-					_this._velX = 0;
-					_this._velY = 0;
-					_this._velZ = 0;
-				} else {
-					_this._velX = linearVelocity.x;
-					_this._velY = linearVelocity.y;
-					_this._velZ = linearVelocity.z;
-				}
-				_this._sleeping = false;
-				_this._sleepTime = 0;
-			}
-		}
-		this.wasGrounded = this.isGrounded;
-		if(input.boost && this.boostFuel > 0.0) {
-			this.boostFuel = Math.max(0.0,this.boostFuel - 0.25 * clampedDt);
-			this.isBoosting = this.boostFuel > 0.0;
-		} else {
-			this.isBoosting = false;
-			if(this.boostFuel < 1.0) {
-				this.boostFuel = Math.min(1.0,this.boostFuel + 0.10 * clampedDt);
-			}
-		}
-		this.updateDrivetrain(clampedDt,input);
-		if(this.isGrounded) {
-			var speedFwdSq = this.forwardSpeed * this.forwardSpeed;
-			var downforceMag = this.config.mass * 9.81 * 0.15 + 0.45 * speedFwdSq + 0.6125 * speedFwdSq * this.config.aero.downforceCoeff;
-			this.scratchVec3A.init(-upX * downforceMag,-upY * downforceMag,-upZ * downforceMag);
-			this.chassisBody.applyForceToCenter(this.scratchVec3A);
-			var netLongForce = this.computeLongitudinalForce(clampedDt,input,groundProvider);
-			this.scratchVec3A.init(fwdX * netLongForce,fwdY * netLongForce,fwdZ * netLongForce);
-			this.chassisBody.applyForceToCenter(this.scratchVec3A);
-			this.updateLateralAndDrift(clampedDt,input,fwdX,fwdY,rightX,rightY,rightZ,upX,upY,upZ,downforceMag,groundProvider);
-			var _this = this.chassisBody;
-			var curAngVel_x = 0;
-			var curAngVel_y = 0;
-			var curAngVel_z = 0;
-			oimo_common_Vec3.numCreations++;
-			curAngVel_x = _this._angVelX;
-			curAngVel_y = _this._angVelY;
-			curAngVel_z = _this._angVelZ;
-			var gyroscopicDamping = -(curAngVel_x * upX + curAngVel_y * upY + curAngVel_z * upZ) * 8.5 * this.config.yawInertia * 0.006;
-			this.scratchVec3A.init(upX * gyroscopicDamping,upY * gyroscopicDamping,upZ * gyroscopicDamping);
-			this.chassisBody.applyTorque(this.scratchVec3A);
-			var avgNx = (this.wheelNormals[0].x + this.wheelNormals[1].x + this.wheelNormals[2].x + this.wheelNormals[3].x) * 0.25;
-			var avgNy = (this.wheelNormals[0].y + this.wheelNormals[1].y + this.wheelNormals[2].y + this.wheelNormals[3].y) * 0.25;
-			var avgNz = (this.wheelNormals[0].z + this.wheelNormals[1].z + this.wheelNormals[2].z + this.wheelNormals[3].z) * 0.25;
-			var errX = upY * avgNz - upZ * avgNy;
-			var errY = upZ * avgNx - upX * avgNz;
-			var errZ = upX * avgNy - upY * avgNx;
-			var tPitch = (errX * rightX + errY * rightY + errZ * rightZ) * 12.0 * this.config.pitchInertia - (curAngVel_x * rightX + curAngVel_y * rightY + curAngVel_z * rightZ) * 2.0 * this.config.pitchInertia;
-			var tRoll = (errX * fwdX + errY * fwdY + errZ * fwdZ) * 12.0 * this.config.rollInertia - (curAngVel_x * fwdX + curAngVel_y * fwdY + curAngVel_z * fwdZ) * 2.0 * this.config.rollInertia;
-			this.scratchVec3A.init(rightX * tPitch + fwdX * tRoll,rightY * tPitch + fwdY * tRoll,rightZ * tPitch + fwdZ * tRoll);
-			this.chassisBody.applyTorque(this.scratchVec3A);
-			var absVLateral = Math.abs(this.lateralVelocity);
-			var speedAbs = Math.abs(this.forwardSpeed);
-			if(speedAbs > 2.0 && absVLateral > 0.25) {
-				var redirectMag = absVLateral * 0.25 * this.config.mass * 2.0;
-				this.scratchVec3A.init(fwdX * redirectMag,fwdY * redirectMag,0.0);
-				this.chassisBody.applyForceToCenter(this.scratchVec3A);
-			}
-			if(speedAbs < 0.25 && absVLateral < 0.25 && input.throttle == 0.0 && input.brake == 0.0) {
-				var _this = this.chassisBody;
-				var curLinV_x = 0;
-				var curLinV_y = 0;
-				var curLinV_z = 0;
-				oimo_common_Vec3.numCreations++;
-				curLinV_x = _this._velX;
-				curLinV_y = _this._velY;
-				curLinV_z = _this._velZ;
-				this.scratchVec3A.init(curLinV_x * 0.85,curLinV_y * 0.85,curLinV_z);
-				var _this = this.chassisBody;
-				var linearVelocity = this.scratchVec3A;
-				if(_this._type == 1) {
-					_this._velX = 0;
-					_this._velY = 0;
-					_this._velZ = 0;
-				} else {
-					_this._velX = linearVelocity.x;
-					_this._velY = linearVelocity.y;
-					_this._velZ = linearVelocity.z;
-				}
-				_this._sleeping = false;
-				_this._sleepTime = 0;
-				this.set_forwardSpeed(0.0);
-				this.lateralVelocity = 0.0;
-				this.scratchVec3B.init(curAngVel_x * 0.50,curAngVel_y * 0.50,curAngVel_z * 0.50);
-				var _this = this.chassisBody;
-				var angularVelocity = this.scratchVec3B;
-				if(_this._type == 1) {
-					_this._angVelX = 0;
-					_this._angVelY = 0;
-					_this._angVelZ = 0;
-				} else {
-					_this._angVelX = angularVelocity.x;
-					_this._angVelY = angularVelocity.y;
-					_this._angVelZ = angularVelocity.z;
-				}
-				_this._sleeping = false;
-				_this._sleepTime = 0;
-			} else {
-				this.scratchVec3B.init(curAngVel_x * 0.85,curAngVel_y * 0.85,curAngVel_z);
-				var _this = this.chassisBody;
-				var angularVelocity = this.scratchVec3B;
-				if(_this._type == 1) {
-					_this._angVelX = 0;
-					_this._angVelY = 0;
-					_this._angVelZ = 0;
-				} else {
-					_this._angVelX = angularVelocity.x;
-					_this._angVelY = angularVelocity.y;
-					_this._angVelZ = angularVelocity.z;
-				}
-				_this._sleeping = false;
-				_this._sleepTime = 0;
-			}
-		} else {
-			this.scratchVec3A.init(0,0,-this.config.mass * 9.81 * ((v1.z > 0.0 ? 1.05 : 1.45) - 1.0));
-			this.chassisBody.applyForceToCenter(this.scratchVec3A);
-			var _this = this.chassisBody;
-			var curAngVel_x = 0;
-			var curAngVel_y = 0;
-			oimo_common_Vec3.numCreations++;
-			curAngVel_x = _this._angVelX;
-			curAngVel_y = _this._angVelY;
-			this.scratchVec3A.init(upY * (this.config.pitchInertia * 0.015 * 40.0) - curAngVel_x * (this.config.pitchInertia * 0.02 * 5.0),-upX * (this.config.rollInertia * 0.015 * 40.0) - curAngVel_y * (this.config.rollInertia * 0.02 * 5.0),0);
-			this.chassisBody.applyTorque(this.scratchVec3A);
-			if(input.steer != 0.0) {
-				var tAftertouch = -input.steer * this.config.yawInertia * 15.0 * 0.35;
-				this.scratchVec3A.init(upX * tAftertouch,upY * tAftertouch,upZ * tAftertouch);
-				this.chassisBody.applyTorque(this.scratchVec3A);
-			}
-			this.driftAngle += (0.0 - this.driftAngle) * 4.0 * clampedDt;
-		}
-		this.physicsWorld.step(clampedDt);
-		var _this = this.chassisBody;
-		var v = new oimo_common_Vec3();
-		v.x = _this._transform._positionX;
-		v.y = _this._transform._positionY;
-		v.z = _this._transform._positionZ;
-		var _this = this.chassisBody;
-		var m = new oimo_common_Mat3();
-		m.e00 = _this._transform._rotation00;
-		m.e01 = _this._transform._rotation01;
-		m.e02 = _this._transform._rotation02;
-		m.e10 = _this._transform._rotation10;
-		m.e11 = _this._transform._rotation11;
-		m.e12 = _this._transform._rotation12;
-		m.e20 = _this._transform._rotation20;
-		m.e21 = _this._transform._rotation21;
-		m.e22 = _this._transform._rotation22;
-		var _this = this.chassisBody;
-		var v1 = new oimo_common_Vec3();
-		v1.x = _this._velX;
-		v1.y = _this._velY;
-		v1.z = _this._velZ;
-		this.pos.x = v.x;
-		this.pos.y = v.y;
-		this.pos.z = v.z - 0.35;
-		fwdX = m.e01;
-		fwdY = m.e11;
-		fwdZ = m.e21;
-		rightX = m.e00;
-		rightY = m.e10;
-		rightZ = m.e20;
-		this.set_forwardSpeed(v1.x * fwdX + v1.y * fwdY + v1.z * fwdZ);
-		this.lateralVelocity = v1.x * rightX + v1.y * rightY + v1.z * rightZ;
-		this.verticalVelocity = v1.z;
-		var sy = m.e02;
-		var euler;
-		if(sy <= -1) {
-			var xSubZ = Math.atan2(m.e21,m.e11);
-			euler = new oimo_common_Vec3(xSubZ * 0.5,-1.570796326794895,-xSubZ * 0.5);
-		} else if(sy >= 1) {
-			var xAddZ = Math.atan2(m.e21,m.e11);
-			euler = new oimo_common_Vec3(xAddZ * 0.5,1.570796326794895,xAddZ * 0.5);
-		} else {
-			euler = new oimo_common_Vec3(Math.atan2(-m.e12,m.e22),Math.asin(sy),Math.atan2(-m.e01,m.e00));
-		}
-		this.pitch = Math.max(-1.15,Math.min(1.15,euler.x));
-		this.roll = Math.max(-0.85,Math.min(0.85,euler.y));
-		this.set_yaw(-euler.z);
-		var _this = this.chassisBody;
-		var angVel_x = 0;
-		var angVel_y = 0;
-		var angVel_z = 0;
-		oimo_common_Vec3.numCreations++;
-		angVel_x = _this._angVelX;
-		angVel_y = _this._angVelY;
-		angVel_z = _this._angVelZ;
-		var _this = this.chassisBody;
-		var x = angVel_x * 0.94;
-		var y = angVel_y * 0.88;
-		var z = angVel_z;
-		if(z == null) {
-			z = 0;
-		}
-		if(y == null) {
-			y = 0;
-		}
-		if(x == null) {
-			x = 0;
-		}
-		oimo_common_Vec3.numCreations++;
+		var angularVelocity = this.oimoVelScratch;
 		if(_this._type == 1) {
 			_this._angVelX = 0;
 			_this._angVelY = 0;
 			_this._angVelZ = 0;
 		} else {
-			_this._angVelX = x;
-			_this._angVelY = y;
-			_this._angVelZ = z;
+			_this._angVelX = angularVelocity.x;
+			_this._angVelY = angularVelocity.y;
+			_this._angVelZ = angularVelocity.z;
 		}
 		_this._sleeping = false;
 		_this._sleepTime = 0;
-		if(groundProvider != null) {
-			var prevX = this.pos.x;
-			var prevY = this.pos.y;
-			var bRes = groundProvider.enforceBoundaries(this.pos,this.forwardSpeed,this.lateralVelocity);
-			if(bRes.hitWall) {
-				var dispX = this.pos.x - prevX;
-				var dispY = this.pos.y - prevY;
-				var dispLen = Math.sqrt(dispX * dispX + dispY * dispY);
-				if(dispLen > 0.0001) {
-					var inNormX = dispX / dispLen;
-					var inNormY = dispY / dispLen;
-					var wallNormX = -inNormX;
-					var wallNormY = -inNormY;
-					var wallTangX = -wallNormY;
-					var _this = this.chassisBody;
-					var curLinV_x = 0;
-					var curLinV_y = 0;
-					var curLinV_z = 0;
-					oimo_common_Vec3.numCreations++;
-					curLinV_x = _this._velX;
-					curLinV_y = _this._velY;
-					curLinV_z = _this._velZ;
-					var vIntoWall = curLinV_x * wallNormX + curLinV_y * wallNormY;
-					var reboundV = vIntoWall > 0.0 ? -0.30 * vIntoWall : 0.0;
-					var newTangV = (curLinV_x * wallTangX + curLinV_y * wallNormX) * 0.985;
-					var newVx = wallTangX * newTangV + inNormX * Math.abs(reboundV);
-					var newVy = wallNormX * newTangV + inNormY * Math.abs(reboundV);
-					if(fwdX * wallNormX + fwdY * wallNormY > 0.05) {
-						var alignSign = newTangV >= 0.0 ? 1.0 : -1.0;
-						var yawDiff = Math.atan2(wallTangX * alignSign,wallNormX * alignSign) - this.yaw;
-						while(yawDiff > Math.PI) yawDiff -= Math.PI * 2.0;
-						while(yawDiff < -Math.PI) yawDiff += Math.PI * 2.0;
-						this.set_yaw(this.yaw + yawDiff * Math.min(1.0,6.0 * clampedDt));
-						oimo_common_Mat3.numCreations++;
-						var x = this.pitch;
-						var y = this.roll;
-						var z = -this.yaw;
-						if(z == null) {
-							z = 0;
-						}
-						if(y == null) {
-							y = 0;
-						}
-						if(x == null) {
-							x = 0;
-						}
-						var eulerAngles_x = x;
-						var eulerAngles_y = y;
-						var eulerAngles_z = z;
-						oimo_common_Vec3.numCreations++;
-						var sx = Math.sin(eulerAngles_x);
-						var sy = Math.sin(eulerAngles_y);
-						var sz = Math.sin(eulerAngles_z);
-						var cx = Math.cos(eulerAngles_x);
-						var cy = Math.cos(eulerAngles_y);
-						var cz = Math.cos(eulerAngles_z);
-						var t00 = cy * cz;
-						var t01 = -cy * sz;
-						var t10 = cx * sz + cz * sx * sy;
-						var t11 = cx * cz - sx * sy * sz;
-						var t12 = -cy * sx;
-						var t20 = sx * sz - cx * cz * sy;
-						var t21 = cz * sx + cx * sy * sz;
-						var _this = this.chassisBody;
-						var q_x = 0;
-						var q_y = 0;
-						var q_z = 0;
-						var q_w = 1;
-						oimo_common_Quat.numCreations++;
-						var e00 = t00;
-						var e11 = t11;
-						var e22 = cx * cy;
-						var t = e00 + e11 + e22;
-						var s;
-						if(t > 0) {
-							s = Math.sqrt(t + 1);
-							q_w = 0.5 * s;
-							s = 0.5 / s;
-							q_x = (t21 - t12) * s;
-							q_y = (sy - t20) * s;
-							q_z = (t10 - t01) * s;
-						} else if(e00 > e11) {
-							if(e00 > e22) {
-								s = Math.sqrt(e00 - e11 - e22 + 1);
-								q_x = 0.5 * s;
-								s = 0.5 / s;
-								q_y = (t01 + t10) * s;
-								q_z = (sy + t20) * s;
-								q_w = (t21 - t12) * s;
-							} else {
-								s = Math.sqrt(e22 - e00 - e11 + 1);
-								q_z = 0.5 * s;
-								s = 0.5 / s;
-								q_x = (sy + t20) * s;
-								q_y = (t12 + t21) * s;
-								q_w = (t10 - t01) * s;
-							}
-						} else if(e11 > e22) {
-							s = Math.sqrt(e11 - e22 - e00 + 1);
-							q_y = 0.5 * s;
-							s = 0.5 / s;
-							q_x = (t01 + t10) * s;
-							q_z = (t12 + t21) * s;
-							q_w = (sy - t20) * s;
-						} else {
-							s = Math.sqrt(e22 - e00 - e11 + 1);
-							q_z = 0.5 * s;
-							s = 0.5 / s;
-							q_x = (sy + t20) * s;
-							q_y = (t12 + t21) * s;
-							q_w = (t10 - t01) * s;
-						}
-						var qX;
-						var qY;
-						var qZ;
-						var qW;
-						qX = q_x;
-						qY = q_y;
-						qZ = q_z;
-						qW = q_w;
-						var x = qX;
-						var y = qY;
-						var z = qZ;
-						var w = qW;
-						var x2 = 2 * x;
-						var y2 = 2 * y;
-						var z2 = 2 * z;
-						var xx = x * x2;
-						var yy = y * y2;
-						var zz = z * z2;
-						var xy = x * y2;
-						var yz = y * z2;
-						var xz = x * z2;
-						var wx = w * x2;
-						var wy = w * y2;
-						var wz = w * z2;
-						_this._transform._rotation00 = 1 - yy - zz;
-						_this._transform._rotation01 = xy - wz;
-						_this._transform._rotation02 = xz + wy;
-						_this._transform._rotation10 = xy + wz;
-						_this._transform._rotation11 = 1 - xx - zz;
-						_this._transform._rotation12 = yz - wx;
-						_this._transform._rotation20 = xz - wy;
-						_this._transform._rotation21 = yz + wx;
-						_this._transform._rotation22 = 1 - xx - yy;
-						var __tmp__00;
-						var __tmp__01;
-						var __tmp__02;
-						var __tmp__10;
-						var __tmp__11;
-						var __tmp__12;
-						var __tmp__20;
-						var __tmp__21;
-						var __tmp__22;
-						__tmp__00 = _this._transform._rotation00 * _this._invLocalInertia00 + _this._transform._rotation01 * _this._invLocalInertia10 + _this._transform._rotation02 * _this._invLocalInertia20;
-						__tmp__01 = _this._transform._rotation00 * _this._invLocalInertia01 + _this._transform._rotation01 * _this._invLocalInertia11 + _this._transform._rotation02 * _this._invLocalInertia21;
-						__tmp__02 = _this._transform._rotation00 * _this._invLocalInertia02 + _this._transform._rotation01 * _this._invLocalInertia12 + _this._transform._rotation02 * _this._invLocalInertia22;
-						__tmp__10 = _this._transform._rotation10 * _this._invLocalInertia00 + _this._transform._rotation11 * _this._invLocalInertia10 + _this._transform._rotation12 * _this._invLocalInertia20;
-						__tmp__11 = _this._transform._rotation10 * _this._invLocalInertia01 + _this._transform._rotation11 * _this._invLocalInertia11 + _this._transform._rotation12 * _this._invLocalInertia21;
-						__tmp__12 = _this._transform._rotation10 * _this._invLocalInertia02 + _this._transform._rotation11 * _this._invLocalInertia12 + _this._transform._rotation12 * _this._invLocalInertia22;
-						__tmp__20 = _this._transform._rotation20 * _this._invLocalInertia00 + _this._transform._rotation21 * _this._invLocalInertia10 + _this._transform._rotation22 * _this._invLocalInertia20;
-						__tmp__21 = _this._transform._rotation20 * _this._invLocalInertia01 + _this._transform._rotation21 * _this._invLocalInertia11 + _this._transform._rotation22 * _this._invLocalInertia21;
-						__tmp__22 = _this._transform._rotation20 * _this._invLocalInertia02 + _this._transform._rotation21 * _this._invLocalInertia12 + _this._transform._rotation22 * _this._invLocalInertia22;
-						_this._invInertia00 = __tmp__00;
-						_this._invInertia01 = __tmp__01;
-						_this._invInertia02 = __tmp__02;
-						_this._invInertia10 = __tmp__10;
-						_this._invInertia11 = __tmp__11;
-						_this._invInertia12 = __tmp__12;
-						_this._invInertia20 = __tmp__20;
-						_this._invInertia21 = __tmp__21;
-						_this._invInertia22 = __tmp__22;
-						var __tmp__00;
-						var __tmp__01;
-						var __tmp__02;
-						var __tmp__10;
-						var __tmp__11;
-						var __tmp__12;
-						var __tmp__20;
-						var __tmp__21;
-						var __tmp__22;
-						__tmp__00 = _this._invInertia00 * _this._transform._rotation00 + _this._invInertia01 * _this._transform._rotation01 + _this._invInertia02 * _this._transform._rotation02;
-						__tmp__01 = _this._invInertia00 * _this._transform._rotation10 + _this._invInertia01 * _this._transform._rotation11 + _this._invInertia02 * _this._transform._rotation12;
-						__tmp__02 = _this._invInertia00 * _this._transform._rotation20 + _this._invInertia01 * _this._transform._rotation21 + _this._invInertia02 * _this._transform._rotation22;
-						__tmp__10 = _this._invInertia10 * _this._transform._rotation00 + _this._invInertia11 * _this._transform._rotation01 + _this._invInertia12 * _this._transform._rotation02;
-						__tmp__11 = _this._invInertia10 * _this._transform._rotation10 + _this._invInertia11 * _this._transform._rotation11 + _this._invInertia12 * _this._transform._rotation12;
-						__tmp__12 = _this._invInertia10 * _this._transform._rotation20 + _this._invInertia11 * _this._transform._rotation21 + _this._invInertia12 * _this._transform._rotation22;
-						__tmp__20 = _this._invInertia20 * _this._transform._rotation00 + _this._invInertia21 * _this._transform._rotation01 + _this._invInertia22 * _this._transform._rotation02;
-						__tmp__21 = _this._invInertia20 * _this._transform._rotation10 + _this._invInertia21 * _this._transform._rotation11 + _this._invInertia22 * _this._transform._rotation12;
-						__tmp__22 = _this._invInertia20 * _this._transform._rotation20 + _this._invInertia21 * _this._transform._rotation21 + _this._invInertia22 * _this._transform._rotation22;
-						_this._invInertia00 = __tmp__00;
-						_this._invInertia01 = __tmp__01;
-						_this._invInertia02 = __tmp__02;
-						_this._invInertia10 = __tmp__10;
-						_this._invInertia11 = __tmp__11;
-						_this._invInertia12 = __tmp__12;
-						_this._invInertia20 = __tmp__20;
-						_this._invInertia21 = __tmp__21;
-						_this._invInertia22 = __tmp__22;
-						_this._invInertia00 *= _this._rotFactor.x;
-						_this._invInertia01 *= _this._rotFactor.x;
-						_this._invInertia02 *= _this._rotFactor.x;
-						_this._invInertia10 *= _this._rotFactor.y;
-						_this._invInertia11 *= _this._rotFactor.y;
-						_this._invInertia12 *= _this._rotFactor.y;
-						_this._invInertia20 *= _this._rotFactor.z;
-						_this._invInertia21 *= _this._rotFactor.z;
-						_this._invInertia22 *= _this._rotFactor.z;
-						var dst = _this._ptransform;
-						var src = _this._transform;
-						dst._positionX = src._positionX;
-						dst._positionY = src._positionY;
-						dst._positionZ = src._positionZ;
-						dst._rotation00 = src._rotation00;
-						dst._rotation01 = src._rotation01;
-						dst._rotation02 = src._rotation02;
-						dst._rotation10 = src._rotation10;
-						dst._rotation11 = src._rotation11;
-						dst._rotation12 = src._rotation12;
-						dst._rotation20 = src._rotation20;
-						dst._rotation21 = src._rotation21;
-						dst._rotation22 = src._rotation22;
-						var s = _this._shapeList;
-						while(s != null) {
-							var n = s._next;
-							var tf1 = _this._ptransform;
-							var tf2 = _this._transform;
-							var dst = s._ptransform;
-							var src1 = s._localTransform;
-							var __tmp__00;
-							var __tmp__01;
-							var __tmp__02;
-							var __tmp__10;
-							var __tmp__11;
-							var __tmp__12;
-							var __tmp__20;
-							var __tmp__21;
-							var __tmp__22;
-							__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
-							__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
-							__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
-							__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
-							__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
-							__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
-							__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
-							__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
-							__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
-							dst._rotation00 = __tmp__00;
-							dst._rotation01 = __tmp__01;
-							dst._rotation02 = __tmp__02;
-							dst._rotation10 = __tmp__10;
-							dst._rotation11 = __tmp__11;
-							dst._rotation12 = __tmp__12;
-							dst._rotation20 = __tmp__20;
-							dst._rotation21 = __tmp__21;
-							dst._rotation22 = __tmp__22;
-							var __tmp__X;
-							var __tmp__Y;
-							var __tmp__Z;
-							__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
-							__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
-							__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
-							dst._positionX = __tmp__X;
-							dst._positionY = __tmp__Y;
-							dst._positionZ = __tmp__Z;
-							dst._positionX += tf1._positionX;
-							dst._positionY += tf1._positionY;
-							dst._positionZ += tf1._positionZ;
-							var dst1 = s._transform;
-							var src11 = s._localTransform;
-							var __tmp__001;
-							var __tmp__011;
-							var __tmp__021;
-							var __tmp__101;
-							var __tmp__111;
-							var __tmp__121;
-							var __tmp__201;
-							var __tmp__211;
-							var __tmp__221;
-							__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
-							__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
-							__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
-							__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
-							__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
-							__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
-							__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
-							__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
-							__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
-							dst1._rotation00 = __tmp__001;
-							dst1._rotation01 = __tmp__011;
-							dst1._rotation02 = __tmp__021;
-							dst1._rotation10 = __tmp__101;
-							dst1._rotation11 = __tmp__111;
-							dst1._rotation12 = __tmp__121;
-							dst1._rotation20 = __tmp__201;
-							dst1._rotation21 = __tmp__211;
-							dst1._rotation22 = __tmp__221;
-							var __tmp__X1;
-							var __tmp__Y1;
-							var __tmp__Z1;
-							__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
-							__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
-							__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
-							dst1._positionX = __tmp__X1;
-							dst1._positionY = __tmp__Y1;
-							dst1._positionZ = __tmp__Z1;
-							dst1._positionX += tf2._positionX;
-							dst1._positionY += tf2._positionY;
-							dst1._positionZ += tf2._positionZ;
-							var minX;
-							var minY;
-							var minZ;
-							var maxX;
-							var maxY;
-							var maxZ;
-							s._geom._computeAabb(s._aabb,s._ptransform);
-							minX = s._aabb._minX;
-							minY = s._aabb._minY;
-							minZ = s._aabb._minZ;
-							maxX = s._aabb._maxX;
-							maxY = s._aabb._maxY;
-							maxZ = s._aabb._maxZ;
-							s._geom._computeAabb(s._aabb,s._transform);
-							s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
-							s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
-							s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
-							s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
-							s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
-							s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
-							if(s._proxy != null) {
-								var dX;
-								var dY;
-								var dZ;
-								dX = s._transform._positionX - s._ptransform._positionX;
-								dY = s._transform._positionY - s._ptransform._positionY;
-								dZ = s._transform._positionZ - s._ptransform._positionZ;
-								var v1 = s.displacement;
-								v1.x = dX;
-								v1.y = dY;
-								v1.z = dZ;
-								s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
-							}
-							s = n;
-						}
-						_this._sleeping = false;
-						_this._sleepTime = 0;
-						fwdX = t01;
-						fwdY = t11;
-						rightX = t00;
-						rightY = t10;
-					}
-					this.set_forwardSpeed(newVx * fwdX + newVy * fwdY);
-					this.lateralVelocity = newVx * rightX + newVy * rightY;
-					var _this = this.chassisBody;
-					var x = this.pos.x;
-					var y = this.pos.y;
-					var z = v.z;
-					if(z == null) {
-						z = 0;
-					}
-					if(y == null) {
-						y = 0;
-					}
-					if(x == null) {
-						x = 0;
-					}
-					oimo_common_Vec3.numCreations++;
-					_this._transform._positionX = x;
-					_this._transform._positionY = y;
-					_this._transform._positionZ = z;
-					var dst = _this._ptransform;
-					var src = _this._transform;
-					dst._positionX = src._positionX;
-					dst._positionY = src._positionY;
-					dst._positionZ = src._positionZ;
-					dst._rotation00 = src._rotation00;
-					dst._rotation01 = src._rotation01;
-					dst._rotation02 = src._rotation02;
-					dst._rotation10 = src._rotation10;
-					dst._rotation11 = src._rotation11;
-					dst._rotation12 = src._rotation12;
-					dst._rotation20 = src._rotation20;
-					dst._rotation21 = src._rotation21;
-					dst._rotation22 = src._rotation22;
-					var s = _this._shapeList;
-					while(s != null) {
-						var n = s._next;
-						var tf1 = _this._ptransform;
-						var tf2 = _this._transform;
-						var dst = s._ptransform;
-						var src1 = s._localTransform;
-						var __tmp__00;
-						var __tmp__01;
-						var __tmp__02;
-						var __tmp__10;
-						var __tmp__11;
-						var __tmp__12;
-						var __tmp__20;
-						var __tmp__21;
-						var __tmp__22;
-						__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
-						__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
-						__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
-						__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
-						__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
-						__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
-						__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
-						__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
-						__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
-						dst._rotation00 = __tmp__00;
-						dst._rotation01 = __tmp__01;
-						dst._rotation02 = __tmp__02;
-						dst._rotation10 = __tmp__10;
-						dst._rotation11 = __tmp__11;
-						dst._rotation12 = __tmp__12;
-						dst._rotation20 = __tmp__20;
-						dst._rotation21 = __tmp__21;
-						dst._rotation22 = __tmp__22;
-						var __tmp__X;
-						var __tmp__Y;
-						var __tmp__Z;
-						__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
-						__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
-						__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
-						dst._positionX = __tmp__X;
-						dst._positionY = __tmp__Y;
-						dst._positionZ = __tmp__Z;
-						dst._positionX += tf1._positionX;
-						dst._positionY += tf1._positionY;
-						dst._positionZ += tf1._positionZ;
-						var dst1 = s._transform;
-						var src11 = s._localTransform;
-						var __tmp__001;
-						var __tmp__011;
-						var __tmp__021;
-						var __tmp__101;
-						var __tmp__111;
-						var __tmp__121;
-						var __tmp__201;
-						var __tmp__211;
-						var __tmp__221;
-						__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
-						__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
-						__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
-						__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
-						__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
-						__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
-						__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
-						__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
-						__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
-						dst1._rotation00 = __tmp__001;
-						dst1._rotation01 = __tmp__011;
-						dst1._rotation02 = __tmp__021;
-						dst1._rotation10 = __tmp__101;
-						dst1._rotation11 = __tmp__111;
-						dst1._rotation12 = __tmp__121;
-						dst1._rotation20 = __tmp__201;
-						dst1._rotation21 = __tmp__211;
-						dst1._rotation22 = __tmp__221;
-						var __tmp__X1;
-						var __tmp__Y1;
-						var __tmp__Z1;
-						__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
-						__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
-						__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
-						dst1._positionX = __tmp__X1;
-						dst1._positionY = __tmp__Y1;
-						dst1._positionZ = __tmp__Z1;
-						dst1._positionX += tf2._positionX;
-						dst1._positionY += tf2._positionY;
-						dst1._positionZ += tf2._positionZ;
-						var minX;
-						var minY;
-						var minZ;
-						var maxX;
-						var maxY;
-						var maxZ;
-						s._geom._computeAabb(s._aabb,s._ptransform);
-						minX = s._aabb._minX;
-						minY = s._aabb._minY;
-						minZ = s._aabb._minZ;
-						maxX = s._aabb._maxX;
-						maxY = s._aabb._maxY;
-						maxZ = s._aabb._maxZ;
-						s._geom._computeAabb(s._aabb,s._transform);
-						s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
-						s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
-						s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
-						s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
-						s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
-						s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
-						if(s._proxy != null) {
-							var dX;
-							var dY;
-							var dZ;
-							dX = s._transform._positionX - s._ptransform._positionX;
-							dY = s._transform._positionY - s._ptransform._positionY;
-							dZ = s._transform._positionZ - s._ptransform._positionZ;
-							var v1 = s.displacement;
-							v1.x = dX;
-							v1.y = dY;
-							v1.z = dZ;
-							s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
-						}
-						s = n;
-					}
-					_this._sleeping = false;
-					_this._sleepTime = 0;
-					this.scratchVec3A.init(newVx,newVy,curLinV_z * 0.5);
-					var _this = this.chassisBody;
-					var linearVelocity = this.scratchVec3A;
-					if(_this._type == 1) {
-						_this._velX = 0;
-						_this._velY = 0;
-						_this._velZ = 0;
-					} else {
-						_this._velX = linearVelocity.x;
-						_this._velY = linearVelocity.y;
-						_this._velZ = linearVelocity.z;
-					}
-					_this._sleeping = false;
-					_this._sleepTime = 0;
-				} else {
-					this.set_forwardSpeed(this.forwardSpeed * bRes.speedMult);
-					this.lateralVelocity *= bRes.latMult;
-					var _this = this.chassisBody;
-					var x = this.pos.x;
-					var y = this.pos.y;
-					var z = v.z;
-					if(z == null) {
-						z = 0;
-					}
-					if(y == null) {
-						y = 0;
-					}
-					if(x == null) {
-						x = 0;
-					}
-					oimo_common_Vec3.numCreations++;
-					_this._transform._positionX = x;
-					_this._transform._positionY = y;
-					_this._transform._positionZ = z;
-					var dst = _this._ptransform;
-					var src = _this._transform;
-					dst._positionX = src._positionX;
-					dst._positionY = src._positionY;
-					dst._positionZ = src._positionZ;
-					dst._rotation00 = src._rotation00;
-					dst._rotation01 = src._rotation01;
-					dst._rotation02 = src._rotation02;
-					dst._rotation10 = src._rotation10;
-					dst._rotation11 = src._rotation11;
-					dst._rotation12 = src._rotation12;
-					dst._rotation20 = src._rotation20;
-					dst._rotation21 = src._rotation21;
-					dst._rotation22 = src._rotation22;
-					var s = _this._shapeList;
-					while(s != null) {
-						var n = s._next;
-						var tf1 = _this._ptransform;
-						var tf2 = _this._transform;
-						var dst = s._ptransform;
-						var src1 = s._localTransform;
-						var __tmp__00;
-						var __tmp__01;
-						var __tmp__02;
-						var __tmp__10;
-						var __tmp__11;
-						var __tmp__12;
-						var __tmp__20;
-						var __tmp__21;
-						var __tmp__22;
-						__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
-						__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
-						__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
-						__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
-						__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
-						__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
-						__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
-						__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
-						__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
-						dst._rotation00 = __tmp__00;
-						dst._rotation01 = __tmp__01;
-						dst._rotation02 = __tmp__02;
-						dst._rotation10 = __tmp__10;
-						dst._rotation11 = __tmp__11;
-						dst._rotation12 = __tmp__12;
-						dst._rotation20 = __tmp__20;
-						dst._rotation21 = __tmp__21;
-						dst._rotation22 = __tmp__22;
-						var __tmp__X;
-						var __tmp__Y;
-						var __tmp__Z;
-						__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
-						__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
-						__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
-						dst._positionX = __tmp__X;
-						dst._positionY = __tmp__Y;
-						dst._positionZ = __tmp__Z;
-						dst._positionX += tf1._positionX;
-						dst._positionY += tf1._positionY;
-						dst._positionZ += tf1._positionZ;
-						var dst1 = s._transform;
-						var src11 = s._localTransform;
-						var __tmp__001;
-						var __tmp__011;
-						var __tmp__021;
-						var __tmp__101;
-						var __tmp__111;
-						var __tmp__121;
-						var __tmp__201;
-						var __tmp__211;
-						var __tmp__221;
-						__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
-						__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
-						__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
-						__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
-						__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
-						__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
-						__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
-						__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
-						__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
-						dst1._rotation00 = __tmp__001;
-						dst1._rotation01 = __tmp__011;
-						dst1._rotation02 = __tmp__021;
-						dst1._rotation10 = __tmp__101;
-						dst1._rotation11 = __tmp__111;
-						dst1._rotation12 = __tmp__121;
-						dst1._rotation20 = __tmp__201;
-						dst1._rotation21 = __tmp__211;
-						dst1._rotation22 = __tmp__221;
-						var __tmp__X1;
-						var __tmp__Y1;
-						var __tmp__Z1;
-						__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
-						__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
-						__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
-						dst1._positionX = __tmp__X1;
-						dst1._positionY = __tmp__Y1;
-						dst1._positionZ = __tmp__Z1;
-						dst1._positionX += tf2._positionX;
-						dst1._positionY += tf2._positionY;
-						dst1._positionZ += tf2._positionZ;
-						var minX;
-						var minY;
-						var minZ;
-						var maxX;
-						var maxY;
-						var maxZ;
-						s._geom._computeAabb(s._aabb,s._ptransform);
-						minX = s._aabb._minX;
-						minY = s._aabb._minY;
-						minZ = s._aabb._minZ;
-						maxX = s._aabb._maxX;
-						maxY = s._aabb._maxY;
-						maxZ = s._aabb._maxZ;
-						s._geom._computeAabb(s._aabb,s._transform);
-						s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
-						s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
-						s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
-						s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
-						s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
-						s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
-						if(s._proxy != null) {
-							var dX;
-							var dY;
-							var dZ;
-							dX = s._transform._positionX - s._ptransform._positionX;
-							dY = s._transform._positionY - s._ptransform._positionY;
-							dZ = s._transform._positionZ - s._ptransform._positionZ;
-							var v1 = s.displacement;
-							v1.x = dX;
-							v1.y = dY;
-							v1.z = dZ;
-							s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
-						}
-						s = n;
-					}
-					_this._sleeping = false;
-					_this._sleepTime = 0;
-					this.scratchVec3A.init(fwdX * this.forwardSpeed + rightX * this.lateralVelocity,fwdY * this.forwardSpeed + rightY * this.lateralVelocity,this.verticalVelocity * 0.5);
-					var _this = this.chassisBody;
-					var linearVelocity = this.scratchVec3A;
-					if(_this._type == 1) {
-						_this._velX = 0;
-						_this._velY = 0;
-						_this._velZ = 0;
-					} else {
-						_this._velX = linearVelocity.x;
-						_this._velY = linearVelocity.y;
-						_this._velZ = linearVelocity.z;
-					}
-					_this._sleeping = false;
-					_this._sleepTime = 0;
-				}
-			}
-			var minChassisZ = groundProvider.getGroundElevation(v.x,v.y) + 0.22 * Math.max(0.2,upZ);
-			if(v.z < minChassisZ) {
-				var pen = minChassisZ - v.z;
-				v.z = minChassisZ;
-				var _this = this.chassisBody;
-				var v1 = v;
-				_this._transform._positionX = v1.x;
-				_this._transform._positionY = v1.y;
-				_this._transform._positionZ = v1.z;
-				var dst = _this._ptransform;
-				var src = _this._transform;
-				dst._positionX = src._positionX;
-				dst._positionY = src._positionY;
-				dst._positionZ = src._positionZ;
-				dst._rotation00 = src._rotation00;
-				dst._rotation01 = src._rotation01;
-				dst._rotation02 = src._rotation02;
-				dst._rotation10 = src._rotation10;
-				dst._rotation11 = src._rotation11;
-				dst._rotation12 = src._rotation12;
-				dst._rotation20 = src._rotation20;
-				dst._rotation21 = src._rotation21;
-				dst._rotation22 = src._rotation22;
-				var s = _this._shapeList;
-				while(s != null) {
-					var n = s._next;
-					var tf1 = _this._ptransform;
-					var tf2 = _this._transform;
-					var dst = s._ptransform;
-					var src1 = s._localTransform;
-					var __tmp__00;
-					var __tmp__01;
-					var __tmp__02;
-					var __tmp__10;
-					var __tmp__11;
-					var __tmp__12;
-					var __tmp__20;
-					var __tmp__21;
-					var __tmp__22;
-					__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
-					__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
-					__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
-					__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
-					__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
-					__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
-					__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
-					__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
-					__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
-					dst._rotation00 = __tmp__00;
-					dst._rotation01 = __tmp__01;
-					dst._rotation02 = __tmp__02;
-					dst._rotation10 = __tmp__10;
-					dst._rotation11 = __tmp__11;
-					dst._rotation12 = __tmp__12;
-					dst._rotation20 = __tmp__20;
-					dst._rotation21 = __tmp__21;
-					dst._rotation22 = __tmp__22;
-					var __tmp__X;
-					var __tmp__Y;
-					var __tmp__Z;
-					__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
-					__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
-					__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
-					dst._positionX = __tmp__X;
-					dst._positionY = __tmp__Y;
-					dst._positionZ = __tmp__Z;
-					dst._positionX += tf1._positionX;
-					dst._positionY += tf1._positionY;
-					dst._positionZ += tf1._positionZ;
-					var dst1 = s._transform;
-					var src11 = s._localTransform;
-					var __tmp__001;
-					var __tmp__011;
-					var __tmp__021;
-					var __tmp__101;
-					var __tmp__111;
-					var __tmp__121;
-					var __tmp__201;
-					var __tmp__211;
-					var __tmp__221;
-					__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
-					__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
-					__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
-					__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
-					__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
-					__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
-					__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
-					__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
-					__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
-					dst1._rotation00 = __tmp__001;
-					dst1._rotation01 = __tmp__011;
-					dst1._rotation02 = __tmp__021;
-					dst1._rotation10 = __tmp__101;
-					dst1._rotation11 = __tmp__111;
-					dst1._rotation12 = __tmp__121;
-					dst1._rotation20 = __tmp__201;
-					dst1._rotation21 = __tmp__211;
-					dst1._rotation22 = __tmp__221;
-					var __tmp__X1;
-					var __tmp__Y1;
-					var __tmp__Z1;
-					__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
-					__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
-					__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
-					dst1._positionX = __tmp__X1;
-					dst1._positionY = __tmp__Y1;
-					dst1._positionZ = __tmp__Z1;
-					dst1._positionX += tf2._positionX;
-					dst1._positionY += tf2._positionY;
-					dst1._positionZ += tf2._positionZ;
-					var minX;
-					var minY;
-					var minZ;
-					var maxX;
-					var maxY;
-					var maxZ;
-					s._geom._computeAabb(s._aabb,s._ptransform);
-					minX = s._aabb._minX;
-					minY = s._aabb._minY;
-					minZ = s._aabb._minZ;
-					maxX = s._aabb._maxX;
-					maxY = s._aabb._maxY;
-					maxZ = s._aabb._maxZ;
-					s._geom._computeAabb(s._aabb,s._transform);
-					s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
-					s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
-					s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
-					s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
-					s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
-					s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
-					if(s._proxy != null) {
-						var dX;
-						var dY;
-						var dZ;
-						dX = s._transform._positionX - s._ptransform._positionX;
-						dY = s._transform._positionY - s._ptransform._positionY;
-						dZ = s._transform._positionZ - s._ptransform._positionZ;
-						var v1 = s.displacement;
-						v1.x = dX;
-						v1.y = dY;
-						v1.z = dZ;
-						s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
-					}
-					s = n;
-				}
-				_this._sleeping = false;
-				_this._sleepTime = 0;
-				this.pos.z = v.z;
-				var _this = this.chassisBody;
-				var v_x = 0;
-				var v_y = 0;
-				var v_z = 0;
-				oimo_common_Vec3.numCreations++;
-				v_x = _this._velX;
-				v_y = _this._velY;
-				v_z = _this._velZ;
-				if(v_z < 0.0) {
-					var _this = this.chassisBody;
-					if(_this._type == 1) {
-						_this._velX = 0;
-						_this._velY = 0;
-						_this._velZ = 0;
-					} else {
-						_this._velX = v_x;
-						_this._velY = v_y;
-						_this._velZ = 0.0;
-					}
-					_this._sleeping = false;
-					_this._sleepTime = 0;
-				}
-				groundProvider.getGroundNormal(v.x,v.y,this.scratchGroundNormal);
-				var bounceForce = pen * this.config.mass * 250.0;
-				this.scratchVec3A.init(this.scratchGroundNormal.x * bounceForce,this.scratchGroundNormal.y * bounceForce,this.scratchGroundNormal.z * bounceForce);
-				this.chassisBody.applyForceToCenter(this.scratchVec3A);
-			}
-		}
 	}
-	,updateSuspension: function(dt,bPos,bRot,bLinVel,fwdX,fwdY,rightX,rightY,upX,upY,upZ,waypoints,groundProvider) {
-		var susp = this.config.suspension;
-		var restLen = susp.restLength;
-		var k = susp.springRate;
-		var c = susp.damping;
-		var arbK = susp.antiRollStiffness;
-		var groundContacts = 0;
+	,update: function(dt,input,waypoints,ground) {
+		if(dt <= 0.0 || isNaN(dt)) {
+			return;
+		}
+		this.groundProvider = ground;
+		var frameDt = dt > this.maxDt ? this.maxDt : dt;
+		var steps = Math.ceil(frameDt / 0.0041666666666666666);
+		if(steps < 1) {
+			steps = 1;
+		}
+		var subDt = frameDt / steps;
+		var steerIn;
+		if(input != null) {
+			var v = input.steer;
+			steerIn = v < -1.0 ? -1.0 : v > 1.0 ? 1.0 : v;
+		} else {
+			steerIn = 0.0;
+		}
+		var throttleIn;
+		if(input != null) {
+			var v = input.throttle;
+			throttleIn = v < 0.0 ? 0.0 : v > 1.0 ? 1.0 : v;
+		} else {
+			throttleIn = 0.0;
+		}
+		var brakeIn;
+		if(input != null) {
+			var v = input.brake;
+			brakeIn = v < 0.0 ? 0.0 : v > 1.0 ? 1.0 : v;
+		} else {
+			brakeIn = 0.0;
+		}
+		var handbrakeIn = input != null && input.handbrake;
+		var boostIn = input != null && input.boost;
 		var _g = 0;
-		while(_g < 4) {
-			var i = _g++;
-			var offset = physics_CarPhysics.WHEEL_OFFSETS[i];
-			var attachX = bPos.x + (rightX * offset.x + fwdX * offset.y);
-			var attachY = bPos.y + (rightY * offset.x + fwdY * offset.y);
-			var attachZ = bPos.z + (bRot.e20 * offset.x + bRot.e21 * offset.y);
-			var _this = this.scratchWheelWorld;
-			var x = attachX;
-			var y = attachY;
-			var z = attachZ;
-			if(attachZ == null) {
-				z = 0.;
-			}
-			if(attachY == null) {
-				y = 0.;
-			}
-			if(attachX == null) {
-				x = 0.;
-			}
-			_this.x = x;
-			_this.y = y;
-			_this.z = z;
-			var groundZ = 0.0;
-			var nx = 0.0;
-			var ny = 0.0;
-			var nz = 1.0;
-			if(groundProvider != null) {
-				groundZ = groundProvider.getGroundElevation(attachX,attachY);
-				groundProvider.getGroundNormal(attachX,attachY,this.scratchGroundNormal);
-				nx = this.scratchGroundNormal.x;
-				ny = this.scratchGroundNormal.y;
-				nz = this.scratchGroundNormal.z;
-			} else if(waypoints != null && waypoints.length > 0) {
-				var proj = physics_SplineMath.getClosestSegment(this.scratchWheelWorld,waypoints);
-				groundZ = proj.z + 0.06;
-				nx = -proj.segDirY * 0.04;
-				ny = proj.segDirX * 0.04;
-				nz = Math.sqrt(Math.max(0.01,1.0 - (nx * nx + ny * ny)));
-			} else {
-				groundZ = 0.0;
-			}
-			this.wheelGroundZ[i] = groundZ;
-			var _this1 = this.wheelNormals[i];
-			var x1 = nx;
-			var y1 = ny;
-			var z1 = nz;
-			if(z1 == null) {
-				z1 = 0.;
-			}
-			if(y1 == null) {
-				y1 = 0.;
-			}
-			if(x1 == null) {
-				x1 = 0.;
-			}
-			_this1.x = x1;
-			_this1.y = y1;
-			_this1.z = z1;
-			var currentLen = (attachZ - groundZ) / Math.max(0.3,upZ);
-			this.prevSuspLength[i] = this.suspLength[i];
-			if(currentLen <= restLen) {
-				this.wheelOnGround[i] = true;
-				++groundContacts;
-				this.suspLength[i] = Math.max(susp.minTravel,Math.min(restLen,currentLen));
-				this.suspCompression[i] = Math.max(0.0,(restLen - this.suspLength[i]) / (restLen - susp.minTravel));
-				var springForce = k * (restLen - currentLen) + c * ((this.prevSuspLength[i] - currentLen) / dt);
-				if(currentLen < susp.minTravel) {
-					springForce += (susp.minTravel - currentLen) * k * 0.5;
-				}
-				if(springForce < 0.0) {
-					springForce = 0.0;
-				}
-				var maxWheelForce = this.config.mass * 9.81 * 0.25 * 2.5;
-				if(springForce > maxWheelForce) {
-					springForce = maxWheelForce;
-				}
-				this.scratchVec3A.init(nx * springForce,ny * springForce,nz * springForce);
-				this.scratchVec3B.init(attachX,attachY,attachZ);
-				this.chassisBody.applyForce(this.scratchVec3A,this.scratchVec3B);
-			} else {
-				this.wheelOnGround[i] = false;
-				this.suspLength[i] = Math.min(susp.maxTravel,currentLen);
-				this.suspCompression[i] = 0.0;
-			}
+		var _g1 = steps;
+		while(_g < _g1) {
+			++_g;
+			this.stepSubstep(subDt,steerIn,throttleIn,brakeIn,handbrakeIn,boostIn,ground);
 		}
-		this.isGrounded = groundContacts >= 2;
-		this.scratchVec3A.init(0,-(((restLen - this.suspLength[0] - (restLen - this.suspLength[1])) * arbK + (restLen - this.suspLength[2] - (restLen - this.suspLength[3])) * arbK) * 0.5) * 0.1,0);
-		this.chassisBody.applyTorque(this.scratchVec3A);
-	}
-	,updateDrivetrain: function(dt,input) {
-		var dtCfg = this.config.drivetrain;
-		if(this.shiftTimer > 0.0) {
-			this.shiftTimer -= dt;
-			if(this.shiftTimer <= 0.0) {
-				this.isShifting = false;
-			}
-		}
-		var speedAbs = Math.abs(this.forwardSpeed);
-		var wheelCircumference = 2.0 * Math.PI * 0.36;
-		var gearRatio = 1.0;
-		if(this.forwardSpeed < -0.5) {
-			this.currentGear = -1;
-			gearRatio = Math.abs(dtCfg.reverseRatio);
-		} else {
-			if(this.currentGear < 1) {
-				this.currentGear = 1;
-			}
-			gearRatio = dtCfg.gearRatios[Math.floor(Math.min(this.currentGear - 1,dtCfg.gearRatios.length - 1))];
-		}
-		var targetRPM = dtCfg.idleRPM + speedAbs / wheelCircumference * 60.0 * gearRatio * dtCfg.finalDrive * 0.42;
-		if(this.isShifting || speedAbs < 1.0 && input.throttle > 0.0) {
-			targetRPM = Math.max(targetRPM,dtCfg.idleRPM + input.throttle * 4500.0);
-		}
-		targetRPM = Math.max(dtCfg.idleRPM,Math.min(dtCfg.redlineRPM,targetRPM));
-		this.engineRPM += (targetRPM - this.engineRPM) * Math.min(1.0,14.0 * dt);
-		if(this.currentGear > 0 && !this.isShifting) {
-			var numGears = dtCfg.gearRatios.length;
-			if(this.engineRPM > dtCfg.shiftUpRPM && this.currentGear < numGears && speedAbs > 8.0) {
-				this.currentGear++;
-				this.isShifting = true;
-				this.shiftTimer = dtCfg.shiftDelay;
-				this.engineRPM *= 0.72;
-			} else if(this.engineRPM < dtCfg.shiftDownRPM && this.currentGear > 1 && speedAbs < 68.0 * (this.currentGear / numGears) * 0.75) {
-				this.currentGear--;
-				this.isShifting = true;
-				this.shiftTimer = dtCfg.shiftDelay;
-				this.engineRPM = Math.min(dtCfg.redlineRPM,this.engineRPM * 1.35);
-			}
-		}
-		var rearAvgSpin = (this.wheelSpinVelocity[2] + this.wheelSpinVelocity[3]) * 0.5;
-		var lsdLock = dtCfg.lsdLockRatio;
-		this.wheelSpinVelocity[2] += (rearAvgSpin - this.wheelSpinVelocity[2]) * lsdLock * Math.min(1.0,15.0 * dt);
-		this.wheelSpinVelocity[3] += (rearAvgSpin - this.wheelSpinVelocity[3]) * lsdLock * Math.min(1.0,15.0 * dt);
-	}
-	,computeLongitudinalForce: function(dt,input,groundProvider) {
-		var surfaceFriction = groundProvider != null ? groundProvider.getGroundFriction(this.pos.x,this.pos.y) : 1.0;
-		var mu = this.config.tires.groundFriction * surfaceFriction;
-		var accelRate = (this.isBoosting ? this.config.boostAcceleration : this.config.baseAcceleration) * mu;
-		var throttleEff = this.isShifting ? input.throttle * 0.25 : input.throttle;
-		var speedAbs = Math.abs(this.forwardSpeed);
-		if(speedAbs < 8.0 && throttleEff > 0.75) {
-			var burnoutRatio = (1.0 - speedAbs / 8.0) * throttleEff * this.config.tires.wheelspinAmount;
-			this.wheelSpinVelocity[2] += burnoutRatio * 140.0 * dt;
-			this.wheelSpinVelocity[3] += burnoutRatio * 140.0 * dt;
-			accelRate *= Math.max(0.65,1.0 - burnoutRatio * 0.35);
-		}
-		var netForce = 0.0;
-		if(throttleEff > 0.0) {
-			if(this.forwardSpeed < (this.isBoosting ? this.config.boostTopSpeed : this.config.baseTopSpeed)) {
-				netForce = accelRate * throttleEff * this.config.mass;
-			}
-		} else if(input.brake > 0.0) {
-			if(this.forwardSpeed > 0.5) {
-				netForce = -this.config.brakeDecel * mu * input.brake * this.config.mass;
-			} else {
-				netForce = -(this.config.baseAcceleration * 0.5) * mu * input.brake * this.config.mass;
-			}
-		} else if(speedAbs < 0.35) {
-			netForce = 0.0;
-			this.set_forwardSpeed(this.forwardSpeed * Math.max(0.0,1.0 - 20.0 * dt));
-			if(Math.abs(this.forwardSpeed) < 0.01) {
-				this.set_forwardSpeed(0.0);
-			}
-		} else {
-			netForce = -(this.forwardSpeed > 0 ? 1.0 : -1.0) * ((this.config.tires.rollingResistance * mu + this.forwardSpeed * this.forwardSpeed * this.config.aero.dragCoeff) * this.config.mass);
-		}
-		return netForce;
-	}
-	,updateLateralAndDrift: function(dt,input,fwdX,fwdY,rightX,rightY,rightZ,upX,upY,upZ,downforceMag,groundProvider) {
-		var driftCfg = this.config.drift;
-		var tireCfg = this.config.tires;
-		var surfaceFriction = groundProvider != null ? groundProvider.getGroundFriction(this.pos.x,this.pos.y) : 1.0;
-		var effectiveFriction = tireCfg.groundFriction * surfaceFriction;
-		var speedAbs = Math.abs(this.forwardSpeed);
-		var speedRatio = Math.min(1.0,speedAbs / this.config.baseTopSpeed);
-		var bias = tireCfg.tireSlipBias;
-		var frontGripMult = (1.0 - bias * 0.40) * effectiveFriction;
-		var rearGripMult = (1.0 + bias * 0.40) * effectiveFriction;
-		if(input.handbrake) {
-			rearGripMult *= 0.15;
-			if(speedAbs > 0.5) {
-				var hbForce = 14.0 * effectiveFriction * this.config.mass * (this.forwardSpeed > 0 ? -1.0 : 1.0);
-				this.scratchVec3A.init(fwdX * hbForce,fwdY * hbForce,0);
-				this.chassisBody.applyForceToCenter(this.scratchVec3A);
-			}
-			if(speedAbs > 2.0) {
-				this.scratchVec3A.init(0,0,(input.steer != 0.0 ? -input.steer : this.lateralVelocity < 0 ? 0.8 : -0.8) * 3.2 * this.config.yawInertia * 4.0);
-				this.chassisBody.applyTorque(this.scratchVec3A);
-			}
-		}
-		if(Math.abs(input.steer) > 0.25 && input.throttle > 0.75 && speedAbs > 4.0) {
-			var spinKick = input.throttle * tireCfg.wheelspinAmount;
-			this.wheelSpinVelocity[2] += spinKick * 60.0 * dt;
-			this.wheelSpinVelocity[3] += spinKick * 60.0 * dt;
-			rearGripMult *= Math.max(0.25,1.0 - tireCfg.wheelspinAmount * 0.35);
-			this.scratchVec3A.init(0,0,-input.steer * 1.8 * tireCfg.wheelspinAmount * this.config.yawInertia * 3.0);
-			this.chassisBody.applyTorque(this.scratchVec3A);
-		}
-		var carSlipAngle = Math.atan2(Math.abs(this.lateralVelocity),Math.max(1.0,speedAbs));
-		var triggerAngle = driftCfg.driftTriggerAngle;
-		if(!this.isDrifting && (input.handbrake && Math.abs(input.steer) > 0.15 || carSlipAngle >= triggerAngle && Math.abs(input.steer) > 0.18 || input.brake > 0.2 && input.throttle > 0.1 && Math.abs(input.steer) > 0.22) && speedAbs > driftCfg.minDriftSpeed) {
-			this.isDrifting = true;
-			this.driftDirection = input.steer != 0.0 ? input.steer > 0.0 ? 1.0 : -1.0 : this.lateralVelocity > 0.0 ? 1.0 : -1.0;
-		}
-		if(this.isDrifting) {
-			if(speedAbs < driftCfg.driftExitSpeed || (this.driftDirection > 0 && input.steer < -0.70 || this.driftDirection < 0 && input.steer > 0.70) || carSlipAngle < triggerAngle * 0.35 && !input.handbrake && Math.abs(input.steer) < 0.10) {
-				this.isDrifting = false;
-			}
-		}
-		var fLateralMax = effectiveFriction * downforceMag;
-		if(this.isDrifting) {
-			this.driftAngle += (this.driftDirection * 0.45 - this.driftAngle) * 5.5 * dt;
-			var latForce = Math.max(-fLateralMax,Math.min(fLateralMax,-this.lateralVelocity * tireCfg.baseLateralStiffness * (driftCfg.lateralStiffnessScale * rearGripMult) * this.config.mass * 0.15));
-			this.scratchVec3A.init(rightX * latForce,rightY * latForce,rightZ * latForce);
-			this.chassisBody.applyForceToCenter(this.scratchVec3A);
+		var sy = Math.sin(this.yaw);
+		var cy = Math.cos(this.yaw);
+		this.forwardSpeed = this.worldVx * sy + this.worldVy * cy;
+		this.lateralVelocity = this.worldVx * cy - this.worldVy * sy;
+		this.verticalVelocity = this.worldVz;
+		if(this.physicsWorld != null && ground != null && this.chassisBody != null) {
+			this.oimoPosScratch.init(this.pos.x,this.pos.y,this.pos.z + this.config.chassis.cogHeight);
 			var _this = this.chassisBody;
-			var curAngVel_x = 0;
-			var curAngVel_y = 0;
-			var curAngVel_z = 0;
-			oimo_common_Vec3.numCreations++;
-			curAngVel_x = _this._angVelX;
-			curAngVel_y = _this._angVelY;
-			curAngVel_z = _this._angVelZ;
-			var yawTorque = (-this.driftDirection * driftCfg.driftYawRate * 0.35 - input.steer * (input.steer * this.driftDirection < 0 ? driftCfg.counterSteerTorque : 1.5) * 0.35 - (curAngVel_x * upX + curAngVel_y * upY + curAngVel_z * upZ)) * this.config.yawInertia * 10.0;
-			this.scratchVec3A.init(upX * yawTorque,upY * yawTorque,upZ * yawTorque);
-			this.chassisBody.applyTorque(this.scratchVec3A);
-			var biasFactor = Math.min(1.0,driftCfg.forwardBiasRate * dt);
-			var _this = this.chassisBody;
-			var linV_x = 0;
-			var linV_y = 0;
-			oimo_common_Vec3.numCreations++;
-			linV_x = _this._velX;
-			linV_y = _this._velY;
-			var currentHorizSpeed = Math.sqrt(linV_x * linV_x + linV_y * linV_y);
-			this.scratchVec3A.init((fwdX * currentHorizSpeed - linV_x) * this.config.mass * biasFactor * 2.5,(fwdY * currentHorizSpeed - linV_y) * this.config.mass * biasFactor * 2.5,0.0);
-			this.chassisBody.applyForceToCenter(this.scratchVec3A);
-		} else {
-			this.driftAngle += (0.0 - this.driftAngle) * 10.0 * dt;
-			if(speedAbs < 0.35 && Math.abs(this.lateralVelocity) < 0.35) {
-				this.lateralVelocity *= Math.max(0.0,1.0 - 20.0 * dt);
-				if(Math.abs(this.lateralVelocity) < 0.01) {
-					this.lateralVelocity = 0.0;
+			var position = this.oimoPosScratch;
+			_this._transform._positionX = position.x;
+			_this._transform._positionY = position.y;
+			_this._transform._positionZ = position.z;
+			var dst = _this._ptransform;
+			var src = _this._transform;
+			dst._positionX = src._positionX;
+			dst._positionY = src._positionY;
+			dst._positionZ = src._positionZ;
+			dst._rotation00 = src._rotation00;
+			dst._rotation01 = src._rotation01;
+			dst._rotation02 = src._rotation02;
+			dst._rotation10 = src._rotation10;
+			dst._rotation11 = src._rotation11;
+			dst._rotation12 = src._rotation12;
+			dst._rotation20 = src._rotation20;
+			dst._rotation21 = src._rotation21;
+			dst._rotation22 = src._rotation22;
+			var s = _this._shapeList;
+			while(s != null) {
+				var n = s._next;
+				var tf1 = _this._ptransform;
+				var tf2 = _this._transform;
+				var dst = s._ptransform;
+				var src1 = s._localTransform;
+				var __tmp__00;
+				var __tmp__01;
+				var __tmp__02;
+				var __tmp__10;
+				var __tmp__11;
+				var __tmp__12;
+				var __tmp__20;
+				var __tmp__21;
+				var __tmp__22;
+				__tmp__00 = tf1._rotation00 * src1._rotation00 + tf1._rotation01 * src1._rotation10 + tf1._rotation02 * src1._rotation20;
+				__tmp__01 = tf1._rotation00 * src1._rotation01 + tf1._rotation01 * src1._rotation11 + tf1._rotation02 * src1._rotation21;
+				__tmp__02 = tf1._rotation00 * src1._rotation02 + tf1._rotation01 * src1._rotation12 + tf1._rotation02 * src1._rotation22;
+				__tmp__10 = tf1._rotation10 * src1._rotation00 + tf1._rotation11 * src1._rotation10 + tf1._rotation12 * src1._rotation20;
+				__tmp__11 = tf1._rotation10 * src1._rotation01 + tf1._rotation11 * src1._rotation11 + tf1._rotation12 * src1._rotation21;
+				__tmp__12 = tf1._rotation10 * src1._rotation02 + tf1._rotation11 * src1._rotation12 + tf1._rotation12 * src1._rotation22;
+				__tmp__20 = tf1._rotation20 * src1._rotation00 + tf1._rotation21 * src1._rotation10 + tf1._rotation22 * src1._rotation20;
+				__tmp__21 = tf1._rotation20 * src1._rotation01 + tf1._rotation21 * src1._rotation11 + tf1._rotation22 * src1._rotation21;
+				__tmp__22 = tf1._rotation20 * src1._rotation02 + tf1._rotation21 * src1._rotation12 + tf1._rotation22 * src1._rotation22;
+				dst._rotation00 = __tmp__00;
+				dst._rotation01 = __tmp__01;
+				dst._rotation02 = __tmp__02;
+				dst._rotation10 = __tmp__10;
+				dst._rotation11 = __tmp__11;
+				dst._rotation12 = __tmp__12;
+				dst._rotation20 = __tmp__20;
+				dst._rotation21 = __tmp__21;
+				dst._rotation22 = __tmp__22;
+				var __tmp__X;
+				var __tmp__Y;
+				var __tmp__Z;
+				__tmp__X = tf1._rotation00 * src1._positionX + tf1._rotation01 * src1._positionY + tf1._rotation02 * src1._positionZ;
+				__tmp__Y = tf1._rotation10 * src1._positionX + tf1._rotation11 * src1._positionY + tf1._rotation12 * src1._positionZ;
+				__tmp__Z = tf1._rotation20 * src1._positionX + tf1._rotation21 * src1._positionY + tf1._rotation22 * src1._positionZ;
+				dst._positionX = __tmp__X;
+				dst._positionY = __tmp__Y;
+				dst._positionZ = __tmp__Z;
+				dst._positionX += tf1._positionX;
+				dst._positionY += tf1._positionY;
+				dst._positionZ += tf1._positionZ;
+				var dst1 = s._transform;
+				var src11 = s._localTransform;
+				var __tmp__001;
+				var __tmp__011;
+				var __tmp__021;
+				var __tmp__101;
+				var __tmp__111;
+				var __tmp__121;
+				var __tmp__201;
+				var __tmp__211;
+				var __tmp__221;
+				__tmp__001 = tf2._rotation00 * src11._rotation00 + tf2._rotation01 * src11._rotation10 + tf2._rotation02 * src11._rotation20;
+				__tmp__011 = tf2._rotation00 * src11._rotation01 + tf2._rotation01 * src11._rotation11 + tf2._rotation02 * src11._rotation21;
+				__tmp__021 = tf2._rotation00 * src11._rotation02 + tf2._rotation01 * src11._rotation12 + tf2._rotation02 * src11._rotation22;
+				__tmp__101 = tf2._rotation10 * src11._rotation00 + tf2._rotation11 * src11._rotation10 + tf2._rotation12 * src11._rotation20;
+				__tmp__111 = tf2._rotation10 * src11._rotation01 + tf2._rotation11 * src11._rotation11 + tf2._rotation12 * src11._rotation21;
+				__tmp__121 = tf2._rotation10 * src11._rotation02 + tf2._rotation11 * src11._rotation12 + tf2._rotation12 * src11._rotation22;
+				__tmp__201 = tf2._rotation20 * src11._rotation00 + tf2._rotation21 * src11._rotation10 + tf2._rotation22 * src11._rotation20;
+				__tmp__211 = tf2._rotation20 * src11._rotation01 + tf2._rotation21 * src11._rotation11 + tf2._rotation22 * src11._rotation21;
+				__tmp__221 = tf2._rotation20 * src11._rotation02 + tf2._rotation21 * src11._rotation12 + tf2._rotation22 * src11._rotation22;
+				dst1._rotation00 = __tmp__001;
+				dst1._rotation01 = __tmp__011;
+				dst1._rotation02 = __tmp__021;
+				dst1._rotation10 = __tmp__101;
+				dst1._rotation11 = __tmp__111;
+				dst1._rotation12 = __tmp__121;
+				dst1._rotation20 = __tmp__201;
+				dst1._rotation21 = __tmp__211;
+				dst1._rotation22 = __tmp__221;
+				var __tmp__X1;
+				var __tmp__Y1;
+				var __tmp__Z1;
+				__tmp__X1 = tf2._rotation00 * src11._positionX + tf2._rotation01 * src11._positionY + tf2._rotation02 * src11._positionZ;
+				__tmp__Y1 = tf2._rotation10 * src11._positionX + tf2._rotation11 * src11._positionY + tf2._rotation12 * src11._positionZ;
+				__tmp__Z1 = tf2._rotation20 * src11._positionX + tf2._rotation21 * src11._positionY + tf2._rotation22 * src11._positionZ;
+				dst1._positionX = __tmp__X1;
+				dst1._positionY = __tmp__Y1;
+				dst1._positionZ = __tmp__Z1;
+				dst1._positionX += tf2._positionX;
+				dst1._positionY += tf2._positionY;
+				dst1._positionZ += tf2._positionZ;
+				var minX;
+				var minY;
+				var minZ;
+				var maxX;
+				var maxY;
+				var maxZ;
+				s._geom._computeAabb(s._aabb,s._ptransform);
+				minX = s._aabb._minX;
+				minY = s._aabb._minY;
+				minZ = s._aabb._minZ;
+				maxX = s._aabb._maxX;
+				maxY = s._aabb._maxY;
+				maxZ = s._aabb._maxZ;
+				s._geom._computeAabb(s._aabb,s._transform);
+				s._aabb._minX = minX < s._aabb._minX ? minX : s._aabb._minX;
+				s._aabb._minY = minY < s._aabb._minY ? minY : s._aabb._minY;
+				s._aabb._minZ = minZ < s._aabb._minZ ? minZ : s._aabb._minZ;
+				s._aabb._maxX = maxX > s._aabb._maxX ? maxX : s._aabb._maxX;
+				s._aabb._maxY = maxY > s._aabb._maxY ? maxY : s._aabb._maxY;
+				s._aabb._maxZ = maxZ > s._aabb._maxZ ? maxZ : s._aabb._maxZ;
+				if(s._proxy != null) {
+					var dX;
+					var dY;
+					var dZ;
+					dX = s._transform._positionX - s._ptransform._positionX;
+					dY = s._transform._positionY - s._ptransform._positionY;
+					dZ = s._transform._positionZ - s._ptransform._positionZ;
+					var v = s.displacement;
+					v.x = dX;
+					v.y = dY;
+					v.z = dZ;
+					s._rigidBody._world._broadPhase.moveProxy(s._proxy,s._aabb,s.displacement);
 				}
-			} else {
-				var latForce = Math.max(-fLateralMax,Math.min(fLateralMax,-this.lateralVelocity * tireCfg.baseLateralStiffness * frontGripMult * this.config.mass * 0.25));
-				this.scratchVec3A.init(rightX * latForce,rightY * latForce,rightZ * latForce);
-				this.chassisBody.applyForceToCenter(this.scratchVec3A);
+				s = n;
 			}
-			if(speedAbs > 0.25) {
-				var targetYawRate = -input.steer * (2.4 * Math.min(1.0,speedRatio + 0.35) * frontGripMult) * (this.forwardSpeed >= 0 ? 1.0 : -1.0) * 0.70;
-				var _this = this.chassisBody;
-				var curAngVel_x = 0;
-				var curAngVel_y = 0;
-				var curAngVel_z = 0;
-				oimo_common_Vec3.numCreations++;
-				curAngVel_x = _this._angVelX;
-				curAngVel_y = _this._angVelY;
-				curAngVel_z = _this._angVelZ;
-				var steerTorque = (targetYawRate - (curAngVel_x * upX + curAngVel_y * upY + curAngVel_z * upZ)) * this.config.yawInertia * 8.0;
-				this.scratchVec3A.init(upX * steerTorque,upY * steerTorque,upZ * steerTorque);
-				this.chassisBody.applyTorque(this.scratchVec3A);
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			this.oimoVelScratch.init(0.0,0.0,0.0);
+			var _this = this.chassisBody;
+			var linearVelocity = this.oimoVelScratch;
+			if(_this._type == 1) {
+				_this._velX = 0;
+				_this._velY = 0;
+				_this._velZ = 0;
 			} else {
-				var _this = this.chassisBody;
-				var curAngVel_x = 0;
-				var curAngVel_y = 0;
-				var curAngVel_z = 0;
-				oimo_common_Vec3.numCreations++;
-				curAngVel_x = _this._angVelX;
-				curAngVel_y = _this._angVelY;
-				curAngVel_z = _this._angVelZ;
-				this.scratchVec3A.init(curAngVel_x * 0.8,curAngVel_y * 0.8,curAngVel_z * 0.5);
-				var _this = this.chassisBody;
-				var angularVelocity = this.scratchVec3A;
-				if(_this._type == 1) {
-					_this._angVelX = 0;
-					_this._angVelY = 0;
-					_this._angVelZ = 0;
-				} else {
-					_this._angVelX = angularVelocity.x;
-					_this._angVelY = angularVelocity.y;
-					_this._angVelZ = angularVelocity.z;
-				}
-				_this._sleeping = false;
-				_this._sleepTime = 0;
+				_this._velX = linearVelocity.x;
+				_this._velY = linearVelocity.y;
+				_this._velZ = linearVelocity.z;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			var _this = this.chassisBody;
+			var angularVelocity = this.oimoVelScratch;
+			if(_this._type == 1) {
+				_this._angVelX = 0;
+				_this._angVelY = 0;
+				_this._angVelZ = 0;
+			} else {
+				_this._angVelX = angularVelocity.x;
+				_this._angVelY = angularVelocity.y;
+				_this._angVelZ = angularVelocity.z;
+			}
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			var _this = this.chassisBody;
+			_this._gravityScale = 0.0;
+			_this._sleeping = false;
+			_this._sleepTime = 0;
+			this.physicsWorld.step(frameDt);
+			var _this = this.chassisBody;
+			var oimoPos_x = 0;
+			var oimoPos_y = 0;
+			oimo_common_Vec3.numCreations++;
+			oimoPos_x = _this._transform._positionX;
+			oimoPos_y = _this._transform._positionY;
+			this.pos.x = oimoPos_x;
+			this.pos.y = oimoPos_y;
+		}
+		if(ground != null) {
+			var hit = ground.enforceBoundaries(this.pos,this.forwardSpeed,this.lateralVelocity);
+			if(hit.hitWall) {
+				this.forwardSpeed *= hit.speedMult;
+				this.lateralVelocity *= hit.latMult;
+				this.yawRate *= 0.35;
 			}
 		}
+		this.syncToOimoBody();
+		this.prevSteerInput = steerIn;
+	}
+	,stepSubstep: function(dt,steerIn,throttleIn,brakeIn,handbrakeIn,boostIn,ground) {
+		var mass = this.config.chassis.massKg;
+		var gMag = Math.abs(this.gravityZ);
+		var sy = Math.sin(this.yaw);
+		var cy = Math.cos(this.yaw);
+		var vLong = this.worldVx * sy + this.worldVy * cy;
+		var vLat = this.worldVx * cy - this.worldVy * sy;
+		var susp = this.suspensionSolver.solve(dt,this.config,this.pos,this.worldVz,this.yaw,this.pitch,this.roll,this.pitchRate,this.rollRate,ground,this.physicsWorld,this.chassisBody);
+		this.groundedWheelCount = susp.groundedCount;
+		this.isGrounded = susp.groundedCount > 0;
+		var w = susp.wheels[0];
+		this.suspLength[0] = w.suspLength;
+		this.wheelNormalLoads[0] = w.normalLoad;
+		this.wheelFriction[0] = w.mu;
+		var w = susp.wheels[1];
+		this.suspLength[1] = w.suspLength;
+		this.wheelNormalLoads[1] = w.normalLoad;
+		this.wheelFriction[1] = w.mu;
+		var w = susp.wheels[2];
+		this.suspLength[2] = w.suspLength;
+		this.wheelNormalLoads[2] = w.normalLoad;
+		this.wheelFriction[2] = w.mu;
+		var w = susp.wheels[3];
+		this.suspLength[3] = w.suspLength;
+		this.wheelNormalLoads[3] = w.normalLoad;
+		this.wheelFriction[3] = w.mu;
+		var nx = susp.avgNormalX;
+		var ny = susp.avgNormalY;
+		var nz = susp.avgNormalZ;
+		var fwdDotN = sy * nx + cy * ny;
+		var rightDotN = cy * nx - sy * ny;
+		var tFwdX = sy - fwdDotN * nx;
+		var tFwdY = cy - fwdDotN * ny;
+		var tFwdZ = -fwdDotN * nz;
+		var tfLen = Math.sqrt(tFwdX * tFwdX + tFwdY * tFwdY + tFwdZ * tFwdZ);
+		if(tfLen > 0.001) {
+			tFwdX /= tfLen;
+			tFwdY /= tfLen;
+			tFwdZ /= tfLen;
+		} else {
+			tFwdX = sy;
+			tFwdY = cy;
+			tFwdZ = 0.0;
+		}
+		var tRightX = cy - rightDotN * nx;
+		var tRightY = -sy - rightDotN * ny;
+		var tRightZ = -rightDotN * nz;
+		var trLen = Math.sqrt(tRightX * tRightX + tRightY * tRightY + tRightZ * tRightZ);
+		if(trLen > 0.001) {
+			tRightX /= trLen;
+			tRightY /= trLen;
+			tRightZ /= trLen;
+		} else {
+			tRightX = cy;
+			tRightY = -sy;
+			tRightZ = 0.0;
+		}
+		var driveRes = this.drivetrainSolver.solve(dt,this.config,throttleIn,brakeIn,handbrakeIn,boostIn,vLong,this.currentGear,this.boostFuel,susp.groundedCount);
+		this.currentGear = driveRes.currentGear;
+		this.engineRPM = driveRes.engineRPM;
+		this.boostFuel = driveRes.boostFuel;
+		this.isBoosting = driveRes.isBoosting;
+		this.wheelSpinVelocity[0] = 0.0;
+		this.wheelSpinVelocity[1] = 0.0;
+		this.wheelSpinVelocity[2] = driveRes.rearWheelSpinDelta;
+		this.wheelSpinVelocity[3] = driveRes.rearWheelSpinDelta;
+		var tireRes = this.tireSlipSolver.solve(dt,this.config,susp.wheels,vLong,vLat,this.yawRate,steerIn,driveRes.driveForce,driveRes.brakeForce,handbrakeIn,this.lastLongAccel,-fwdDotN,-rightDotN,gMag);
+		this.frontSteerAngle = tireRes.frontSteerAngle;
+		var totalFx = susp.totalNormalZForce > 0.0 ? susp.avgNormalX * (susp.totalNormalZForce / Math.max(0.35,susp.avgNormalZ)) : 0.0;
+		var totalFy = susp.totalNormalZForce > 0.0 ? susp.avgNormalY * (susp.totalNormalZForce / Math.max(0.35,susp.avgNormalZ)) : 0.0;
+		var totalFz = susp.totalNormalZForce + mass * this.gravityZ - (susp.groundedCount > 0 ? this.config.chassis.aeroDownforce * (this.worldVx * this.worldVx + this.worldVy * this.worldVy) : 0.0);
+		if(susp.groundedCount > 0) {
+			var netFwd = tireRes.forceFwd + driveRes.nitroThrust;
+			totalFx += netFwd * tFwdX + tireRes.forceRight * tRightX;
+			totalFy += netFwd * tFwdY + tireRes.forceRight * tRightY;
+			totalFz += netFwd * tFwdZ + tireRes.forceRight * tRightZ;
+		} else if(driveRes.nitroThrust > 0.0) {
+			totalFx += driveRes.nitroThrust * tFwdX;
+			totalFy += driveRes.nitroThrust * tFwdY;
+		}
+		this.worldVx += totalFx / mass * dt;
+		this.worldVy += totalFy / mass * dt;
+		this.worldVz += totalFz / mass * dt;
+		if(tireRes.isStictionActive) {
+			var vDecay = Math.exp(-20.0 * dt);
+			this.worldVx *= vDecay;
+			this.worldVy *= vDecay;
+			if(Math.abs(this.worldVx) < 0.005) {
+				this.worldVx = 0.0;
+			}
+			if(Math.abs(this.worldVy) < 0.005) {
+				this.worldVy = 0.0;
+			}
+			this.yawRate *= vDecay;
+			if(Math.abs(this.yawRate) < 0.002) {
+				this.yawRate = 0.0;
+			}
+		}
+		var newVLong = this.worldVx * sy + this.worldVy * cy;
+		var instAccel = (newVLong - vLong) / dt;
+		if(instAccel > 25.0) {
+			instAccel = 25.0;
+		} else if(instAccel < -30.0) {
+			instAccel = -30.0;
+		}
+		this.lastLongAccel += (instAccel - this.lastLongAccel) * Math.min(1.0,dt * 18.0);
+		this.pos.x += this.worldVx * dt;
+		this.pos.y += this.worldVy * dt;
+		this.pos.z += this.worldVz * dt;
+		if(susp.groundedCount > 0 && susp.maxBottomOutPenetration > 0.0) {
+			this.pos.z += susp.maxBottomOutPenetration / Math.max(0.5,nz);
+			var vn = this.worldVx * nx + this.worldVy * ny + this.worldVz * nz;
+			if(vn < 0.0) {
+				this.worldVx -= vn * nx;
+				this.worldVy -= vn * ny;
+				this.worldVz -= vn * nz;
+			}
+		}
+		this.yawRate = this.yawRate * Math.exp(-(handbrakeIn ? 2.2 : 3.6) * dt) + tireRes.yawTorque / this.config.chassis.yawInertia * dt;
+		if(Math.abs(this.yawRate) > 4.2) {
+			this.yawRate = this.yawRate > 0 ? 4.2 : -4.2;
+		}
+		if((this.yaw += this.yawRate * dt) > Math.PI * 2.0) {
+			this.yaw -= Math.PI * 2.0;
+		} else if(this.yaw < -Math.PI * 2.0) {
+			this.yaw += Math.PI * 2.0;
+		}
+		var cog = this.config.chassis.cogHeight;
+		if(susp.groundedCount > 0) {
+			this.pitchRate = this.pitchRate * Math.exp(-3.2 * dt) + (susp.pitchTorque + tireRes.forceFwd * cog * 0.42) / this.config.chassis.pitchInertia * dt;
+			this.rollRate = this.rollRate * Math.exp(-3.8 * dt) + (susp.rollTorque + -tireRes.forceRight * cog * 0.55) / this.config.chassis.rollInertia * dt;
+		} else {
+			this.pitchRate = this.pitchRate * Math.exp(-2.4 * dt) - this.pitch * 1.4 * dt;
+			this.rollRate = this.rollRate * Math.exp(-2.8 * dt) - this.roll * 1.8 * dt;
+		}
+		var v = this.pitch + this.pitchRate * dt;
+		this.pitch = v < -0.65 ? -0.65 : v > 0.65 ? 0.65 : v;
+		var v = this.roll + this.rollRate * dt;
+		this.roll = v < -0.60 ? -0.60 : v > 0.60 ? 0.60 : v;
+		this.driftAngle = 0.0;
+		this.isDrifting = this.isGrounded && Math.abs(newVLong) > 6.5 && (tireRes.lateralSlipAngle > this.config.tires.driftSlipThreshold || handbrakeIn && Math.abs(this.worldVx * Math.cos(this.yaw) - this.worldVy * Math.sin(this.yaw)) > 2.2);
 	}
 	,__class__: physics_CarPhysics
+};
+var physics_DrivetrainSolver = function() {
+	this.shiftCooldown = 0.0;
+};
+$hxClasses["physics.DrivetrainSolver"] = physics_DrivetrainSolver;
+physics_DrivetrainSolver.__name__ = "physics.DrivetrainSolver";
+physics_DrivetrainSolver.prototype = {
+	reset: function() {
+		this.shiftCooldown = 0.0;
+	}
+	,solve: function(dt,cfg,throttle,brake,handbrake,boostInput,forwardSpeed,currentGear,boostFuel,groundedCount) {
+		var driveCfg = cfg.drivetrain;
+		var boostCfg = cfg.boost;
+		if(this.shiftCooldown > 0.0) {
+			this.shiftCooldown = Math.max(0.0,this.shiftCooldown - dt);
+		}
+		var isBoosting = false;
+		var fuel = boostFuel;
+		if(boostInput && boostFuel > 0.02 && (throttle > 0.05 || forwardSpeed > 3.0)) {
+			isBoosting = true;
+			fuel = Math.max(0.0,boostFuel - boostCfg.burnRate * dt);
+		} else {
+			fuel = Math.min(boostCfg.maxFuel,boostFuel + boostCfg.regenRate * dt);
+		}
+		var gear = currentGear;
+		if(currentGear == 0) {
+			gear = 1;
+		}
+		if(brake > 0.1 && throttle < 0.1 && forwardSpeed <= 1.2) {
+			gear = -1;
+		} else if(gear < 0 && (throttle > 0.1 || forwardSpeed > 0.8)) {
+			gear = 1;
+		} else if(gear < 0 && brake <= 0.1 && forwardSpeed > -0.5) {
+			gear = 1;
+		}
+		var gearRatio = gear < 0 ? driveCfg.reverseRatio : driveCfg.gearRatios[gear - 1];
+		var wheelOmega = Math.abs(forwardSpeed) / 0.36;
+		var rawRPM = wheelOmega * Math.abs(gearRatio) * driveCfg.finalDrive * (60.0 / (2.0 * Math.PI));
+		var targetRPM = Math.max(driveCfg.idleRPM + throttle * 1600.0,rawRPM);
+		if(isBoosting) {
+			targetRPM += 450.0;
+		}
+		var clampedRPM = Math.min(driveCfg.redlineRPM,Math.max(driveCfg.idleRPM,targetRPM));
+		if(gear > 0 && this.shiftCooldown <= 0.0 && groundedCount > 0) {
+			if(clampedRPM >= driveCfg.shiftUpRPM && gear < driveCfg.gearRatios.length && throttle > 0.15) {
+				++gear;
+				this.shiftCooldown = 0.22;
+				gearRatio = driveCfg.gearRatios[gear - 1];
+				rawRPM = wheelOmega * Math.abs(gearRatio) * driveCfg.finalDrive * (60.0 / (2.0 * Math.PI));
+				clampedRPM = Math.min(driveCfg.redlineRPM,Math.max(driveCfg.idleRPM + throttle * 900.0,rawRPM));
+			} else if(clampedRPM <= driveCfg.shiftDownRPM && gear > 1) {
+				--gear;
+				this.shiftCooldown = 0.22;
+				gearRatio = driveCfg.gearRatios[gear - 1];
+				rawRPM = wheelOmega * Math.abs(gearRatio) * driveCfg.finalDrive * (60.0 / (2.0 * Math.PI));
+				clampedRPM = Math.min(driveCfg.redlineRPM,Math.max(driveCfg.idleRPM,rawRPM));
+			}
+		}
+		var torqueFactor = 0.72 + 0.34 * Math.sin(Math.min(1.0,Math.max(0.0,(clampedRPM - driveCfg.idleRPM) / Math.max(100.0,driveCfg.redlineRPM - driveCfg.idleRPM))) * Math.PI * 0.85);
+		var effectiveMaxSpeed = driveCfg.maxForwardSpeed + (isBoosting ? boostCfg.speedBonus : 0.0);
+		var driveForce = 0.0;
+		var brakeForce = 0.0;
+		var nitroThrust = 0.0;
+		if(gear > 0) {
+			if(throttle > 0.01) {
+				driveForce = throttle * driveCfg.peakTorqueNm * (isBoosting ? 1.25 : 1.0) * torqueFactor * gearRatio * driveCfg.finalDrive / 0.36;
+				if(forwardSpeed > effectiveMaxSpeed - 6.0) {
+					driveForce *= Math.max(0.0,Math.min(1.0,1.0 - (forwardSpeed - (effectiveMaxSpeed - 6.0)) / 6.0));
+				}
+			} else if(brake < 0.05 && Math.abs(forwardSpeed) > 0.8) {
+				var ebForce = driveCfg.engineBrakeTorque * Math.min(gearRatio,2.6) / 0.36;
+				driveForce = forwardSpeed > 0.0 ? -ebForce : ebForce;
+			}
+			if(isBoosting && forwardSpeed < effectiveMaxSpeed) {
+				nitroThrust = boostCfg.thrustForce;
+			}
+			if(brake > 0.01) {
+				brakeForce = brake * driveCfg.brakeForce;
+			}
+		} else if(brake > 0.01) {
+			if(forwardSpeed > 0.5) {
+				brakeForce = brake * driveCfg.brakeForce;
+			} else {
+				driveForce = brake * driveCfg.peakTorqueNm * 0.65 * driveCfg.reverseRatio * driveCfg.finalDrive / 0.36 * (forwardSpeed < -(driveCfg.maxReverseSpeed - 3.0) ? Math.max(0.0,1.0 - (Math.abs(forwardSpeed) - (driveCfg.maxReverseSpeed - 3.0)) / 3.0) : 1.0);
+			}
+		}
+		var rearSpinDelta = 0.0;
+		if(handbrake && Math.abs(forwardSpeed) > 1.0) {
+			rearSpinDelta = -(forwardSpeed / 0.36);
+		} else if((isBoosting || throttle > 0.7 && gear == 1) && Math.abs(forwardSpeed) < 18.0) {
+			rearSpinDelta = 18.0;
+		}
+		return { driveForce : driveForce, brakeForce : brakeForce, nitroThrust : nitroThrust, currentGear : gear, engineRPM : clampedRPM, boostFuel : fuel, isBoosting : isBoosting, rearWheelSpinDelta : rearSpinDelta};
+	}
+	,__class__: physics_DrivetrainSolver
 };
 var physics_SplineMath = function() { };
 $hxClasses["physics.SplineMath"] = physics_SplineMath;
@@ -71618,6 +73384,399 @@ physics_SplineMath.getClosestSegment = function(p,waypoints) {
 		return projB;
 	}
 };
+var physics_WheelRayCallback = function(ignoreBody) {
+	this.normalZ = 1.0;
+	this.normalY = 0.0;
+	this.normalX = 0.0;
+	this.hitZ = 0.0;
+	this.fraction = 1.0;
+	this.hit = false;
+	oimo_dynamics_callback_RayCastCallback.call(this);
+	this.ignoreBody = ignoreBody;
+};
+$hxClasses["physics.WheelRayCallback"] = physics_WheelRayCallback;
+physics_WheelRayCallback.__name__ = "physics.WheelRayCallback";
+physics_WheelRayCallback.__super__ = oimo_dynamics_callback_RayCastCallback;
+physics_WheelRayCallback.prototype = $extend(oimo_dynamics_callback_RayCastCallback.prototype,{
+	process: function(shape,rhit) {
+		if(this.ignoreBody != null && shape._rigidBody == this.ignoreBody) {
+			return;
+		}
+		if(rhit.normal.z <= 0.65) {
+			return;
+		}
+		if(rhit.fraction < this.fraction) {
+			this.fraction = rhit.fraction;
+			this.hit = true;
+			this.hitZ = rhit.position.z;
+			this.normalX = rhit.normal.x;
+			this.normalY = rhit.normal.y;
+			this.normalZ = rhit.normal.z;
+		}
+	}
+	,__class__: physics_WheelRayCallback
+});
+var physics_SuspensionSolver = function() {
+	this.prevCompressions = [0.14,0.14,0.14,0.14];
+	this.prevGrounded = [true,true,true,true];
+	this.rayCallback = new physics_WheelRayCallback(null);
+	this.rayStart = new oimo_common_Vec3();
+	this.rayEnd = new oimo_common_Vec3();
+	this.scratchNormal = new h3d_VectorImpl(0.0,0.0,1.0);
+};
+$hxClasses["physics.SuspensionSolver"] = physics_SuspensionSolver;
+physics_SuspensionSolver.__name__ = "physics.SuspensionSolver";
+physics_SuspensionSolver.prototype = {
+	resetHistory: function(initialCompression) {
+		if(initialCompression == null) {
+			initialCompression = 0.14;
+		}
+		this.prevCompressions[0] = initialCompression;
+		this.prevGrounded[0] = true;
+		this.prevCompressions[1] = initialCompression;
+		this.prevGrounded[1] = true;
+		this.prevCompressions[2] = initialCompression;
+		this.prevGrounded[2] = true;
+		this.prevCompressions[3] = initialCompression;
+		this.prevGrounded[3] = true;
+	}
+	,solve: function(dt,cfg,pos,vz,yaw,pitch,roll,pitchRate,rollRate,ground,physicsWorld,chassisBody) {
+		var safeDt = dt > 0.0001 ? dt : 0.0001;
+		var suspCfg = cfg.suspension;
+		var unloadedLen = suspCfg.unloadedLength;
+		var minLen = suspCfg.minLength;
+		var sy = Math.sin(yaw);
+		var cy = Math.cos(yaw);
+		var sp = Math.sin(pitch);
+		var cp = Math.cos(pitch);
+		var sr = Math.sin(roll);
+		var cr = Math.cos(roll);
+		var ryL = sr * sp;
+		var rzL = -sr * cp;
+		var rightX = cy * cr + sy * ryL;
+		var rightY = -sy * cr + cy * ryL;
+		var fwdX = sy * cp;
+		var fwdY = cy * cp;
+		var uyL = -sp * cr;
+		var uzL = cp * cr;
+		var upX = cy * sr + sy * uyL;
+		var upY = -sy * sr + cy * uyL;
+		var mountLocalZ = 0.36 + suspCfg.restLength;
+		var maxRayDist = 0.36 + unloadedLen;
+		var upProjection = uzL > 0.45 ? uzL : 0.45;
+		var wheelContacts = [];
+		var groundedCount = 0;
+		var sumNormX = 0.0;
+		var sumNormY = 0.0;
+		var sumNormZ = 0.0;
+		var maxBottomOut = 0.0;
+		var _g = 0;
+		while(_g < 4) {
+			var i = _g++;
+			var offset = entities_CarMesh.WHEEL_OFFSETS[i];
+			var wxOffset = offset.x;
+			var wyOffset = offset.y;
+			var mountX = pos.x + rightX * wxOffset + fwdX * wyOffset + upX * mountLocalZ;
+			var mountY = pos.y + rightY * wxOffset + fwdY * wyOffset + upY * mountLocalZ;
+			var mountZ = pos.z + rzL * wxOffset + sp * wyOffset + uzL * mountLocalZ;
+			var queryX = (mountX + (mountX - upX * maxRayDist)) * 0.5;
+			var queryY = (mountY + (mountY - upY * maxRayDist)) * 0.5;
+			var surfaceZ = 0.0;
+			var mu = 1.0;
+			var nx = 0.0;
+			var ny = 0.0;
+			var nz = 1.0;
+			if(ground != null) {
+				surfaceZ = ground.getGroundElevation(queryX,queryY);
+				mu = ground.getGroundFriction(queryX,queryY);
+				ground.getGroundNormal(queryX,queryY,this.scratchNormal);
+				nx = this.scratchNormal.x;
+				ny = this.scratchNormal.y;
+				nz = this.scratchNormal.z;
+				if(nz < 0.2) {
+					nx = 0.0;
+					ny = 0.0;
+					nz = 1.0;
+				}
+			}
+			if(physicsWorld != null) {
+				this.rayStart.init(mountX,mountY,mountZ);
+				this.rayEnd.init(mountX - upX * maxRayDist,mountY - upY * maxRayDist,mountZ - uzL * maxRayDist);
+				var _this = this.rayCallback;
+				_this.ignoreBody = chassisBody;
+				_this.hit = false;
+				_this.fraction = 1.0;
+				_this.hitZ = 0.0;
+				_this.normalX = 0.0;
+				_this.normalY = 0.0;
+				_this.normalZ = 1.0;
+				physicsWorld.rayCast(this.rayStart,this.rayEnd,this.rayCallback);
+				if(this.rayCallback.hit && this.rayCallback.hitZ >= surfaceZ - 0.05 && this.rayCallback.hitZ <= surfaceZ + 6.0) {
+					surfaceZ = this.rayCallback.hitZ;
+					nx = this.rayCallback.normalX;
+					ny = this.rayCallback.normalY;
+					nz = this.rayCallback.normalZ;
+				}
+			}
+			var rawStrutLen = (mountZ - surfaceZ) / upProjection - 0.36;
+			var hardStopLen = minLen - 0.04;
+			if(rawStrutLen < hardStopLen) {
+				var pen = hardStopLen - rawStrutLen;
+				if(pen > maxBottomOut) {
+					maxBottomOut = pen;
+				}
+			}
+			if(rawStrutLen <= unloadedLen) {
+				++groundedCount;
+				sumNormX += nx;
+				sumNormY += ny;
+				sumNormZ += nz;
+				var clampedLen = rawStrutLen < minLen ? minLen : rawStrutLen;
+				var compression = unloadedLen - clampedLen;
+				var compVel = this.prevGrounded[i] ? (compression - this.prevCompressions[i]) / safeDt : -(vz + wyOffset * pitchRate - wxOffset * rollRate);
+				if(compVel > 8.0) {
+					compVel = 8.0;
+				} else if(compVel < -8.0) {
+					compVel = -8.0;
+				}
+				var springForce = suspCfg.springStiffness * compression + (compVel >= 0.0 ? suspCfg.bumpDamping : suspCfg.reboundDamping) * compVel;
+				if(rawStrutLen < minLen) {
+					springForce += (minLen - rawStrutLen) * suspCfg.springStiffness * 1.45;
+				}
+				if(springForce < 0.0) {
+					springForce = 0.0;
+				}
+				if(springForce > suspCfg.maxWheelForce) {
+					springForce = suspCfg.maxWheelForce;
+				}
+				this.prevCompressions[i] = compression;
+				this.prevGrounded[i] = true;
+				wheelContacts.push({ grounded : true, groundZ : surfaceZ, suspLength : clampedLen, compression : compression, compressionVel : compVel, normalLoad : springForce, mu : mu, normalX : nx, normalY : ny, normalZ : nz, worldX : queryX, worldY : queryY, worldZ : surfaceZ});
+			} else {
+				this.prevCompressions[i] = 0.0;
+				this.prevGrounded[i] = false;
+				wheelContacts.push({ grounded : false, groundZ : surfaceZ, suspLength : unloadedLen, compression : 0.0, compressionVel : 0.0, normalLoad : 0.0, mu : mu, normalX : nx, normalY : ny, normalZ : nz, worldX : queryX, worldY : queryY, worldZ : surfaceZ});
+			}
+		}
+		var arbStiffness = suspCfg.antiRollStiffness;
+		var leftWheel = wheelContacts[0];
+		var rightWheel = wheelContacts[1];
+		var maxForce = suspCfg.maxWheelForce;
+		if(!(!leftWheel.grounded && !rightWheel.grounded)) {
+			var arbForce = (leftWheel.compression - rightWheel.compression) * arbStiffness;
+			if(leftWheel.grounded) {
+				var v = leftWheel.normalLoad + arbForce;
+				leftWheel.normalLoad = v < 0.0 ? 0.0 : v > maxForce ? maxForce : v;
+			}
+			if(rightWheel.grounded) {
+				var v = rightWheel.normalLoad - arbForce;
+				rightWheel.normalLoad = v < 0.0 ? 0.0 : v > maxForce ? maxForce : v;
+			}
+		}
+		var leftWheel = wheelContacts[2];
+		var rightWheel = wheelContacts[3];
+		var maxForce = suspCfg.maxWheelForce;
+		if(!(!leftWheel.grounded && !rightWheel.grounded)) {
+			var arbForce = (leftWheel.compression - rightWheel.compression) * arbStiffness;
+			if(leftWheel.grounded) {
+				var v = leftWheel.normalLoad + arbForce;
+				leftWheel.normalLoad = v < 0.0 ? 0.0 : v > maxForce ? maxForce : v;
+			}
+			if(rightWheel.grounded) {
+				var v = rightWheel.normalLoad - arbForce;
+				rightWheel.normalLoad = v < 0.0 ? 0.0 : v > maxForce ? maxForce : v;
+			}
+		}
+		var totalZForce = 0.0;
+		var pitchTorque = 0.0;
+		var rollTorque = 0.0;
+		var _g = 0;
+		while(_g < 4) {
+			var i = _g++;
+			var wc = wheelContacts[i];
+			if(!wc.grounded || wc.normalLoad <= 0.0) {
+				continue;
+			}
+			var off = entities_CarMesh.WHEEL_OFFSETS[i];
+			totalZForce += wc.normalLoad * wc.normalZ;
+			pitchTorque += wc.normalLoad * off.y;
+			rollTorque += wc.normalLoad * -off.x;
+		}
+		var avgNX = 0.0;
+		var avgNY = 0.0;
+		var avgNZ = 1.0;
+		if(groundedCount > 0) {
+			var len = Math.sqrt(sumNormX * sumNormX + sumNormY * sumNormY + sumNormZ * sumNormZ);
+			if(len > 0.001) {
+				avgNX = sumNormX / len;
+				avgNY = sumNormY / len;
+				avgNZ = sumNormZ / len;
+			}
+		}
+		return { wheels : wheelContacts, groundedCount : groundedCount, avgNormalX : avgNX, avgNormalY : avgNY, avgNormalZ : avgNZ, totalNormalZForce : totalZForce, pitchTorque : pitchTorque, rollTorque : rollTorque, maxBottomOutPenetration : maxBottomOut};
+	}
+	,__class__: physics_SuspensionSolver
+};
+var physics_TireSlipSolver = function() {
+	this.smoothedSlip = [0.0,0.0,0.0,0.0];
+};
+$hxClasses["physics.TireSlipSolver"] = physics_TireSlipSolver;
+physics_TireSlipSolver.__name__ = "physics.TireSlipSolver";
+physics_TireSlipSolver.prototype = {
+	reset: function() {
+		this.smoothedSlip[0] = 0.0;
+		this.smoothedSlip[1] = 0.0;
+		this.smoothedSlip[2] = 0.0;
+		this.smoothedSlip[3] = 0.0;
+	}
+	,solve: function(dt,cfg,wheels,vLong,vLat,yawRate,steerInput,driveForce,brakeForce,handbrake,longAccel,slopeFwdSin,slopeRightSin,gravityMag) {
+		var chassisCfg = cfg.chassis;
+		var tireCfg = cfg.tires;
+		var totalSpeed = Math.sqrt(vLong * vLong + vLat * vLat);
+		var steerAngleBase = steerInput * tireCfg.maxSteerAngle / (1.0 + Math.abs(vLong) * tireCfg.highSpeedSteerDamp);
+		var leftWheelAngle = steerAngleBase;
+		var rightWheelAngle = steerAngleBase;
+		var absSteer = Math.abs(steerAngleBase);
+		if(absSteer > 0.015) {
+			var radius = chassisCfg.wheelbase / Math.max(0.01,Math.tan(absSteer));
+			var halfTrack = chassisCfg.trackWidth * 0.5;
+			var innerAng = Math.atan2(chassisCfg.wheelbase,Math.max(0.4,radius - halfTrack));
+			var outerAng = Math.atan2(chassisCfg.wheelbase,radius + halfTrack);
+			var ack = tireCfg.ackermannFactor;
+			if(steerAngleBase < 0.0) {
+				leftWheelAngle = -(absSteer + (innerAng - absSteer) * ack);
+				rightWheelAngle = -(absSteer + (outerAng - absSteer) * ack);
+			} else {
+				rightWheelAngle = absSteer + (innerAng - absSteer) * ack;
+				leftWheelAngle = absSteer + (outerAng - absSteer) * ack;
+			}
+		}
+		var groundedCount = 0;
+		var totalNormalLoad = 0.0;
+		var avgMu = 0.0;
+		if(wheels[0].grounded && wheels[0].normalLoad > 0.0) {
+			groundedCount = 1;
+			totalNormalLoad = wheels[0].normalLoad;
+			avgMu = wheels[0].mu;
+		}
+		if(wheels[1].grounded && wheels[1].normalLoad > 0.0) {
+			++groundedCount;
+			totalNormalLoad += wheels[1].normalLoad;
+			avgMu += wheels[1].mu;
+		}
+		if(wheels[2].grounded && wheels[2].normalLoad > 0.0) {
+			++groundedCount;
+			totalNormalLoad += wheels[2].normalLoad;
+			avgMu += wheels[2].mu;
+		}
+		if(wheels[3].grounded && wheels[3].normalLoad > 0.0) {
+			++groundedCount;
+			totalNormalLoad += wheels[3].normalLoad;
+			avgMu += wheels[3].mu;
+		}
+		if(groundedCount == 0) {
+			this.smoothedSlip[0] *= Math.max(0.0,1.0 - dt * 8.0);
+			this.smoothedSlip[1] *= Math.max(0.0,1.0 - dt * 8.0);
+			this.smoothedSlip[2] *= Math.max(0.0,1.0 - dt * 8.0);
+			this.smoothedSlip[3] *= Math.max(0.0,1.0 - dt * 8.0);
+			return { forceFwd : 0.0, forceRight : 0.0, yawTorque : 0.0, frontSteerAngle : steerAngleBase, lateralSlipAngle : 0.0, isStictionActive : false};
+		}
+		avgMu /= groundedCount;
+		if(totalSpeed < tireCfg.stictionSpeed && Math.abs(driveForce) < 50.0 && !handbrake) {
+			var maxStatic = avgMu * totalNormalLoad;
+			var cancelFwd = -vLong * chassisCfg.massKg * 18.0 + chassisCfg.massKg * gravityMag * slopeFwdSin;
+			var cancelRight = -vLat * chassisCfg.massKg * 18.0 + chassisCfg.massKg * gravityMag * slopeRightSin;
+			var mag = Math.sqrt(cancelFwd * cancelFwd + cancelRight * cancelRight);
+			if(mag > maxStatic && mag > 0.001) {
+				var scale = maxStatic / mag;
+				cancelFwd *= scale;
+				cancelRight *= scale;
+			}
+			this.smoothedSlip[0] = 0.0;
+			this.smoothedSlip[1] = 0.0;
+			this.smoothedSlip[2] = 0.0;
+			this.smoothedSlip[3] = 0.0;
+			return { forceFwd : cancelFwd, forceRight : cancelRight, yawTorque : -yawRate * chassisCfg.yawInertia * 16.0, frontSteerAngle : steerAngleBase, lateralSlipAngle : 0.0, isStictionActive : true};
+		}
+		var dFzTotal = longAccel * chassisCfg.massKg * chassisCfg.cogHeight / chassisCfg.wheelbase;
+		if(dFzTotal > 3200.0) {
+			dFzTotal = 3200.0;
+		} else if(dFzTotal < -3200.0) {
+			dFzTotal = -3200.0;
+		}
+		var frontAxleTransfer = -0.5 * dFzTotal;
+		var rearAxleTransfer = 0.5 * dFzTotal;
+		var frontGrounded = (wheels[0].grounded ? 1 : 0) + (wheels[1].grounded ? 1 : 0);
+		var rearGrounded = (wheels[2].grounded ? 1 : 0) + (wheels[3].grounded ? 1 : 0);
+		var frontShare = frontGrounded > 0 ? (rearGrounded > 0 ? 0.35 : 1.0) / frontGrounded : 0.0;
+		var rearShare = rearGrounded > 0 ? (frontGrounded > 0 ? 0.65 : 1.0) / rearGrounded : 0.0;
+		var totalForceFwd = 0.0;
+		var totalForceRight = 0.0;
+		var totalYawTorque = 0.0;
+		var maxSlipObserved = 0.0;
+		var B = tireCfg.pacejkaB;
+		var C = tireCfg.pacejkaC;
+		var D = tireCfg.pacejkaD;
+		var E = tireCfg.pacejkaE;
+		var lambda = tireCfg.relaxationLength;
+		var _g = 0;
+		while(_g < 4) {
+			var i = _g++;
+			var wc = wheels[i];
+			if(!wc.grounded || wc.normalLoad <= 0.0) {
+				this.smoothedSlip[i] *= Math.max(0.0,1.0 - dt * 8.0);
+				continue;
+			}
+			var isFront = i < 2;
+			var offset = entities_CarMesh.WHEEL_OFFSETS[i];
+			var fz = wc.normalLoad + (isFront ? frontAxleTransfer : rearAxleTransfer);
+			if(fz < 150.0) {
+				fz = 150.0;
+			}
+			var delta = i == 0 ? leftWheelAngle : i == 1 ? rightWheelAngle : 0.0;
+			var cosD = Math.cos(delta);
+			var sinD = Math.sin(delta);
+			var vPatchFwd = vLong - yawRate * offset.x;
+			var vPatchRight = vLat + yawRate * offset.y;
+			var vWheelFwd = vPatchFwd * cosD + vPatchRight * sinD;
+			var alpha = this.smoothedSlip[i] += (Math.atan2(-vPatchFwd * sinD + vPatchRight * cosD,Math.max(Math.abs(vWheelFwd),tireCfg.minSlipSpeed)) * Math.min(1.0,totalSpeed / 1.5) - this.smoothedSlip[i]) * (1.0 - Math.exp(-(Math.max(Math.abs(vWheelFwd),2.5) * dt) / lambda));
+			if(!isFront && Math.abs(alpha) > maxSlipObserved) {
+				maxSlipObserved = Math.abs(alpha);
+			}
+			var ba = B * alpha;
+			var tractionLimit = wc.mu * fz;
+			var fyWheel = -tractionLimit * (!isFront && handbrake ? tireCfg.handbrakeRearGrip : 1.0) * (D * Math.sin(C * Math.atan(ba - E * (ba - Math.atan(ba)))));
+			var fxWheel = driveForce * (isFront ? frontShare : rearShare);
+			if(brakeForce > 0.0) {
+				var brakeSplit = isFront ? 0.62 / Math.max(1,frontGrounded) : 0.38 / Math.max(1,rearGrounded);
+				if(!isFront && handbrake) {
+					brakeSplit *= 1.35;
+				}
+				if(Math.abs(vWheelFwd) > 0.25) {
+					fxWheel += (vWheelFwd > 0.0 ? -1.0 : 1.0) * brakeForce * brakeSplit;
+				} else {
+					fxWheel += -vWheelFwd * chassisCfg.massKg * 3.0;
+				}
+			} else if(!isFront && handbrake && Math.abs(vWheelFwd) > 0.4) {
+				fxWheel += (vWheelFwd > 0.0 ? -1.0 : 1.0) * wc.mu * fz * 0.45;
+			}
+			var forceMag = Math.sqrt(fxWheel * fxWheel + fyWheel * fyWheel);
+			if(forceMag > tractionLimit && forceMag > 0.001) {
+				var circleScale = tractionLimit / forceMag;
+				fxWheel *= circleScale;
+				fyWheel *= circleScale;
+			}
+			var fxChassis = fxWheel * cosD - fyWheel * sinD;
+			var fyChassis = fxWheel * sinD + fyWheel * cosD;
+			totalForceFwd += fxChassis;
+			totalForceRight += fyChassis;
+			totalYawTorque += offset.y * fyChassis - offset.x * fxChassis;
+		}
+		totalForceFwd -= chassisCfg.aeroDragArea * vLong * Math.abs(vLong) + chassisCfg.massKg * gravityMag * chassisCfg.rollingResistance * (Math.abs(vLong) > 0.2 ? vLong > 0 ? 1.0 : -1.0 : 0.0);
+		return { forceFwd : totalForceFwd, forceRight : totalForceRight, yawTorque : totalYawTorque, frontSteerAngle : steerAngleBase, lateralSlipAngle : maxSlipObserved, isStictionActive : false};
+	}
+	,__class__: physics_TireSlipSolver
+};
 var save_SaveSystem = function() { };
 $hxClasses["save.SaveSystem"] = save_SaveSystem;
 save_SaveSystem.__name__ = "save.SaveSystem";
@@ -71630,30 +73789,17 @@ save_SaveSystem.getDefaultTouchSettings = function() {
 save_SaveSystem.load = function() {
 	try {
 		var storage = js_Browser.getLocalStorage();
-		var raw = storage.getItem("mob_motors_on_boost_save_v4");
+		var raw = null;
 		var isLegacy = false;
-		if(raw == null) {
-			raw = storage.getItem("mob_motors_on_boost_save_v3");
+		var orderedKeys = ["mob_motors_on_boost_save_v4","mob_motors_on_boost_save_v3","mob_motors_on_boost_save_v2","mob_motors_on_boost_save_v1","burnout_overdrive_save_v1"];
+		var _g = 0;
+		var _g1 = orderedKeys.length;
+		while(_g < _g1) {
+			var i = _g++;
+			raw = storage.getItem(orderedKeys[i]);
 			if(raw != null) {
-				isLegacy = true;
-			}
-		}
-		if(raw == null) {
-			raw = storage.getItem("mob_motors_on_boost_save_v2");
-			if(raw != null) {
-				isLegacy = true;
-			}
-		}
-		if(raw == null) {
-			raw = storage.getItem("mob_motors_on_boost_save_v1");
-			if(raw != null) {
-				isLegacy = true;
-			}
-		}
-		if(raw == null) {
-			raw = storage.getItem("burnout_overdrive_save_v1");
-			if(raw != null) {
-				isLegacy = true;
+				isLegacy = i > 0;
+				break;
 			}
 		}
 		if(raw != null) {
@@ -71669,19 +73815,19 @@ save_SaveSystem.load = function() {
 			}
 			if(data.version == null || data.version < 4 || isLegacy) {
 				data.version = 4;
-				data.buildNumber = 10;
+				data.buildNumber = 14;
 				save_SaveSystem.save(data);
 			}
 			return data;
 		}
 	} catch( _g ) {
 	}
-	return { version : 4, buildNumber : 10, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 0.0, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, steerSensitivity : 1.0, graphics : save_SaveSystem.getDefaultGraphics(), touchSettings : save_SaveSystem.getDefaultTouchSettings()};
+	return { version : 4, buildNumber : 14, hasActiveRun : false, playerState : { posX : 0.0, posY : 0.0, posZ : 0.0, yaw : 0.0, forwardSpeed : 0.0}, masterVol : 0.8, musicVol : 0.7, sfxVol : 0.9, steerSensitivity : 1.0, graphics : save_SaveSystem.getDefaultGraphics(), touchSettings : save_SaveSystem.getDefaultTouchSettings()};
 };
 save_SaveSystem.save = function(data) {
 	try {
 		data.version = 4;
-		data.buildNumber = 10;
+		data.buildNumber = 14;
 		if(data.steerSensitivity == null || data.steerSensitivity <= 0.0) {
 			data.steerSensitivity = 1.0;
 		}
@@ -71959,44 +74105,73 @@ ui_ControlDiagrams.prototype = $extend(h2d_Object.prototype,{
 			t.y = c.y2 - 8;
 		}
 	}
-	,drawTouchLayout: function() {
+	,drawTouchLayout: function(ts) {
 		this.g.clear();
 		this.labelsContainer.removeChildren();
+		var cx = 0.0;
+		var cy = 0.0;
+		var sc = ts != null ? Math.max(0.5,Math.min(1.5,ts.scale)) : 1.0;
+		var ox = function(v) {
+			return v * 0.35;
+		};
+		var clampX = function(x) {
+			return Math.max(cx - 195.0,Math.min(cx + 195.0,x));
+		};
+		var clampY = function(y) {
+			return Math.max(cy - 70.0,Math.min(cy + 70.0,y));
+		};
 		this.g.beginFill(1579808,0.85);
 		this.g.lineStyle(2.5,58879,0.95);
-		this.g.drawRoundedRect(-240.,-110.,480,220,16);
+		this.g.drawRoundedRect(cx - 240,cy - 110,480,220,16);
 		this.g.endFill();
 		this.g.lineStyle(1.0,3359829,0.6);
-		this.g.drawRoundedRect(-228.,-98.,456,196,10);
+		this.g.drawRoundedRect(cx - 228,cy - 98,456,196,10);
+		var stickX = clampX(cx - 170 + (ts != null ? ox(ts.stickOffsetX) : 0.0));
+		var stickY = clampY(cy + 42 + (ts != null ? ox(ts.stickOffsetY) : 0.0));
+		var stickR = 32.0 * sc;
 		this.g.beginFill(659222,0.7);
 		this.g.lineStyle(2.0,58879,0.9);
-		this.g.drawCircle(-170.,42.,32);
+		this.g.drawCircle(stickX,stickY,stickR);
 		this.g.endFill();
 		this.g.beginFill(58879,0.35);
 		this.g.lineStyle(1.5,58879,0.95);
-		this.g.drawCircle(-170.,42.,16);
+		this.g.drawCircle(stickX,stickY,16.0 * sc);
 		this.g.endFill();
+		var nitroX = clampX(cx - 170 + (ts != null ? ox(ts.nitroOffsetX) : 0.0));
+		var nitroY = clampY(cy - 42 + (ts != null ? ox(ts.nitroOffsetY) : 0.0));
+		var nitroR = 22.0 * sc;
 		this.g.beginFill(3807240,0.7);
 		this.g.lineStyle(2.0,16737792,0.9);
-		this.g.drawCircle(-170.,-42.,22);
+		this.g.drawCircle(nitroX,nitroY,nitroR);
 		this.g.endFill();
+		var gasX = clampX(cx + 175 + (ts != null ? ox(ts.gasOffsetX) : 0.0));
+		var gasY = clampY(cy + 45 + (ts != null ? ox(ts.gasOffsetY) : 0.0));
+		var gasR = 24.0 * sc;
 		this.g.beginFill(536094,0.7);
 		this.g.lineStyle(2.0,65416,0.9);
-		this.g.drawCircle(175.,45.,24);
+		this.g.drawCircle(gasX,gasY,gasR);
 		this.g.endFill();
+		var driftX = clampX(cx + 195 + (ts != null ? ox(ts.driftOffsetX) : 0.0));
+		var driftY = clampY(cy - 20 + (ts != null ? ox(ts.driftOffsetY) : 0.0));
+		var driftR = 20.0 * sc;
 		this.g.beginFill(3022856,0.7);
 		this.g.lineStyle(2.0,16763904,0.9);
-		this.g.drawCircle(195.,-20.,20);
+		this.g.drawCircle(driftX,driftY,driftR);
 		this.g.endFill();
+		var brakeX = clampX(cx + 140 + (ts != null ? ox(ts.brakeOffsetX) : 0.0));
+		var brakeY = clampY(cy - 54 + (ts != null ? ox(ts.brakeOffsetY) : 0.0));
+		var brakeR = 20.0 * sc;
 		this.g.beginFill(3018002,0.7);
 		this.g.lineStyle(2.0,16724804,0.9);
-		this.g.drawCircle(140.,-54.,20);
+		this.g.drawCircle(brakeX,brakeY,brakeR);
 		this.g.endFill();
+		var pauseX = cx + 210;
+		var pauseY = cy - 80;
 		this.g.beginFill(659222,0.6);
 		this.g.lineStyle(1.5,16777215,0.8);
-		this.g.drawCircle(210.,-80.,11);
+		this.g.drawCircle(pauseX,pauseY,11);
 		this.g.endFill();
-		var callouts = [{ x1 : -170., y1 : 76., x2 : -170., y2 : 122., text : "LEFT THUMB: Analog Steering Joystick"},{ x1 : -170., y1 : -66., x2 : -170., y2 : -122., text : "LEFT FINGER: Nitro Boost"},{ x1 : 175., y1 : 71., x2 : 175., y2 : 122., text : "RIGHT THUMB: Gas / Throttle"},{ x1 : 217., y1 : -20., x2 : 265., y2 : -20., text : "HANDBRAKE (DRIFT)"},{ x1 : 140., y1 : -76., x2 : 140., y2 : -122., text : "BRAKE / REVERSE"},{ x1 : 210., y1 : -93., x2 : 230., y2 : -110., text : "PAUSE"}];
+		var callouts = [{ x1 : stickX, y1 : stickY + stickR + 2.0, x2 : cx - 170, y2 : cy + 122, text : "LEFT THUMB: Analog Steering Joystick"},{ x1 : nitroX, y1 : nitroY - nitroR - 2.0, x2 : cx - 170, y2 : cy - 122, text : "LEFT FINGER: Nitro Boost"},{ x1 : gasX, y1 : gasY + gasR + 2.0, x2 : cx + 175, y2 : cy + 122, text : "RIGHT THUMB: Gas / Throttle"},{ x1 : driftX + driftR + 2.0, y1 : driftY, x2 : cx + 265, y2 : cy - 20, text : "HANDBRAKE (DRIFT)"},{ x1 : brakeX, y1 : brakeY - brakeR - 2.0, x2 : cx + 140, y2 : cy - 122, text : "BRAKE / REVERSE"},{ x1 : pauseX, y1 : pauseY - 13, x2 : cx + 230, y2 : cy - 110, text : "PAUSE"}];
 		this.g.lineStyle(1.5,58879,0.8);
 		var _g = 0;
 		while(_g < callouts.length) {
@@ -72018,12 +74193,12 @@ ui_ControlDiagrams.prototype = $extend(h2d_Object.prototype,{
 			t.scaleX = 0.85;
 			t.posChanged = true;
 			t.scaleY = 0.85;
-			if(c.x2 >= 200.) {
+			if(c.x2 >= cx + 200) {
 				t.posChanged = true;
 				t.x = c.x2 + 6;
 				t.posChanged = true;
 				t.y = c.y2 - 8;
-			} else if(c.y2 > 0.0) {
+			} else if(c.y2 > cy) {
 				var v = c.x2 - t.get_textWidth() * 0.85 * 0.5;
 				t.posChanged = true;
 				t.x = v;
@@ -72089,7 +74264,7 @@ ui_FontManager.sanitizeAllFonts = function() {
 		}
 	}
 };
-var ui_UIBuilder = function(input,gfxSettings,hasSave,parent) {
+var ui_UIBuilder = function(input,gfxSettings,hasSave,parent,mp) {
 	h2d_Object.call(this,parent);
 	this.modalDimmer = new h2d_Bitmap(h2d_Tile.fromColor(0,1,1,0.76),this);
 	this.cardBg = new h2d_Graphics(this);
@@ -72097,6 +74272,10 @@ var ui_UIBuilder = function(input,gfxSettings,hasSave,parent) {
 	this.mainMenuView = new ui_views_mainmenu_MainMenuView(this);
 	this.mapSelectView = new ui_views_mapselect_MapSelectView(this);
 	this.mapSelectView.set_visible(false);
+	this.multiplayerMenuView = new ui_views_multiplayer_MultiplayerMenuView(this);
+	this.multiplayerMenuView.set_visible(false);
+	this.multiplayerLobbyView = new ui_views_multiplayer_MultiplayerLobbyView(mp,this);
+	this.multiplayerLobbyView.set_visible(false);
 	this.pauseMenuView = new ui_views_pause_PauseMenuView(this);
 	this.optionsView = new ui_views_options_OptionsView(input,gfxSettings,this);
 	this.creditsView = new ui_views_credits_CreditsView(this);
@@ -72123,13 +74302,19 @@ ui_UIBuilder.prototype = $extend(h2d_Object.prototype,{
 		case 2:
 			ui_components_CardBackplate.drawMapSelect(this.cardBg,sw,sh,this.mapSelectView.selectedIndex);
 			break;
-		case 4:
-			ui_components_CardBackplate.drawPauseMenu(this.cardBg,sw,sh,this.pauseMenuView.selectedIndex);
+		case 3:
+			ui_components_CardBackplate.drawMultiplayerMenu(this.cardBg,sw,sh,this.multiplayerMenuView.selectedIndex,this.multiplayerMenuView.enteredCode.length > 0);
 			break;
-		case 5:
-			ui_components_CardBackplate.drawOptionsMenu(this.cardBg,sw,sh,ui_views_options_OptionsView.TAB_ORDER.indexOf(this.optionsView.currentTab),ui_views_options_OptionsView.TAB_ORDER.length);
+		case 4:
+			ui_components_CardBackplate.drawMultiplayerLobby(this.cardBg,sw,sh,this.multiplayerLobbyView.isHostRole(),this.multiplayerLobbyView.selectedMapIndex,this.multiplayerLobbyView.focusedActionIdx);
 			break;
 		case 6:
+			ui_components_CardBackplate.drawPauseMenu(this.cardBg,sw,sh,this.pauseMenuView.selectedIndex);
+			break;
+		case 7:
+			ui_components_CardBackplate.drawOptionsMenu(this.cardBg,sw,sh,ui_views_options_OptionsView.TAB_ORDER.indexOf(this.optionsView.currentTab),ui_views_options_OptionsView.TAB_ORDER.length);
+			break;
+		case 8:
 			ui_components_CardBackplate.drawCreditsScreen(this.cardBg,sw,sh);
 			break;
 		default:
@@ -72156,6 +74341,12 @@ ui_UIBuilder.prototype = $extend(h2d_Object.prototype,{
 		}
 		if(this.mapSelectView != null && this.mapSelectView.visible) {
 			this.mapSelectView.layout(sw,sh);
+		}
+		if(this.multiplayerMenuView != null && this.multiplayerMenuView.visible) {
+			this.multiplayerMenuView.layout(sw,sh);
+		}
+		if(this.multiplayerLobbyView != null && this.multiplayerLobbyView.visible) {
+			this.multiplayerLobbyView.layout(sw,sh);
 		}
 		if(this.pauseMenuView != null && this.pauseMenuView.visible) {
 			this.pauseMenuView.layout(sw,sh);
@@ -72199,10 +74390,11 @@ var ui_IconType = $hxEnums["ui.IconType"] = { __ename__:true,__constructs__:null
 	,Credits: {_hx_name:"Credits",_hx_index:11,__enum__:"ui.IconType",toString:$estr}
 	,Touch: {_hx_name:"Touch",_hx_index:12,__enum__:"ui.IconType",toString:$estr}
 	,Sandbox: {_hx_name:"Sandbox",_hx_index:13,__enum__:"ui.IconType",toString:$estr}
-	,Exit: {_hx_name:"Exit",_hx_index:14,__enum__:"ui.IconType",toString:$estr}
+	,Multiplayer: {_hx_name:"Multiplayer",_hx_index:14,__enum__:"ui.IconType",toString:$estr}
+	,Exit: {_hx_name:"Exit",_hx_index:15,__enum__:"ui.IconType",toString:$estr}
 };
-ui_IconType.__constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Sandbox,ui_IconType.Exit];
-ui_IconType.__empty_constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Sandbox,ui_IconType.Exit];
+ui_IconType.__constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Sandbox,ui_IconType.Multiplayer,ui_IconType.Exit];
+ui_IconType.__empty_constructs__ = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Restart,ui_IconType.Settings,ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Mute,ui_IconType.Music,ui_IconType.Sfx,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Credits,ui_IconType.Touch,ui_IconType.Sandbox,ui_IconType.Multiplayer,ui_IconType.Exit];
 var ui_UIIcons = function() { };
 $hxClasses["ui.UIIcons"] = ui_UIIcons;
 ui_UIIcons.__name__ = "ui.UIIcons";
@@ -72443,6 +74635,13 @@ ui_UIIcons.get = function(type,size,color) {
 		g.drawCircle(pad + w * 0.78,pad + w * 0.22,w * 0.08);
 		break;
 	case 14:
+		g.drawCircle(pad + w * 0.34,pad + w * 0.32,w * 0.16);
+		g.drawRoundedRect(pad + w * 0.12,pad + w * 0.56,w * 0.44,w * 0.34,3);
+		g.beginFill(color,0.72);
+		g.drawCircle(pad + w * 0.72,pad + w * 0.38,w * 0.13);
+		g.drawRoundedRect(pad + w * 0.54,pad + w * 0.60,w * 0.36,w * 0.28,3);
+		break;
+	case 15:
 		g.endFill();
 		g.drawRect(pad,pad,w * 0.55,w);
 		g.lineStyle(2.0,color,1.0);
@@ -72477,7 +74676,7 @@ ui_UIIcons.get = function(type,size,color) {
 	ui_UIIcons.cache.h[key] = tile;
 	return tile;
 };
-var ui_UIManager = function(input,initialGfx,hasSave,parent) {
+var ui_UIManager = function(input,initialGfx,hasSave,parent,mp) {
 	this.hasActiveSave = false;
 	this.isOpenedFromPause = false;
 	this.currentState = ui_components_UIState.Splash;
@@ -72487,7 +74686,7 @@ var ui_UIManager = function(input,initialGfx,hasSave,parent) {
 	this.inputRef = input;
 	this.gfxSettings = initialGfx;
 	this.hasActiveSave = hasSave;
-	this.builder = new ui_UIBuilder(input,initialGfx,hasSave,this);
+	this.builder = new ui_UIBuilder(input,initialGfx,hasSave,this,mp);
 	this.builder.splashView.onEnter = function() {
 		_gthis.showMainMenu();
 	};
@@ -72506,6 +74705,33 @@ var ui_UIManager = function(input,initialGfx,hasSave,parent) {
 		_gthis.showMainMenu();
 	};
 	this.builder.mapSelectView.onSelectionChanged = function() {
+		_gthis.layout();
+	};
+	this.builder.multiplayerMenuView.onHostSelected = function() {
+		if(mp != null) {
+			mp.hostRoom(null,"HOST");
+		}
+		_gthis.showMultiplayerLobby();
+	};
+	this.builder.multiplayerMenuView.onJoinSelected = function(code) {
+		if(mp != null) {
+			mp.joinRoom(code,"GUEST");
+		}
+		_gthis.showMultiplayerLobby();
+	};
+	this.builder.multiplayerMenuView.onBack = function() {
+		_gthis.showMainMenu();
+	};
+	this.builder.multiplayerMenuView.onSelectionChanged = function() {
+		_gthis.layout();
+	};
+	this.builder.multiplayerLobbyView.onBack = function() {
+		if(mp != null) {
+			mp.leaveRoom();
+		}
+		_gthis.showMultiplayerMenu();
+	};
+	this.builder.multiplayerLobbyView.onVisualRefresh = function() {
 		_gthis.layout();
 	};
 	this.builder.pauseMenuView.onResume = function() {
@@ -72536,6 +74762,11 @@ var ui_UIManager = function(input,initialGfx,hasSave,parent) {
 			_gthis.showMainMenu();
 		}
 	};
+	this.builder.optionsView.onTabChanged = function() {
+		if(_gthis.currentState == ui_components_UIState.OptionsMenu) {
+			_gthis.layout();
+		}
+	};
 	this.builder.optionsView.gfxPanel.onUIResolutionChanged = function() {
 		_gthis.layout();
 	};
@@ -72547,7 +74778,11 @@ var ui_UIManager = function(input,initialGfx,hasSave,parent) {
 	};
 	this.builder.touchControlsHUD.onPauseTriggered = function() {
 		if(_gthis.currentState == ui_components_UIState.InGameHUD) {
-			_gthis.showPause();
+			if(_gthis.onPauseRequested != null) {
+				_gthis.onPauseRequested();
+			} else {
+				_gthis.showPause();
+			}
 		}
 	};
 };
@@ -72558,131 +74793,84 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 	get_inGameHUD: function() {
 		return this.builder.inGameHUDView;
 	}
+	,prepareTransition: function(state,showModalCard,helpMsg,resetTouch) {
+		if(resetTouch == null) {
+			resetTouch = true;
+		}
+		this.inputRef.flushInputs();
+		this.currentState = state;
+		this.builder.modalDimmer.set_visible(showModalCard);
+		this.builder.cardBg.set_visible(showModalCard);
+		this.builder.splashView.set_visible(false);
+		this.builder.mainMenuView.set_visible(false);
+		this.builder.mapSelectView.set_visible(false);
+		this.builder.multiplayerMenuView.set_visible(false);
+		this.builder.multiplayerLobbyView.set_visible(false);
+		this.builder.pauseMenuView.set_visible(false);
+		this.builder.optionsView.set_visible(false);
+		this.builder.creditsView.set_visible(false);
+		this.builder.inGameHUDView.set_visible(false);
+		this.builder.touchControlsHUD.set_visible(false);
+		if(resetTouch) {
+			this.builder.touchControlsHUD.resetTouchStates();
+		}
+		if(helpMsg != null) {
+			this.builder.helpText.set_text(helpMsg);
+			this.builder.helpText.set_visible(true);
+		} else {
+			this.builder.helpText.set_visible(false);
+		}
+	}
 	,setHasActiveSave: function(val) {
 		this.hasActiveSave = val;
 		this.builder.mainMenuView.setHasActiveSave(val);
 	}
 	,showSplash: function() {
 		this.set_visible(true);
-		this.inputRef.flushInputs();
-		this.currentState = ui_components_UIState.Splash;
-		this.builder.modalDimmer.set_visible(false);
-		this.builder.cardBg.set_visible(false);
+		this.prepareTransition(ui_components_UIState.Splash,false,null,false);
 		this.builder.splashView.activate();
-		this.builder.mainMenuView.set_visible(false);
-		this.builder.mapSelectView.set_visible(false);
-		this.builder.pauseMenuView.set_visible(false);
-		this.builder.optionsView.set_visible(false);
-		this.builder.creditsView.set_visible(false);
-		this.builder.inGameHUDView.set_visible(false);
-		this.builder.touchControlsHUD.set_visible(false);
-		this.builder.helpText.set_visible(false);
 		this.layout();
 	}
 	,showMainMenu: function() {
-		this.inputRef.flushInputs();
-		this.currentState = ui_components_UIState.MainMenu;
-		this.builder.modalDimmer.set_visible(true);
-		this.builder.cardBg.set_visible(true);
-		this.builder.splashView.set_visible(false);
+		this.prepareTransition(ui_components_UIState.MainMenu,true,"[Up / Down / D-Pad] Select    [A / Enter] Confirm",false);
 		this.builder.mainMenuView.activate(this.hasActiveSave);
-		this.builder.mapSelectView.set_visible(false);
-		this.builder.pauseMenuView.set_visible(false);
-		this.builder.optionsView.set_visible(false);
-		this.builder.creditsView.set_visible(false);
-		this.builder.inGameHUDView.set_visible(false);
-		this.builder.touchControlsHUD.set_visible(false);
-		this.builder.helpText.set_text("[Up / Down / D-Pad] Select    [A / Enter] Confirm");
-		this.builder.helpText.set_visible(true);
 		this.layout();
 	}
 	,showMapSelect: function() {
-		this.inputRef.flushInputs();
-		this.currentState = ui_components_UIState.MapSelect;
-		this.builder.modalDimmer.set_visible(true);
-		this.builder.cardBg.set_visible(true);
-		this.builder.splashView.set_visible(false);
-		this.builder.mainMenuView.set_visible(false);
+		this.prepareTransition(ui_components_UIState.MapSelect,true,"[Left / Right / Up / Down] Select Map    [A / Enter] Launch    [B / Esc] Back",false);
 		this.builder.mapSelectView.activate();
-		this.builder.pauseMenuView.set_visible(false);
-		this.builder.optionsView.set_visible(false);
-		this.builder.creditsView.set_visible(false);
-		this.builder.inGameHUDView.set_visible(false);
-		this.builder.touchControlsHUD.set_visible(false);
-		this.builder.helpText.set_text("[Left / Right / Up / Down] Select Map    [A / Enter] Launch    [B / Esc] Back");
-		this.builder.helpText.set_visible(true);
+		this.layout();
+	}
+	,showMultiplayerMenu: function() {
+		this.prepareTransition(ui_components_UIState.MultiplayerMenu,true,"[Left / Right] Host or Join    [Type A-Z / 0-9] Invite Code    [A / Enter] Confirm    [B / Esc] Back",false);
+		this.builder.multiplayerMenuView.activate();
+		this.layout();
+	}
+	,showMultiplayerLobby: function() {
+		this.prepareTransition(ui_components_UIState.MultiplayerLobby,true,"[Up / Down] Select Map    [A / Enter] Start Match (Host)    [B / Esc] Back",false);
+		this.builder.multiplayerLobbyView.activate();
 		this.layout();
 	}
 	,showInGame: function() {
-		this.inputRef.flushInputs();
-		this.currentState = ui_components_UIState.InGameHUD;
-		this.builder.modalDimmer.set_visible(false);
-		this.builder.cardBg.set_visible(false);
-		this.builder.splashView.set_visible(false);
-		this.builder.mainMenuView.set_visible(false);
-		this.builder.mapSelectView.set_visible(false);
-		this.builder.pauseMenuView.set_visible(false);
-		this.builder.optionsView.set_visible(false);
-		this.builder.creditsView.set_visible(false);
+		this.prepareTransition(ui_components_UIState.InGameHUD,false,null,true);
 		this.builder.inGameHUDView.set_visible(true);
-		this.builder.helpText.set_visible(false);
 		this.builder.touchControlsHUD.set_visible(this.inputRef.isTouchActive);
-		this.builder.touchControlsHUD.resetTouchStates();
 		this.layout();
 	}
 	,showPause: function() {
-		this.inputRef.flushInputs();
-		this.currentState = ui_components_UIState.PauseMenu;
-		this.builder.modalDimmer.set_visible(true);
-		this.builder.cardBg.set_visible(true);
-		this.builder.splashView.set_visible(false);
-		this.builder.mainMenuView.set_visible(false);
-		this.builder.mapSelectView.set_visible(false);
+		this.prepareTransition(ui_components_UIState.PauseMenu,true,"[Up / Down] Select    [A / Enter] Confirm    [B / Esc] Resume",true);
 		this.builder.pauseMenuView.activate();
-		this.builder.optionsView.set_visible(false);
-		this.builder.creditsView.set_visible(false);
-		this.builder.inGameHUDView.set_visible(false);
-		this.builder.touchControlsHUD.set_visible(false);
-		this.builder.touchControlsHUD.resetTouchStates();
-		this.builder.helpText.set_text("[Up / Down] Select    [A / Enter] Confirm    [B / Esc] Resume");
-		this.builder.helpText.set_visible(true);
 		this.layout();
 	}
 	,openOptions: function(fromPause) {
-		this.inputRef.flushInputs();
-		this.currentState = ui_components_UIState.OptionsMenu;
 		this.isOpenedFromPause = fromPause;
-		this.builder.modalDimmer.set_visible(true);
-		this.builder.cardBg.set_visible(true);
-		this.builder.splashView.set_visible(false);
-		this.builder.mainMenuView.set_visible(false);
-		this.builder.mapSelectView.set_visible(false);
-		this.builder.pauseMenuView.set_visible(false);
+		this.prepareTransition(ui_components_UIState.OptionsMenu,true,"[LB / RB / Q / E] Switch Tabs    [Left / Right] Value    [B / Esc] Back",true);
 		this.builder.optionsView.activate(fromPause);
-		this.builder.creditsView.set_visible(false);
-		this.builder.inGameHUDView.set_visible(false);
-		this.builder.touchControlsHUD.set_visible(false);
-		this.builder.touchControlsHUD.resetTouchStates();
-		this.builder.helpText.set_text("[LB / RB / Q / E] Switch Tabs    [Left / Right] Value    [B / Esc] Back");
-		this.builder.helpText.set_visible(true);
 		this.layout();
 	}
 	,showCredits: function() {
-		this.inputRef.flushInputs();
-		this.currentState = ui_components_UIState.CreditsScreen;
-		this.builder.modalDimmer.set_visible(true);
-		this.builder.cardBg.set_visible(true);
-		this.builder.splashView.set_visible(false);
-		this.builder.mainMenuView.set_visible(false);
-		this.builder.mapSelectView.set_visible(false);
-		this.builder.pauseMenuView.set_visible(false);
-		this.builder.optionsView.set_visible(false);
+		this.prepareTransition(ui_components_UIState.CreditsScreen,true,"[B / Esc / Enter] Return to Main Menu",true);
 		this.builder.creditsView.activate();
-		this.builder.inGameHUDView.set_visible(false);
-		this.builder.touchControlsHUD.set_visible(false);
-		this.builder.touchControlsHUD.resetTouchStates();
-		this.builder.helpText.set_text("[B / Esc / Enter] Return to Main Menu");
-		this.builder.helpText.set_visible(true);
 		this.layout();
 	}
 	,triggerMainAction: function(act) {
@@ -72692,31 +74880,38 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 			break;
 		case 1:
 			if(this.onMenuAction != null) {
-				this.onMenuAction(ui_components_MenuAction.StartGame);
+				this.onMenuAction(ui_components_MenuAction.OpenMultiplayer);
+			} else {
+				this.showMultiplayerMenu();
 			}
 			break;
 		case 2:
 			if(this.onMenuAction != null) {
-				this.onMenuAction(ui_components_MenuAction.StartSandbox);
+				this.onMenuAction(ui_components_MenuAction.StartGame);
 			}
 			break;
 		case 3:
 			if(this.onMenuAction != null) {
-				this.onMenuAction(ui_components_MenuAction.RestartRace);
+				this.onMenuAction(ui_components_MenuAction.StartSandbox);
 			}
 			break;
 		case 4:
+			if(this.onMenuAction != null) {
+				this.onMenuAction(ui_components_MenuAction.RestartRace);
+			}
+			break;
+		case 5:
 			if(this.hasActiveSave && this.onMenuAction != null) {
 				this.onMenuAction(ui_components_MenuAction.ResumeGame);
 			}
 			break;
-		case 5:
+		case 6:
 			this.openOptions(false);
 			break;
-		case 6:
+		case 7:
 			this.showCredits();
 			break;
-		case 7:
+		case 8:
 			this.showSplash();
 			break;
 		}
@@ -72745,6 +74940,40 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 				this.builder.mapSelectView.confirmSelection();
 			} else if(uiCancel) {
 				this.showMainMenu();
+			}
+		} else if(this.currentState == ui_components_UIState.MultiplayerMenu) {
+			var mpMenu = this.builder.multiplayerMenuView;
+			var navLeft = uiLeft || uiUp;
+			var navRight = uiRight || uiDown;
+			if(mpMenu.shouldCaptureWasdAsText()) {
+				navLeft = navLeft && (hxd_Key.isDown(37) || hxd_Key.isDown(38) || !(hxd_Key.isDown(65) || hxd_Key.isDown(87)));
+				navRight = navRight && (hxd_Key.isDown(39) || hxd_Key.isDown(40) || !(hxd_Key.isDown(68) || hxd_Key.isDown(83)));
+			}
+			if(navLeft) {
+				mpMenu.navigate(-1);
+			} else if(navRight) {
+				mpMenu.navigate(1);
+			}
+			if(uiConfirm) {
+				mpMenu.confirmSelection();
+			} else if(uiCancel && !mpMenu.consumeBackspaceCancel()) {
+				this.showMainMenu();
+			}
+		} else if(this.currentState == ui_components_UIState.MultiplayerLobby) {
+			this.builder.multiplayerLobbyView.updateTimer(dt);
+			if(uiLeft || uiUp) {
+				this.builder.multiplayerLobbyView.navigate(-1);
+			} else if(uiRight || uiDown) {
+				this.builder.multiplayerLobbyView.navigate(1);
+			}
+			if(uiConfirm) {
+				this.builder.multiplayerLobbyView.confirmFocused();
+			} else if(uiCancel) {
+				if(this.builder.multiplayerLobbyView.onBack != null) {
+					this.builder.multiplayerLobbyView.onBack();
+				} else {
+					this.showMainMenu();
+				}
 			}
 		} else if(this.currentState == ui_components_UIState.PauseMenu) {
 			if(uiUp) {
@@ -72787,7 +75016,7 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 				if(uiLeft) {
 					opt.audioPanel.adjustVolume(opt.audioPanel.selectedIndex,-0.1);
 				}
-				if(uiRight) {
+				if(uiRight || uiConfirm) {
 					opt.audioPanel.adjustVolume(opt.audioPanel.selectedIndex,0.1);
 				}
 			} else if(opt.controlsPanel.controlViewMode == "Custom") {
@@ -72811,6 +75040,9 @@ ui_UIManager.prototype = $extend(h2d_Object.prototype,{
 				}
 				if(uiRight) {
 					opt.controlsPanel.adjustSensitivity(0.02);
+				}
+				if(uiConfirm) {
+					opt.controlsPanel.toggleCustomMode();
 				}
 			}
 			if(uiCancel) {
@@ -72952,13 +75184,13 @@ ui_components_CardBackplate.drawStyledCardBase = function(g,cardX,cardY,cardW,ca
 };
 ui_components_CardBackplate.drawMainMenu = function(g,sw,sh,selectedIdx) {
 	var cardW = Math.min(560.0,sw - 32.0);
-	var cardH = Math.min(380.0,sh * 0.64);
+	var cardH = Math.min(432.0,sh * 0.72);
 	var cardX = (sw - cardW) * 0.5;
 	var cardY = Math.max(76.0,(sh - cardH) * 0.5 + 14.0);
 	ui_components_CardBackplate.drawStyledCardBase(g,cardX,cardY,cardW,cardH,14.0,58879);
-	var startY = cardY + (cardH - 240.) * 0.5 + 6.0;
+	var startY = cardY + (cardH - 288.) * 0.5 + 6.0;
 	var _g = 0;
-	while(_g < 5) {
+	while(_g < 6) {
 		var i = _g++;
 		var ry = startY + i * 48.0;
 		if(i == selectedIdx) {
@@ -73127,6 +75359,113 @@ ui_components_CardBackplate.drawCreditsScreen = function(g,sw,sh) {
 	ui_components_CardBackplate.drawStyledCardBase(g,cardX,Math.max(24.0,(sh - cardH) * 0.5),cardW,cardH,16.0,58879);
 	ui_components_CardBackplate.drawChamferedBox(g,cardX + 36,sh * 0.215,cardW - 72,78,8.0,58879,0.08,58879,0.50,1.5);
 };
+ui_components_CardBackplate.drawMultiplayerMenu = function(g,sw,sh,selectedIdx,hasCode) {
+	var cardW = Math.min(860.0,sw - 32.0);
+	var cardH = Math.min(480.0,sh - 110.0);
+	var cardX = (sw - cardW) * 0.5;
+	var cardY = Math.max(68.0,(sh - cardH) * 0.5 + 8.0);
+	ui_components_CardBackplate.drawStyledCardBase(g,cardX,cardY,cardW,cardH,16.0,58879);
+	g.lineStyle(1.2,2372685,0.75);
+	var x = cardX + 24;
+	var y = cardY + 58;
+	g.flush();
+	g.addVertex(x,y,g.curR,g.curG,g.curB,g.curA,x * g.ma + y * g.mc + g.mx,x * g.mb + y * g.md + g.my);
+	var x = cardX + cardW - 24;
+	var y = cardY + 58;
+	g.addVertex(x,y,g.curR,g.curG,g.curB,g.curA,x * g.ma + y * g.mc + g.mx,x * g.mb + y * g.md + g.my);
+	g.lineStyle(0);
+	var modeCardW = (cardW - 56. - 24.0) * 0.5;
+	var modeCardH = cardH - 134.0;
+	var modeCardY = cardY + 74.0;
+	var _g = 0;
+	while(_g < 2) {
+		var i = _g++;
+		var mx = cardX + 28.0 + i * (modeCardW + 24.0);
+		var isSel = i == selectedIdx;
+		ui_components_CardBackplate.drawChamferedBox(g,mx,modeCardY,modeCardW,modeCardH,10.0,isSel ? 1253941 : 1054242,isSel ? 0.94 : 0.78,isSel ? 58879 : 2372685,isSel ? 0.95 : 0.55,isSel ? 2.2 : 1.2);
+		var prevX = mx + 16.0;
+		var prevY = modeCardY + 16.0;
+		var prevW = modeCardW - 32.0;
+		var prevH = Math.max(84.0,modeCardH * 0.40);
+		ui_components_CardBackplate.drawChamferedBox(g,prevX,prevY,prevW,prevH,6.0,527636,0.92,isSel ? 58879 : 2438473,isSel ? 0.65 : 0.45,1.2);
+		if(i == 0) {
+			var cx = prevX + prevW * 0.5;
+			var cy = prevY + prevH * 0.5;
+			var nodeColor = isSel ? 58879 : 5927822;
+			var offsetsX_0 = -prevW * 0.24;
+			var offsetsX_1 = prevW * 0.24;
+			var offsetsY_0 = -prevH * 0.24;
+			var offsetsY_1 = -prevH * 0.24;
+			var offsetsY_2 = prevH * 0.26;
+			g.lineStyle(1.8,nodeColor,0.75);
+			g.flush();
+			g.addVertex(cx,cy,g.curR,g.curG,g.curB,g.curA,cx * g.ma + cy * g.mc + g.mx,cx * g.mb + cy * g.md + g.my);
+			var x = cx + offsetsX_0;
+			var y = cy + offsetsY_0;
+			g.addVertex(x,y,g.curR,g.curG,g.curB,g.curA,x * g.ma + y * g.mc + g.mx,x * g.mb + y * g.md + g.my);
+			g.flush();
+			g.addVertex(cx,cy,g.curR,g.curG,g.curB,g.curA,cx * g.ma + cy * g.mc + g.mx,cx * g.mb + cy * g.md + g.my);
+			var x1 = cx + offsetsX_1;
+			var y1 = cy + offsetsY_1;
+			g.addVertex(x1,y1,g.curR,g.curG,g.curB,g.curA,x1 * g.ma + y1 * g.mc + g.mx,x1 * g.mb + y1 * g.md + g.my);
+			g.flush();
+			g.addVertex(cx,cy,g.curR,g.curG,g.curB,g.curA,cx * g.ma + cy * g.mc + g.mx,cx * g.mb + cy * g.md + g.my);
+			var x2 = cx;
+			var y2 = cy + offsetsY_2;
+			g.addVertex(x2,y2,g.curR,g.curG,g.curB,g.curA,x2 * g.ma + y2 * g.mc + g.mx,x2 * g.mb + y2 * g.md + g.my);
+			g.lineStyle(0);
+			g.beginFill(nodeColor,0.9);
+			g.drawCircle(cx + offsetsX_0,cy + offsetsY_0,5.5);
+			g.endFill();
+			g.beginFill(nodeColor,0.9);
+			g.drawCircle(cx + offsetsX_1,cy + offsetsY_1,5.5);
+			g.endFill();
+			g.beginFill(nodeColor,0.9);
+			g.drawCircle(cx,cy + offsetsY_2,5.5);
+			g.endFill();
+			g.beginFill(16772608,1.0);
+			g.drawCircle(cx,cy,8.5);
+			g.endFill();
+		} else {
+			var boxY = prevY + 34.0;
+			ui_components_CardBackplate.drawChamferedBox(g,prevX + 14.0,boxY,Math.max(120.0,prevW - 92.0),40.0,5.0,989995,0.96,isSel || hasCode ? 16772608 : 2372685,isSel || hasCode ? 0.95 : 0.55,isSel || hasCode ? 1.8 : 1.1);
+			ui_components_CardBackplate.drawChamferedBox(g,prevX + prevW - 72.0,boxY,58.0,40.0,5.0,1515824,0.90,hasCode ? 16750592 : 2372685,hasCode ? 0.85 : 0.45,1.1);
+		}
+		ui_components_CardBackplate.drawChamferedBox(g,mx + 18.0,modeCardY + modeCardH - 38.0 - 14.0,modeCardW - 36.0,38.0,6.0,isSel ? 58879 : 1779256,isSel ? 0.24 : 0.55,isSel ? 58879 : 2372685,isSel ? 0.95 : 0.50,1.5);
+	}
+};
+ui_components_CardBackplate.drawMultiplayerLobby = function(g,sw,sh,isHost,selectedMapIdx,focusIdx) {
+	var cardW = Math.min(860.0,sw - 28.0);
+	var cardH = Math.min(500.0,sh - 76.0);
+	var cardX = (sw - cardW) * 0.5;
+	var cardY = Math.max(46.0,(sh - cardH) * 0.5 + 6.0);
+	ui_components_CardBackplate.drawStyledCardBase(g,cardX,cardY,cardW,cardH,14.0,58879);
+	g.lineStyle(1.2,2372685,0.75);
+	var x = cardX + 24;
+	var y = cardY + 54;
+	g.flush();
+	g.addVertex(x,y,g.curR,g.curG,g.curB,g.curA,x * g.ma + y * g.mc + g.mx,x * g.mb + y * g.md + g.my);
+	var x = cardX + cardW - 24;
+	var y = cardY + 54;
+	g.addVertex(x,y,g.curR,g.curG,g.curB,g.curA,x * g.ma + y * g.mc + g.mx,x * g.mb + y * g.md + g.my);
+	g.lineStyle(0);
+	ui_components_CardBackplate.drawChamferedBox(g,cardX + 24,cardY + 64,cardW - 48,56,8.0,1055016,0.88,58879,0.55,1.4);
+	var bodyTop = cardY + 132.0;
+	var bodyH = cardH - 208.0;
+	var leftW = (cardW - 64.0) * 0.52;
+	var mapBtnH = (bodyH - 12.0) * 0.5;
+	var isSel = 0 == selectedMapIdx;
+	ui_components_CardBackplate.drawChamferedBox(g,cardX + 24.0,bodyTop + 0 * (mapBtnH + 12.0),leftW,mapBtnH,8.0,isSel ? 1254456 : 1054242,isSel ? 0.94 : 0.76,isSel ? 58879 : 2372685,isSel ? 0.95 : 0.50,isSel ? 2.0 : 1.1);
+	var isSel = 1 == selectedMapIdx;
+	ui_components_CardBackplate.drawChamferedBox(g,cardX + 24.0,bodyTop + (mapBtnH + 12.0),leftW,mapBtnH,8.0,isSel ? 1254456 : 1054242,isSel ? 0.94 : 0.76,isSel ? 58879 : 2372685,isSel ? 0.95 : 0.50,isSel ? 2.0 : 1.1);
+	ui_components_CardBackplate.drawChamferedBox(g,cardX + 24.0 + leftW + 16.0,bodyTop,cardW - 64.0 - leftW,bodyH,8.0,922912,0.88,2372685,0.65,1.2);
+	var btnY = cardY + cardH - 58.0;
+	if(isHost) {
+		var halfBtnW = Math.min(230.0,(cardW - 200.0) * 0.5);
+		ui_components_CardBackplate.drawChamferedBox(g,cardX + 24.0,btnY,halfBtnW,38.0,6.0,focusIdx == 0 ? 1387328 : 1186342,0.92,58879,focusIdx == 0 ? 1.0 : 0.65,focusIdx == 0 ? 1.8 : 1.1);
+		ui_components_CardBackplate.drawChamferedBox(g,cardX + cardW - 24.0 - halfBtnW,btnY,halfBtnW,38.0,6.0,focusIdx == 1 ? 2827536 : 1973010,0.95,16772608,focusIdx == 1 ? 1.0 : 0.75,focusIdx == 1 ? 2.0 : 1.3);
+	}
+};
 var ui_components_MenuItemRow = function(iconTile,label,width,height,parent) {
 	if(height == null) {
 		height = 44.0;
@@ -73224,51 +75563,26 @@ var ui_components_TouchControlsHUD = function(input,parent) {
 	h2d_Object.call(this,parent);
 	this.inputRef = input;
 	this.canvas = new h2d_Graphics(this);
-	try {
-		var burnTile = hxd_Res.load("icons/burn.png").toTile();
-		burnTile.dx = -(0.5 * burnTile.width);
-		burnTile.dy = -(0.5 * burnTile.height);
-		this.nitroIconBmp = new h2d_Bitmap(burnTile,this);
-		this.nitroIconBmp.smooth = true;
-	} catch( _g ) {
-		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/burn.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 134, className : "ui.components.TouchControlsHUD", methodName : "new"});
-	}
-	try {
-		var gasTile = hxd_Res.load("icons/gas-pedal.png").toTile();
-		gasTile.dx = -(0.5 * gasTile.width);
-		gasTile.dy = -(0.5 * gasTile.height);
-		this.gasIconBmp = new h2d_Bitmap(gasTile,this);
-		this.gasIconBmp.smooth = true;
-	} catch( _g ) {
-		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/gas-pedal.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 143, className : "ui.components.TouchControlsHUD", methodName : "new"});
-	}
-	try {
-		var brakeTile = hxd_Res.load("icons/brake.png").toTile();
-		brakeTile.dx = -(0.5 * brakeTile.width);
-		brakeTile.dy = -(0.5 * brakeTile.height);
-		this.brakeIconBmp = new h2d_Bitmap(brakeTile,this);
-		this.brakeIconBmp.smooth = true;
-	} catch( _g ) {
-		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/brake.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 152, className : "ui.components.TouchControlsHUD", methodName : "new"});
-	}
-	try {
-		var handbrakeTile = hxd_Res.load("icons/hand-brake.png").toTile();
-		handbrakeTile.dx = -(0.5 * handbrakeTile.width);
-		handbrakeTile.dy = -(0.5 * handbrakeTile.height);
-		this.driftIconBmp = new h2d_Bitmap(handbrakeTile,this);
-		this.driftIconBmp.smooth = true;
-	} catch( _g ) {
-		haxe_Log.trace("[TouchControlsHUD] Failed to load icons/hand-brake.png: " + haxe_Exception.caught(_g).get_message(),{ fileName : "src/ui/components/TouchControlsHUD.hx", lineNumber : 161, className : "ui.components.TouchControlsHUD", methodName : "new"});
-	}
+	this.nitroIconBmp = this.loadIconBitmap("icons/burn.png");
+	this.gasIconBmp = this.loadIconBitmap("icons/gas-pedal.png");
+	this.brakeIconBmp = this.loadIconBitmap("icons/brake.png");
+	this.driftIconBmp = this.loadIconBitmap("icons/hand-brake.png");
 	this.windowEventTarget = $bind(this,this.onWindowEvent);
 	hxd_Window.getInstance().addEventTarget(this.windowEventTarget);
 	try {
 		this.nativeCanvas = window.document.getElementById("webgl");
 		if(this.nativeCanvas != null) {
 			this.nativeTouchStartHandler = function(e) {
-				if(!_gthis.visible || !_gthis.inputRef.isTouchActive) {
-					_gthis.inputRef.isTouchActive = true;
+				_gthis.inputRef.isTouchActive = true;
+				if(parent == null || !parent.visible) {
+					return;
+				}
+				if(!_gthis.visible) {
 					_gthis.set_visible(true);
+					var s2d = _gthis.getScene();
+					if(s2d != null) {
+						_gthis.layout(s2d.width,s2d.height);
+					}
 				}
 				e.preventDefault();
 				var _g = 0;
@@ -73282,6 +75596,9 @@ var ui_components_TouchControlsHUD = function(input,parent) {
 				}
 			};
 			this.nativeTouchMoveHandler = function(e) {
+				if(parent == null || !parent.visible || !_gthis.visible) {
+					return;
+				}
 				e.preventDefault();
 				var _g = 0;
 				var _g1 = e.changedTouches;
@@ -73293,6 +75610,12 @@ var ui_components_TouchControlsHUD = function(input,parent) {
 				}
 			};
 			this.nativeTouchEndHandler = function(e) {
+				if(parent == null || !parent.visible || !_gthis.visible) {
+					var _g = 0;
+					var _g1 = e.changedTouches;
+					while(_g < _g1.length) _gthis.nativeTouchesActive.remove(_g1[_g++].identifier);
+					return;
+				}
 				e.preventDefault();
 				var _g = 0;
 				var _g1 = e.changedTouches;
@@ -73304,6 +75627,12 @@ var ui_components_TouchControlsHUD = function(input,parent) {
 				}
 			};
 			this.nativeTouchCancelHandler = function(e) {
+				if(parent == null || !parent.visible || !_gthis.visible) {
+					var _g = 0;
+					var _g1 = e.changedTouches;
+					while(_g < _g1.length) _gthis.nativeTouchesActive.remove(_g1[_g++].identifier);
+					return;
+				}
 				e.preventDefault();
 				var _g = 0;
 				var _g1 = e.changedTouches;
@@ -73803,8 +76132,29 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 		this.canvas.lineStyle(1.0,16777215,isGrabbed ? 0.40 : 0.18);
 		this.canvas.drawCircle(this.stickKnobX,this.stickKnobY,this.stickKnobRadius - 3.5);
 	}
+	,loadIconBitmap: function(path) {
+		var tile = core_AssetPreloader.tryLoadEmbeddedTile(path);
+		if(tile == null) {
+			return null;
+		}
+		var centered = tile.clone();
+		centered.dx = -(0.5 * centered.width);
+		centered.dy = -(0.5 * centered.height);
+		var bmp = new h2d_Bitmap(centered,this);
+		bmp.smooth = true;
+		return bmp;
+	}
+	,resolveTouchSettings: function() {
+		if(this.getTouchSettings != null) {
+			var provided = this.getTouchSettings();
+			if(provided != null) {
+				return provided;
+			}
+		}
+		return save_SaveSystem.load().touchSettings;
+	}
 	,refreshSettings: function() {
-		this.touchSettings = save_SaveSystem.load().touchSettings;
+		this.touchSettings = this.resolveTouchSettings();
 		var s2d = this.getScene();
 		if(s2d != null) {
 			this.layout(s2d.width,s2d.height);
@@ -73812,7 +76162,7 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 	}
 	,layout: function(sw,sh) {
 		if(this.touchSettings == null) {
-			this.touchSettings = save_SaveSystem.load().touchSettings;
+			this.touchSettings = this.resolveTouchSettings();
 		}
 		var s = 1.0;
 		var oxStick = 0.0;
@@ -73926,27 +76276,30 @@ ui_components_TouchControlsHUD.prototype = $extend(h2d_Object.prototype,{
 });
 var ui_components_MenuAction = $hxEnums["ui.components.MenuAction"] = { __ename__:true,__constructs__:null
 	,OpenMapSelect: {_hx_name:"OpenMapSelect",_hx_index:0,__enum__:"ui.components.MenuAction",toString:$estr}
-	,StartGame: {_hx_name:"StartGame",_hx_index:1,__enum__:"ui.components.MenuAction",toString:$estr}
-	,StartSandbox: {_hx_name:"StartSandbox",_hx_index:2,__enum__:"ui.components.MenuAction",toString:$estr}
-	,RestartRace: {_hx_name:"RestartRace",_hx_index:3,__enum__:"ui.components.MenuAction",toString:$estr}
-	,ResumeGame: {_hx_name:"ResumeGame",_hx_index:4,__enum__:"ui.components.MenuAction",toString:$estr}
-	,OpenOptions: {_hx_name:"OpenOptions",_hx_index:5,__enum__:"ui.components.MenuAction",toString:$estr}
-	,OpenCredits: {_hx_name:"OpenCredits",_hx_index:6,__enum__:"ui.components.MenuAction",toString:$estr}
-	,QuitToTitle: {_hx_name:"QuitToTitle",_hx_index:7,__enum__:"ui.components.MenuAction",toString:$estr}
+	,OpenMultiplayer: {_hx_name:"OpenMultiplayer",_hx_index:1,__enum__:"ui.components.MenuAction",toString:$estr}
+	,StartGame: {_hx_name:"StartGame",_hx_index:2,__enum__:"ui.components.MenuAction",toString:$estr}
+	,StartSandbox: {_hx_name:"StartSandbox",_hx_index:3,__enum__:"ui.components.MenuAction",toString:$estr}
+	,RestartRace: {_hx_name:"RestartRace",_hx_index:4,__enum__:"ui.components.MenuAction",toString:$estr}
+	,ResumeGame: {_hx_name:"ResumeGame",_hx_index:5,__enum__:"ui.components.MenuAction",toString:$estr}
+	,OpenOptions: {_hx_name:"OpenOptions",_hx_index:6,__enum__:"ui.components.MenuAction",toString:$estr}
+	,OpenCredits: {_hx_name:"OpenCredits",_hx_index:7,__enum__:"ui.components.MenuAction",toString:$estr}
+	,QuitToTitle: {_hx_name:"QuitToTitle",_hx_index:8,__enum__:"ui.components.MenuAction",toString:$estr}
 };
-ui_components_MenuAction.__constructs__ = [ui_components_MenuAction.OpenMapSelect,ui_components_MenuAction.StartGame,ui_components_MenuAction.StartSandbox,ui_components_MenuAction.RestartRace,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
-ui_components_MenuAction.__empty_constructs__ = [ui_components_MenuAction.OpenMapSelect,ui_components_MenuAction.StartGame,ui_components_MenuAction.StartSandbox,ui_components_MenuAction.RestartRace,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
+ui_components_MenuAction.__constructs__ = [ui_components_MenuAction.OpenMapSelect,ui_components_MenuAction.OpenMultiplayer,ui_components_MenuAction.StartGame,ui_components_MenuAction.StartSandbox,ui_components_MenuAction.RestartRace,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
+ui_components_MenuAction.__empty_constructs__ = [ui_components_MenuAction.OpenMapSelect,ui_components_MenuAction.OpenMultiplayer,ui_components_MenuAction.StartGame,ui_components_MenuAction.StartSandbox,ui_components_MenuAction.RestartRace,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
 var ui_components_UIState = $hxEnums["ui.components.UIState"] = { __ename__:true,__constructs__:null
 	,Splash: {_hx_name:"Splash",_hx_index:0,__enum__:"ui.components.UIState",toString:$estr}
 	,MainMenu: {_hx_name:"MainMenu",_hx_index:1,__enum__:"ui.components.UIState",toString:$estr}
 	,MapSelect: {_hx_name:"MapSelect",_hx_index:2,__enum__:"ui.components.UIState",toString:$estr}
-	,InGameHUD: {_hx_name:"InGameHUD",_hx_index:3,__enum__:"ui.components.UIState",toString:$estr}
-	,PauseMenu: {_hx_name:"PauseMenu",_hx_index:4,__enum__:"ui.components.UIState",toString:$estr}
-	,OptionsMenu: {_hx_name:"OptionsMenu",_hx_index:5,__enum__:"ui.components.UIState",toString:$estr}
-	,CreditsScreen: {_hx_name:"CreditsScreen",_hx_index:6,__enum__:"ui.components.UIState",toString:$estr}
+	,MultiplayerMenu: {_hx_name:"MultiplayerMenu",_hx_index:3,__enum__:"ui.components.UIState",toString:$estr}
+	,MultiplayerLobby: {_hx_name:"MultiplayerLobby",_hx_index:4,__enum__:"ui.components.UIState",toString:$estr}
+	,InGameHUD: {_hx_name:"InGameHUD",_hx_index:5,__enum__:"ui.components.UIState",toString:$estr}
+	,PauseMenu: {_hx_name:"PauseMenu",_hx_index:6,__enum__:"ui.components.UIState",toString:$estr}
+	,OptionsMenu: {_hx_name:"OptionsMenu",_hx_index:7,__enum__:"ui.components.UIState",toString:$estr}
+	,CreditsScreen: {_hx_name:"CreditsScreen",_hx_index:8,__enum__:"ui.components.UIState",toString:$estr}
 };
-ui_components_UIState.__constructs__ = [ui_components_UIState.Splash,ui_components_UIState.MainMenu,ui_components_UIState.MapSelect,ui_components_UIState.InGameHUD,ui_components_UIState.PauseMenu,ui_components_UIState.OptionsMenu,ui_components_UIState.CreditsScreen];
-ui_components_UIState.__empty_constructs__ = [ui_components_UIState.Splash,ui_components_UIState.MainMenu,ui_components_UIState.MapSelect,ui_components_UIState.InGameHUD,ui_components_UIState.PauseMenu,ui_components_UIState.OptionsMenu,ui_components_UIState.CreditsScreen];
+ui_components_UIState.__constructs__ = [ui_components_UIState.Splash,ui_components_UIState.MainMenu,ui_components_UIState.MapSelect,ui_components_UIState.MultiplayerMenu,ui_components_UIState.MultiplayerLobby,ui_components_UIState.InGameHUD,ui_components_UIState.PauseMenu,ui_components_UIState.OptionsMenu,ui_components_UIState.CreditsScreen];
+ui_components_UIState.__empty_constructs__ = [ui_components_UIState.Splash,ui_components_UIState.MainMenu,ui_components_UIState.MapSelect,ui_components_UIState.MultiplayerMenu,ui_components_UIState.MultiplayerLobby,ui_components_UIState.InGameHUD,ui_components_UIState.PauseMenu,ui_components_UIState.OptionsMenu,ui_components_UIState.CreditsScreen];
 var ui_components_OptionsTab = $hxEnums["ui.components.OptionsTab"] = { __ename__:true,__constructs__:null
 	,Graphics: {_hx_name:"Graphics",_hx_index:0,__enum__:"ui.components.OptionsTab",toString:$estr}
 	,Audio: {_hx_name:"Audio",_hx_index:1,__enum__:"ui.components.OptionsTab",toString:$estr}
@@ -73987,7 +76340,7 @@ var ui_views_credits_CreditsView = function(parent) {
 	this.techDetailsText.set_textColor(10531526);
 	this.techDetailsText.set_text("Built with Haxe, Heaps.io (Hardware-Accelerated WebGL) & Modern Shaders\n" + "Typography: Stack Sans Headline & Material Symbols Sharp\n" + "Homage & Inspiration: Need for Speed: Most Wanted (2005) & Burnout Revenge (2005)\n\n" + "Thank you for playing!");
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.4.4" + " (Build " + "0010" + ")");
+	this.versionText.set_text("v" + "0.6.1" + " (Build " + "0014" + ")");
 	this.versionText.set_textColor(15057019);
 	this.backBtnText = new h2d_Text(ui_FontManager.titleFont,this);
 	this.backBtnText.set_text("> BACK TO MAIN MENU <");
@@ -74137,6 +76490,7 @@ var ui_views_hud_InGameHUDView = function(parent) {
 	this.minimapX = 24.0;
 	this.screenH = 720.0;
 	this.screenW = 1280.0;
+	this.remotePeerMarkers = [];
 	h2d_Object.call(this,parent);
 	this.canvas = new h2d_Graphics(this);
 	this.speedText = new h2d_Text(ui_FontManager.heroFont,this);
@@ -74398,6 +76752,18 @@ ui_views_hud_InGameHUDView.prototype = $extend(h2d_Object.prototype,{
 			var rangeX = this.mapMaxX - this.mapMinX;
 			var rangeY = this.mapMaxY - this.mapMinY;
 			if(rangeX > 0 && rangeY > 0) {
+				var _g = 0;
+				var _g1 = this.remotePeerMarkers;
+				while(_g < _g1.length) {
+					var rm = _g1[_g];
+					++_g;
+					var rDotX = this.minimapX + 16.0 + (rm.x - this.mapMinX) / rangeX * mapDrawW;
+					var rDotY = this.minimapY + this.minimapH - 16.0 - (rm.y - this.mapMinY) / rangeY * mapDrawH;
+					this.canvas.beginFill(rm.colorHex,1.0);
+					this.canvas.lineStyle(1.2,658964,0.9);
+					this.canvas.drawCircle(rDotX,rDotY,3.6);
+					this.canvas.endFill();
+				}
 				var dotX = this.minimapX + 16.0 + (car.pos.x - this.mapMinX) / rangeX * mapDrawW;
 				var dotY = this.minimapY + this.minimapH - 16.0 - (car.pos.y - this.mapMinY) / rangeY * mapDrawH;
 				this.canvas.beginFill(58879,0.35);
@@ -74533,10 +76899,10 @@ var ui_views_mainmenu_MainMenuView = function(parent) {
 	this.subtitleText.set_text("SELECT DRIVER OPERATION");
 	this.subtitleText.set_textColor(9413043);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.4.4" + " (Build " + "0010" + ")");
+	this.versionText.set_text("v" + "0.6.1" + " (Build " + "0014" + ")");
 	this.versionText.set_textColor(9413043);
-	var labels = ["PLAY SINGLEPLAYER","RESUME SAVED RACE","OPTIONS","CREDITS","EXIT TO SPLASH"];
-	var iconTypes = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Settings,ui_IconType.Credits,ui_IconType.Exit];
+	var labels = ["PLAY SINGLEPLAYER","RESUME SAVED RACE","MULTIPLAYER LOBBY","OPTIONS","CREDITS","EXIT TO SPLASH"];
+	var iconTypes = [ui_IconType.Play,ui_IconType.Resume,ui_IconType.Multiplayer,ui_IconType.Settings,ui_IconType.Credits,ui_IconType.Exit];
 	var _g = 0;
 	var _g1 = labels.length;
 	while(_g < _g1) {
@@ -74611,7 +76977,7 @@ ui_views_mainmenu_MainMenuView.prototype = $extend(h2d_Object.prototype,{
 	}
 	,layout: function(sw,sh) {
 		var cardW = Math.min(560.0,sw - 32.0);
-		var cardH = Math.min(380.0,sh * 0.64);
+		var cardH = Math.min(432.0,sh * 0.72);
 		var cardX = (sw - cardW) * 0.5;
 		var cardY = Math.max(76.0,(sh - cardH) * 0.5 + 14.0);
 		if(this.titleText != null) {
@@ -74902,6 +77268,1128 @@ ui_views_mapselect_MapSelectView.prototype = $extend(h2d_Object.prototype,{
 	}
 	,__class__: ui_views_mapselect_MapSelectView
 });
+var ui_views_multiplayer_MultiplayerLobbyView = function(mpManager,parent) {
+	this.copyFeedbackTimer = 0.0;
+	this.focusedActionIdx = 1;
+	this.selectedMapIndex = 0;
+	this.rosterLines = [];
+	this.mapInteractives = [];
+	this.mapBadges = [];
+	this.mapDescs = [];
+	this.mapTitles = [];
+	var _gthis = this;
+	h2d_Object.call(this,parent);
+	this.mp = mpManager;
+	this.titleText = new h2d_Text(ui_FontManager.titleFont,this);
+	this.titleText.set_text("MULTIPLAYER LOBBY");
+	this.titleText.set_textColor(16777215);
+	var _this = this.titleText;
+	_this.posChanged = true;
+	_this.scaleX *= 1.18;
+	_this.posChanged = true;
+	_this.scaleY *= 1.18;
+	this.subtitleText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.subtitleText.set_text("PEER-TO-PEER HOST VALIDATED MATCH");
+	this.subtitleText.set_textColor(58879);
+	var _this = this.subtitleText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.86;
+	_this.posChanged = true;
+	_this.scaleY *= 0.86;
+	this.roomBannerText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.roomBannerText.set_textColor(16777215);
+	var _this = this.roomBannerText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.90;
+	_this.posChanged = true;
+	_this.scaleY *= 0.90;
+	this.statusText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.statusText.set_textColor(16772608);
+	var _this = this.statusText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.84;
+	_this.posChanged = true;
+	_this.scaleY *= 0.84;
+	this.mapHeader = new h2d_Text(ui_FontManager.regularFont,this);
+	this.mapHeader.set_text("SELECT MATCH ARENA (HOST PICK)");
+	this.mapHeader.set_textColor(9413043);
+	var _this = this.mapHeader;
+	_this.posChanged = true;
+	_this.scaleX *= 0.84;
+	_this.posChanged = true;
+	_this.scaleY *= 0.84;
+	var inter = new h2d_Interactive(360,110,this);
+	var idx = 0;
+	var mode = world_MapMode.Circuit;
+	inter.onClick = function(_) {
+		if(!_gthis.visible) {
+			return;
+		}
+		if(_gthis.mp != null && _gthis.mp.role == net_NetworkRole.Client) {
+			audio_AudioManager.inst.playMenuBeep(220.0,0.05);
+			return;
+		}
+		audio_AudioManager.inst.playMenuBeep(460.0,0.06);
+		_gthis.selectedMapIndex = idx;
+		if(_gthis.mp != null) {
+			_gthis.mp.setSelectedMap(mode);
+		}
+		_gthis.refreshFromManager();
+		if(_gthis.onVisualRefresh != null) {
+			_gthis.onVisualRefresh();
+		}
+	};
+	this.mapInteractives.push(inter);
+	var t = new h2d_Text(ui_FontManager.titleFont,this);
+	t.set_text("HIGHWAY CIRCUIT");
+	t.posChanged = true;
+	t.scaleX *= 0.88;
+	t.posChanged = true;
+	t.scaleY *= 0.88;
+	this.mapTitles.push(t);
+	var d = new h2d_Text(ui_FontManager.regularFont,this);
+	d.set_text("Closed asphalt loop track\nHigh-speed banked corners & rails");
+	d.set_textColor(9413043);
+	d.posChanged = true;
+	d.scaleX *= 0.78;
+	d.posChanged = true;
+	d.scaleY *= 0.78;
+	this.mapDescs.push(d);
+	var b = new h2d_Text(ui_FontManager.regularFont,this);
+	b.posChanged = true;
+	b.scaleX *= 0.76;
+	b.posChanged = true;
+	b.scaleY *= 0.76;
+	this.mapBadges.push(b);
+	var inter = new h2d_Interactive(360,110,this);
+	var idx1 = 1;
+	var mode1 = world_MapMode.Sandbox;
+	inter.onClick = function(_) {
+		if(!_gthis.visible) {
+			return;
+		}
+		if(_gthis.mp != null && _gthis.mp.role == net_NetworkRole.Client) {
+			audio_AudioManager.inst.playMenuBeep(220.0,0.05);
+			return;
+		}
+		audio_AudioManager.inst.playMenuBeep(460.0,0.06);
+		_gthis.selectedMapIndex = idx1;
+		if(_gthis.mp != null) {
+			_gthis.mp.setSelectedMap(mode1);
+		}
+		_gthis.refreshFromManager();
+		if(_gthis.onVisualRefresh != null) {
+			_gthis.onVisualRefresh();
+		}
+	};
+	this.mapInteractives.push(inter);
+	var t = new h2d_Text(ui_FontManager.titleFont,this);
+	t.set_text("SANDBOX PROVING GROUNDS");
+	t.posChanged = true;
+	t.scaleX *= 0.88;
+	t.posChanged = true;
+	t.scaleY *= 0.88;
+	this.mapTitles.push(t);
+	var d = new h2d_Text(ui_FontManager.regularFont,this);
+	d.set_text("Open undulating off-road terrain\nRamps, jumps & asphalt skidpad");
+	d.set_textColor(9413043);
+	d.posChanged = true;
+	d.scaleX *= 0.78;
+	d.posChanged = true;
+	d.scaleY *= 0.78;
+	this.mapDescs.push(d);
+	var b = new h2d_Text(ui_FontManager.regularFont,this);
+	b.posChanged = true;
+	b.scaleX *= 0.76;
+	b.posChanged = true;
+	b.scaleY *= 0.76;
+	this.mapBadges.push(b);
+	this.rosterHeader = new h2d_Text(ui_FontManager.regularFont,this);
+	this.rosterHeader.set_text("CONNECTED DRIVERS (0 / 8)");
+	this.rosterHeader.set_textColor(58879);
+	var _this = this.rosterHeader;
+	_this.posChanged = true;
+	_this.scaleX *= 0.86;
+	_this.posChanged = true;
+	_this.scaleY *= 0.86;
+	var line = new h2d_Text(ui_FontManager.regularFont,this);
+	line.set_text("");
+	line.posChanged = true;
+	line.scaleX *= 0.88;
+	line.posChanged = true;
+	line.scaleY *= 0.88;
+	this.rosterLines.push(line);
+	var line = new h2d_Text(ui_FontManager.regularFont,this);
+	line.set_text("");
+	line.posChanged = true;
+	line.scaleX *= 0.88;
+	line.posChanged = true;
+	line.scaleY *= 0.88;
+	this.rosterLines.push(line);
+	var line = new h2d_Text(ui_FontManager.regularFont,this);
+	line.set_text("");
+	line.posChanged = true;
+	line.scaleX *= 0.88;
+	line.posChanged = true;
+	line.scaleY *= 0.88;
+	this.rosterLines.push(line);
+	var line = new h2d_Text(ui_FontManager.regularFont,this);
+	line.set_text("");
+	line.posChanged = true;
+	line.scaleX *= 0.88;
+	line.posChanged = true;
+	line.scaleY *= 0.88;
+	this.rosterLines.push(line);
+	var line = new h2d_Text(ui_FontManager.regularFont,this);
+	line.set_text("");
+	line.posChanged = true;
+	line.scaleX *= 0.88;
+	line.posChanged = true;
+	line.scaleY *= 0.88;
+	this.rosterLines.push(line);
+	var line = new h2d_Text(ui_FontManager.regularFont,this);
+	line.set_text("");
+	line.posChanged = true;
+	line.scaleX *= 0.88;
+	line.posChanged = true;
+	line.scaleY *= 0.88;
+	this.rosterLines.push(line);
+	var line = new h2d_Text(ui_FontManager.regularFont,this);
+	line.set_text("");
+	line.posChanged = true;
+	line.scaleX *= 0.88;
+	line.posChanged = true;
+	line.scaleY *= 0.88;
+	this.rosterLines.push(line);
+	var line = new h2d_Text(ui_FontManager.regularFont,this);
+	line.set_text("");
+	line.posChanged = true;
+	line.scaleX *= 0.88;
+	line.posChanged = true;
+	line.scaleY *= 0.88;
+	this.rosterLines.push(line);
+	this.copyLinkInteractive = new h2d_Interactive(220,38,this);
+	this.copyLinkInteractive.onOver = function(_) {
+		if(_gthis.visible) {
+			_gthis.focusedActionIdx = 0;
+			if(_gthis.onVisualRefresh != null) {
+				_gthis.onVisualRefresh();
+			}
+		}
+	};
+	this.copyLinkInteractive.onClick = function(_) {
+		if(!_gthis.visible || _gthis.mp == null || _gthis.mp.roomId == "") {
+			return;
+		}
+		net_MultiplayerManager.copyInviteLinkToClipboard(_gthis.mp.getInviteLink());
+		_gthis.copyFeedbackTimer = 2.5;
+		audio_AudioManager.inst.playMenuBeep(560.0,0.07);
+		_gthis.refreshFromManager();
+	};
+	this.copyLinkText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.copyLinkText.set_text("COPY INVITE LINK");
+	this.copyLinkText.set_textColor(58879);
+	var _this = this.copyLinkText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.92;
+	_this.posChanged = true;
+	_this.scaleY *= 0.92;
+	this.hostRoomInteractive = new h2d_Interactive(170,38,this);
+	this.hostRoomInteractive.onClick = function(_) {
+		if(!_gthis.visible || _gthis.mp == null) {
+			return;
+		}
+		audio_AudioManager.inst.playMenuBeep(500.0,0.07);
+		_gthis.mp.hostRoom();
+	};
+	this.hostRoomText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.hostRoomText.set_text("HOST ROOM");
+	this.hostRoomText.set_textColor(58879);
+	var _this = this.hostRoomText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.90;
+	_this.posChanged = true;
+	_this.scaleY *= 0.90;
+	this.joinCodeInteractive = new h2d_Interactive(170,38,this);
+	this.joinCodeInteractive.onClick = function(_) {
+		if(!_gthis.visible || _gthis.mp == null) {
+			return;
+		}
+		var hasWin = typeof window !== 'undefined' && typeof window.prompt === 'function';
+		if(hasWin) {
+			var entered = window.prompt("Paste Invite URL or Room Code (e.g. ABC123):","");
+			if(entered != null && StringTools.trim(entered) != "") {
+				var parsed = net_MultiplayerManager.extractRoomCode(entered);
+				audio_AudioManager.inst.playMenuBeep(480.0,0.07);
+				_gthis.mp.joinRoom(parsed);
+			}
+		}
+	};
+	this.joinCodeText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.joinCodeText.set_text("JOIN BY CODE");
+	this.joinCodeText.set_textColor(16777215);
+	var _this = this.joinCodeText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.90;
+	_this.posChanged = true;
+	_this.scaleY *= 0.90;
+	this.startMatchInteractive = new h2d_Interactive(220,38,this);
+	this.startMatchInteractive.onOver = function(_) {
+		if(_gthis.visible) {
+			_gthis.focusedActionIdx = 1;
+			if(_gthis.onVisualRefresh != null) {
+				_gthis.onVisualRefresh();
+			}
+		}
+	};
+	this.startMatchInteractive.onClick = function(_) {
+		if(!_gthis.visible || _gthis.mp == null) {
+			return;
+		}
+		if(_gthis.mp.role == net_NetworkRole.Host && _gthis.mp.status == net_LobbyStatus.WaitingInLobby) {
+			audio_AudioManager.inst.playMenuBeep(600.0,0.09);
+			_gthis.mp.startMatch();
+		} else {
+			audio_AudioManager.inst.playMenuBeep(220.0,0.05);
+		}
+	};
+	this.startMatchText = new h2d_Text(ui_FontManager.titleFont,this);
+	this.startMatchText.set_text("START MATCH");
+	this.startMatchText.set_textColor(16772608);
+	var _this = this.startMatchText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.86;
+	_this.posChanged = true;
+	_this.scaleY *= 0.86;
+	this.backInteractive = new h2d_Interactive(100.0,40.0,this);
+	this.backInteractive.onOver = function(_) {
+		if(_gthis.visible) {
+			_gthis.backBtnText.set_textColor(16772608);
+		}
+	};
+	this.backInteractive.onOut = function(_) {
+		if(_gthis.visible) {
+			_gthis.backBtnText.set_textColor(12767712);
+		}
+	};
+	this.backInteractive.onClick = function(_) {
+		if(!_gthis.visible) {
+			return;
+		}
+		audio_AudioManager.inst.playMenuBeep(320.0,0.06);
+		if(_gthis.onBack != null) {
+			_gthis.onBack();
+		}
+	};
+	this.backBtnText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.backBtnText.set_text("< BACK");
+	this.backBtnText.set_textColor(12767712);
+	var _this = this.backBtnText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.95;
+	_this.posChanged = true;
+	_this.scaleY *= 0.95;
+};
+$hxClasses["ui.views.multiplayer.MultiplayerLobbyView"] = ui_views_multiplayer_MultiplayerLobbyView;
+ui_views_multiplayer_MultiplayerLobbyView.__name__ = "ui.views.multiplayer.MultiplayerLobbyView";
+ui_views_multiplayer_MultiplayerLobbyView.__super__ = h2d_Object;
+ui_views_multiplayer_MultiplayerLobbyView.prototype = $extend(h2d_Object.prototype,{
+	isHostRole: function() {
+		if(this.mp != null) {
+			return this.mp.role == net_NetworkRole.Host;
+		} else {
+			return false;
+		}
+	}
+	,activate: function() {
+		this.set_visible(true);
+		this.focusedActionIdx = 1;
+		this.refreshFromManager();
+	}
+	,updateTimer: function(dt) {
+		if(this.copyFeedbackTimer > 0.0) {
+			this.copyFeedbackTimer -= dt;
+			if(this.copyFeedbackTimer <= 0.0) {
+				this.copyFeedbackTimer = 0.0;
+				this.refreshFromManager();
+			}
+		}
+	}
+	,navigate: function(dir) {
+		if(this.mp != null && this.mp.role == net_NetworkRole.Client) {
+			return;
+		}
+		this.selectedMapIndex = (this.selectedMapIndex + dir + 2) % 2;
+		audio_AudioManager.inst.playMenuBeep(380.0,0.04);
+		if(this.mp != null) {
+			this.mp.setSelectedMap(this.selectedMapIndex == 0 ? world_MapMode.Circuit : world_MapMode.Sandbox);
+		}
+		this.refreshFromManager();
+		if(this.onVisualRefresh != null) {
+			this.onVisualRefresh();
+		}
+	}
+	,confirmFocused: function() {
+		if(this.mp == null) {
+			return;
+		}
+		if(this.mp.role == net_NetworkRole.Host && this.mp.status == net_LobbyStatus.WaitingInLobby) {
+			audio_AudioManager.inst.playMenuBeep(600.0,0.09);
+			this.mp.startMatch();
+		} else if(this.mp.role == net_NetworkRole.None || this.mp.status == net_LobbyStatus.Disconnected) {
+			this.mp.hostRoom();
+		}
+	}
+	,refreshFromManager: function() {
+		if(this.mp == null) {
+			return;
+		}
+		this.selectedMapIndex = this.mp.selectedMap == world_MapMode.Sandbox ? 1 : 0;
+		var isHost = this.mp.role == net_NetworkRole.Host;
+		var isClient = this.mp.role == net_NetworkRole.Client;
+		var inLobby = this.mp.status == net_LobbyStatus.WaitingInLobby;
+		this.subtitleText.set_text(isHost ? "ROLE: HOST (AUTHORITATIVE VALIDATION & SERVER RELAY)" : isClient ? "ROLE: CLIENT (WAITING FOR HOST START)" : "PEER-TO-PEER CLIENT/SERVER RELAY");
+		this.subtitleText.set_textColor(isHost ? 16772608 : 58879);
+		if(this.mp.roomId != "") {
+			var link = this.mp.getInviteLink();
+			if(link.length > 52) {
+				link = HxOverrides.substr(link,0,49) + "...";
+			}
+			this.roomBannerText.set_text("INVITE CODE: " + this.mp.roomId + "   |   INVITE: " + link);
+		} else {
+			this.roomBannerText.set_text("NO ACTIVE ROOM  -  HOST A MATCH OR OPEN AN INVITE LINK (?room=CODE)");
+		}
+		if(this.mp.lastError != "") {
+			this.statusText.set_text("ERROR: " + this.mp.lastError);
+			this.statusText.set_textColor(16750592);
+		} else {
+			this.statusText.set_text(this.mp.statusMessage);
+			this.statusText.set_textColor(inLobby ? 58998 : 16772608);
+		}
+		this.mapHeader.set_text(isHost ? "SELECT MATCH ARENA (HOST PICK)" : isClient ? "ARENA CHOSEN BY HOST" : "SELECT ARENA");
+		var isSel = 0 == this.selectedMapIndex;
+		this.mapTitles[0].set_textColor(isSel ? 58879 : 16777215);
+		this.mapBadges[0].set_text(isSel ? isClient ? "[ HOST SELECTED ]" : "[ ACTIVE ARENA ]" : "");
+		this.mapBadges[0].set_textColor(16772608);
+		var isSel = 1 == this.selectedMapIndex;
+		this.mapTitles[1].set_textColor(isSel ? 58879 : 16777215);
+		this.mapBadges[1].set_text(isSel ? isClient ? "[ HOST SELECTED ]" : "[ ACTIVE ARENA ]" : "");
+		this.mapBadges[1].set_textColor(16772608);
+		this.rosterHeader.set_text("CONNECTED DRIVERS (" + this.mp.peers.length + " / " + 8 + ")");
+		var _g = 0;
+		var _g1 = this.rosterLines.length;
+		while(_g < _g1) {
+			var i = _g++;
+			if(i < this.mp.peers.length) {
+				var p = this.mp.peers[i];
+				this.rosterLines[i].set_text((p.isHost ? "[HOST] " : "[P" + (p.slotIndex + 1) + "] ") + p.name + (p.peerId == this.mp.localPeerId ? "  (YOU)" : ""));
+				this.rosterLines[i].set_textColor(p.colorHex);
+				this.rosterLines[i].set_visible(true);
+			} else {
+				this.rosterLines[i].set_text("-- OPEN GRID SLOT --");
+				this.rosterLines[i].set_textColor(4543332);
+				this.rosterLines[i].set_visible(i < 4 || this.mp.peers.length > 4);
+			}
+		}
+		this.copyLinkInteractive.set_visible(this.mp.roomId != "");
+		this.copyLinkText.set_visible(this.copyLinkInteractive.visible);
+		this.copyLinkText.set_text(this.copyFeedbackTimer > 0.0 ? "INVITE LINK COPIED!" : "COPY INVITE LINK");
+		this.copyLinkText.set_textColor(this.copyFeedbackTimer > 0.0 ? 58998 : 58879);
+		var showOfflineBtns = !inLobby && this.mp.status != net_LobbyStatus.Connecting;
+		this.hostRoomInteractive.set_visible(showOfflineBtns);
+		this.hostRoomText.set_visible(showOfflineBtns);
+		this.joinCodeInteractive.set_visible(showOfflineBtns);
+		this.joinCodeText.set_visible(showOfflineBtns);
+		this.startMatchInteractive.set_visible(isHost && inLobby);
+		this.startMatchText.set_visible(this.startMatchInteractive.visible);
+	}
+	,layout: function(sw,sh) {
+		var cardW = Math.min(860.0,sw - 28.0);
+		var cardH = Math.min(500.0,sh - 76.0);
+		var cardX = (sw - cardW) * 0.5;
+		var cardY = Math.max(46.0,(sh - cardH) * 0.5 + 6.0);
+		var _this = this.titleText;
+		_this.posChanged = true;
+		_this.x = cardX + 24.0;
+		var _this = this.titleText;
+		_this.posChanged = true;
+		_this.y = cardY + 14.0;
+		var _this = this.subtitleText;
+		var v = cardX + cardW - 24.0 - this.subtitleText.get_textWidth() * this.subtitleText.scaleX;
+		_this.posChanged = true;
+		_this.x = v;
+		var _this = this.subtitleText;
+		_this.posChanged = true;
+		_this.y = cardY + 20.0;
+		var _this = this.roomBannerText;
+		_this.posChanged = true;
+		_this.x = cardX + 38.0;
+		var _this = this.roomBannerText;
+		_this.posChanged = true;
+		_this.y = cardY + 72.0;
+		var _this = this.statusText;
+		_this.posChanged = true;
+		_this.x = cardX + 38.0;
+		var _this = this.statusText;
+		_this.posChanged = true;
+		_this.y = cardY + 95.0;
+		var bodyTop = cardY + 132.0;
+		var leftW = (cardW - 64.0) * 0.52;
+		var rightX = cardX + 24.0 + leftW + 16.0;
+		var _this = this.mapHeader;
+		_this.posChanged = true;
+		_this.x = cardX + 24.0;
+		var _this = this.mapHeader;
+		_this.posChanged = true;
+		_this.y = bodyTop - 25.0;
+		var mapBtnH = (cardH - 208.0 - 12.0) * 0.5;
+		var my = bodyTop + 0 * (mapBtnH + 12.0);
+		var _this = this.mapInteractives[0];
+		_this.posChanged = true;
+		_this.x = cardX + 24.0;
+		var _this = this.mapInteractives[0];
+		_this.posChanged = true;
+		_this.y = my;
+		this.mapInteractives[0].width = leftW;
+		this.mapInteractives[0].height = mapBtnH;
+		var _this = this.mapTitles[0];
+		_this.posChanged = true;
+		_this.x = cardX + 40.0;
+		var _this = this.mapTitles[0];
+		_this.posChanged = true;
+		_this.y = my + 12.0;
+		var _this = this.mapDescs[0];
+		_this.posChanged = true;
+		_this.x = cardX + 40.0;
+		var _this = this.mapDescs[0];
+		_this.posChanged = true;
+		_this.y = my + 42.0;
+		var _this = this.mapBadges[0];
+		_this.posChanged = true;
+		_this.x = cardX + 40.0;
+		var _this = this.mapBadges[0];
+		_this.posChanged = true;
+		_this.y = my + mapBtnH - 28.0;
+		var my = bodyTop + (mapBtnH + 12.0);
+		var _this = this.mapInteractives[1];
+		_this.posChanged = true;
+		_this.x = cardX + 24.0;
+		var _this = this.mapInteractives[1];
+		_this.posChanged = true;
+		_this.y = my;
+		this.mapInteractives[1].width = leftW;
+		this.mapInteractives[1].height = mapBtnH;
+		var _this = this.mapTitles[1];
+		_this.posChanged = true;
+		_this.x = cardX + 40.0;
+		var _this = this.mapTitles[1];
+		_this.posChanged = true;
+		_this.y = my + 12.0;
+		var _this = this.mapDescs[1];
+		_this.posChanged = true;
+		_this.x = cardX + 40.0;
+		var _this = this.mapDescs[1];
+		_this.posChanged = true;
+		_this.y = my + 42.0;
+		var _this = this.mapBadges[1];
+		_this.posChanged = true;
+		_this.x = cardX + 40.0;
+		var _this = this.mapBadges[1];
+		_this.posChanged = true;
+		_this.y = my + mapBtnH - 28.0;
+		var _this = this.rosterHeader;
+		_this.posChanged = true;
+		_this.x = rightX + 14.0;
+		var _this = this.rosterHeader;
+		_this.posChanged = true;
+		_this.y = bodyTop + 10.0;
+		var _g = 0;
+		var _g1 = this.rosterLines.length;
+		while(_g < _g1) {
+			var i = _g++;
+			var _this = this.rosterLines[i];
+			_this.posChanged = true;
+			_this.x = rightX + 16.0;
+			var _this1 = this.rosterLines[i];
+			_this1.posChanged = true;
+			_this1.y = bodyTop + 36.0 + i * 26.0;
+		}
+		var btnY = cardY + cardH - 58.0;
+		var halfBtnW = Math.min(230.0,(cardW - 200.0) * 0.5);
+		var _this = this.copyLinkInteractive;
+		_this.posChanged = true;
+		_this.x = cardX + 24.0;
+		var _this = this.copyLinkInteractive;
+		_this.posChanged = true;
+		_this.y = btnY;
+		this.copyLinkInteractive.width = halfBtnW;
+		this.copyLinkInteractive.height = 38.0;
+		var _this = this.copyLinkText;
+		var v = this.copyLinkInteractive.x + (halfBtnW - this.copyLinkText.get_textWidth() * this.copyLinkText.scaleX) * 0.5;
+		_this.posChanged = true;
+		_this.x = v;
+		var _this = this.copyLinkText;
+		_this.posChanged = true;
+		_this.y = btnY + 1.0;
+		var _this = this.hostRoomInteractive;
+		_this.posChanged = true;
+		_this.x = cardX + 24.0;
+		var _this = this.hostRoomInteractive;
+		_this.posChanged = true;
+		_this.y = btnY;
+		this.hostRoomInteractive.width = 160.0;
+		this.hostRoomInteractive.height = 38.0;
+		var _this = this.hostRoomText;
+		_this.posChanged = true;
+		_this.x = this.hostRoomInteractive.x + 28.0;
+		var _this = this.hostRoomText;
+		_this.posChanged = true;
+		_this.y = btnY + 1.0;
+		var _this = this.joinCodeInteractive;
+		_this.posChanged = true;
+		_this.x = cardX + 200.0;
+		var _this = this.joinCodeInteractive;
+		_this.posChanged = true;
+		_this.y = btnY;
+		this.joinCodeInteractive.width = 160.0;
+		this.joinCodeInteractive.height = 38.0;
+		var _this = this.joinCodeText;
+		_this.posChanged = true;
+		_this.x = this.joinCodeInteractive.x + 24.0;
+		var _this = this.joinCodeText;
+		_this.posChanged = true;
+		_this.y = btnY + 1.0;
+		var _this = this.startMatchInteractive;
+		_this.posChanged = true;
+		_this.x = cardX + cardW - 24.0 - halfBtnW;
+		var _this = this.startMatchInteractive;
+		_this.posChanged = true;
+		_this.y = btnY;
+		this.startMatchInteractive.width = halfBtnW;
+		this.startMatchInteractive.height = 38.0;
+		var _this = this.startMatchText;
+		var v = this.startMatchInteractive.x + (halfBtnW - this.startMatchText.get_textWidth() * this.startMatchText.scaleX) * 0.5;
+		_this.posChanged = true;
+		_this.x = v;
+		var _this = this.startMatchText;
+		_this.posChanged = true;
+		_this.y = btnY - 9.0;
+		var _this = this.backInteractive;
+		_this.posChanged = true;
+		_this.x = (sw - 100.0) * 0.5;
+		var _this = this.backInteractive;
+		_this.posChanged = true;
+		_this.y = btnY + 4.0;
+		var _this = this.backBtnText;
+		var v = this.backInteractive.x + (100.0 - this.backBtnText.get_textWidth() * this.backBtnText.scaleX) * 0.5;
+		_this.posChanged = true;
+		_this.x = v;
+		var _this = this.backBtnText;
+		_this.posChanged = true;
+		_this.y = btnY;
+	}
+	,__class__: ui_views_multiplayer_MultiplayerLobbyView
+});
+var ui_views_multiplayer_MultiplayerMenuView = function(parent) {
+	this.defaultHintMessage = "Type A-Z / 0-9, paste link, or tap box";
+	this.consumedBackspaceCancel = false;
+	this.enteredCode = "";
+	this.selectedIndex = 0;
+	this.modeInteractives = [];
+	this.modeIcons = [];
+	this.modeLaunchLabels = [];
+	this.modeDescs = [];
+	this.modeTags = [];
+	this.modeTitles = [];
+	var _gthis = this;
+	h2d_Object.call(this,parent);
+	this.titleText = new h2d_Text(ui_FontManager.titleFont,this);
+	this.titleText.set_text("MULTIPLAYER // HOST OR JOIN");
+	this.titleText.set_textColor(58879);
+	this.subtitleText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.subtitleText.set_text("CHOOSE SESSION ROLE OR ENTER A 6-CHARACTER INVITE CODE");
+	this.subtitleText.set_textColor(9413043);
+	this.backBtnText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.backBtnText.set_text("< BACK");
+	this.backBtnText.set_textColor(58879);
+	this.backInteractive = new h2d_Interactive(100.0,40.0,this);
+	this.backInteractive.onOver = function(_) {
+		if(_gthis.visible) {
+			_gthis.backBtnText.set_textColor(16772608);
+		}
+	};
+	this.backInteractive.onOut = function(_) {
+		if(_gthis.visible) {
+			_gthis.backBtnText.set_textColor(58879);
+		}
+	};
+	this.backInteractive.onClick = function(_) {
+		if(_gthis.visible && _gthis.onBack != null) {
+			audio_AudioManager.inst.playMenuBeep(320.0,0.06);
+			_gthis.onBack();
+		}
+	};
+	var titles = ["HOST A MATCH","JOIN BY INVITE CODE"];
+	var tags = ["CREATE LOBBY  |  HOST VALIDATED  |  UP TO 8 DRIVERS","ENTER 6-CHAR INVITE CODE  |  OR PASTE INVITE LINK"];
+	var descs = ["Open a new relay lobby, pick Highway Circuit or Sandbox, and validate connected peers.","Type or paste the Host's room code (e.g. X5VC8D) below to enter their match directly."];
+	var launches = ["CREATE & HOST LOBBY >","JOIN WITH INVITE CODE >"];
+	var iconTypes = [ui_IconType.Multiplayer,ui_IconType.Play];
+	var _g = 0;
+	while(_g < 2) {
+		var i = _g++;
+		var idx = [i];
+		var ic = new h2d_Bitmap(ui_UIIcons.get(iconTypes[i],24,58879),this);
+		this.modeIcons.push(ic);
+		var tTitle = new h2d_Text(ui_FontManager.titleFont,this);
+		tTitle.set_text(titles[i]);
+		this.modeTitles.push(tTitle);
+		var tTag = new h2d_Text(ui_FontManager.regularFont,this);
+		tTag.set_text(tags[i]);
+		this.modeTags.push(tTag);
+		var tDesc = new h2d_Text(ui_FontManager.regularFont,this);
+		tDesc.set_text(descs[i]);
+		tDesc.set_lineSpacing(2.0);
+		this.modeDescs.push(tDesc);
+		var tLaunch = new h2d_Text(ui_FontManager.regularFont,this);
+		tLaunch.set_text(launches[i]);
+		this.modeLaunchLabels.push(tLaunch);
+		var inter = new h2d_Interactive(360,320,this);
+		inter.onOver = (function(idx) {
+			return function(_) {
+				if(_gthis.visible && _gthis.selectedIndex != idx[0]) {
+					_gthis.selectedIndex = idx[0];
+					_gthis.updateStyles();
+					if(_gthis.onSelectionChanged != null) {
+						_gthis.onSelectionChanged();
+					}
+				}
+			};
+		})(idx);
+		inter.onClick = (function(idx) {
+			return function(_) {
+				if(!_gthis.visible) {
+					return;
+				}
+				_gthis.selectedIndex = idx[0];
+				_gthis.updateStyles();
+				if(_gthis.onSelectionChanged != null) {
+					_gthis.onSelectionChanged();
+				}
+				_gthis.confirmSelection();
+			};
+		})(idx);
+		this.modeInteractives.push(inter);
+	}
+	this.codeBoxLabel = new h2d_Text(ui_FontManager.regularFont,this);
+	this.codeBoxLabel.set_text("INVITE CODE:");
+	this.codeBoxLabel.set_textColor(58879);
+	var _this = this.codeBoxLabel;
+	_this.posChanged = true;
+	_this.scaleX *= 0.84;
+	_this.posChanged = true;
+	_this.scaleY *= 0.84;
+	this.codeBoxInteractive = new h2d_Interactive(220,40,this);
+	this.codeBoxInteractive.onClick = function(_) {
+		if(!_gthis.visible) {
+			return;
+		}
+		_gthis.selectedIndex = 1;
+		_gthis.codeHintText.set_text(_gthis.defaultHintMessage);
+		_gthis.codeHintText.set_textColor(9413043);
+		var hasWin = typeof window !== 'undefined' && typeof window.prompt === 'function';
+		if(hasWin) {
+			var entered = window.prompt("Enter Invite Code or Paste Invite Link (e.g. X5VC8D):",_gthis.enteredCode);
+			if(entered != null) {
+				_gthis.setInviteCode(entered);
+				audio_AudioManager.inst.playMenuBeep(480.0,0.05);
+				return;
+			}
+		}
+		_gthis.updateStyles();
+		if(_gthis.onSelectionChanged != null) {
+			_gthis.onSelectionChanged();
+		}
+	};
+	this.codeValueText = new h2d_Text(ui_FontManager.titleFont,this);
+	var _this = this.codeValueText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.95;
+	_this.posChanged = true;
+	_this.scaleY *= 0.95;
+	this.clearCodeInteractive = new h2d_Interactive(58,40,this);
+	this.clearCodeInteractive.onClick = function(_) {
+		if(!_gthis.visible) {
+			return;
+		}
+		_gthis.selectedIndex = 1;
+		_gthis.enteredCode = "";
+		_gthis.codeHintText.set_text(_gthis.defaultHintMessage);
+		_gthis.codeHintText.set_textColor(9413043);
+		audio_AudioManager.inst.playMenuBeep(300.0,0.04);
+		_gthis.updateStyles();
+		if(_gthis.onSelectionChanged != null) {
+			_gthis.onSelectionChanged();
+		}
+	};
+	this.clearCodeText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.clearCodeText.set_text("CLEAR");
+	this.clearCodeText.set_textColor(9413043);
+	var _this = this.clearCodeText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.80;
+	_this.posChanged = true;
+	_this.scaleY *= 0.80;
+	this.codeHintText = new h2d_Text(ui_FontManager.regularFont,this);
+	this.codeHintText.set_text(this.defaultHintMessage);
+	this.codeHintText.set_textColor(9413043);
+	var _this = this.codeHintText;
+	_this.posChanged = true;
+	_this.scaleX *= 0.76;
+	_this.posChanged = true;
+	_this.scaleY *= 0.76;
+	var hasDom = typeof window !== 'undefined' && typeof window.addEventListener === 'function';
+	if(hasDom) {
+		window.addEventListener("paste",function(ev) {
+			if(!_gthis.visible) {
+				return;
+			}
+			try {
+				var clip = ev != null && ev.clipboardData != null ? ev.clipboardData.getData("text") : "";
+				if(clip != null && StringTools.trim(clip) != "") {
+					_gthis.setInviteCode(clip);
+					audio_AudioManager.inst.playMenuBeep(520.0,0.05);
+				}
+			} catch( _g ) {
+			}
+		},true);
+		window.addEventListener("keydown",function(ev) {
+			if(!_gthis.visible || ev == null) {
+				return;
+			}
+			if(ev.ctrlKey || ev.altKey || ev.metaKey) {
+				return;
+			}
+			var key = ev.key != null ? Std.string(ev.key) : "";
+			if(key == "Backspace") {
+				if(_gthis.selectedIndex == 1 && _gthis.enteredCode.length > 0) {
+					if(_gthis.backspaceCode() && ev.preventDefault != null) {
+						ev.preventDefault();
+					}
+				}
+				return;
+			}
+			if(key.length == 1) {
+				var code = HxOverrides.cca(key,0);
+				if(!(code >= 48 && code <= 57 || code >= 65 && code <= 90 || code >= 97 && code <= 122)) {
+					return;
+				}
+				var upper = key.toUpperCase();
+				if(_gthis.selectedIndex == 1 || upper != "W" && upper != "A" && upper != "S" && upper != "D") {
+					_gthis.appendCodeChar(upper);
+				}
+			}
+		},true);
+	}
+	this.updateStyles();
+};
+$hxClasses["ui.views.multiplayer.MultiplayerMenuView"] = ui_views_multiplayer_MultiplayerMenuView;
+ui_views_multiplayer_MultiplayerMenuView.__name__ = "ui.views.multiplayer.MultiplayerMenuView";
+ui_views_multiplayer_MultiplayerMenuView.__super__ = h2d_Object;
+ui_views_multiplayer_MultiplayerMenuView.prototype = $extend(h2d_Object.prototype,{
+	activate: function() {
+		this.set_visible(true);
+		this.consumedBackspaceCancel = false;
+		if(this.codeHintText != null) {
+			this.codeHintText.set_text(this.defaultHintMessage);
+			this.codeHintText.set_textColor(9413043);
+		}
+		this.updateStyles();
+	}
+	,setInviteCode: function(raw) {
+		this.enteredCode = net_MultiplayerManager.extractRoomCode(raw);
+		if(this.enteredCode != "") {
+			this.selectedIndex = 1;
+		}
+		if(this.codeHintText != null) {
+			this.codeHintText.set_text(this.defaultHintMessage);
+			this.codeHintText.set_textColor(9413043);
+		}
+		this.updateStyles();
+		if(this.onSelectionChanged != null) {
+			this.onSelectionChanged();
+		}
+	}
+	,appendCodeChar: function(ch) {
+		var clean = net_MultiplayerManager.extractRoomCode(ch);
+		if(clean == "") {
+			return;
+		}
+		var _g = 0;
+		var _g1 = clean.length;
+		while(_g < _g1) {
+			var i = _g++;
+			if(this.enteredCode.length < 8) {
+				this.enteredCode += clean.charAt(i);
+			}
+		}
+		this.selectedIndex = 1;
+		if(this.codeHintText != null) {
+			this.codeHintText.set_text(this.defaultHintMessage);
+			this.codeHintText.set_textColor(9413043);
+		}
+		audio_AudioManager.inst.playMenuBeep(440.0,0.03);
+		this.updateStyles();
+		if(this.onSelectionChanged != null) {
+			this.onSelectionChanged();
+		}
+	}
+	,backspaceCode: function() {
+		if(this.enteredCode.length <= 0) {
+			return false;
+		}
+		this.enteredCode = HxOverrides.substr(this.enteredCode,0,this.enteredCode.length - 1);
+		this.consumedBackspaceCancel = true;
+		if(this.codeHintText != null) {
+			this.codeHintText.set_text(this.defaultHintMessage);
+			this.codeHintText.set_textColor(9413043);
+		}
+		audio_AudioManager.inst.playMenuBeep(300.0,0.03);
+		this.updateStyles();
+		if(this.onSelectionChanged != null) {
+			this.onSelectionChanged();
+		}
+		return true;
+	}
+	,consumeBackspaceCancel: function() {
+		if(!this.consumedBackspaceCancel) {
+			return false;
+		}
+		this.consumedBackspaceCancel = false;
+		return true;
+	}
+	,shouldCaptureWasdAsText: function() {
+		return this.selectedIndex == 1;
+	}
+	,navigate: function(dir) {
+		this.selectedIndex = (this.selectedIndex + dir + 2) % 2;
+		audio_AudioManager.inst.playMenuBeep(380.0,0.04);
+		this.updateStyles();
+		if(this.onSelectionChanged != null) {
+			this.onSelectionChanged();
+		}
+	}
+	,confirmSelection: function() {
+		if(this.selectedIndex == 0) {
+			audio_AudioManager.inst.playMenuBeep(540.0,0.08);
+			if(this.onHostSelected != null) {
+				this.onHostSelected();
+			}
+			return;
+		}
+		var code = net_MultiplayerManager.extractRoomCode(this.enteredCode);
+		if(code == "") {
+			var hasWin = typeof window !== 'undefined' && typeof window.prompt === 'function';
+			if(hasWin) {
+				var prompted = window.prompt("Enter 6-character Invite Code or Paste Invite Link:","");
+				if(prompted != null && StringTools.trim(prompted) != "") {
+					code = net_MultiplayerManager.extractRoomCode(prompted);
+					this.enteredCode = code;
+				}
+			}
+		}
+		if(code != "") {
+			this.enteredCode = code;
+			this.updateStyles();
+			audio_AudioManager.inst.playMenuBeep(540.0,0.08);
+			if(this.onJoinSelected != null) {
+				this.onJoinSelected(code);
+			}
+		} else {
+			audio_AudioManager.inst.playMenuBeep(220.0,0.06);
+			if(this.codeHintText != null) {
+				this.codeHintText.set_text("ENTER A 6-CHAR INVITE CODE FIRST (TYPE A-Z / 0-9)");
+				this.codeHintText.set_textColor(16750592);
+			}
+			this.updateStyles();
+		}
+	}
+	,updateStyles: function() {
+		var isSel = 0 == this.selectedIndex;
+		this.modeTitles[0].set_textColor(isSel ? 58879 : 16777215);
+		this.modeTags[0].set_textColor(isSel ? 16772608 : 9413043);
+		this.modeDescs[0].set_textColor(isSel ? 12767712 : 9413043);
+		this.modeLaunchLabels[0].set_textColor(isSel ? 58879 : 9413043);
+		var _this = this.modeIcons[0].color;
+		var c = isSel ? 58879 : 9413043;
+		_this.x = (c >> 16 & 255) / 255;
+		_this.y = (c >> 8 & 255) / 255;
+		_this.z = (c & 255) / 255;
+		_this.w = (c >>> 24) / 255;
+		var isSel = 1 == this.selectedIndex;
+		this.modeTitles[1].set_textColor(isSel ? 58879 : 16777215);
+		this.modeTags[1].set_textColor(isSel ? 16772608 : 9413043);
+		this.modeDescs[1].set_textColor(isSel ? 12767712 : 9413043);
+		this.modeLaunchLabels[1].set_textColor(isSel ? 58879 : 9413043);
+		var _this = this.modeIcons[1].color;
+		var c = isSel ? 58879 : 9413043;
+		_this.x = (c >> 16 & 255) / 255;
+		_this.y = (c >> 8 & 255) / 255;
+		_this.z = (c & 255) / 255;
+		_this.w = (c >>> 24) / 255;
+		if(this.codeValueText != null) {
+			if(this.enteredCode.length > 0) {
+				this.codeValueText.set_text(this.enteredCode);
+				this.codeValueText.set_textColor(16772608);
+			} else {
+				this.codeValueText.set_text("- - - - - -");
+				this.codeValueText.set_textColor(this.selectedIndex == 1 ? 10533072 : 9413043);
+			}
+		}
+		if(this.clearCodeText != null) {
+			this.clearCodeText.set_textColor(this.enteredCode.length > 0 ? 16750592 : 8032166);
+		}
+	}
+	,layout: function(sw,sh) {
+		var cardW = Math.min(860.0,sw - 32.0);
+		var cardH = Math.min(480.0,sh - 110.0);
+		var cardX = (sw - cardW) * 0.5;
+		var cardY = Math.max(68.0,(sh - cardH) * 0.5 + 8.0);
+		if(this.titleText != null) {
+			var _this = this.titleText;
+			var v = (sw - this.titleText.get_textWidth()) * 0.5;
+			_this.posChanged = true;
+			_this.x = v;
+			var _this = this.titleText;
+			var v = Math.max(14.0,cardY - 52.0);
+			_this.posChanged = true;
+			_this.y = v;
+		}
+		if(this.subtitleText != null) {
+			var _this = this.subtitleText;
+			var v = (sw - this.subtitleText.get_textWidth()) * 0.5;
+			_this.posChanged = true;
+			_this.x = v;
+			var _this = this.subtitleText;
+			_this.posChanged = true;
+			_this.y = cardY + 20.0;
+		}
+		if(this.backBtnText != null && this.backInteractive != null) {
+			var _this = this.backBtnText;
+			_this.posChanged = true;
+			_this.x = cardX + 28.0;
+			var _this = this.backBtnText;
+			_this.posChanged = true;
+			_this.y = cardY + 20.0;
+			var _this = this.backInteractive;
+			_this.posChanged = true;
+			_this.x = cardX + 20.0;
+			var _this = this.backInteractive;
+			_this.posChanged = true;
+			_this.y = cardY + 12.0;
+			this.backInteractive.width = 100.0;
+			this.backInteractive.height = 40.0;
+		}
+		var modeCardW = (cardW - 56. - 24.0) * 0.5;
+		var modeCardH = cardH - 134.0;
+		var modeCardY = cardY + 74.0;
+		var prevH = Math.max(84.0,modeCardH * 0.40);
+		var _g = 0;
+		while(_g < 2) {
+			var i = _g++;
+			var mx = cardX + 28.0 + i * (modeCardW + 24.0);
+			var contentY = modeCardY + 16.0 + prevH + 10.0;
+			var _this = this.modeIcons[i];
+			_this.posChanged = true;
+			_this.x = mx + 18.0;
+			var _this1 = this.modeIcons[i];
+			_this1.posChanged = true;
+			_this1.y = contentY + 4.0;
+			var _this2 = this.modeTitles[i];
+			_this2.posChanged = true;
+			_this2.x = mx + 50.0;
+			var _this3 = this.modeTitles[i];
+			_this3.posChanged = true;
+			_this3.y = contentY;
+			var _this4 = this.modeTags[i];
+			_this4.posChanged = true;
+			_this4.x = mx + 18.0;
+			var _this5 = this.modeTags[i];
+			_this5.posChanged = true;
+			_this5.y = contentY + 36.0;
+			this.modeDescs[i].set_maxWidth(modeCardW - 36.0);
+			var _this6 = this.modeDescs[i];
+			_this6.posChanged = true;
+			_this6.x = mx + 18.0;
+			var _this7 = this.modeDescs[i];
+			_this7.posChanged = true;
+			_this7.y = contentY + 62.0;
+			var _this8 = this.modeLaunchLabels[i];
+			var v = mx + (modeCardW - this.modeLaunchLabels[i].get_textWidth()) * 0.5;
+			_this8.posChanged = true;
+			_this8.x = v;
+			var _this9 = this.modeLaunchLabels[i];
+			_this9.posChanged = true;
+			_this9.y = modeCardY + modeCardH - 38.0 - 14.0 - 1.0;
+			var _this10 = this.modeInteractives[i];
+			_this10.posChanged = true;
+			_this10.x = mx;
+			var _this11 = this.modeInteractives[i];
+			_this11.posChanged = true;
+			_this11.y = modeCardY;
+			this.modeInteractives[i].width = modeCardW;
+			this.modeInteractives[i].height = modeCardH;
+		}
+		var prevX = cardX + 28.0 + (modeCardW + 24.0) + 16.0;
+		var prevY = modeCardY + 16.0;
+		var prevW = modeCardW - 32.0;
+		var _this = this.codeBoxLabel;
+		_this.posChanged = true;
+		_this.x = prevX + 14.0;
+		var _this = this.codeBoxLabel;
+		_this.posChanged = true;
+		_this.y = prevY + 9.0;
+		var boxX = prevX + 14.0;
+		var boxY = prevY + 34.0;
+		var boxW = Math.max(120.0,prevW - 92.0);
+		var _this = this.codeBoxInteractive;
+		_this.posChanged = true;
+		_this.x = boxX;
+		var _this = this.codeBoxInteractive;
+		_this.posChanged = true;
+		_this.y = boxY;
+		this.codeBoxInteractive.width = boxW;
+		this.codeBoxInteractive.height = 40.0;
+		var _this = this.codeValueText;
+		_this.posChanged = true;
+		_this.x = boxX + 14.0;
+		var _this = this.codeValueText;
+		_this.posChanged = true;
+		_this.y = boxY - 11.0;
+		var clrX = prevX + prevW - 72.0;
+		var _this = this.clearCodeInteractive;
+		_this.posChanged = true;
+		_this.x = clrX;
+		var _this = this.clearCodeInteractive;
+		_this.posChanged = true;
+		_this.y = boxY;
+		this.clearCodeInteractive.width = 58.0;
+		this.clearCodeInteractive.height = 40.0;
+		var _this = this.clearCodeText;
+		var v = clrX + (58.0 - this.clearCodeText.get_textWidth() * this.clearCodeText.scaleX) * 0.5;
+		_this.posChanged = true;
+		_this.x = v;
+		var _this = this.clearCodeText;
+		_this.posChanged = true;
+		_this.y = boxY + 4.0;
+		var _this = this.codeHintText;
+		_this.posChanged = true;
+		_this.x = prevX + 14.0;
+		var _this = this.codeHintText;
+		_this.posChanged = true;
+		_this.y = prevY + prevH - 28.0;
+	}
+	,__class__: ui_views_multiplayer_MultiplayerMenuView
+});
 var ui_views_options_AudioOptionsPanel = function(parent) {
 	this.selectedIndex = 0;
 	this.interactives = [];
@@ -75052,30 +78540,41 @@ ui_views_options_AudioOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 var ui_views_options_ControlsOptionsPanel = function(input,parent) {
 	this.currentTab = ui_components_OptionsTab.Keyboard;
 	this.controlViewMode = "Diagram";
+	this.lastCardH = 0.0;
+	this.lastCardW = 0.0;
+	this.lastCardY = 0.0;
+	this.lastCardX = 0.0;
+	this.lastSh = 0.0;
+	this.lastSw = 0.0;
 	this.remapIndex = 0;
+	this.remapIncrInteractives = [];
+	this.remapIncrBtns = [];
+	this.remapDecrInteractives = [];
+	this.remapDecrBtns = [];
 	this.remapInteractives = [];
 	this.remapItems = [];
 	var _gthis = this;
 	h2d_Object.call(this,parent);
 	this.inputRef = input;
+	this.headerBg = new h2d_Graphics(this);
 	this.sensContainer = new h2d_Object(this);
 	this.sensDecrBtn = new h2d_Text(ui_FontManager.regularFont,this.sensContainer);
 	this.sensDecrBtn.set_text("[ < -2% ]");
 	this.sensDecrBtn.set_textColor(58879);
-	this.sensDecrInter = new h2d_Interactive(80,28,this.sensContainer);
+	this.sensDecrInter = new h2d_Interactive(80,30,this.sensContainer);
 	this.sensDecrInter.onClick = function(_) {
 		_gthis.adjustSensitivity(-0.02);
 	};
 	this.sensLabel = new h2d_Text(ui_FontManager.regularFont,this.sensContainer);
 	this.sensLabel.set_textColor(12767712);
-	this.sensRowInter = new h2d_Interactive(320,28,this.sensContainer);
+	this.sensRowInter = new h2d_Interactive(320,30,this.sensContainer);
 	this.sensRowInter.onClick = function(_) {
 		_gthis.adjustSensitivity(_gthis.inputRef.steerSensitivity >= 0.99 ? -1.0 : 0.02);
 	};
 	this.sensIncrBtn = new h2d_Text(ui_FontManager.regularFont,this.sensContainer);
 	this.sensIncrBtn.set_text("[ +2% > ]");
 	this.sensIncrBtn.set_textColor(58879);
-	this.sensIncrInter = new h2d_Interactive(80,28,this.sensContainer);
+	this.sensIncrInter = new h2d_Interactive(80,30,this.sensContainer);
 	this.sensIncrInter.onClick = function(_) {
 		_gthis.adjustSensitivity(0.02);
 	};
@@ -75085,46 +78584,82 @@ var ui_views_options_ControlsOptionsPanel = function(input,parent) {
 		_gthis.toggleExclusiveDevice();
 	};
 	this.toggleViewModeBtn = new h2d_Text(ui_FontManager.regularFont,this);
-	this.toggleViewModeInter = new h2d_Interactive(300,32,this);
+	this.toggleViewModeInter = new h2d_Interactive(360,32,this);
 	this.toggleViewModeInter.onClick = function(_) {
-		_gthis.controlViewMode = _gthis.controlViewMode == "Diagram" ? "Custom" : "Diagram";
-		if(_gthis.currentTab == ui_components_OptionsTab.Touch) {
-			var d = save_SaveSystem.load();
-			if(d.touchSettings == null) {
-				d.touchSettings = save_SaveSystem.getDefaultTouchSettings();
-			}
-			d.touchSettings.mode = _gthis.controlViewMode == "Diagram" ? "Default" : "Custom";
-			save_SaveSystem.save(d);
-			if(_gthis.onTouchSettingsChanged != null) {
-				_gthis.onTouchSettingsChanged();
-			}
-		}
-		_gthis.updateControlViewMode();
+		_gthis.toggleCustomMode();
 	};
 	this.diagramViewer = new ui_ControlDiagrams(this);
 	this.remapContainer = new h2d_Object(this);
+	this.remapBg = new h2d_Graphics(this.remapContainer);
 	var _g = 0;
 	while(_g < 12) {
-		var i = [_g++];
-		var txt = new h2d_Text(ui_FontManager.regularFont,this.remapContainer);
-		this.remapItems.push(txt);
-		var inter = new h2d_Interactive(540.0,26.0,this.remapContainer);
-		inter.onOver = (function(i) {
+		var idx = [_g++];
+		var decrTxt = new h2d_Text(ui_FontManager.regularFont,this.remapContainer);
+		decrTxt.set_text("- 10");
+		decrTxt.set_textColor(58879);
+		decrTxt.set_visible(false);
+		this.remapDecrBtns.push(decrTxt);
+		var decrInter = new h2d_Interactive(68,34,this.remapContainer);
+		decrInter.set_visible(false);
+		decrInter.onOver = (function(idx) {
 			return function(_) {
-				if(_gthis.visible && _gthis.controlViewMode == "Custom") {
-					_gthis.remapIndex = i[0];
+				if(_gthis.visible && _gthis.controlViewMode == "Custom" && _gthis.currentTab == ui_components_OptionsTab.Touch) {
+					_gthis.remapIndex = idx[0];
 					_gthis.updateRemapStyles();
 				}
 			};
-		})(i);
-		inter.onClick = (function(i) {
+		})(idx);
+		decrInter.onClick = (function(idx) {
 			return function(_) {
-				if(_gthis.visible && _gthis.controlViewMode == "Custom") {
-					_gthis.triggerRemapEntry(i[0]);
+				if(_gthis.visible && _gthis.controlViewMode == "Custom" && _gthis.currentTab == ui_components_OptionsTab.Touch) {
+					_gthis.cycleCustomTouchRow(idx[0],-1);
 				}
 			};
-		})(i);
+		})(idx);
+		this.remapDecrInteractives.push(decrInter);
+		var txt = new h2d_Text(ui_FontManager.regularFont,this.remapContainer);
+		this.remapItems.push(txt);
+		var inter = new h2d_Interactive(540.0,26.0,this.remapContainer);
+		inter.onOver = (function(idx) {
+			return function(_) {
+				if(_gthis.visible && _gthis.controlViewMode == "Custom") {
+					_gthis.remapIndex = idx[0];
+					_gthis.updateRemapStyles();
+				}
+			};
+		})(idx);
+		inter.onClick = (function(idx) {
+			return function(_) {
+				if(_gthis.visible && _gthis.controlViewMode == "Custom") {
+					_gthis.remapIndex = idx[0];
+					_gthis.triggerRemapEntry(idx[0]);
+				}
+			};
+		})(idx);
 		this.remapInteractives.push(inter);
+		var incrTxt = new h2d_Text(ui_FontManager.regularFont,this.remapContainer);
+		incrTxt.set_text("+ 10");
+		incrTxt.set_textColor(58879);
+		incrTxt.set_visible(false);
+		this.remapIncrBtns.push(incrTxt);
+		var incrInter = new h2d_Interactive(68,34,this.remapContainer);
+		incrInter.set_visible(false);
+		incrInter.onOver = (function(idx) {
+			return function(_) {
+				if(_gthis.visible && _gthis.controlViewMode == "Custom" && _gthis.currentTab == ui_components_OptionsTab.Touch) {
+					_gthis.remapIndex = idx[0];
+					_gthis.updateRemapStyles();
+				}
+			};
+		})(idx);
+		incrInter.onClick = (function(idx) {
+			return function(_) {
+				if(_gthis.visible && _gthis.controlViewMode == "Custom" && _gthis.currentTab == ui_components_OptionsTab.Touch) {
+					_gthis.cycleCustomTouchRow(idx[0],1);
+				}
+			};
+		})(idx);
+		this.remapIncrInteractives.push(incrInter);
 	}
 	this.remapStatusNotice = new h2d_Text(ui_FontManager.regularFont,this);
 	this.remapStatusNotice.set_textColor(16772608);
@@ -75132,13 +78667,41 @@ var ui_views_options_ControlsOptionsPanel = function(input,parent) {
 	this.sensitivityRow = this.sensContainer;
 	this.touchDiagram = this.diagramViewer;
 	this.customTouchList = this.remapContainer;
+	this.inputRef.onRemapComplete = function(bound) {
+		_gthis.remapStatusNotice.set_visible(false);
+		if(bound) {
+			_gthis.persistInputBindings();
+		}
+		_gthis.updateRemapStyles();
+	};
 	this.updateSensitivityDisplay();
 };
 $hxClasses["ui.views.options.ControlsOptionsPanel"] = ui_views_options_ControlsOptionsPanel;
 ui_views_options_ControlsOptionsPanel.__name__ = "ui.views.options.ControlsOptionsPanel";
 ui_views_options_ControlsOptionsPanel.__super__ = h2d_Object;
 ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
-	toggleExclusiveDevice: function() {
+	loadActiveSave: function() {
+		var d = this.getSaveData != null ? this.getSaveData() : save_SaveSystem.load();
+		if(d == null) {
+			d = save_SaveSystem.load();
+		}
+		if(d.touchSettings == null) {
+			d.touchSettings = save_SaveSystem.getDefaultTouchSettings();
+		}
+		return d;
+	}
+	,persistActiveSave: function(d) {
+		save_SaveSystem.save(d);
+		if(this.onSaveDataUpdated != null) {
+			this.onSaveDataUpdated(d);
+		}
+	}
+	,persistInputBindings: function() {
+		var d = this.loadActiveSave();
+		this.inputRef.exportToSave(d);
+		this.persistActiveSave(d);
+	}
+	,toggleExclusiveDevice: function() {
 		if(this.currentTab == ui_components_OptionsTab.Touch) {
 			return;
 		}
@@ -75148,21 +78711,18 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		} else if(this.currentTab == ui_components_OptionsTab.Gamepad) {
 			this.inputRef.exclusiveDevice = this.inputRef.exclusiveDevice == input_ExclusiveDevice.GamepadOnly ? input_ExclusiveDevice.Both : input_ExclusiveDevice.GamepadOnly;
 		}
+		this.persistInputBindings();
 		this.updateControlHeaderButtons();
 	}
 	,adjustSensitivity: function(stepsOrDelta) {
-		var delta = Math.abs(stepsOrDelta) >= 1.0 ? stepsOrDelta * 0.02 : stepsOrDelta;
-		var sens = Math.round((this.inputRef.steerSensitivity + delta) * 50) / 50.0;
+		var sens = Math.round((this.inputRef.steerSensitivity + (Math.abs(stepsOrDelta) >= 1.0 ? stepsOrDelta * 0.02 : stepsOrDelta)) * 50) / 50.0;
 		sens = Math.max(0.0,Math.min(1.0,sens));
 		this.inputRef.steerSensitivity = sens;
 		audio_AudioManager.inst.playMenuBeep(420 + sens * 240,0.04);
 		this.updateSensitivityDisplay();
-		var d = save_SaveSystem.load();
+		var d = this.loadActiveSave();
 		d.steerSensitivity = sens;
-		save_SaveSystem.save(d);
-		if(window.app != null) {
-			window.app.saveData = d;
-		}
+		this.persistActiveSave(d);
 	}
 	,updateSensitivityDisplay: function() {
 		var barLen = Math.round(this.inputRef.steerSensitivity * 20);
@@ -75194,7 +78754,7 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			this.toggleExclusiveBtn.set_text("[INTERFACE: MULTI-TOUCH ACTIVE]");
 			this.toggleExclusiveBtn.set_textColor(10011513);
 			this.toggleExclusiveInter.set_visible(false);
-			this.toggleViewModeBtn.set_text("[MODE: " + (this.controlViewMode == "Diagram" ? "DEFAULT LAYOUT" : "CUSTOM LAYOUT") + "]");
+			this.toggleViewModeBtn.set_text(this.controlViewMode == "Diagram" ? "[MODE: DEFAULT LAYOUT  |  TAP TO CUSTOMIZE]" : "[MODE: CUSTOM OFFSETS  |  TAP FOR PREVIEW]");
 			this.toggleViewModeBtn.set_textColor(58879);
 			return;
 		}
@@ -75215,19 +78775,20 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	,updateControlViewMode: function() {
 		this.diagramViewer.set_visible(this.controlViewMode == "Diagram");
 		this.remapContainer.set_visible(this.controlViewMode == "Custom");
+		this.updateControlHeaderButtons();
+		this.updateSensitivityDisplay();
 		if(this.controlViewMode == "Diagram") {
 			if(this.currentTab == ui_components_OptionsTab.Keyboard) {
 				this.diagramViewer.drawKeyboardLayout();
 			} else if(this.currentTab == ui_components_OptionsTab.Gamepad) {
 				this.diagramViewer.drawGamepadLayout();
 			} else if(this.currentTab == ui_components_OptionsTab.Touch) {
-				this.diagramViewer.drawTouchLayout();
+				this.diagramViewer.drawTouchLayout(this.loadActiveSave().touchSettings);
 			}
 		} else {
 			this.updateRemapStyles();
 		}
-		this.updateControlHeaderButtons();
-		this.updateSensitivityDisplay();
+		this.applySubpanelLayout();
 	}
 	,getMaxRemapCount: function() {
 		if(this.currentTab == ui_components_OptionsTab.Touch) {
@@ -75238,16 +78799,13 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	}
 	,triggerRemapEntry: function(idx) {
 		if(this.currentTab == ui_components_OptionsTab.Touch) {
-			var d = save_SaveSystem.load();
-			var ts = d.touchSettings != null ? d.touchSettings : save_SaveSystem.getDefaultTouchSettings();
+			this.remapIndex = idx;
 			if(idx == 11) {
 				audio_AudioManager.inst.playMenuBeep(320,0.08);
+				var d = this.loadActiveSave();
 				d.touchSettings = save_SaveSystem.getDefaultTouchSettings();
 				d.touchSettings.mode = "Custom";
-				save_SaveSystem.save(d);
-				if(window.app != null) {
-					window.app.saveData = d;
-				}
+				this.persistActiveSave(d);
 				if(this.onTouchSettingsChanged != null) {
 					this.onTouchSettingsChanged();
 				}
@@ -75264,22 +78822,22 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			} else {
 				this.inputRef.bindings.resetGamepadDefaults();
 			}
+			this.persistInputBindings();
 			this.updateRemapStyles();
 			return;
 		}
 		var isGamepad = this.currentTab == ui_components_OptionsTab.Gamepad;
-		var actList = [input_InputAction.Throttle,input_InputAction.Brake,input_InputAction.SteerLeft,input_InputAction.SteerRight,input_InputAction.Handbrake,input_InputAction.Boost];
 		audio_AudioManager.inst.playMenuBeep(640,0.1);
 		this.remapStatusNotice.set_text("PRESS ANY " + (isGamepad ? "BUTTON" : "KEY") + "...");
 		this.remapStatusNotice.set_visible(true);
-		this.inputRef.startListening(actList[idx],isGamepad);
+		this.inputRef.startListening([input_InputAction.Throttle,input_InputAction.Brake,input_InputAction.SteerLeft,input_InputAction.SteerRight,input_InputAction.Handbrake,input_InputAction.Boost][idx],isGamepad);
 	}
 	,adjustCurrentCustomOption: function(dir) {
 		if(this.currentTab != ui_components_OptionsTab.Touch) {
 			return;
 		}
-		var d = save_SaveSystem.load();
-		var ts = d.touchSettings != null ? d.touchSettings : save_SaveSystem.getDefaultTouchSettings();
+		var d = this.loadActiveSave();
+		var ts = d.touchSettings;
 		ts.mode = "Custom";
 		var delta = dir * 10.0;
 		switch(this.remapIndex) {
@@ -75314,17 +78872,13 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			ts.driftOffsetY = Math.max(-100.0,Math.min(100.0,ts.driftOffsetY + delta));
 			break;
 		case 10:
-			var s = Math.round((ts.scale + dir * 0.05) * 100) / 100.0;
-			ts.scale = Math.max(0.5,Math.min(1.5,s));
+			ts.scale = Math.max(0.5,Math.min(1.5,Math.round((ts.scale + dir * 0.05) * 100) / 100.0));
 			break;
 		case 11:
 			return;
 		}
 		d.touchSettings = ts;
-		save_SaveSystem.save(d);
-		if(window.app != null) {
-			window.app.saveData = d;
-		}
+		this.persistActiveSave(d);
 		audio_AudioManager.inst.playMenuBeep(450 + this.remapIndex * 20,0.04);
 		if(this.onTouchSettingsChanged != null) {
 			this.onTouchSettingsChanged();
@@ -75333,16 +78887,15 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	}
 	,toggleCustomMode: function() {
 		this.controlViewMode = this.controlViewMode == "Diagram" ? "Custom" : "Diagram";
-		var d = save_SaveSystem.load();
-		d.touchSettings.mode = this.controlViewMode == "Diagram" ? "Default" : "Custom";
-		save_SaveSystem.save(d);
-		if(window.app != null) {
-			window.app.saveData = d;
+		if(this.currentTab == ui_components_OptionsTab.Touch) {
+			var d = this.loadActiveSave();
+			d.touchSettings.mode = this.controlViewMode == "Diagram" ? "Default" : "Custom";
+			this.persistActiveSave(d);
+			if(this.onTouchSettingsChanged != null) {
+				this.onTouchSettingsChanged();
+			}
 		}
 		this.updateControlViewMode();
-		if(this.onTouchSettingsChanged != null) {
-			this.onTouchSettingsChanged();
-		}
 	}
 	,cycleCustomTouchRow: function(row,dir) {
 		this.remapIndex = row;
@@ -75357,37 +78910,23 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		audio_AudioManager.inst.playMenuBeep(380,0.04);
 		this.updateRemapStyles();
 	}
-	,updateRemapStyles: function() {
-		var count = this.getMaxRemapCount();
-		if(this.currentTab == ui_components_OptionsTab.Touch) {
-			var d = save_SaveSystem.load();
-			var ts = d.touchSettings != null ? d.touchSettings : save_SaveSystem.getDefaultTouchSettings();
-			var labels = ["Analog Joystick Offset X:  " + Math.round(ts.stickOffsetX) + " px  [ < / > ]","Analog Joystick Offset Y:  " + Math.round(ts.stickOffsetY) + " px  [ < / > ]","Nitro Button Offset X:     " + Math.round(ts.nitroOffsetX) + " px  [ < / > ]","Nitro Button Offset Y:     " + Math.round(ts.nitroOffsetY) + " px  [ < / > ]","Gas Pedal Offset X:        " + Math.round(ts.gasOffsetX) + " px  [ < / > ]","Gas Pedal Offset Y:        " + Math.round(ts.gasOffsetY) + " px  [ < / > ]","Brake Disc Offset X:       " + Math.round(ts.brakeOffsetX) + " px  [ < / > ]","Brake Disc Offset Y:       " + Math.round(ts.brakeOffsetY) + " px  [ < / > ]","Handbrake Offset X:        " + Math.round(ts.driftOffsetX) + " px  [ < / > ]","Handbrake Offset Y:        " + Math.round(ts.driftOffsetY) + " px  [ < / > ]","Touch Controls Scale:      " + Math.round(ts.scale * 100) + "%  [ < / > ]","[RESET TOUCH LAYOUT TO DEFAULTS]"];
-			var _g = 0;
-			while(_g < 12) {
-				var i = _g++;
-				var item = this.remapItems[i];
-				var inter = this.remapInteractives[i];
-				if(i < count) {
-					item.set_visible(true);
-					inter.set_visible(true);
-					if(i == this.remapIndex) {
-						item.set_textColor(58879);
-						item.set_text("> " + labels[i] + " <");
-					} else {
-						item.set_textColor(i == 11 ? 15057019 : 12767712);
-						item.set_text("  " + labels[i] + "  ");
-					}
-				} else {
-					item.set_visible(false);
-					inter.set_visible(false);
-				}
-			}
-			return;
+	,fmtSignedPx: function(val) {
+		var n = Math.round(val);
+		return (n > 0 ? "+" : "") + n + " px";
+	}
+	,hideTouchStepButtons: function() {
+		var _g = 0;
+		while(_g < 12) {
+			var i = _g++;
+			this.remapDecrBtns[i].set_visible(false);
+			this.remapDecrInteractives[i].set_visible(false);
+			this.remapIncrBtns[i].set_visible(false);
+			this.remapIncrInteractives[i].set_visible(false);
 		}
-		var isGamepad = this.currentTab == ui_components_OptionsTab.Gamepad;
-		var b = this.inputRef.bindings;
-		var labels = ["Throttle (Gas):       " + (isGamepad ? input_InputController.getGamepadBtnName(b.padGas) : input_InputController.getKeyName(b.keyGas)),"Brake / Reverse:      " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBrake) : input_InputController.getKeyName(b.keyBrake)),"Steer Left:           " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyLeft)),"Steer Right:          " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyRight)),"Handbrake (Drift):    " + (isGamepad ? input_InputController.getGamepadBtnName(b.padHandbrake) : input_InputController.getKeyName(b.keyHandbrake)),"Nitro Boost:          " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBoost) : input_InputController.getKeyName(b.keyBoost)),"[RESET TO DEFAULTS]"];
+	}
+	,applyRemapRowLabels: function(labels,resetIdx) {
+		this.hideTouchStepButtons();
+		var count = labels.length;
 		var _g = 0;
 		while(_g < 12) {
 			var i = _g++;
@@ -75400,7 +78939,7 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 					item.set_textColor(58879);
 					item.set_text("> " + labels[i] + " <");
 				} else {
-					item.set_textColor(i == 6 ? 15057019 : 12767712);
+					item.set_textColor(i == resetIdx ? 15057019 : 12767712);
 					item.set_text("  " + labels[i] + "  ");
 				}
 			} else {
@@ -75408,6 +78947,45 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 				inter.set_visible(false);
 			}
 		}
+	}
+	,updateRemapStyles: function() {
+		if(this.currentTab == ui_components_OptionsTab.Touch) {
+			var ts = this.loadActiveSave().touchSettings;
+			var labels = ["Joystick X:   " + this.fmtSignedPx(ts.stickOffsetX),"Joystick Y:   " + this.fmtSignedPx(ts.stickOffsetY),"Nitro Btn X:  " + this.fmtSignedPx(ts.nitroOffsetX),"Nitro Btn Y:  " + this.fmtSignedPx(ts.nitroOffsetY),"Gas Pedal X:  " + this.fmtSignedPx(ts.gasOffsetX),"Gas Pedal Y:  " + this.fmtSignedPx(ts.gasOffsetY),"Brake Disc X: " + this.fmtSignedPx(ts.brakeOffsetX),"Brake Disc Y: " + this.fmtSignedPx(ts.brakeOffsetY),"Handbrake X:  " + this.fmtSignedPx(ts.driftOffsetX),"Handbrake Y:  " + this.fmtSignedPx(ts.driftOffsetY),"HUD Scale:    " + Math.round(ts.scale * 100) + "%","RESET DEFAULT LAYOUT"];
+			var _g = 0;
+			while(_g < 12) {
+				var i = _g++;
+				var isSel = i == this.remapIndex;
+				this.remapItems[i].set_visible(true);
+				this.remapInteractives[i].set_visible(true);
+				this.remapItems[i].set_text(labels[i]);
+				if(i < 11) {
+					this.remapItems[i].set_textColor(isSel ? 58879 : 12767712);
+					var decrBtn = this.remapDecrBtns[i];
+					var incrBtn = this.remapIncrBtns[i];
+					decrBtn.set_text(i == 10 ? "- 5%" : "- 10");
+					incrBtn.set_text(i == 10 ? "+ 5%" : "+ 10");
+					decrBtn.set_textColor(isSel ? 16772608 : 58879);
+					incrBtn.set_textColor(isSel ? 16772608 : 58879);
+					decrBtn.set_visible(true);
+					this.remapDecrInteractives[i].set_visible(true);
+					incrBtn.set_visible(true);
+					this.remapIncrInteractives[i].set_visible(true);
+				} else {
+					this.remapItems[i].set_textColor(isSel ? 58879 : 16772608);
+					this.remapDecrBtns[i].set_visible(false);
+					this.remapDecrInteractives[i].set_visible(false);
+					this.remapIncrBtns[i].set_visible(false);
+					this.remapIncrInteractives[i].set_visible(false);
+				}
+			}
+			this.applySubpanelLayout();
+			return;
+		}
+		var isGamepad = this.currentTab == ui_components_OptionsTab.Gamepad;
+		var b = this.inputRef.bindings;
+		this.applyRemapRowLabels(["Throttle (Gas):       " + (isGamepad ? input_InputController.getGamepadBtnName(b.padGas) : input_InputController.getKeyName(b.keyGas)),"Brake / Reverse:      " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBrake) : input_InputController.getKeyName(b.keyBrake)),"Steer Left:           " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyLeft)),"Steer Right:          " + (isGamepad ? "Left Analog / D-Pad" : input_InputController.getKeyName(b.keyRight)),"Handbrake (Drift):    " + (isGamepad ? input_InputController.getGamepadBtnName(b.padHandbrake) : input_InputController.getKeyName(b.keyHandbrake)),"Nitro Boost:          " + (isGamepad ? input_InputController.getGamepadBtnName(b.padBoost) : input_InputController.getKeyName(b.keyBoost)),"[RESET TO DEFAULTS]"],6);
+		this.applySubpanelLayout();
 	}
 	,layout: function(sw,sh,cardX,cardY,cardW,cardH) {
 		if(cardH == null) {
@@ -75422,10 +79000,27 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		if(cardX == null) {
 			cardX = 0;
 		}
-		var effectiveCardX = cardW > 0 ? cardX : (sw - 920.0) * 0.5;
-		var effectiveCardY = cardH > 0 ? cardY : sh * 0.16;
-		var effectiveCardW = cardW > 0 ? cardW : 920.0;
-		var sensY = effectiveCardY + 54.0;
+		this.lastSw = sw;
+		this.lastSh = sh;
+		this.lastCardX = cardX;
+		this.lastCardY = cardY;
+		this.lastCardW = cardW;
+		this.lastCardH = cardH;
+		this.applySubpanelLayout();
+	}
+	,applySubpanelLayout: function() {
+		var sw = this.lastSw > 0 ? this.lastSw : 1280.0;
+		var effectiveCardW = this.lastCardW > 0 ? this.lastCardW : 920.0;
+		var effectiveCardH = this.lastCardH > 0 ? this.lastCardH : 580.0;
+		var effectiveCardX = this.lastCardW > 0 ? this.lastCardX : (sw - effectiveCardW) * 0.5;
+		var effectiveCardY = this.lastCardH > 0 ? this.lastCardY : Math.max(12.0,((this.lastSh > 0 ? this.lastSh : 720.0) - effectiveCardH) * 0.5);
+		if(this.headerBg != null) {
+			this.headerBg.clear();
+		}
+		if(this.remapBg != null) {
+			this.remapBg.clear();
+		}
+		var sensY = effectiveCardY + 66.0;
 		if(this.sensLabel != null) {
 			var _this = this.sensLabel;
 			var v = (sw - this.sensLabel.get_textWidth()) * 0.5;
@@ -75439,11 +79034,11 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			_this.x = this.sensLabel.x;
 			var _this = this.sensRowInter;
 			_this.posChanged = true;
-			_this.y = sensY;
+			_this.y = sensY + 5.0;
 			this.sensRowInter.width = this.sensLabel.get_textWidth();
-			this.sensRowInter.height = 24.0;
+			this.sensRowInter.height = 30.0;
 			var _this = this.sensDecrBtn;
-			var v = this.sensLabel.x - this.sensDecrBtn.get_textWidth() - 14.0;
+			var v = this.sensLabel.x - this.sensDecrBtn.get_textWidth() - 16.0;
 			_this.posChanged = true;
 			_this.x = v;
 			var _this = this.sensDecrBtn;
@@ -75451,14 +79046,15 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			_this.y = sensY;
 			var _this = this.sensDecrInter;
 			_this.posChanged = true;
-			_this.x = this.sensDecrBtn.x;
+			_this.x = this.sensDecrBtn.x - 6.0;
 			var _this = this.sensDecrInter;
 			_this.posChanged = true;
-			_this.y = sensY;
-			this.sensDecrInter.width = this.sensDecrBtn.get_textWidth();
-			this.sensDecrInter.height = 24.0;
+			_this.y = sensY + 5.0;
+			var tmp = this.sensDecrBtn.get_textWidth();
+			this.sensDecrInter.width = tmp + 12.0;
+			this.sensDecrInter.height = 30.0;
 			var _this = this.sensIncrBtn;
-			var v = this.sensLabel.x + this.sensLabel.get_textWidth() + 14.0;
+			var v = this.sensLabel.x + this.sensLabel.get_textWidth() + 16.0;
 			_this.posChanged = true;
 			_this.x = v;
 			var _this = this.sensIncrBtn;
@@ -75466,56 +79062,71 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			_this.y = sensY;
 			var _this = this.sensIncrInter;
 			_this.posChanged = true;
-			_this.x = this.sensIncrBtn.x;
+			_this.x = this.sensIncrBtn.x - 6.0;
 			var _this = this.sensIncrInter;
 			_this.posChanged = true;
-			_this.y = sensY;
-			this.sensIncrInter.width = this.sensIncrBtn.get_textWidth();
-			this.sensIncrInter.height = 24.0;
+			_this.y = sensY + 5.0;
+			var tmp = this.sensIncrBtn.get_textWidth();
+			this.sensIncrInter.width = tmp + 12.0;
+			this.sensIncrInter.height = 30.0;
+			if(this.headerBg != null) {
+				ui_components_CardBackplate.drawChamferedBox(this.headerBg,this.sensDecrInter.x,this.sensDecrInter.y,this.sensDecrInter.width,this.sensDecrInter.height,4.0,1055788,0.72,58879,0.55,1.0);
+				ui_components_CardBackplate.drawChamferedBox(this.headerBg,this.sensIncrInter.x,this.sensIncrInter.y,this.sensIncrInter.width,this.sensIncrInter.height,4.0,1055788,0.72,58879,0.55,1.0);
+			}
 		}
-		var headerY = sensY + 34.0;
+		var headerY = sensY + 36.0;
 		if(this.toggleExclusiveBtn != null) {
 			var _this = this.toggleExclusiveBtn;
 			_this.posChanged = true;
-			_this.x = effectiveCardX + 50.0;
+			_this.x = effectiveCardX + 40.0;
 			var _this = this.toggleExclusiveBtn;
 			_this.posChanged = true;
 			_this.y = headerY;
 			var _this = this.toggleExclusiveInter;
 			_this.posChanged = true;
-			_this.x = this.toggleExclusiveBtn.x;
+			_this.x = this.toggleExclusiveBtn.x - 8.0;
 			var _this = this.toggleExclusiveInter;
 			_this.posChanged = true;
-			_this.y = this.toggleExclusiveBtn.y;
+			_this.y = headerY + 4.0;
+			var tmp = this.toggleExclusiveBtn.get_textWidth() + 16.0;
+			this.toggleExclusiveInter.width = Math.max(220.0,tmp);
+			this.toggleExclusiveInter.height = 32.0;
 		}
 		if(this.toggleViewModeBtn != null) {
+			var modeW = Math.max(260.0,this.toggleViewModeBtn.get_textWidth() + 24.0);
+			var modeX = effectiveCardX + effectiveCardW - modeW - 36.0;
 			var _this = this.toggleViewModeBtn;
 			_this.posChanged = true;
-			_this.x = effectiveCardX + effectiveCardW - 350.0;
+			_this.x = modeX + 12.0;
 			var _this = this.toggleViewModeBtn;
 			_this.posChanged = true;
 			_this.y = headerY;
 			var _this = this.toggleViewModeInter;
 			_this.posChanged = true;
-			_this.x = this.toggleViewModeBtn.x;
+			_this.x = modeX;
 			var _this = this.toggleViewModeInter;
 			_this.posChanged = true;
-			_this.y = this.toggleViewModeBtn.y;
+			_this.y = headerY + 4.0;
+			this.toggleViewModeInter.width = modeW;
+			this.toggleViewModeInter.height = 32.0;
+			if(this.headerBg != null) {
+				ui_components_CardBackplate.drawChamferedBox(this.headerBg,modeX,headerY + 4.0,modeW,32.0,5.0,1057848,0.80,58879,0.85,1.3);
+			}
 		}
 		if(this.diagramViewer != null) {
 			var _this = this.diagramViewer;
 			_this.posChanged = true;
 			_this.x = effectiveCardX + effectiveCardW * 0.5;
 			var _this = this.diagramViewer;
+			var v = effectiveCardY + Math.min(340.0,effectiveCardH * 0.57);
 			_this.posChanged = true;
-			_this.y = effectiveCardY + 320.0;
+			_this.y = v;
 			var _this = this.diagramViewer;
 			_this.posChanged = true;
 			_this.scaleX = 0.92;
 			_this.posChanged = true;
 			_this.scaleY = 0.92;
 		}
-		var remapStartY = headerY + 42.0;
 		if(this.remapStatusNotice != null) {
 			var _this = this.remapStatusNotice;
 			var v = (sw - this.remapStatusNotice.get_textWidth()) * 0.5;
@@ -75523,9 +79134,13 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			_this.x = v;
 			var _this = this.remapStatusNotice;
 			_this.posChanged = true;
-			_this.y = remapStartY;
+			_this.y = headerY + 36.0;
 		}
-		var itemsStartY = remapStartY + 24.0;
+		if(this.currentTab == ui_components_OptionsTab.Touch) {
+			this.layoutTouchCustomGrid(effectiveCardX,effectiveCardY,effectiveCardW,effectiveCardH,headerY + 44.0);
+			return;
+		}
+		var itemsStartY = headerY + 62.0;
 		var _g = 0;
 		while(_g < 12) {
 			var i = _g++;
@@ -75542,6 +79157,87 @@ ui_views_options_ControlsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 			inter.y = item.y;
 			inter.width = 540.0;
 			inter.height = 26.0;
+		}
+	}
+	,layoutTouchCustomGrid: function(cardX,cardY,cardW,cardH,gridTop) {
+		var cellW = (cardW - 64. - 20.0) * 0.5;
+		var rowStride = Math.min(56.0,Math.max(180.0,cardH - (gridTop - cardY) - 14.0) / 6.0);
+		var cellH = Math.min(44.0,Math.max(26.0,rowStride - 8.0));
+		var btnW = Math.min(68.0,Math.max(48.0,cellW * 0.165));
+		var btnH = Math.min(34.0,cellH - 6.0);
+		var _g = 0;
+		while(_g < 12) {
+			var i = _g++;
+			var cellX = cardX + 32.0 + i % 2 * (cellW + 20.0);
+			var cellY = gridTop + (i / 2 | 0) * rowStride;
+			var textTopY = cellY + cellH * 0.5 - 20.0;
+			var isSel = i == this.remapIndex;
+			var item = this.remapItems[i];
+			var inter = this.remapInteractives[i];
+			if(i < 11) {
+				var btnY = cellY + (cellH - btnH) * 0.5;
+				var decrX = cellX + 6.0;
+				var incrX = cellX + cellW - btnW - 6.0;
+				var midX = decrX + btnW + 4.0;
+				var midW = Math.max(40.0,incrX - 4.0 - midX);
+				var decrBtn = this.remapDecrBtns[i];
+				var decrInter = this.remapDecrInteractives[i];
+				var v = decrX + (btnW - decrBtn.get_textWidth()) * 0.5;
+				decrBtn.posChanged = true;
+				decrBtn.x = v;
+				decrBtn.posChanged = true;
+				decrBtn.y = textTopY;
+				decrInter.posChanged = true;
+				decrInter.x = decrX;
+				decrInter.posChanged = true;
+				decrInter.y = btnY;
+				decrInter.width = btnW;
+				decrInter.height = btnH;
+				var incrBtn = this.remapIncrBtns[i];
+				var incrInter = this.remapIncrInteractives[i];
+				var v1 = incrX + (btnW - incrBtn.get_textWidth()) * 0.5;
+				incrBtn.posChanged = true;
+				incrBtn.x = v1;
+				incrBtn.posChanged = true;
+				incrBtn.y = textTopY;
+				incrInter.posChanged = true;
+				incrInter.x = incrX;
+				incrInter.posChanged = true;
+				incrInter.y = btnY;
+				incrInter.width = btnW;
+				incrInter.height = btnH;
+				var v2 = midX + (midW - item.get_textWidth()) * 0.5;
+				item.posChanged = true;
+				item.x = v2;
+				item.posChanged = true;
+				item.y = textTopY;
+				inter.posChanged = true;
+				inter.x = midX;
+				inter.posChanged = true;
+				inter.y = btnY;
+				inter.width = midW;
+				inter.height = btnH;
+				if(this.remapBg != null && this.controlViewMode == "Custom") {
+					ui_components_CardBackplate.drawChamferedBox(this.remapBg,cellX,cellY,cellW,cellH,6.0,isSel ? 1253941 : 988706,isSel ? 0.90 : 0.72,isSel ? 58879 : 2372685,isSel ? 0.90 : 0.55,isSel ? 1.6 : 1.0);
+					ui_components_CardBackplate.drawChamferedBox(this.remapBg,decrX,btnY,btnW,btnH,4.0,1386301,0.92,isSel ? 16772608 : 58879,0.82,1.2);
+					ui_components_CardBackplate.drawChamferedBox(this.remapBg,incrX,btnY,btnW,btnH,4.0,1386301,0.92,isSel ? 16772608 : 58879,0.82,1.2);
+				}
+			} else {
+				var v3 = cellX + (cellW - item.get_textWidth()) * 0.5;
+				item.posChanged = true;
+				item.x = v3;
+				item.posChanged = true;
+				item.y = textTopY;
+				inter.posChanged = true;
+				inter.x = cellX;
+				inter.posChanged = true;
+				inter.y = cellY;
+				inter.width = cellW;
+				inter.height = cellH;
+				if(this.remapBg != null && this.controlViewMode == "Custom") {
+					ui_components_CardBackplate.drawChamferedBox(this.remapBg,cellX,cellY,cellW,cellH,6.0,isSel ? 2366226 : 1709328,0.85,isSel ? 58879 : 16750592,0.85,isSel ? 1.6 : 1.2);
+				}
+			}
 		}
 	}
 	,__class__: ui_views_options_ControlsOptionsPanel
@@ -75608,114 +79304,44 @@ var ui_views_options_GraphicsOptionsPanel = function(gfxSettings,parent) {
 };
 $hxClasses["ui.views.options.GraphicsOptionsPanel"] = ui_views_options_GraphicsOptionsPanel;
 ui_views_options_GraphicsOptionsPanel.__name__ = "ui.views.options.GraphicsOptionsPanel";
+ui_views_options_GraphicsOptionsPanel.cycleArray = function(arr,curr,dir) {
+	var idx = arr.indexOf(curr);
+	if(idx == -1) {
+		idx = 0;
+	}
+	return arr[(idx + dir + arr.length) % arr.length];
+};
 ui_views_options_GraphicsOptionsPanel.__super__ = h2d_Object;
 ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 	isOptionDisabled: function(idx) {
-		switch(idx) {
-		case 2:
-			return this.settings.shadowLevel == "Off";
-		case 6:
-			return !this.settings.mipmapping;
-		case 8:
-			return this.settings.aaType == "None";
-		case 11:
-			return !this.settings.modelReflections;
-		default:
+		if(idx < 0 || idx >= ui_views_options_GraphicsOptionsPanel.OPTION_DEFS.length) {
+			return false;
+		}
+		var pred = ui_views_options_GraphicsOptionsPanel.OPTION_DEFS[idx].disabledWhen;
+		if(pred != null) {
+			return pred(this.settings);
+		} else {
 			return false;
 		}
 	}
 	,cycleOption: function(idx,dir) {
+		if(idx < 0 || idx >= ui_views_options_GraphicsOptionsPanel.OPTION_DEFS.length) {
+			return;
+		}
 		if(this.isOptionDisabled(idx)) {
 			audio_AudioManager.inst.playMenuBeep(220.0,0.05);
 			return;
 		}
 		audio_AudioManager.inst.playMenuBeep(480.0,0.05);
-		var s = this.settings;
-		switch(idx) {
-		case 0:
-			if(this.isOpenedFromPause) {
-				return;
-			}
-			s.textures = this.cycleArray(["Off","Very Low","Low","Medium","High","Ultra","Unreal"],s.textures,dir);
-			break;
-		case 1:
-			s.shadowLevel = this.cycleArray(["Off","Normal","High","Ultra","Dynamic"],s.shadowLevel,dir);
-			if(graphics_GraphicsManager.inst != null) {
-				graphics_GraphicsManager.inst.applyShadows();
-			}
-			break;
-		case 2:
-			s.shadowRes = this.cycleArray([512,1024,2048,4096],s.shadowRes,dir);
-			if(graphics_GraphicsManager.inst != null) {
-				graphics_GraphicsManager.inst.applyShadows();
-			}
-			break;
-		case 3:
-			if(this.isOpenedFromPause) {
-				return;
-			}
-			s.lightingLevel = this.cycleArray(["Low","Medium","High","Ultra (RTX/Path)"],s.lightingLevel,dir);
-			if(graphics_GraphicsManager.inst != null) {
-				graphics_GraphicsManager.inst.applyLighting();
-			}
-			break;
-		case 4:
-			s.lightingRes = this.cycleArray([512,1024,2048],s.lightingRes,dir);
-			break;
-		case 5:
-			if(this.isOpenedFromPause) {
-				return;
-			}
-			s.mipmapping = !s.mipmapping;
-			break;
-		case 6:
-			if(this.isOpenedFromPause) {
-				return;
-			}
-			s.anisotropic = this.cycleArray([1,2,4,8,16],s.anisotropic,dir);
-			break;
-		case 7:
-			s.aaType = this.cycleArray(["None","FXAA","TSAA","SMAA","MSAA"],s.aaType,dir);
-			break;
-		case 8:
-			s.aaLevel = this.cycleArray([2,4,8],s.aaLevel,dir);
-			break;
-		case 9:
-			if(this.isOpenedFromPause) {
-				return;
-			}
-			s.modelGeometry = this.cycleArray(["Very Low","Low","Medium","High","Ultra"],s.modelGeometry,dir);
-			break;
-		case 10:
-			s.modelReflections = !s.modelReflections;
-			break;
-		case 11:
-			s.reflectionLevel = this.cycleArray(["Low","Medium","High","Ultra"],s.reflectionLevel,dir);
-			break;
-		case 12:
-			s.renderScale = this.cycleArray([0.25,0.334,0.5,0.75,1.0,2.0,3.0,4.0],s.renderScale,dir);
-			if(graphics_GraphicsManager.inst != null) {
-				graphics_GraphicsManager.inst.applyRenderScale();
-			}
-			break;
-		case 13:
-			s.uiResolution = this.cycleArray(["720p (HD)","1080p (FHD)","1440p (2K)","2160p (4K)","Native / Match Window"],s.uiResolution,dir);
-			if(graphics_GraphicsManager.inst != null) {
-				graphics_GraphicsManager.inst.applyUIResolution();
-			}
-			if(this.onUIResolutionChanged != null) {
-				this.onUIResolutionChanged();
-			}
-			break;
+		var def = ui_views_options_GraphicsOptionsPanel.OPTION_DEFS[idx];
+		if(this.isOpenedFromPause && def.menuOnly == true) {
+			return;
+		}
+		def.cycle(this.settings,dir);
+		if(def.triggersLayout == true && this.onUIResolutionChanged != null) {
+			this.onUIResolutionChanged();
 		}
 		this.updateStyles();
-	}
-	,cycleArray: function(arr,curr,dir) {
-		var idx = arr.indexOf(curr);
-		if(idx == -1) {
-			idx = 0;
-		}
-		return arr[(idx + dir + arr.length) % arr.length];
 	}
 	,navigate: function(dir) {
 		this.selectedIndex = (this.selectedIndex + dir + this.items.length) % this.items.length;
@@ -75740,46 +79366,29 @@ ui_views_options_GraphicsOptionsPanel.prototype = $extend(h2d_Object.prototype,{
 		this.layout(this.cachedSw,this.cachedSh,this.cachedCardX,this.cachedCardY,this.cachedCardW,this.cachedCardH);
 	}
 	,updateStyles: function() {
-		var s = this.settings;
 		var inGameLocked = this.isOpenedFromPause;
-		var shadowResStr = this.isOptionDisabled(2) ? "[DISABLED]" : s.shadowRes + "p";
-		var anisoStr = this.isOptionDisabled(6) ? "[DISABLED]" : s.anisotropic + "x";
-		var aaLevelStr = this.isOptionDisabled(8) ? "[DISABLED]" : s.aaLevel + "x";
-		var reflLevelStr = this.isOptionDisabled(11) ? "[DISABLED]" : s.reflectionLevel;
-		var vals = s.textures + (inGameLocked ? " [LOCKED IN-RUN]" : "");
-		var s1 = s.shadowLevel;
-		var vals1 = s.lightingLevel + (inGameLocked ? " [LOCKED IN-RUN]" : "");
-		var vals2 = s.lightingRes + "p";
-		var vals3 = s.mipmapping ? "Enabled" : "Disabled";
-		var vals4 = inGameLocked && !this.isOptionDisabled(6);
-		var vals5 = [vals,s1,shadowResStr,vals1,vals2,vals3 + (inGameLocked ? " [LOCKED IN-RUN]" : ""),anisoStr + (vals4 ? " [LOCKED IN-RUN]" : ""),s.aaType,aaLevelStr,s.modelGeometry + (inGameLocked ? " [LOCKED IN-RUN]" : ""),s.modelReflections ? "Active" : "Disabled",reflLevelStr,s.renderScale + "x (" + Math.round(s.renderScale * 100) + "%)",s.uiResolution];
-		var titles = ["Texture Fidelity:    ","Shadow Quality:      ","Shadow Buffer:       ","Lighting Pipeline:   ","Light Buffer:        ","Mipmapping Filters:  ","Anisotropy Sampling: ","Anti-Aliasing Pass:  ","AA Multiplier:       ","Model Geometry LOD:  ","Screen Reflections:  ","Reflection Updates:  ","3D Render Resolution:","UI Interface Target: "];
 		var _g = 0;
 		var _g1 = this.items.length;
 		while(_g < _g1) {
 			var i = _g++;
+			var def = ui_views_options_GraphicsOptionsPanel.OPTION_DEFS[i];
 			var item = this.items[i];
-			var isLocked = inGameLocked && (i == 0 || i == 3 || i == 5 || i == 6 || i == 9);
 			var isDisabled = this.isOptionDisabled(i);
-			if(i == this.selectedIndex) {
-				if(isDisabled) {
-					item.set_textColor(5595246);
-				} else if(isLocked) {
-					item.set_textColor(9413043);
-				} else {
-					item.set_textColor(58879);
-				}
-				item.set_text("> " + titles[i] + vals5[i] + " <");
-			} else {
-				if(isDisabled) {
-					item.set_textColor(5595246);
-				} else if(isLocked) {
-					item.set_textColor(9413043);
-				} else {
-					item.set_textColor(12767712);
-				}
-				item.set_text("  " + titles[i] + vals5[i] + "  ");
+			var isLocked = inGameLocked && def.menuOnly == true;
+			var valueStr = isDisabled ? "[DISABLED]" : def.formatValue(this.settings);
+			if(!isDisabled && isLocked) {
+				valueStr += " [LOCKED IN-RUN]";
 			}
+			if(isDisabled) {
+				item.set_textColor(5595246);
+			} else if(isLocked) {
+				item.set_textColor(9413043);
+			} else if(i == this.selectedIndex) {
+				item.set_textColor(58879);
+			} else {
+				item.set_textColor(12767712);
+			}
+			item.set_text((i == this.selectedIndex ? "> " : "  ") + def.label + valueStr + (i == this.selectedIndex ? " <" : "  "));
 		}
 	}
 	,layout: function(sw,sh,cardX,cardY,cardW,cardH) {
@@ -75874,7 +79483,7 @@ var ui_views_options_OptionsView = function(input,gfxSettings,parent) {
 	this.titleText.set_text("CONFIGURATION & HARDWARE");
 	this.titleText.set_textColor(58879);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.4.4" + " (Build " + "0010" + ")");
+	this.versionText.set_text("v" + "0.6.1" + " (Build " + "0014" + ")");
 	this.versionText.set_textColor(9413043);
 	var tabNames = ["GRAPHICS","AUDIO","KEYBOARD","GAMEPAD","TOUCH"];
 	var tabIconTypes = [ui_IconType.Graphics,ui_IconType.Volume,ui_IconType.Keyboard,ui_IconType.Gamepad,ui_IconType.Touch];
@@ -75944,6 +79553,9 @@ ui_views_options_OptionsView.prototype = $extend(h2d_Object.prototype,{
 			this.audioPanel.updateStyles();
 		}
 		this.updateTabStyles();
+		if(this.onTabChanged != null) {
+			this.onTabChanged();
+		}
 	}
 	,cycleTab: function(dir) {
 		this.switchTab(ui_views_options_OptionsView.TAB_ORDER[(ui_views_options_OptionsView.TAB_ORDER.indexOf(this.currentTab) + dir + ui_views_options_OptionsView.TAB_ORDER.length) % ui_views_options_OptionsView.TAB_ORDER.length]);
@@ -76217,7 +79829,7 @@ var ui_views_splash_SplashView = function(parent) {
 	this.promptText.set_text("PRESS ANY BUTTON OR CLICK TO ENTER");
 	this.promptText.set_textColor(16777215);
 	this.versionText = new h2d_Text(ui_FontManager.regularFont,this);
-	this.versionText.set_text("v" + "0.4.4" + " (Build " + "0010" + ")");
+	this.versionText.set_text("v" + "0.6.1" + " (Build " + "0014" + ")");
 	this.versionText.set_textColor(9413043);
 	this.screenHit = new h2d_Interactive(3000,3000,this);
 	this.screenHit.onClick = function(_) {
@@ -76306,11 +79918,12 @@ world_IGroundProvider.__isInterface__ = true;
 world_IGroundProvider.prototype = {
 	__class__: world_IGroundProvider
 };
-var world_SandboxMap = function(parent) {
+var world_SandboxMap = function(parent,config) {
 	this.rigidBodies = [];
 	this.obstacles = [];
 	this.floodlights = [];
 	h3d_scene_Object.call(this,parent);
+	this.config = config != null ? config : config_WorldConfig.getDefaultSandbox();
 	this.buildTerrainMesh();
 	this.buildSkidpad();
 	this.buildFloodlights();
@@ -76336,20 +79949,16 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 		if(hillDistSq < 3600.) {
 			elev += 12.5 * Math.exp(-hillDistSq / 1100.0);
 		}
-		if(x >= -22.0 && x <= 22.0 && y >= 70.0 && y <= 125.0) {
-			var xEdgeDist = Math.min(22.0 - Math.abs(x),4.0) / 4.0;
-			if(y <= 120.0) {
-				var rampFrac = (y - 70.0) / 50.0;
-				elev += Math.max(0.0,rampFrac * rampFrac * 3.8 * xEdgeDist);
-			} else {
-				elev += Math.max(0.0,(1.0 - (y - 120.0) / 5.0) * 3.8 * xEdgeDist);
-			}
+		if(x >= -24.0 && x <= 24.0 && y >= 70.0 && y <= 120.0) {
+			var xFrac = Math.sin((x + 24.0) / 48.0 * Math.PI);
+			var rampFrac = (y - 70.0) / 50.0;
+			elev += rampFrac * rampFrac * 3.8 * xFrac;
 		}
 		var bowlDx = x - (-100.0);
 		var bowlDy = y - (-100.0);
 		var bowlDist = Math.sqrt(bowlDx * bowlDx + bowlDy * bowlDy);
-		if(bowlDist > 25.0 && bowlDist < 75.0) {
-			elev += Math.sin((bowlDist - 25.0) / 50.0 * (Math.PI * 0.5)) * 5.2;
+		if(bowlDist > 25.0 && bowlDist < 100.0) {
+			elev += Math.sin((bowlDist - 25.0) / 75.0 * Math.PI) * 5.0;
 		}
 		return elev;
 	}
@@ -76376,21 +79985,25 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 		_this.z = z;
 	}
 	,getGroundFriction: function(x,y) {
-		if(x * x + y * y < 1296.) {
-			return 1.05;
+		var distSq = x * x + y * y;
+		if(distSq < 1296.) {
+			return this.config.skidpadFriction;
+		}
+		if(distSq < 2704.) {
+			return 0.44;
 		}
 		if(x >= -22.0 && x <= 22.0 && y >= 70.0 && y <= 125.0) {
-			return 1.0;
+			return this.config.concreteFeatureFriction;
 		}
 		if(x > 35.0 && x < 140.0 && y > -50.0 && y < 50.0) {
-			return 0.85;
+			return 0.58;
 		}
 		var hillDx = x - (-95.0);
 		var hillDy = y - 95.0;
 		if(hillDx * hillDx + hillDy * hillDy < 3600.) {
-			return 0.80;
+			return 0.62;
 		}
-		return 0.75;
+		return this.config.turfFriction;
 	}
 	,enforceBoundaries: function(pos,forwardSpeed,lateralVelocity) {
 		var hit = false;
@@ -76457,11 +80070,11 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 		var uvs = [];
 		var idxBuf = new Array(0);
 		var _g = 0;
-		while(_g < 65) {
-			var y = -200. + _g++ * 6.25;
+		while(_g < 97) {
+			var y = -200. + _g++ * 4.166666666666667;
 			var _g1 = 0;
-			while(_g1 < 65) {
-				var x = -200. + _g1++ * 6.25;
+			while(_g1 < 97) {
+				var x = -200. + _g1++ * 4.166666666666667;
 				var z = this.getGroundElevation(x,y);
 				var x1 = x;
 				var y1 = y;
@@ -76480,14 +80093,14 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 			}
 		}
 		var _g = 0;
-		while(_g < 64) {
+		while(_g < 96) {
 			var iy = _g++;
 			var _g1 = 0;
-			while(_g1 < 64) {
+			while(_g1 < 96) {
 				var ix = _g1++;
-				var i0 = iy * 65 + ix;
+				var i0 = iy * 97 + ix;
 				var i1 = i0 + 1;
-				var i2 = (iy + 1) * 65 + ix;
+				var i2 = (iy + 1) * 97 + ix;
 				idxBuf.push(i0);
 				idxBuf.push(i1);
 				idxBuf.push(i2);
@@ -76727,26 +80340,44 @@ world_SandboxMap.prototype = $extend(h3d_scene_Object.prototype,{
 	}
 	,__class__: world_SandboxMap
 });
-var world_SkyGradientShader = function() {
+var world_SkyGradientShader = function(topHex,horizonHex,groundHex) {
+	if(groundHex == null) {
+		groundHex = 1317412;
+	}
+	if(horizonHex == null) {
+		horizonHex = 8045298;
+	}
+	if(topHex == null) {
+		topHex = 1069752;
+	}
 	this.groundColor__ = new h3d_VectorImpl(0.,0.,0.);
 	this.horizonColor__ = new h3d_VectorImpl(0.,0.,0.);
 	this.topColor__ = new h3d_VectorImpl(0.,0.,0.);
 	hxsl_Shader.call(this);
-	var _this = this.topColor__;
-	_this.x = 0.06;
-	_this.y = 0.32;
-	_this.z = 0.72;
-	var _this = this.horizonColor__;
-	_this.x = 0.48;
-	_this.y = 0.76;
-	_this.z = 0.95;
-	var _this = this.groundColor__;
-	_this.x = 0.08;
-	_this.y = 0.10;
-	_this.z = 0.14;
+	world_SkyGradientShader.setHexColor(this.topColor__,topHex);
+	world_SkyGradientShader.setHexColor(this.horizonColor__,horizonHex);
+	world_SkyGradientShader.setHexColor(this.groundColor__,groundHex);
 };
 $hxClasses["world.SkyGradientShader"] = world_SkyGradientShader;
 world_SkyGradientShader.__name__ = "world.SkyGradientShader";
+world_SkyGradientShader.setHexColor = function(target,hex) {
+	var _this = target;
+	var x = (hex >> 16 & 255) / 255.0;
+	var y = (hex >> 8 & 255) / 255.0;
+	var z = (hex & 255) / 255.0;
+	if(z == null) {
+		z = 0.;
+	}
+	if(y == null) {
+		y = 0.;
+	}
+	if(x == null) {
+		x = 0.;
+	}
+	_this.x = x;
+	_this.y = y;
+	_this.z = z;
+};
 world_SkyGradientShader.__super__ = hxsl_Shader;
 world_SkyGradientShader.prototype = $extend(hxsl_Shader.prototype,{
 	get_topColor: function() {
@@ -76788,9 +80419,10 @@ world_SkyGradientShader.prototype = $extend(hxsl_Shader.prototype,{
 	}
 	,__class__: world_SkyGradientShader
 });
-var world_Skybox = function(parent) {
+var world_Skybox = function(parent,config) {
 	h3d_scene_Object.call(this,parent);
-	var spherePrim = new h3d_prim_Sphere(950.0,32,24);
+	this.config = config != null ? config : config_WorldConfig.getDefaultSkybox();
+	var spherePrim = new h3d_prim_Sphere(this.config.radius,this.config.segments,24);
 	spherePrim.addNormals();
 	this.skyMesh = new h3d_scene_Mesh(spherePrim,null,this);
 	this.skyMesh.material.passes.set_culling(h3d_mat_Face.None);
@@ -76799,7 +80431,7 @@ var world_Skybox = function(parent) {
 	_this.set_receiveShadows(false);
 	this.skyMesh.material.passes.set_depthWrite(false);
 	this.skyMesh.material.passes.set_depthTest(h3d_mat_Compare.LessEqual);
-	this.skyShader = new world_SkyGradientShader();
+	this.skyShader = new world_SkyGradientShader(this.config.topColor,this.config.horizonColor);
 	this.skyMesh.material.passes.addShader(this.skyShader);
 };
 $hxClasses["world.Skybox"] = world_Skybox;
@@ -76828,13 +80460,15 @@ world_Skybox.prototype = $extend(h3d_scene_Object.prototype,{
 	}
 	,__class__: world_Skybox
 });
-var world_Track = function(parent) {
+var world_Track = function(parent,config) {
 	this.scratchFromCenter = new h3d_VectorImpl(0.,0.,0.);
 	this.scratchQuery = new h3d_VectorImpl(0.,0.,0.);
 	this.rigidBodies = [];
 	this.streetLights = [];
 	this.waypoints = [];
 	h3d_scene_Object.call(this,parent);
+	this.config = config != null ? config : config_WorldConfig.getDefaultTrack();
+	this.buildSurroundingTerrain();
 	this.buildCircuitWaypoints();
 	this.buildRoadBed();
 	this.buildRoadRibbon();
@@ -76847,8 +80481,57 @@ world_Track.__name__ = "world.Track";
 world_Track.__interfaces__ = [world_IGroundProvider];
 world_Track.__super__ = h3d_scene_Object;
 world_Track.prototype = $extend(h3d_scene_Object.prototype,{
-	buildCircuitWaypoints: function() {
-		var rawNodes = [new h3d_VectorImpl(0,0,0),new h3d_VectorImpl(0,85,0),new h3d_VectorImpl(30,170,1.5),new h3d_VectorImpl(90,240,3.0),new h3d_VectorImpl(170,260,3.0),new h3d_VectorImpl(250,215,1.5),new h3d_VectorImpl(280,135,0),new h3d_VectorImpl(255,45,-1.0),new h3d_VectorImpl(175,-25,-1.0),new h3d_VectorImpl(110,10,0),new h3d_VectorImpl(60,-40,0),new h3d_VectorImpl(10,-60,0)];
+	buildSurroundingTerrain: function() {
+		var terrainPrim = new h3d_prim_Cube(this.config.terrainWidth,this.config.terrainHeight,0.4,true);
+		terrainPrim.unindex();
+		terrainPrim.addNormals();
+		this.terrainGround = new h3d_scene_Mesh(terrainPrim,null,this);
+		var _this = this.terrainGround.material.mshader.color__;
+		var c = this.config.terrainColor;
+		_this.x = (c >> 16 & 255) / 255;
+		_this.y = (c >> 8 & 255) / 255;
+		_this.z = (c & 255) / 255;
+		_this.w = (c >>> 24) / 255;
+		var _this = this.terrainGround;
+		_this.x = 110.0;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.terrainGround;
+		_this.y = 90.0;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.terrainGround;
+		_this.z = this.config.terrainZ;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+	}
+	,buildCircuitWaypoints: function() {
+		var rawNodes = [];
+		var _g = 0;
+		var _g1 = this.config.controlNodes;
+		while(_g < _g1.length) {
+			var node = _g1[_g];
+			++_g;
+			var x = node[0];
+			var y = node[1];
+			var z = node[2];
+			if(z == null) {
+				z = 0.;
+			}
+			if(y == null) {
+				y = 0.;
+			}
+			if(x == null) {
+				x = 0.;
+			}
+			rawNodes.push(new h3d_VectorImpl(x,y,z));
+		}
 		var n = rawNodes.length;
 		var _g = 0;
 		while(_g < n) {
@@ -78112,10 +81795,10 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 		_this.z = 0;
 		var proj = physics_SplineMath.getClosestSegment(this.scratchQuery,this.waypoints);
 		var dist = Math.sqrt(proj.distSq);
-		if(dist <= 10.0) {
+		if(dist <= 11.8) {
 			return proj.z + 0.06;
-		} else if(dist <= 12.) {
-			var t = (dist - 10.0) / 2.0;
+		} else if(dist <= 14.) {
+			var t = (dist - 11.8) / 2.1999999999999993;
 			return (proj.z + 0.06) * (1.0 - t) + -2.5 * t;
 		} else {
 			return -2.5;
@@ -78135,7 +81818,7 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 		_this.y = y1;
 		_this.z = 0;
 		var proj = physics_SplineMath.getClosestSegment(this.scratchQuery,this.waypoints);
-		if(Math.sqrt(proj.distSq) > 12.) {
+		if(Math.sqrt(proj.distSq) > 14.) {
 			var _this = outNormal;
 			_this.x = 0;
 			_this.y = 0;
@@ -78144,7 +81827,7 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 		}
 		var tx = proj.segDirX;
 		var ty = proj.segDirY;
-		var slopePitch = (this.getGroundElevation(x + tx * 0.5,y + ty * 0.5) - this.getGroundElevation(x - tx * 0.5,y - ty * 0.5)) / 1.;
+		var slopePitch = (this.getGroundElevation(proj.centerPoint.x + tx * 0.5,proj.centerPoint.y + ty * 0.5) - this.getGroundElevation(proj.centerPoint.x - tx * 0.5,proj.centerPoint.y - ty * 0.5)) / 1.;
 		var nx = -tx * slopePitch;
 		var ny = -ty * slopePitch;
 		var len = Math.sqrt(nx * nx + ny * ny + 1.);
@@ -78179,12 +81862,14 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 		_this.y = y1;
 		_this.z = 0;
 		var dist = Math.sqrt(physics_SplineMath.getClosestSegment(this.scratchQuery,this.waypoints).distSq);
-		if(dist <= 10.0) {
-			return 1.0;
+		if(dist <= 8.8) {
+			return this.config.asphaltFriction;
+		} else if(dist <= 10.0) {
+			return this.config.asphaltFriction * 0.88;
 		} else if(dist <= 12.) {
-			return 0.65;
+			return 0.55;
 		} else {
-			return 0.50;
+			return this.config.offroadFriction;
 		}
 	}
 	,enforceBoundaries: function(pos,forwardSpeed,lateralVelocity) {
@@ -78202,7 +81887,8 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 		_this.z = 0;
 		var proj = physics_SplineMath.getClosestSegment(this.scratchQuery,this.waypoints);
 		var lateralDist = Math.sqrt(proj.distSq);
-		if(lateralDist > 9.7 && lateralDist > 0.001) {
+		var maxHalf = this.config.halfWidth - 0.75;
+		if(lateralDist > maxHalf && lateralDist > 0.001) {
 			var _this = this.scratchFromCenter;
 			var x = pos.x - proj.centerPoint.x;
 			var y = pos.y - proj.centerPoint.y;
@@ -78225,9 +81911,13 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 			_this.x *= k;
 			_this.y *= k;
 			_this.z *= k;
-			pos.x = proj.centerPoint.x + this.scratchFromCenter.x * 9.7;
-			pos.y = proj.centerPoint.y + this.scratchFromCenter.y * 9.7;
-			return { hitWall : true, speedMult : 0.94, latMult : 0.0};
+			pos.x = proj.centerPoint.x + this.scratchFromCenter.x * maxHalf;
+			pos.y = proj.centerPoint.y + this.scratchFromCenter.y * maxHalf;
+			var roadFloorZ = proj.z + 0.06;
+			if(pos.z < roadFloorZ) {
+				pos.z = roadFloorZ;
+			}
+			return { hitWall : true, speedMult : this.config.wallStickiness, latMult : 0.0};
 		}
 		return { hitWall : false, speedMult : 1.0, latMult : 1.0};
 	}
@@ -78241,7 +81931,7 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 		rbConfig.position = new oimo_common_Vec3(110.0,90.0,-7.5);
 		var body = new oimo_dynamics_rigidbody_RigidBody(rbConfig);
 		var shapeConfig = new oimo_dynamics_rigidbody_ShapeConfig();
-		shapeConfig.geometry = new oimo_collision_geometry_BoxGeometry(new oimo_common_Vec3(500.0,500.0,5.0));
+		shapeConfig.geometry = new oimo_collision_geometry_BoxGeometry(new oimo_common_Vec3(this.config.foundationHalfSpan,this.config.foundationHalfSpan,5.0));
 		shapeConfig.restitution = 0.2;
 		shapeConfig.friction = 0.5;
 		body.addShape(new oimo_dynamics_rigidbody_Shape(shapeConfig));
@@ -78259,6 +81949,427 @@ world_Track.prototype = $extend(h3d_scene_Object.prototype,{
 	}
 	,__class__: world_Track
 });
+var world_MapMode = $hxEnums["world.MapMode"] = { __ename__:true,__constructs__:null
+	,Circuit: {_hx_name:"Circuit",_hx_index:0,__enum__:"world.MapMode",toString:$estr}
+	,Sandbox: {_hx_name:"Sandbox",_hx_index:1,__enum__:"world.MapMode",toString:$estr}
+};
+world_MapMode.__constructs__ = [world_MapMode.Circuit,world_MapMode.Sandbox];
+world_MapMode.__empty_constructs__ = [world_MapMode.Circuit,world_MapMode.Sandbox];
+var world_WorldManager = function(s3d,config) {
+	this.showcaseAngle = 0.6;
+	this.rearWheelSpinAngle = 0.0;
+	this.wheelSpinAngle = 0.0;
+	this.trafficEnabled = true;
+	this.remoteCars = new haxe_ds_StringMap();
+	this.currentMapMode = world_MapMode.Circuit;
+	this.s3d = s3d;
+	this.config = config != null ? config : config_GameConfig.getDefault();
+	this.initializeWorld();
+};
+$hxClasses["world.WorldManager"] = world_WorldManager;
+world_WorldManager.__name__ = "world.WorldManager";
+world_WorldManager.prototype = {
+	initializeWorld: function() {
+		this.carPhysics = new physics_CarPhysics(0.0,0.0,0.0,null,this.config.physicsWorld);
+		this.chaseCam = new camera_ChaseCamera(this.s3d.camera,0.0,-10.0,4.0);
+		this.postRenderer = new graphics_PostProcessRenderer();
+		this.s3d.set_renderer(this.postRenderer);
+		this.s3d.camera.zFar = this.config.camera.farPlane;
+		this.skybox = new world_Skybox(this.s3d,config_WorldConfig.getDefaultSkybox());
+		this.initLighting();
+		this.track = new world_Track(this.s3d,config_WorldConfig.getDefaultTrack());
+		this.sandboxMap = new world_SandboxMap(this.s3d,config_WorldConfig.getDefaultSandbox());
+		this.sandboxMap.flags &= -3;
+		this.traffic = new entities_TrafficSystem(this.track.waypoints,this.s3d,config_WorldConfig.getDefaultTraffic());
+		this.playerMesh = new entities_CarMesh(this.s3d);
+		this.loadMap(world_MapMode.Circuit);
+		this.resetCarToStartLine();
+	}
+	,initLighting: function() {
+		var lc = this.config.lighting;
+		var x = lc.sunDirX;
+		var y = lc.sunDirY;
+		var z = lc.sunDirZ;
+		if(z == null) {
+			z = 0.;
+		}
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		var sunDir = new h3d_VectorImpl(x,y,z);
+		var _this = sunDir;
+		var k = _this.x * _this.x + _this.y * _this.y + _this.z * _this.z;
+		if(k < 1e-20) {
+			k = 0;
+		} else {
+			k = 1. / Math.sqrt(k);
+		}
+		_this.x *= k;
+		_this.y *= k;
+		_this.z *= k;
+		this.dirLight = new h3d_scene_fwd_DirLight(sunDir,this.s3d);
+		var _this = this.dirLight;
+		_this.x = lc.sunX;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		_this.y = lc.sunY;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		_this.z = lc.sunZ;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.dirLight.get_color();
+		_this.x = 1.;
+		_this.y = 0.94901960784313721;
+		_this.z = 0.85098039215686272;
+		var fillDir = new h3d_VectorImpl(0.55,-0.78,0.45);
+		var _this = fillDir;
+		var k = _this.x * _this.x + _this.y * _this.y + _this.z * _this.z;
+		if(k < 1e-20) {
+			k = 0;
+		} else {
+			k = 1. / Math.sqrt(k);
+		}
+		_this.x *= k;
+		_this.y *= k;
+		_this.z *= k;
+		this.fillLight = new h3d_scene_fwd_DirLight(fillDir,this.s3d);
+		var _this = this.fillLight.get_color();
+		_this.x = 0.47058823529411764;
+		_this.y = 0.54509803921568623;
+		_this.z = 0.61960784313725492;
+		this.fillLight.set_enableSpecular(false);
+	}
+	,getActiveGround: function() {
+		if(this.currentMapMode == world_MapMode.Sandbox) {
+			return this.sandboxMap;
+		} else {
+			return this.track;
+		}
+	}
+	,loadMap: function(mode) {
+		var prevGround = this.getActiveGround();
+		if(prevGround != null && this.carPhysics != null) {
+			prevGround.unregisterPhysicsColliders(this.carPhysics.physicsWorld);
+		}
+		this.currentMapMode = mode;
+		if(this.skybox != null) {
+			this.skybox.flags |= 2;
+		}
+		var nextGround = this.getActiveGround();
+		if(nextGround != null && this.carPhysics != null) {
+			nextGround.registerPhysicsColliders(this.carPhysics.physicsWorld);
+		}
+		if(mode == world_MapMode.Circuit) {
+			if(this.track != null) {
+				this.track.flags |= 2;
+			}
+			if(this.sandboxMap != null) {
+				this.sandboxMap.flags &= -3;
+			}
+			if(this.traffic != null) {
+				this.traffic.flags |= 2;
+			}
+		} else {
+			if(this.track != null) {
+				this.track.flags &= -3;
+			}
+			if(this.sandboxMap != null) {
+				this.sandboxMap.flags |= 2;
+			}
+			if(this.traffic != null) {
+				this.traffic.flags &= -3;
+			}
+		}
+	}
+	,reloadCurrentMap: function() {
+		if(this.currentMapMode == world_MapMode.Sandbox) {
+			this.loadMap(world_MapMode.Sandbox);
+			this.resetCarToSandboxCenter();
+		} else {
+			this.loadMap(world_MapMode.Circuit);
+			this.resetCarToStartLine();
+			if(this.traffic != null) {
+				this.traffic.resetPositions();
+			}
+		}
+	}
+	,resetCarToStartLine: function() {
+		this.carPhysics.resetState(0.0,0.0,0.06,0.0);
+		this.syncBodyTransformOnly();
+	}
+	,resetCarToSandboxCenter: function() {
+		this.carPhysics.resetState(0.0,0.0,0.05,0.0);
+		this.syncBodyTransformOnly();
+	}
+	,syncSkybox: function() {
+		if(this.skybox != null && this.s3d != null && this.s3d.camera != null) {
+			this.skybox.syncCamera(this.s3d.camera.pos);
+		}
+	}
+	,clearPostEffects: function() {
+		if(this.postRenderer != null) {
+			this.postRenderer.blurShader.blurIntensity__ = 0.0;
+		}
+	}
+	,updateShowcaseCamera: function(dt) {
+		this.clearPostEffects();
+		this.showcaseAngle += 0.35 * dt;
+		var _this = this.s3d.camera.pos;
+		var x = this.carPhysics.pos.x + Math.sin(this.showcaseAngle) * 11.0;
+		var y = this.carPhysics.pos.y - Math.cos(this.showcaseAngle) * 11.0;
+		var z = this.carPhysics.pos.z + 4.2;
+		if(z == null) {
+			z = 0.;
+		}
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = z;
+		var _this = this.s3d.camera.target;
+		var x = this.carPhysics.pos.x;
+		var y = this.carPhysics.pos.y;
+		var z = this.carPhysics.pos.z + 1.2;
+		if(z == null) {
+			z = 0.;
+		}
+		if(y == null) {
+			y = 0.;
+		}
+		if(x == null) {
+			x = 0.;
+		}
+		_this.x = x;
+		_this.y = y;
+		_this.z = z;
+	}
+	,updateDriving: function(dt,input) {
+		var wasDrifting = this.carPhysics.isDrifting;
+		if(this.currentMapMode == world_MapMode.Circuit) {
+			this.carPhysics.update(dt,input,this.track != null ? this.track.waypoints : null,this.track);
+			if(this.traffic != null && this.trafficEnabled) {
+				this.traffic.update(dt,this.carPhysics,this.chaseCam);
+			}
+		} else {
+			this.carPhysics.update(dt,input,null,this.sandboxMap);
+		}
+		if(!wasDrifting && this.carPhysics.isDrifting) {
+			this.chaseCam.addTrauma(0.35);
+		}
+		if(input.boost && this.carPhysics.forwardSpeed > 20.0) {
+			this.chaseCam.addTrauma(0.12 * dt * 60.0);
+		}
+		var kmh = Math.round(Math.abs(this.carPhysics.forwardSpeed) * 3.6);
+		this.updateSpeedBlur(kmh,input.boost);
+		this.syncPlayerVisuals(dt,input);
+		this.chaseCam.update(dt,this.carPhysics,this.carPhysics.isBoosting);
+		return kmh;
+	}
+	,updateSpeedBlur: function(kmh,isBoosting) {
+		if(this.postRenderer == null) {
+			return;
+		}
+		var thresh = this.config.camera.radialBlurThresholdKmh;
+		var blurIntensity = 0.0;
+		if(kmh > thresh) {
+			blurIntensity = Math.min(0.065,(kmh - thresh) / 180.0 * 0.055);
+		}
+		if(isBoosting && kmh > 70) {
+			blurIntensity = Math.min(0.08,blurIntensity + 0.025);
+		}
+		this.postRenderer.blurShader.blurIntensity__ = blurIntensity;
+	}
+	,syncPlayerVisuals: function(dt,input) {
+		var _this = this.playerMesh;
+		_this.x = this.carPhysics.pos.x;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.playerMesh;
+		_this.y = this.carPhysics.pos.y;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.playerMesh;
+		_this.z = this.carPhysics.pos.z;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		this.playerMesh.setRotation(this.carPhysics.pitch,this.carPhysics.roll,0);
+		this.playerMesh.rotate(0,0,-(this.carPhysics.yaw + this.carPhysics.driftAngle));
+		this.wheelSpinAngle += this.carPhysics.forwardSpeed * dt / 0.36;
+		this.rearWheelSpinAngle += (this.carPhysics.forwardSpeed / 0.36 + this.carPhysics.wheelSpinVelocity[2]) * dt;
+		var currentSteer = -input.steer * 0.55;
+		var restLen = this.carPhysics.config.suspension.restLength;
+		if(this.playerMesh.wheels.length >= 4) {
+			this.playerMesh.updateWheelTransform(0,restLen - this.carPhysics.suspLength[0],this.wheelSpinAngle,currentSteer);
+			this.playerMesh.updateWheelTransform(1,restLen - this.carPhysics.suspLength[1],this.wheelSpinAngle,currentSteer);
+			this.playerMesh.updateWheelTransform(2,restLen - this.carPhysics.suspLength[2],this.rearWheelSpinAngle,0.0);
+			this.playerMesh.updateWheelTransform(3,restLen - this.carPhysics.suspLength[3],this.rearWheelSpinAngle,0.0);
+		}
+	}
+	,spawnPlayerAt: function(x,y,z,yaw) {
+		if(this.carPhysics == null) {
+			return;
+		}
+		this.carPhysics.resetState(x,y,z,yaw);
+		this.syncBodyTransformOnly();
+	}
+	,syncBodyTransformOnly: function() {
+		if(this.playerMesh == null || this.carPhysics == null) {
+			return;
+		}
+		var _this = this.playerMesh;
+		_this.x = this.carPhysics.pos.x;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.playerMesh;
+		_this.y = this.carPhysics.pos.y;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		var _this = this.playerMesh;
+		_this.z = this.carPhysics.pos.z;
+		_this.flags |= 1;
+		if((_this.flags & 131072) != 0) {
+			_this.flags |= 262144;
+		}
+		this.playerMesh.setRotation(this.carPhysics.pitch,this.carPhysics.roll,0);
+		this.playerMesh.rotate(0,0,-this.carPhysics.yaw);
+	}
+	,setPlayerPaintColor: function(colorHex) {
+		if(this.playerMesh == null) {
+			return;
+		}
+		if(this.playerMesh.bodyMesh != null && this.playerMesh.bodyMesh.material != null) {
+			var _this = this.playerMesh.bodyMesh.material.mshader.color__;
+			_this.x = (colorHex >> 16 & 255) / 255;
+			_this.y = (colorHex >> 8 & 255) / 255;
+			_this.z = (colorHex & 255) / 255;
+			_this.w = (colorHex >>> 24) / 255;
+		}
+		if(this.playerMesh.hoodMesh != null && this.playerMesh.hoodMesh.material != null) {
+			var _this = this.playerMesh.hoodMesh.material.mshader.color__;
+			_this.x = (colorHex >> 16 & 255) / 255;
+			_this.y = (colorHex >> 8 & 255) / 255;
+			_this.z = (colorHex & 255) / 255;
+			_this.w = (colorHex >>> 24) / 255;
+		}
+	}
+	,setTrafficEnabled: function(enabled) {
+		this.trafficEnabled = enabled;
+		if(this.traffic != null && this.traffic.trafficList != null) {
+			var _g = 0;
+			var _g1 = this.traffic.trafficList;
+			while(_g < _g1.length) {
+				var c = _g1[_g];
+				++_g;
+				if(c.carMesh != null) {
+					var _this = c.carMesh;
+					if(enabled && this.currentMapMode == world_MapMode.Circuit) {
+						_this.flags |= 2;
+					} else {
+						_this.flags &= -3;
+					}
+				}
+			}
+		}
+	}
+	,syncRemoteCars: function(dt,states) {
+		if(states == null) {
+			return;
+		}
+		var toRemove = [];
+		var pid_keys = Object.keys(this.remoteCars.h);
+		var pid_length = pid_keys.length;
+		var pid_current = 0;
+		while(pid_current < pid_length) {
+			var pid = pid_keys[pid_current++];
+			if(!Object.prototype.hasOwnProperty.call(states.h,pid)) {
+				toRemove.push(pid);
+			}
+		}
+		var _g = 0;
+		while(_g < toRemove.length) {
+			var pid = toRemove[_g];
+			++_g;
+			var old = this.remoteCars.h[pid];
+			if(old != null) {
+				old.destroy();
+			}
+			var _this = this.remoteCars;
+			if(Object.prototype.hasOwnProperty.call(_this.h,pid)) {
+				delete(_this.h[pid]);
+			}
+		}
+		var pid_keys = Object.keys(states.h);
+		var pid_length = pid_keys.length;
+		var pid_current = 0;
+		while(pid_current < pid_length) {
+			var pid = pid_keys[pid_current++];
+			var st = states.h[pid];
+			var actor = this.remoteCars.h[pid];
+			if(actor == null) {
+				actor = new entities_RemoteCarActor(this.s3d,st.peerId,st.name,st.colorHex);
+				this.remoteCars.h[pid] = actor;
+			}
+			actor.applyTargetState(st);
+			actor.update(dt);
+			if(this.carPhysics != null) {
+				var dx = this.carPhysics.pos.x - actor.currentX;
+				var dy = this.carPhysics.pos.y - actor.currentY;
+				var distSq = dx * dx + dy * dy;
+				if(Math.abs(this.carPhysics.pos.z - actor.currentZ) < 1.8 && distSq > 0.0001 && distSq < 7.0225) {
+					var dist = Math.sqrt(distSq);
+					var overlap = 2.65 - dist;
+					this.carPhysics.pos.x += dx / dist * overlap * 0.55;
+					this.carPhysics.pos.y += dy / dist * overlap * 0.55;
+					this.carPhysics.forwardSpeed *= 0.94;
+					this.carPhysics.syncToOimoBody();
+					this.chaseCam.addTrauma(0.18);
+				}
+			}
+		}
+	}
+	,clearRemoteCars: function() {
+		var pid_keys = Object.keys(this.remoteCars.h);
+		var pid_length = pid_keys.length;
+		var pid_current = 0;
+		while(pid_current < pid_length) {
+			var actor = this.remoteCars.h[pid_keys[pid_current++]];
+			if(actor != null) {
+				actor.destroy();
+			}
+		}
+		this.remoteCars.h = Object.create(null);
+		this.setPlayerPaintColor(15092249);
+	}
+	,__class__: world_WorldManager
+};
 function $getIterator(o) { if( o instanceof Array ) return new haxe_iterators_ArrayIterator(o); else return o.iterator(); }
 function $bind(o,m) { if( m == null ) return null; if( m.__id__ == null ) m.__id__ = $global.$haxeUID++; var f; if( o.hx__closures__ == null ) o.hx__closures__ = {}; else f = o.hx__closures__[m.__id__]; if( f == null ) { f = m.bind(o); o.hx__closures__[m.__id__] = f; } return f; }
 $global.$haxeUID |= 0;
@@ -78309,7 +82420,29 @@ Xml.Comment = 3;
 Xml.DocType = 4;
 Xml.ProcessingInstruction = 5;
 Xml.Document = 6;
+core_AssetPreloader.sharedTileCache = new haxe_ds_StringMap();
 entities_CarMesh.WHEEL_OFFSETS = [{ x : -0.98, y : 1.35, isLeft : true},{ x : 0.98, y : 1.35, isLeft : false},{ x : -0.98, y : -1.35, isLeft : true},{ x : 0.98, y : -1.35, isLeft : false}];
+graphics_GraphicsManager.UI_RES_PRESETS = (function($this) {
+	var $r;
+	var _g = new haxe_ds_StringMap();
+	_g.h["720p (HD)"] = { isNative : false, width : 1280, height : 720};
+	_g.h["1080p (FHD)"] = { isNative : false, width : 1920, height : 1080};
+	_g.h["1440p (2K)"] = { isNative : false, width : 2560, height : 1440};
+	_g.h["2160p (4K)"] = { isNative : false, width : 3840, height : 2160};
+	_g.h["Native / Match Window"] = { isNative : true, width : 0, height : 0};
+	$r = _g;
+	return $r;
+}(this));
+graphics_GraphicsManager.LIGHTING_PRESETS = (function($this) {
+	var $r;
+	var _g = new haxe_ds_StringMap();
+	_g.h["Low"] = { sunColor : 15391672, ambientColor : 7373460};
+	_g.h["Medium"] = { sunColor : 16772296, ambientColor : 8821680};
+	_g.h["High"] = { sunColor : 16773846, ambientColor : 10400968};
+	_g.h["Ultra (RTX/Path)"] = { sunColor : 16775662, ambientColor : 11716828};
+	$r = _g;
+	return $r;
+}(this));
 h3d_shader_ScreenShader.SRC = "HXSMF2gzZC5zaGFkZXIuU2NyZWVuU2hhZGVyBwEFaW5wdXQNAQICCHBvc2l0aW9uBQoBAQADAnV2BQoBAQABAAAEBWZsaXBZAwIAAAUGb3V0cHV0DQICBghwb3NpdGlvbgUMBAUABwVjb2xvcgUMBAUABAAACApwaXhlbENvbG9yBQwEAAAJDGNhbGN1bGF0ZWRVVgUKBAAACghfX2luaXRfXw4GAAALBnZlcnRleA4GAAACAgoAAAUCBgQCBwUMAggFDAUMBgQCCQUKAgMFCgUKAAALAAAFAQYEAgYFDAkDKw4ECgICBQoAAAMGAQoCAgUKBAADAgQDAwEDAAAAAAAAAAADAQMAAAAAAADwPwMFDAUMAA";
 h3d_shader_ScreenShader._MODULE = "h3d.shader.ScreenShader";
 graphics_RadialBlurShader.SRC = "HXSMGWdyYXBoaWNzLlJhZGlhbEJsdXJTaGFkZXILAQVpbnB1dA0BAgIIcG9zaXRpb24FCgEBAAMCdXYFCgEBAAEAAAQFZmxpcFkDAgAABQZvdXRwdXQNAgIGCHBvc2l0aW9uBQwEBQAHBWNvbG9yBQwEBQAEAAAICnBpeGVsQ29sb3IFDAQAAAkMY2FsY3VsYXRlZFVWBQoEAAAKB3RleHR1cmUKAgIAAAsKYmx1ck9yaWdpbgUKAgAADA1ibHVySW50ZW5zaXR5AwIAAA0IX19pbml0X18OBgAADgZ2ZXJ0ZXgOBgAADwhmcmFnbWVudA4GAAADAg0AAAUCBgQCBwUMAggFDAUMBgQCCQUKAgMFCgUKAAAOAAAFAQYEAgYFDAkDKw4ECgICBQoAAAMGAQoCAgUKBAADAgQDAwEDAAAAAAAAAAADAQMAAAAAAADwPwMFDAUMAAEPAAAFBQgQAnV2BQoEAAACAwUKAAgRA2RpcgUKBAAABgEEBgMCEAUKAgsFCgUKBQoCDAMFCgAIEgNjb2wFDAQAAAkDKw4EAQMAAAAAAAAAAAMBAwAAAAAAAAAAAwEDAAAAAAAAAAADAQMAAAAAAAAAAAMFDAAVBnVucm9sbAAOEwFpAQQAAAYVAQIAAAAAAQECCAAAAAEPAQAABQIIFAhzYW1wbGVVdgUKBAAACQMXDgMGAwIQBQoGAQIRBQoEBgIJAycOAQITAQMBAwAAAAAAABxAAwMDBQoFCgkDKQ4BAQMAAAAAAAAAAAMFCgkDKQ4BAQMAAAAAAADwPwMFCgUKAAaAAhIFDAkDIg4CAgoKAgIUBQoFDAUMAAAABgQCCAUMBgICEgUMAQMAAAAAAAAgQAMFDAUMAA";
@@ -78582,6 +82715,53 @@ hxsl_ShaderList.ALLOW_DUPLICATES = true;
 hxsl_ShaderInstance.UID = 0;
 hxsl_SharedShader.UNROLL_LOOPS = false;
 hxsl_SharedShader.SHADER_RESOLVE = new haxe_ds_StringMap();
+input_InputController.KEY_NAMES = (function($this) {
+	var $r;
+	var _g = new haxe_ds_IntMap();
+	_g.h[32] = "SPACE";
+	_g.h[16] = "L-SHIFT";
+	_g.h[17] = "CTRL";
+	_g.h[18] = "ALT";
+	_g.h[38] = "UP ARROW";
+	_g.h[40] = "DOWN ARROW";
+	_g.h[37] = "LEFT ARROW";
+	_g.h[39] = "RIGHT ARROW";
+	_g.h[13] = "ENTER";
+	$r = _g;
+	return $r;
+}(this));
+input_InputController.PAD_BTN_NAMES = (function($this) {
+	var $r;
+	var _g = new haxe_ds_IntMap();
+	_g.h[0] = "A (Bottom)";
+	_g.h[1] = "B (Right)";
+	_g.h[2] = "X (Left)";
+	_g.h[3] = "Y (Top)";
+	_g.h[4] = "LB";
+	_g.h[5] = "RB";
+	_g.h[6] = "LT";
+	_g.h[7] = "RT";
+	_g.h[8] = "Select";
+	_g.h[9] = "Start";
+	_g.h[12] = "D-Pad Up";
+	_g.h[13] = "D-Pad Down";
+	_g.h[14] = "D-Pad Left";
+	_g.h[15] = "D-Pad Right";
+	$r = _g;
+	return $r;
+}(this));
+net_NetworkProtocol.MSG_JOIN_REQUEST = "join_request";
+net_NetworkProtocol.MSG_JOIN_ACCEPTED = "join_accepted";
+net_NetworkProtocol.MSG_JOIN_REJECTED = "join_rejected";
+net_NetworkProtocol.MSG_LOBBY_STATE = "lobby_state";
+net_NetworkProtocol.MSG_START_MATCH = "start_match";
+net_NetworkProtocol.MSG_CLIENT_STATE = "client_state";
+net_NetworkProtocol.MSG_WORLD_SNAPSHOT = "world_snapshot";
+net_NetworkProtocol.MSG_HOST_RETURN_TO_LOBBY = "host_return_to_lobby";
+net_NetworkProtocol.MAP_CIRCUIT = "circuit";
+net_NetworkProtocol.MAP_SANDBOX = "sandbox";
+net_NetworkProtocol.MAX_PLAYERS = 8;
+net_NetworkProtocol.PLAYER_COLORS = [15092249,58879,16766464,58998,16723603,10233776,16777215,2718207];
 oimo_common_Vec3.numCreations = 0;
 oimo_common_Setting.defaultFriction = 0.2;
 oimo_common_Setting.defaultRestitution = 0.2;
@@ -78623,7 +82803,6 @@ oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_FAILED_TO_INIT 
 oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_FAILED_TO_ADD_VERTEX = 258;
 oimo_collision_narrowphase_detector_gjkepa_GjkEpaResultState.EPA_DID_NOT_CONVERGE = 259;
 oimo_common_Mat3.numCreations = 0;
-oimo_common_Quat.numCreations = 0;
 oimo_dynamics_common_Performance.broadPhaseCollisionTime = 0;
 oimo_dynamics_common_Performance.narrowPhaseCollisionTime = 0;
 oimo_dynamics_common_Performance.dynamicsTime = 0;
@@ -78633,9 +82812,8 @@ oimo_dynamics_constraint_PositionCorrectionAlgorithm.SPLIT_IMPULSE = 1;
 oimo_dynamics_constraint_PositionCorrectionAlgorithm.NGS = 2;
 oimo_dynamics_rigidbody_RigidBodyType.DYNAMIC = 0;
 oimo_dynamics_rigidbody_RigidBodyType.STATIC = 1;
-physics_CarPhysics.WHEEL_OFFSETS = [{ x : -0.98, y : 1.35},{ x : 0.98, y : 1.35},{ x : -0.98, y : -1.35},{ x : 0.98, y : -1.35}];
 ui_UIIcons.cache = new haxe_ds_StringMap();
-ui_views_mainmenu_MainMenuView.ACTIONS = [ui_components_MenuAction.OpenMapSelect,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
+ui_views_mainmenu_MainMenuView.ACTIONS = [ui_components_MenuAction.OpenMapSelect,ui_components_MenuAction.ResumeGame,ui_components_MenuAction.OpenMultiplayer,ui_components_MenuAction.OpenOptions,ui_components_MenuAction.OpenCredits,ui_components_MenuAction.QuitToTitle];
 ui_views_mainmenu_MainMenuView.AUDIO_BEEP_CONFIRM_FREQ = 520.0;
 ui_views_mainmenu_MainMenuView.AUDIO_BEEP_NAV_FREQ = 380.0;
 ui_views_mapselect_MapSelectView.MAP_ACTIONS = [ui_components_MenuAction.StartGame,ui_components_MenuAction.StartSandbox];
@@ -78643,7 +82821,105 @@ ui_views_options_ControlsOptionsPanel.REMAP_ROW_WIDTH = 540.0;
 ui_views_options_ControlsOptionsPanel.REMAP_ROW_HEIGHT = 26.0;
 ui_views_options_ControlsOptionsPanel.REMAP_ROW_STRIDE = 27.0;
 ui_views_options_ControlsOptionsPanel.MAX_REMAP_ITEMS = 12;
-ui_views_options_GraphicsOptionsPanel.NAMES = ["Textures","Shadow Level","Shadow Res","Lighting","Lighting Res","Mipmapping","Anisotropy","Anti-Aliasing","AA Level","Model Geometry","Reflections","Reflection Level","Render Scale","UI Resolution"];
+ui_views_options_GraphicsOptionsPanel.OPTION_DEFS = [{ name : "Textures", label : "Texture Fidelity:    ", menuOnly : true, formatValue : function(s) {
+	return s.textures;
+}, cycle : function(s,d) {
+	s.textures = ui_views_options_GraphicsOptionsPanel.cycleArray(["Off","Very Low","Low","Medium","High","Ultra","Unreal"],s.textures,d);
+}},{ name : "Shadow Level", label : "Shadow Quality:      ", formatValue : function(s) {
+	return s.shadowLevel;
+}, cycle : function(s,d) {
+	s.shadowLevel = ui_views_options_GraphicsOptionsPanel.cycleArray(["Off","Normal","High","Ultra","Dynamic"],s.shadowLevel,d);
+	if(graphics_GraphicsManager.inst != null) {
+		graphics_GraphicsManager.inst.applyShadows();
+	}
+}},{ name : "Shadow Res", label : "Shadow Buffer:       ", disabledWhen : function(s) {
+	return s.shadowLevel == "Off";
+}, formatValue : function(s) {
+	return s.shadowRes + "p";
+}, cycle : function(s,d) {
+	s.shadowRes = ui_views_options_GraphicsOptionsPanel.cycleArray([512,1024,2048,4096],s.shadowRes,d);
+	if(graphics_GraphicsManager.inst != null) {
+		graphics_GraphicsManager.inst.applyShadows();
+	}
+}},{ name : "Lighting", label : "Lighting Pipeline:   ", menuOnly : true, formatValue : function(s) {
+	return s.lightingLevel;
+}, cycle : function(s,d) {
+	s.lightingLevel = ui_views_options_GraphicsOptionsPanel.cycleArray(["Low","Medium","High","Ultra (RTX/Path)"],s.lightingLevel,d);
+	if(graphics_GraphicsManager.inst != null) {
+		graphics_GraphicsManager.inst.applyLighting();
+	}
+}},{ name : "Lighting Res", label : "Light Buffer:        ", formatValue : function(s) {
+	return s.lightingRes + "p";
+}, cycle : function(s,d) {
+	s.lightingRes = ui_views_options_GraphicsOptionsPanel.cycleArray([512,1024,2048],s.lightingRes,d);
+}},{ name : "Mipmapping", label : "Mipmapping Filters:  ", menuOnly : true, formatValue : function(s) {
+	if(s.mipmapping) {
+		return "Enabled";
+	} else {
+		return "Disabled";
+	}
+}, cycle : function(s,_) {
+	s.mipmapping = !s.mipmapping;
+}},{ name : "Anisotropy", label : "Anisotropy Sampling: ", menuOnly : true, disabledWhen : function(s) {
+	return !s.mipmapping;
+}, formatValue : function(s) {
+	return s.anisotropic + "x";
+}, cycle : function(s,d) {
+	s.anisotropic = ui_views_options_GraphicsOptionsPanel.cycleArray([1,2,4,8,16],s.anisotropic,d);
+}},{ name : "Anti-Aliasing", label : "Anti-Aliasing Pass:  ", formatValue : function(s) {
+	return s.aaType;
+}, cycle : function(s,d) {
+	s.aaType = ui_views_options_GraphicsOptionsPanel.cycleArray(["None","FXAA","TSAA","SMAA","MSAA"],s.aaType,d);
+}},{ name : "AA Level", label : "AA Multiplier:       ", disabledWhen : function(s) {
+	return s.aaType == "None";
+}, formatValue : function(s) {
+	return s.aaLevel + "x";
+}, cycle : function(s,d) {
+	s.aaLevel = ui_views_options_GraphicsOptionsPanel.cycleArray([2,4,8],s.aaLevel,d);
+}},{ name : "Model Geometry", label : "Model Geometry LOD:  ", menuOnly : true, formatValue : function(s) {
+	return s.modelGeometry;
+}, cycle : function(s,d) {
+	s.modelGeometry = ui_views_options_GraphicsOptionsPanel.cycleArray(["Very Low","Low","Medium","High","Ultra"],s.modelGeometry,d);
+}},{ name : "Reflections", label : "Screen Reflections:  ", formatValue : function(s) {
+	if(s.modelReflections) {
+		return "Active";
+	} else {
+		return "Disabled";
+	}
+}, cycle : function(s,_) {
+	s.modelReflections = !s.modelReflections;
+}},{ name : "Reflection Level", label : "Reflection Updates:  ", disabledWhen : function(s) {
+	return !s.modelReflections;
+}, formatValue : function(s) {
+	return s.reflectionLevel;
+}, cycle : function(s,d) {
+	s.reflectionLevel = ui_views_options_GraphicsOptionsPanel.cycleArray(["Low","Medium","High","Ultra"],s.reflectionLevel,d);
+}},{ name : "Render Scale", label : "3D Render Resolution:", formatValue : function(s) {
+	return s.renderScale + "x (" + Math.round(s.renderScale * 100) + "%)";
+}, cycle : function(s,d) {
+	s.renderScale = ui_views_options_GraphicsOptionsPanel.cycleArray([0.25,0.334,0.5,0.75,1.0,2.0,3.0,4.0],s.renderScale,d);
+	if(graphics_GraphicsManager.inst != null) {
+		graphics_GraphicsManager.inst.applyRenderScale();
+	}
+}},{ name : "UI Resolution", label : "UI Interface Target: ", triggersLayout : true, formatValue : function(s) {
+	return s.uiResolution;
+}, cycle : function(s,d) {
+	s.uiResolution = ui_views_options_GraphicsOptionsPanel.cycleArray(["720p (HD)","1080p (FHD)","1440p (2K)","2160p (4K)","Native / Match Window"],s.uiResolution,d);
+	if(graphics_GraphicsManager.inst != null) {
+		graphics_GraphicsManager.inst.applyUIResolution();
+	}
+}}];
+ui_views_options_GraphicsOptionsPanel.NAMES = (function($this) {
+	var $r;
+	var _g = [];
+	{
+		var _g1 = 0;
+		var _g2 = ui_views_options_GraphicsOptionsPanel.OPTION_DEFS;
+		while(_g1 < _g2.length) _g.push(_g2[_g1++].name);
+	}
+	$r = _g;
+	return $r;
+}(this));
 ui_views_options_OptionsView.TAB_ORDER = [ui_components_OptionsTab.Graphics,ui_components_OptionsTab.Audio,ui_components_OptionsTab.Keyboard,ui_components_OptionsTab.Gamepad,ui_components_OptionsTab.Touch];
 ui_views_options_OptionsView.TAB_BUTTON_WIDTH = 130.0;
 ui_views_options_OptionsView.TAB_BUTTON_HEIGHT = 42.0;

@@ -11,6 +11,10 @@ import audio.AudioManager;
 
 /**
  * Main menu panel view providing navigation across play, resume, options, credits, and exit.
+ *
+ * @class MainMenuView
+ * @extends h2d.Object
+ * @module ui/views/mainmenu/MainMenuView
  */
 @:keep
 class MainMenuView extends Object {
@@ -30,6 +34,7 @@ class MainMenuView extends Object {
     public static var ACTIONS:Array<MenuAction> = [
         OpenMapSelect,
         ResumeGame,
+        OpenMultiplayer,
         OpenOptions,
         OpenCredits,
         QuitToTitle
@@ -73,10 +78,11 @@ class MainMenuView extends Object {
         versionText.text = Version.DISPLAY;
         versionText.textColor = UITheme.COLOR_TEXT_MUTED;
 
-        var labels = ["PLAY SINGLEPLAYER", "RESUME SAVED RACE", "OPTIONS", "CREDITS", "EXIT TO SPLASH"];
+        var labels = ["PLAY SINGLEPLAYER", "RESUME SAVED RACE", "MULTIPLAYER LOBBY", "OPTIONS", "CREDITS", "EXIT TO SPLASH"];
         var iconTypes = [
             UIIcons.IconType.Play,
             UIIcons.IconType.Resume,
+            UIIcons.IconType.Multiplayer,
             UIIcons.IconType.Settings,
             UIIcons.IconType.Credits,
             UIIcons.IconType.Exit
@@ -183,7 +189,7 @@ class MainMenuView extends Object {
      */
     public function layout(sw:Float, sh:Float) {
         var cardW = Math.min(UITheme.MAIN_CARD_WIDTH, sw - 32.0);
-        var cardH = Math.min(UITheme.MAIN_CARD_HEIGHT, sh * 0.64);
+        var cardH = Math.min(UITheme.MAIN_CARD_HEIGHT, sh * 0.72);
         var cardX = (sw - cardW) * 0.5;
         var cardY = Math.max(76.0, (sh - cardH) * 0.5 + 14.0);
 

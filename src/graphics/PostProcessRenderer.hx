@@ -7,6 +7,10 @@ import h3d.pass.ScreenFx;
  * Custom forward scene renderer providing clean post-processing passes.
  * Intercepts the forward rendering pipeline to render off-screen when high-speed
  * radial directional motion blur is active, rendering directly to backbuffer otherwise.
+ *
+ * @class PostProcessRenderer
+ * @extends h3d.scene.fwd.Renderer
+ * @module graphics/PostProcessRenderer
  */
 class PostProcessRenderer extends Renderer {
     /** Custom radial directional motion blur shader. */
