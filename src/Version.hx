@@ -8,14 +8,14 @@ package;
  * @module Version
  */
 class Version {
-    /** Semantic version string: Major.Minor.Patch (Milestone v0.6.1) */
-    public static inline var NUMBER:String = "0.6.1";
+    /** Semantic version string: Major.Minor.Patch (Milestone v0.8.0 AA + Garage + Steering Contract) */
+    public static inline var NUMBER:String = "0.8.0";
 
     /** Monotonically increasing build compilation counter tallied from 0. */
-    public static inline var BUILD:Int = 14;
+    public static inline var BUILD:Int = 16;
 
     /** Build compilation counter formatted with zero-padding (0000 format). */
-    public static inline var BUILD_STRING:String = "0014";
+    public static inline var BUILD_STRING:String = "0016";
 
     /** Human-readable release designation. */
     public static inline var CHANNEL:String = "Alpha";
@@ -27,5 +27,5 @@ class Version {
     public static inline var SHORT:String = "v" + NUMBER;
 
     /** Build release date. */
-    public static inline var BUILD_DATE:String = "2026-11-15";
+    public static inline var BUILD_DATE:String = "2026-11-17";
 }

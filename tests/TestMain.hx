@@ -42,9 +42,6 @@ class TestMain {
             dispose: function() {},
             isDisposed: function() return false
         };
-        untyped h3d.mat.Texture.fromColor = function(color, alpha) {
-            return dummyTex;
-        };
         #end
 
         new audio.AudioManager();

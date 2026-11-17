@@ -1,8 +1,9 @@
 package input;
 
 import config.GameConfig;
-import hxd.Key;
-import hxd.Pad;
+import core.WebBridge;
+import input.InputKey as Key;
+import input.GamepadDevice as Pad;
 
 /**
  * Controller physical button naming and layout convention.
@@ -258,6 +259,8 @@ class InputController {
         Key.SHIFT => "L-SHIFT",
         Key.CTRL => "CTRL",
         Key.ALT => "ALT",
+        Key.BACKSPACE => "BACKSPACE",
+        Key.TAB => "TAB",
         Key.UP => "UP ARROW",
         Key.DOWN => "DOWN ARROW",
         Key.LEFT => "LEFT ARROW",
@@ -374,23 +377,10 @@ class InputController {
      * Inspects browser navigator capabilities and sets up listeners for touch events.
      */
     function initTouchDetection() {
-        #if js
-        try {
-            var w = js.Browser.window;
-            var nav = js.Browser.navigator;
-            if (nav != null && (nav.maxTouchPoints > 0 || untyped nav.msMaxTouchPoints > 0)) {
-                isTouchActive = true;
-            }
-            if (w != null && js.Syntax.code("('ontouchstart' in window)")) {
-                isTouchActive = true;
-            }
-            if (w != null && w.addEventListener != null) {
-                w.addEventListener("touchstart", function(_) {
-                    isTouchActive = true;
-                }, { passive: true });
-            }
-        } catch (e:haxe.Exception) {}
-        #end
+        var wbTouch = WebBridge.inst.readTouchState();
+        if (wbTouch.active) {
+            isTouchActive = true;
+        }
     }
 
     /**
@@ -402,6 +392,11 @@ class InputController {
         pad.onDisconnect = function() {
             pad = null;
         };
+    }
+
+    /** Returns true if a physical or browser-bridged gamepad is currently connected. */
+    public inline function isPadConnected():Bool {
+        return pad != null && pad.connected;
     }
 
     /**
@@ -441,7 +436,21 @@ class InputController {
         tabNextPressed = false;
         anyKeyPressed = false;
         rawDigitalSteer = 0.0;
-        inputCooldown = 0.22;
+        Key.clearLatches();
+
+        var stickY = (pad != null) ? pad.yAxis : 0.0;
+        var stickX = (pad != null) ? pad.xAxis : 0.0;
+        prevEscape = Key.isDown(Key.ESCAPE);
+        prevPadStart = isBtnDown(BTN_START);
+        prevUp = Key.isDown(Key.UP) || Key.isDown(Key.W) || isBtnDown(DPAD_UP) || (stickY < -UI_STICK_THRESHOLD);
+        prevDown = Key.isDown(Key.DOWN) || Key.isDown(Key.S) || isBtnDown(DPAD_DOWN) || (stickY > UI_STICK_THRESHOLD);
+        prevLeft = Key.isDown(Key.LEFT) || Key.isDown(Key.A) || isBtnDown(DPAD_LEFT) || (stickX < -UI_STICK_THRESHOLD);
+        prevRight = Key.isDown(Key.RIGHT) || Key.isDown(Key.D) || isBtnDown(DPAD_RIGHT) || (stickX > UI_STICK_THRESHOLD);
+        prevConfirm = Key.isDown(Key.ENTER) || Key.isDown(Key.SPACE) || isBtnDown(BTN_SOUTH);
+        prevCancel = Key.isDown(Key.BACKSPACE) || isBtnDown(BTN_EAST);
+        prevLb = isBtnDown(BTN_LB) || Key.isDown(Key.Q);
+        prevRb = isBtnDown(BTN_RB) || Key.isDown(Key.E);
+        inputCooldown = 0.04;
     }
 
     /**
@@ -454,6 +463,7 @@ class InputController {
         isListeningForRemap = true;
         listeningAction = action;
         listeningForGamepad = isGamepad;
+        inputCooldown = 0.14;
         flushInputs();
     }
 
@@ -463,6 +473,16 @@ class InputController {
      * @param dt Delta time elapsed since last frame in seconds.
      */
     public function update(dt:Float) {
+        var wbTouch = WebBridge.inst.readTouchState();
+        if (wbTouch.active) {
+            isTouchActive = true;
+            touchSteer = wbTouch.steer;
+            touchThrottle = wbTouch.throttle;
+            touchBrake = wbTouch.brake;
+            touchHandbrake = wbTouch.handbrake;
+            touchBoost = wbTouch.boost;
+            if (wbTouch.pause) pausePressed = true;
+        }
         if (inputCooldown > 0.0) {
             inputCooldown -= dt;
         }
@@ -472,8 +492,8 @@ class InputController {
             return;
         }
 
-        // 1. Navigation & Edge-Triggered Discrete Inputs
-        var currEscape = Key.isDown(Key.ESCAPE);
+        // 1. Navigation & Edge-Triggered Discrete Inputs (uses isDownOrTapped so sub-frame key taps are never dropped)
+        var currEscape = Key.isDownOrTapped(Key.ESCAPE);
         var currPadStart = isBtnDown(BTN_START);
 
         pausePressed = (inputCooldown <= 0.0) && ((currEscape && !prevEscape) || (currPadStart && !prevPadStart));
@@ -483,10 +503,10 @@ class InputController {
         var stickY = (pad != null) ? pad.yAxis : 0.0;
         var stickX = (pad != null) ? pad.xAxis : 0.0;
 
-        var currUp = Key.isDown(Key.UP) || Key.isDown(Key.W) || isBtnDown(DPAD_UP) || (stickY < -UI_STICK_THRESHOLD);
-        var currDown = Key.isDown(Key.DOWN) || Key.isDown(Key.S) || isBtnDown(DPAD_DOWN) || (stickY > UI_STICK_THRESHOLD);
-        var currLeft = Key.isDown(Key.LEFT) || Key.isDown(Key.A) || isBtnDown(DPAD_LEFT) || (stickX < -UI_STICK_THRESHOLD);
-        var currRight = Key.isDown(Key.RIGHT) || Key.isDown(Key.D) || isBtnDown(DPAD_RIGHT) || (stickX > UI_STICK_THRESHOLD);
+        var currUp = Key.isDownOrTapped(Key.UP) || Key.isDownOrTapped(Key.W) || isBtnDown(DPAD_UP) || (stickY < -UI_STICK_THRESHOLD);
+        var currDown = Key.isDownOrTapped(Key.DOWN) || Key.isDownOrTapped(Key.S) || isBtnDown(DPAD_DOWN) || (stickY > UI_STICK_THRESHOLD);
+        var currLeft = Key.isDownOrTapped(Key.LEFT) || Key.isDownOrTapped(Key.A) || isBtnDown(DPAD_LEFT) || (stickX < -UI_STICK_THRESHOLD);
+        var currRight = Key.isDownOrTapped(Key.RIGHT) || Key.isDownOrTapped(Key.D) || isBtnDown(DPAD_RIGHT) || (stickX > UI_STICK_THRESHOLD);
 
         uiUpPressed = (inputCooldown <= 0.0) && (currUp && !prevUp);
         uiDownPressed = (inputCooldown <= 0.0) && (currDown && !prevDown);
@@ -498,8 +518,8 @@ class InputController {
         prevLeft = currLeft;
         prevRight = currRight;
 
-        var currConfirm = Key.isDown(Key.ENTER) || Key.isDown(Key.SPACE) || isBtnDown(BTN_SOUTH);
-        var currCancel = Key.isDown(Key.BACKSPACE) || isBtnDown(BTN_EAST);
+        var currConfirm = Key.isDownOrTapped(Key.ENTER) || Key.isDownOrTapped(Key.SPACE) || isBtnDown(BTN_SOUTH);
+        var currCancel = Key.isDownOrTapped(Key.BACKSPACE) || isBtnDown(BTN_EAST);
 
         uiConfirmPressed = (inputCooldown <= 0.0) && (currConfirm && !prevConfirm);
         uiCancelPressed = (inputCooldown <= 0.0) && (currCancel && !prevCancel);
@@ -507,8 +527,8 @@ class InputController {
         prevCancel = currCancel;
 
         // Discrete bumper / tab cycling (LB / RB or Q / E)
-        var currLb = isBtnDown(BTN_LB) || Key.isDown(Key.Q);
-        var currRb = isBtnDown(BTN_RB) || Key.isDown(Key.E);
+        var currLb = isBtnDown(BTN_LB) || Key.isDownOrTapped(Key.Q);
+        var currRb = isBtnDown(BTN_RB) || Key.isDownOrTapped(Key.E);
         tabPrevPressed = (inputCooldown <= 0.0) && (currLb && !prevLb);
         tabNextPressed = (inputCooldown <= 0.0) && (currRb && !prevRb);
         prevLb = currLb;
@@ -516,7 +536,7 @@ class InputController {
 
         anyKeyPressed = false;
         if (inputCooldown <= 0.0) {
-            if (currConfirm || currCancel || Key.isDown(Key.MOUSE_LEFT) || currEscape || currPadStart
+            if (currConfirm || currCancel || Key.isDownOrTapped(Key.MOUSE_LEFT) || currEscape || currPadStart
                 || touchThrottle > 0 || touchBrake > 0 || Math.abs(touchSteer) > 0.05 || touchHandbrake || touchBoost) {
                 anyKeyPressed = true;
             } else if (pad != null && pad.buttons != null) {
@@ -524,6 +544,7 @@ class InputController {
                     if (b) { anyKeyPressed = true; break; }
                 }
             }
+            Key.clearLatches();
         }
 
         // 2. Continuous Driving Controls Integration (strictly - = Left, + = Right across all devices)
@@ -540,8 +561,8 @@ class InputController {
         var steerLeft = keyLeft || dpadLeft;
         var steerRight = keyRight || dpadRight;
 
-        if (steerLeft && !steerRight) digitalSteerTarget = 1.0;
-        else if (steerRight && !steerLeft) digitalSteerTarget = -1.0;
+        if (steerLeft && !steerRight) digitalSteerTarget = -1.0;
+        else if (steerRight && !steerLeft) digitalSteerTarget = 1.0;
         else digitalSteerTarget = 0.0;
 
         var steerRate = config.steerSpeed;
@@ -564,11 +585,11 @@ class InputController {
         handbrake = allowKeyboard && Key.isDown(bindings.keyHandbrake);
         boost = allowKeyboard && Key.isDown(bindings.keyBoost);
 
-        // Analog gamepad thumbstick steering (deadzone-rescaled & sign-flipped) and progressive triggers
+        // Analog gamepad thumbstick steering (deadzone-rescaled, canonical - = Left, + = Right) and progressive triggers
         if (allowGamepad && pad != null) {
             var absStick = Math.abs(stickX);
             if (absStick > padDeadzone && padDeadzone < 0.99) {
-                var sign = stickX < 0.0 ? 1.0 : -1.0;
+                var sign = stickX < 0.0 ? -1.0 : 1.0;
                 var norm = Math.max(0.0, Math.min(1.0, (absStick - padDeadzone) / (1.0 - padDeadzone)));
                 var padSteer = sign * Math.pow(norm, 1.35);
                 if (digitalSteerTarget == 0.0 || Math.abs(padSteer) >= Math.abs(combinedSteer)) {
@@ -592,7 +613,7 @@ class InputController {
         // Virtual multi-touch analog stick & pedal blending (small inner deadzone prevents resting jitter)
         var absTouchSteer = Math.abs(touchSteer);
         if (absTouchSteer > 0.03) {
-            var tSign = touchSteer < 0.0 ? 1.0 : -1.0;
+            var tSign = touchSteer < 0.0 ? -1.0 : 1.0;
             var tNorm = Math.max(0.0, Math.min(1.0, (absTouchSteer - 0.03) / 0.97));
             var touchCurved = tSign * Math.pow(tNorm, 1.15);
             if (digitalSteerTarget == 0.0 || Math.abs(touchCurved) >= Math.abs(combinedSteer)) {
@@ -623,9 +644,18 @@ class InputController {
      * Intercepts key presses or gamepad buttons while remapping menu is active.
      */
     function handleRemappingCapture() {
+        if (inputCooldown > 0.0) return;
+
+        // Allow cancellation via Escape or Start button
+        if (Key.isDownOrTapped(Key.ESCAPE) || isBtnDown(BTN_START)) {
+            Key.clearLatches();
+            finishRemapping(false);
+            return;
+        }
+
         if (!listeningForGamepad) {
-            for (k in 1...255) {
-                if (Key.isDown(k) && k != Key.ESCAPE) {
+            for (k in 4...255) {
+                if (Key.isDownOrTapped(k) && k != Key.ESCAPE) {
                     switch (listeningAction) {
                         case SteerLeft: bindings.keyLeft = k;
                         case SteerRight: bindings.keyRight = k;
@@ -634,6 +664,7 @@ class InputController {
                         case Handbrake: bindings.keyHandbrake = k;
                         case Boost: bindings.keyBoost = k;
                     }
+                    Key.clearLatches();
                     finishRemapping(true);
                     return;
                 }
@@ -652,11 +683,6 @@ class InputController {
                     return;
                 }
             }
-        }
-
-        // Allow cancellation via Escape or Start button
-        if (Key.isDown(Key.ESCAPE) || isBtnDown(BTN_START)) {
-            finishRemapping(false);
         }
     }
 

@@ -2,7 +2,7 @@ package tests.camera;
 
 import utest.Test;
 import utest.Assert;
-import h3d.Camera;
+import graphics.SceneGraph.Camera3D;
 import input.InputController;
 import physics.CarPhysics;
 import camera.ChaseCamera;
@@ -13,14 +13,14 @@ import tests.physics.TestCarPhysics.MockGroundProvider;
  * lateral-G banking limits, terrain clearance floor protection, and trauma decay.
  */
 class TestChaseCamera extends Test {
-    var cam:Camera;
+    var cam:Camera3D;
     var chase:ChaseCamera;
     var car:CarPhysics;
     var input:InputController;
     var dt:Float = 1.0 / 60.0;
 
     public function setup() {
-        cam = new Camera();
+        cam = new Camera3D();
         car = new CarPhysics(0.0, 0.0, 0.0);
         chase = new ChaseCamera(cam, 0.0, -ChaseCamera.BASE_DISTANCE, ChaseCamera.BASE_HEIGHT);
         input = new InputController();
@@ -90,5 +90,32 @@ class TestChaseCamera extends Test {
 
         var floorAtCam = rampGround.getGroundElevation(cam.pos.x, cam.pos.y);
         Assert.isTrue(cam.pos.z >= floorAtCam + 0.4, "Chase camera must never clip below rising terrain");
+    }
+
+    public function testProjectionJitterAndSoAPacking() {
+        cam.pos.set(0.0, -10.0, 2.0, 1.0);
+        cam.target.set(0.0, 0.0, 1.0, 1.0);
+        cam.up.set(0.0, 0.0, 1.0, 0.0);
+
+        var jx = 0.0025;
+        var jy = -0.0040;
+        cam.updateMatrices(16.0 / 9.0, jx, jy);
+
+        var worldPt = new math.Vec3(0.0, 0.0, 1.0, 1.0);
+        var jClip = worldPt.transformed(cam.viewProjMat);
+        var uClip = worldPt.transformed(cam.unjitteredViewProjMat);
+        Assert.floatEquals(uClip.x / uClip.w + jx, jClip.x / jClip.w, 0.0001);
+        Assert.floatEquals(uClip.y / uClip.w + jy, jClip.y / jClip.w, 0.0001);
+
+        var soa = new math.SoABuffer(4);
+        var curMat = new math.Mat4();
+        curMat.m[12] = 5.0;
+        var prevMat = new math.Mat4();
+        prevMat.m[12] = 2.5;
+        soa.pushInstance(curMat, 1.0, 0.5, 0.25, 1.0, 0.0, 0.4, 0.0, 0.0, prevMat);
+        var bytesLen = soa.packToBytes();
+        Assert.equals(math.SoABuffer.INSTANCE_STRIDE_BYTES, bytesLen);
+        Assert.floatEquals(5.0, soa.stagingBytes.getFloat(48), 0.0001);
+        Assert.floatEquals(2.5, soa.stagingBytes.getFloat(64 + 48), 0.0001);
     }
 }

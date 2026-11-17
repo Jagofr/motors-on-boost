@@ -2,7 +2,7 @@ package tests.physics;
 
 import utest.Test;
 import utest.Assert;
-import h3d.Vector;
+import math.Vec3;
 import physics.SplineMath;
 
 /**
@@ -24,9 +24,9 @@ class TestSplineMath extends Test {
     }
 
     public function testProjectOntoSegmentCollinear() {
-        var a = new Vector(0, 0, 0);
-        var b = new Vector(10, 0, 0);
-        var p = new Vector(5, 2, 0); // 2 units above midpoint
+        var a = new Vec3(0, 0, 0);
+        var b = new Vec3(10, 0, 0);
+        var p = new Vec3(5, 2, 0); // 2 units above midpoint
 
         var proj = SplineMath.projectOntoSegment(p, a, b);
         Assert.floatEquals(5.0, proj.centerPoint.x, 0.001);
@@ -37,10 +37,10 @@ class TestSplineMath extends Test {
     }
 
     public function testProjectOntoSegmentClamping() {
-        var a = new Vector(0, 0, 0);
-        var b = new Vector(10, 0, 0);
-        var beforeA = new Vector(-5, 0, 0);
-        var afterB = new Vector(15, 0, 0);
+        var a = new Vec3(0, 0, 0);
+        var b = new Vec3(10, 0, 0);
+        var beforeA = new Vec3(-5, 0, 0);
+        var afterB = new Vec3(15, 0, 0);
 
         var projBefore = SplineMath.projectOntoSegment(beforeA, a, b);
         Assert.floatEquals(0.0, projBefore.centerPoint.x, 0.001);
@@ -51,13 +51,13 @@ class TestSplineMath extends Test {
 
     public function testGetClosestSegment() {
         var waypoints = [
-            new Vector(0, 0, 0),
-            new Vector(100, 0, 0),
-            new Vector(100, 100, 0),
-            new Vector(0, 100, 0)
+            new Vec3(0, 0, 0),
+            new Vec3(100, 0, 0),
+            new Vec3(100, 100, 0),
+            new Vec3(0, 100, 0)
         ];
 
-        var query = new Vector(50, 5, 0); // Near first segment (0,0)->(100,0)
+        var query = new Vec3(50, 5, 0); // Near first segment (0,0)->(100,0)
         var proj = SplineMath.getClosestSegment(query, waypoints);
 
         Assert.floatEquals(50.0, proj.centerPoint.x, 0.1);

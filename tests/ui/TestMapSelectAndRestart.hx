@@ -52,19 +52,46 @@ class TestMapSelectAndRestart extends Test {
         Assert.isFalse(ui.builder.mainMenuView.visible, "MainMenuView should be hidden");
     }
 
-    public function testMapSelectionDispatchesCircuitAndSandbox() {
+    public function testMapSelectionOpensCarSelectWithThreeCarsAndPaintPicker() {
+        var launchedMode:Null<world.WorldManager.MapMode> = null;
+        var launchedCar:String = "";
+        var launchedHex:Int = 0;
+        ui.onCarLaunch = function(mode, cid, chex) {
+            launchedMode = mode;
+            launchedCar = cid;
+            launchedHex = chex;
+        };
+
+        // MapSelect index 0 -> opens CarSelect targeting Circuit
         ui.showMapSelect();
         Assert.equals(0, ui.builder.mapSelectView.selectedIndex);
-
-        // Confirm index 0 -> Highway Circuit (StartGame)
         ui.builder.mapSelectView.confirmSelection();
-        Assert.equals(MenuAction.StartGame, lastAction);
+        Assert.equals(UIState.CarSelect, ui.currentState);
+        Assert.equals(world.WorldManager.MapMode.Circuit, ui.builder.carSelectView.targetMap);
 
-        // Navigate to index 1 -> Sandbox Proving Grounds (StartSandbox)
+        // Select Sports Hatch (FWD) and Cobalt Blue paint swatch (index 4)
+        ui.builder.carSelectView.selectCar(1);
+        ui.builder.carSelectView.selectColor(4);
+        ui.builder.carSelectView.confirmSelection();
+        Assert.equals(world.WorldManager.MapMode.Circuit, launchedMode);
+        Assert.equals(physics.CarConfig.ID_HATCH_FWD, launchedCar);
+        Assert.equals(physics.CarConfig.PAINT_PALETTE[4].hex, launchedHex);
+
+        // Back from CarSelect returns to MapSelect; index 1 -> CarSelect targeting Sandbox + Low Coupe RWD
+        ui.showMapSelect();
         ui.builder.mapSelectView.navigate(1);
         Assert.equals(1, ui.builder.mapSelectView.selectedIndex);
         ui.builder.mapSelectView.confirmSelection();
-        Assert.equals(MenuAction.StartSandbox, lastAction);
+        Assert.equals(UIState.CarSelect, ui.currentState);
+        Assert.equals(world.WorldManager.MapMode.Sandbox, ui.builder.carSelectView.targetMap);
+
+        ui.builder.carSelectView.onBack();
+        Assert.equals(UIState.MapSelect, ui.currentState);
+        ui.builder.mapSelectView.confirmSelection();
+        ui.builder.carSelectView.selectCar(2);
+        ui.builder.carSelectView.confirmSelection();
+        Assert.equals(world.WorldManager.MapMode.Sandbox, launchedMode);
+        Assert.equals(physics.CarConfig.ID_COUPE_RWD, launchedCar);
     }
 
     public function testPauseMenuRestartEmitsRestartRace() {

@@ -4,4 +4,8 @@ bin/
 .unittest/
 node_modules/
 aitests/node_modules/
+aitests/test-results/
 res/.tmp/
+js_imports.txt
+js_exports.txt
+js_externs.txt

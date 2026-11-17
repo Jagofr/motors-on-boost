@@ -54,6 +54,8 @@ typedef DrivetrainConfig = {
     var maxReverseSpeed:Float;
     var brakeForce:Float;
     var engineBrakeTorque:Float;
+    /** Front axle torque split ratio: 0.0 = RWD (0/100), 0.35 = AWD (35/65), 1.0 = FWD (100/0). */
+    var ?frontDriveSplit:Float;
 }
 
 /**
@@ -102,6 +104,25 @@ typedef VehicleConfigData = {
     var boost:BoostConfig;
 }
 
+typedef VehiclePresetMeta = {
+    var id:String;
+    var name:String;
+    var drivetrain:String;
+    var tag:String;
+    var desc:String;
+    var defaultColorHex:Int;
+    var defaultColorIdx:Int;
+    var topSpeedKmh:Int;
+    var turnRadiusM:Float;
+    var weightKg:Int;
+}
+
+typedef PaintSwatch = {
+    var name:String;
+    var hex:Int;
+    var cssHex:String;
+}
+
 /**
  * Central vehicle geometry constants, default tuning factory, safe parameter clamping,
  * and JSON serialization helpers for the 4-wheel raycast physics engine.
@@ -130,6 +151,152 @@ class CarConfig {
 
     /** Nominal left-to-right track width matching CarMesh wheel offsets (+/- 0.98 m). */
     public static inline var TRACK_WIDTH:Float = 1.96;
+
+    /** Canonical car archetype IDs. */
+    public static inline var ID_RACE_AWD:String = "race_awd";
+    public static inline var ID_HATCH_FWD:String = "hatch_fwd";
+    public static inline var ID_COUPE_RWD:String = "coupe_rwd";
+
+    /** Curated motorsport paint swatches available in Car Select. */
+    public static var PAINT_PALETTE(default, never):Array<PaintSwatch> = [
+        { name: "Apex Orange",     hex: 0xE64A19, cssHex: "#E64A19" },
+        { name: "Cyber Cyan",      hex: 0x00B8D4, cssHex: "#00B8D4" },
+        { name: "Track Crimson",   hex: 0xD32F2F, cssHex: "#D32F2F" },
+        { name: "Racing Yellow",   hex: 0xFFD600, cssHex: "#FFD600" },
+        { name: "Cobalt Blue",     hex: 0x2979FF, cssHex: "#2979FF" },
+        { name: "Acid Green",      hex: 0x00E676, cssHex: "#00E676" },
+        { name: "Pearl White",     hex: 0xF4F7FB, cssHex: "#F4F7FB" },
+        { name: "Midnight Violet", hex: 0x7E57C2, cssHex: "#7E57C2" }
+    ];
+
+    /** Metadata catalog for all 3 playable vehicle archetypes. */
+    public static var VEHICLE_PRESETS(default, never):Array<VehiclePresetMeta> = [
+        {
+            id: ID_RACE_AWD,
+            name: "GT RACE CAR",
+            drivetrain: "AWD",
+            tag: "AWD 35/65  |  HIGH AERO  |  BALANCED",
+            desc: "All-wheel traction with aero wing stability, planted high-speed cornering, and 274 km/h top speed.",
+            defaultColorHex: 0xE64A19,
+            defaultColorIdx: 0,
+            topSpeedKmh: 274,
+            turnRadiusM: 4.5,
+            weightKg: 1380
+        },
+        {
+            id: ID_HATCH_FWD,
+            name: "SPORTS HATCH",
+            drivetrain: "FWD",
+            tag: "FWD 100/0  |  SHORT WHEELBASE  |  TIGHT TURN",
+            desc: "Compact hot hatch with 2.42m wheelbase and high front lock for the tightest turning radius (3.1m).",
+            defaultColorHex: 0x00B8D4,
+            defaultColorIdx: 1,
+            topSpeedKmh: 230,
+            turnRadiusM: 3.1,
+            weightKg: 1180
+        },
+        {
+            id: ID_COUPE_RWD,
+            name: "LOW SPORTS COUPE",
+            drivetrain: "RWD",
+            tag: "RWD 0/100  |  LOW CoG  |  OVERSTEER ROTATION",
+            desc: "Slammed rear-drive coupe with low CoG and responsive rear rotation for sharp throttle-on hairpins.",
+            defaultColorHex: 0xD32F2F,
+            defaultColorIdx: 2,
+            topSpeedKmh: 263,
+            turnRadiusM: 3.7,
+            weightKg: 1360
+        }
+    ];
+
+    public static function getPresetIndex(id:String):Int {
+        for (i in 0...VEHICLE_PRESETS.length) {
+            if (VEHICLE_PRESETS[i].id == id) return i;
+        }
+        return 0;
+    }
+
+    public static function getPresetMeta(id:String):VehiclePresetMeta {
+        return VEHICLE_PRESETS[getPresetIndex(id)];
+    }
+
+    public static function getColorIndex(hex:Int):Int {
+        for (i in 0...PAINT_PALETTE.length) {
+            if (PAINT_PALETTE[i].hex == hex) return i;
+        }
+        return -1;
+    }
+
+    /**
+     * Returns tuned VehicleConfigData for one of the 3 selectable archetypes:
+     * `"race_awd"`, `"hatch_fwd"`, or `"coupe_rwd"`.
+     */
+    public static function getPresetConfig(id:String):VehicleConfigData {
+        var cfg = getDefault();
+        switch (id) {
+            case ID_HATCH_FWD:
+                cfg.chassis.massKg = 1180.0;
+                cfg.chassis.wheelbase = 2.42;
+                cfg.chassis.trackWidth = 1.84;
+                cfg.chassis.cogHeight = 0.50;
+                cfg.chassis.yawInertia = 1850.0;
+                cfg.chassis.aeroDownforce = 1.15;
+                cfg.suspension.restLength = 0.37;
+                cfg.suspension.springStiffness = 22800.0;
+                cfg.drivetrain.peakTorqueNm = 455.0;
+                cfg.drivetrain.finalDrive = 3.92;
+                cfg.drivetrain.maxForwardSpeed = 64.0;
+                cfg.drivetrain.frontDriveSplit = 1.0; // Pure FWD (100% Front)
+                cfg.tires.pacejkaB = 9.6;
+                cfg.tires.pacejkaD = 1.06;
+                cfg.tires.maxSteerAngle = 0.66; // Tight ~37.8 deg steering lock
+                cfg.tires.highSpeedSteerDamp = 0.025;
+                cfg.tires.ackermannFactor = 0.85;
+                cfg.tires.handbrakeRearGrip = 0.24;
+                return clamp(cfg);
+
+            case ID_COUPE_RWD:
+                cfg.chassis.massKg = 1360.0;
+                cfg.chassis.wheelbase = 2.64;
+                cfg.chassis.trackWidth = 1.96;
+                cfg.chassis.cogHeight = 0.39; // Low-slung coupe CoG
+                cfg.chassis.rollInertia = 680.0;
+                cfg.chassis.yawInertia = 2250.0;
+                cfg.chassis.aeroDownforce = 1.65;
+                cfg.suspension.minLength = 0.12;
+                cfg.suspension.restLength = 0.31;
+                cfg.suspension.unloadedLength = 0.44;
+                cfg.suspension.springStiffness = 27600.0;
+                cfg.suspension.antiRollStiffness = 16500.0;
+                cfg.drivetrain.peakTorqueNm = 575.0;
+                cfg.drivetrain.maxForwardSpeed = 73.0;
+                cfg.drivetrain.frontDriveSplit = 0.0; // Pure RWD (100% Rear)
+                cfg.tires.pacejkaB = 9.4;
+                cfg.tires.pacejkaD = 1.10;
+                cfg.tires.maxSteerAngle = 0.62; // ~35.5 deg agile lock
+                cfg.tires.highSpeedSteerDamp = 0.018;
+                cfg.tires.ackermannFactor = 0.75;
+                cfg.tires.handbrakeRearGrip = 0.22;
+                cfg.tires.driftSlipThreshold = 0.11;
+                return clamp(cfg);
+
+            case ID_RACE_AWD | _:
+                cfg.chassis.massKg = 1380.0;
+                cfg.chassis.wheelbase = 2.70;
+                cfg.chassis.trackWidth = 1.96;
+                cfg.chassis.cogHeight = 0.45;
+                cfg.chassis.aeroDownforce = 2.50;
+                cfg.drivetrain.peakTorqueNm = 600.0;
+                cfg.drivetrain.maxForwardSpeed = 76.0;
+                cfg.drivetrain.frontDriveSplit = 0.35; // Sporty AWD (35/65)
+                cfg.tires.pacejkaB = 9.8;
+                cfg.tires.pacejkaD = 1.15;
+                cfg.tires.maxSteerAngle = 0.54;
+                cfg.tires.highSpeedSteerDamp = 0.024;
+                cfg.tires.ackermannFactor = 0.68;
+                return clamp(cfg);
+        }
+    }
 
     /**
      * Returns a freshly allocated default sports-coupe vehicle configuration.
@@ -172,7 +339,8 @@ class CarConfig {
                 maxForwardSpeed: 72.0,
                 maxReverseSpeed: 19.0,
                 brakeForce: 19500.0,
-                engineBrakeTorque: 95.0
+                engineBrakeTorque: 95.0,
+                frontDriveSplit: 0.35
             },
             tires: {
                 pacejkaB: 9.2,
@@ -264,7 +432,8 @@ class CarConfig {
                 maxForwardSpeed: clampVal(d.maxForwardSpeed, 10.0, 150.0, def.drivetrain.maxForwardSpeed),
                 maxReverseSpeed: clampVal(d.maxReverseSpeed, 5.0, 50.0, def.drivetrain.maxReverseSpeed),
                 brakeForce: clampVal(d.brakeForce, 1000.0, 80000.0, def.drivetrain.brakeForce),
-                engineBrakeTorque: clampVal(d.engineBrakeTorque, 0.0, 1000.0, def.drivetrain.engineBrakeTorque)
+                engineBrakeTorque: clampVal(d.engineBrakeTorque, 0.0, 1000.0, def.drivetrain.engineBrakeTorque),
+                frontDriveSplit: clampVal(d.frontDriveSplit != null ? d.frontDriveSplit : def.drivetrain.frontDriveSplit, 0.0, 1.0, 0.35)
             },
             tires: {
                 pacejkaB: clampVal(t.pacejkaB, 2.0, 25.0, def.tires.pacejkaB),

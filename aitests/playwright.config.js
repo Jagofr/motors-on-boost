@@ -14,7 +14,10 @@ module.exports = defineConfig({
     headless: true,
     channel: 'msedge',
     launchOptions: {
-      args: ['--use-gl=angle']
+      args: [
+        ...(process.platform === 'win32' ? ['--use-webgpu-adapter=d3d11'] : ['--use-gl=angle']),
+        '--enable-unsafe-webgpu'
+      ]
     }
   },
   webServer: process.env.MOB_TEST_URL ? undefined : {

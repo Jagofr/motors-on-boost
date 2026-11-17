@@ -1,6 +1,6 @@
 package ui;
 
-import h2d.Object;
+import ui.nodes.UINodes.UIObject as Object;
 import input.InputController;
 import net.MultiplayerManager;
 import save.SaveSystem.GraphicsSettings;
@@ -8,6 +8,7 @@ import ui.components.UIEnums.MenuAction;
 import ui.components.UIEnums.UIState;
 import ui.components.UIEnums.OptionsTab;
 import ui.UIBuilder;
+import world.WorldManager.MapMode;
 
 /**
  * User interface manager, menu hierarchy, and modal coordinator.
@@ -15,7 +16,7 @@ import ui.UIBuilder;
  * and delegates visual element assembly and layout to `UIBuilder`.
  *
  * @class UIManager
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  */
 @:keep
 class UIManager extends Object {
@@ -37,6 +38,16 @@ class UIManager extends Object {
 
     /** Optional callback invoked when pause is requested via touch HUD or pause shortcut. */
     public var onPauseRequested:Null<Void -> Void>;
+
+    /** Optional callback invoked when the player confirms vehicle + paint on CarSelect. */
+    public var onCarLaunch:Null<MapMode -> String -> Int -> Void>;
+
+    /** Optional callback invoked when the player previews a vehicle or paint color in CarSelect. */
+    public var onCarPreview:Null<String -> Int -> Void>;
+
+    /** Active saved vehicle selection passed into CarSelectView. */
+    public var preferredCarId:Null<String> = null;
+    public var preferredPaintHex:Null<Int> = null;
 
     /** Reference to active input controller. */
     var inputRef:InputController;
@@ -71,10 +82,24 @@ class UIManager extends Object {
         builder.mainMenuView.onActionSelected = function(act) triggerMainAction(act);
         builder.mainMenuView.onSelectionChanged = function() layout();
         builder.mapSelectView.onMapSelected = function(act) {
-            if (onMenuAction != null) onMenuAction(act);
+            showCarSelect(act == StartSandbox ? Sandbox : Circuit);
         };
         builder.mapSelectView.onBack = function() showMainMenu();
         builder.mapSelectView.onSelectionChanged = function() layout();
+        builder.carSelectView.onCarSelected = function(mode, carId, paintHex) {
+            preferredCarId = carId;
+            preferredPaintHex = paintHex;
+            if (onCarLaunch != null) {
+                onCarLaunch(mode, carId, paintHex);
+            } else if (onMenuAction != null) {
+                onMenuAction(mode == Sandbox ? StartSandbox : StartGame);
+            }
+        };
+        builder.carSelectView.onPreviewChanged = function(carId, paintHex) {
+            if (onCarPreview != null) onCarPreview(carId, paintHex);
+        };
+        builder.carSelectView.onBack = function() showMapSelect();
+        builder.carSelectView.onSelectionChanged = function() layout();
         builder.multiplayerMenuView.onHostSelected = function() {
             if (mp != null) mp.hostRoom(null, "HOST");
             showMultiplayerLobby();
@@ -120,12 +145,16 @@ class UIManager extends Object {
     function prepareTransition(state:UIState, showModalCard:Bool, ?helpMsg:String, resetTouch:Bool = true) {
         inputRef.flushInputs();
         currentState = state;
+        if (state != OptionsMenu && state != PauseMenu) {
+            isOpenedFromPause = false;
+        }
 
         builder.modalDimmer.visible = showModalCard;
         builder.cardBg.visible = showModalCard;
         builder.splashView.visible = false;
         builder.mainMenuView.visible = false;
         builder.mapSelectView.visible = false;
+        builder.carSelectView.visible = false;
         builder.multiplayerMenuView.visible = false;
         builder.multiplayerLobbyView.visible = false;
         builder.pauseMenuView.visible = false;
@@ -179,8 +208,19 @@ class UIManager extends Object {
      * Activates the singleplayer map selection screen before starting a game session.
      */
     public function showMapSelect() {
-        prepareTransition(MapSelect, true, "[Left / Right / Up / Down] Select Map    [A / Enter] Launch    [B / Esc] Back", false);
+        prepareTransition(MapSelect, true, "[Left / Right / Up / Down] Select Map    [A / Enter] Next: Choose Car    [B / Esc] Back", false);
         builder.mapSelectView.activate();
+        layout();
+    }
+
+    /**
+     * Activates the vehicle & paint selection garage screen for the chosen map.
+     */
+    public function showCarSelect(mapMode:MapMode, ?carId:String, ?paintHex:Null<Int>) {
+        if (carId != null) preferredCarId = carId;
+        if (paintHex != null) preferredPaintHex = paintHex;
+        prepareTransition(CarSelect, true, "[Left / Right] Choose Car    [Q / E / Up / Down] Paint Color    [A / Enter] Drive    [B / Esc] Back", false);
+        builder.carSelectView.activate(mapMode, preferredCarId, preferredPaintHex);
         layout();
     }
 
@@ -287,13 +327,27 @@ class UIManager extends Object {
             else if (uiRight || uiDown) builder.mapSelectView.navigate(1);
             if (uiConfirm) builder.mapSelectView.confirmSelection();
             else if (uiCancel) showMainMenu();
+        } else if (currentState == CarSelect) {
+            var csv = builder.carSelectView;
+            if (inputRef.tabPrevPressed) csv.cycleColor(-1);
+            else if (inputRef.tabNextPressed) csv.cycleColor(1);
+            if (uiUp || uiDown) csv.toggleFocusRow(uiUp ? -1 : 1);
+            if (uiLeft) {
+                if (csv.focusRow == 1) csv.cycleColor(-1);
+                else csv.navigate(-1);
+            } else if (uiRight) {
+                if (csv.focusRow == 1) csv.cycleColor(1);
+                else csv.navigate(1);
+            }
+            if (uiConfirm) csv.confirmSelection();
+            else if (uiCancel) showMapSelect();
         } else if (currentState == MultiplayerMenu) {
             var mpMenu = builder.multiplayerMenuView;
             var navLeft = uiLeft || uiUp;
             var navRight = uiRight || uiDown;
             if (mpMenu.shouldCaptureWasdAsText()) {
-                var allowArrowOrPadLeft = hxd.Key.isDown(hxd.Key.LEFT) || hxd.Key.isDown(hxd.Key.UP) || !(hxd.Key.isDown(hxd.Key.A) || hxd.Key.isDown(hxd.Key.W));
-                var allowArrowOrPadRight = hxd.Key.isDown(hxd.Key.RIGHT) || hxd.Key.isDown(hxd.Key.DOWN) || !(hxd.Key.isDown(hxd.Key.D) || hxd.Key.isDown(hxd.Key.S));
+                var allowArrowOrPadLeft = input.InputKey.isDown(input.InputKey.LEFT) || input.InputKey.isDown(input.InputKey.UP) || !(input.InputKey.isDown(input.InputKey.A) || input.InputKey.isDown(input.InputKey.W));
+                var allowArrowOrPadRight = input.InputKey.isDown(input.InputKey.RIGHT) || input.InputKey.isDown(input.InputKey.DOWN) || !(input.InputKey.isDown(input.InputKey.D) || input.InputKey.isDown(input.InputKey.S));
                 navLeft = navLeft && allowArrowOrPadLeft;
                 navRight = navRight && allowArrowOrPadRight;
             }
@@ -339,10 +393,18 @@ class UIManager extends Object {
                 if (opt.controlsPanel.controlViewMode == "Custom") {
                     if (uiUp) opt.controlsPanel.navigate(-1);
                     else if (uiDown) opt.controlsPanel.navigate(1);
-                    if (uiLeft) opt.controlsPanel.adjustCurrentCustomOption(-1);
-                    if (uiRight) opt.controlsPanel.adjustCurrentCustomOption(1);
+                    if (uiLeft) {
+                        if (opt.currentTab == Touch) opt.controlsPanel.adjustCurrentCustomOption(-1);
+                        else opt.controlsPanel.adjustSensitivity(-0.02);
+                    }
+                    if (uiRight) {
+                        if (opt.currentTab == Touch) opt.controlsPanel.adjustCurrentCustomOption(1);
+                        else opt.controlsPanel.adjustSensitivity(0.02);
+                    }
                     if (uiConfirm) opt.controlsPanel.triggerRemapEntry(opt.controlsPanel.remapIndex);
                 } else {
+                    if (uiUp) opt.controlsPanel.navigate(-1);
+                    else if (uiDown) opt.controlsPanel.navigate(1);
                     if (uiLeft) opt.controlsPanel.adjustSensitivity(-0.02);
                     if (uiRight) opt.controlsPanel.adjustSensitivity(0.02);
                     if (uiConfirm) opt.controlsPanel.toggleCustomMode();

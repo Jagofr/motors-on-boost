@@ -1,13 +1,13 @@
 package world;
 
 import config.WorldConfig;
-import h3d.scene.Object;
-import h3d.scene.Mesh;
-import h3d.prim.Polygon;
-import h3d.prim.Cube;
-import h3d.col.Point;
-import h3d.Vector;
-import hxd.IndexBuffer;
+import graphics.SceneGraph.Object3D;
+import graphics.SceneGraph.MeshNode;
+import graphics.Primitives.Polygon;
+import graphics.Primitives.Cube;
+import graphics.Primitives.Point;
+import math.Vec3;
+
 import physics.SplineMath;
 
 /**
@@ -19,36 +19,36 @@ import physics.SplineMath;
  * @implements IGroundProvider
  * @module world/Track
  */
-class Track extends Object implements IGroundProvider {
+class Track extends Object3D implements IGroundProvider {
     /** High-density discrete Catmull-Rom spline waypoints defining track centerline. */
-    public var waypoints:Array<Vector> = [];
+    public var waypoints:Array<Vec3> = [];
 
     /** Asphalt road surface polygon ribbon mesh. */
-    public var roadMesh:Mesh;
+    public var roadMesh:MeshNode;
 
     /** Gravel and concrete sub-base foundation ribbon mesh. */
-    public var bedMesh:Mesh;
+    public var bedMesh:MeshNode;
 
     /** Continuous left-hand side steel barrier ribbon mesh. */
-    public var leftRailMesh:Mesh;
+    public var leftRailMesh:MeshNode;
 
     /** Continuous right-hand side steel barrier ribbon mesh. */
-    public var rightRailMesh:Mesh;
+    public var rightRailMesh:MeshNode;
 
     /** Array of procedural highway street light meshes lining the circuit. */
-    public var streetLights:Array<Mesh> = [];
+    public var streetLights:Array<MeshNode> = [];
 
     /** Array of registered OimoPhysics static foundation bodies. */
     public var rigidBodies:Array<oimo.dynamics.rigidbody.RigidBody> = [];
 
     /** Surrounding flat ambient ground plane owned directly by the circuit world. */
-    public var terrainGround:Mesh;
+    public var terrainGround:MeshNode;
 
     /** Active configurable circuit parameters. */
     public var config:config.WorldConfig.TrackConfig;
 
-    var scratchQuery:Vector = new Vector();
-    var scratchFromCenter:Vector = new Vector();
+    var scratchQuery:Vec3 = new Vec3();
+    var scratchFromCenter:Vec3 = new Vec3();
 
     /** Total roadway width in meters across all four lanes. @default 20.0 */
     public static inline var ROAD_WIDTH:Float = 20.0;
@@ -71,7 +71,7 @@ class Track extends Object implements IGroundProvider {
      * @param {Null<Object>} [parent] Optional parent 3D scene graph node.
      * @param {Null<config.WorldConfig.TrackConfig>} [config] Optional track geometry/friction configuration.
      */
-    public function new(?parent:Object, ?config:config.WorldConfig.TrackConfig) {
+    public function new(?parent:Object3D, ?config:config.WorldConfig.TrackConfig) {
         super(parent);
         this.config = config != null ? config : WorldConfig.getDefaultTrack();
         buildSurroundingTerrain();
@@ -92,7 +92,7 @@ class Track extends Object implements IGroundProvider {
         var terrainPrim = new Cube(config.terrainWidth, config.terrainHeight, 0.4, true);
         terrainPrim.unindex();
         terrainPrim.addNormals();
-        terrainGround = new Mesh(terrainPrim, this);
+        terrainGround = new MeshNode(terrainPrim, this);
         terrainGround.material.color.setColor(config.terrainColor);
         terrainGround.x = 110.0;
         terrainGround.y = 90.0;
@@ -105,9 +105,9 @@ class Track extends Object implements IGroundProvider {
      * @returns {Void}
      */
     function buildCircuitWaypoints():Void {
-        var rawNodes:Array<Vector> = [];
+        var rawNodes:Array<Vec3> = [];
         for (node in config.controlNodes) {
-            rawNodes.push(new Vector(node[0], node[1], node[2]));
+            rawNodes.push(new Vec3(node[0], node[1], node[2]));
         }
 
         var segments = 16;
@@ -123,7 +123,7 @@ class Track extends Object implements IGroundProvider {
                 var x = SplineMath.catmullRom(p0.x, p1.x, p2.x, p3.x, t);
                 var y = SplineMath.catmullRom(p0.y, p1.y, p2.y, p3.y, t);
                 var z = SplineMath.catmullRom(p0.z, p1.z, p2.z, p3.z, t);
-                waypoints.push(new Vector(x, y, z));
+                waypoints.push(new Vec3(x, y, z));
             }
         }
     }
@@ -134,7 +134,7 @@ class Track extends Object implements IGroundProvider {
     function buildRoadBed() {
         var count = waypoints.length;
         var pts:Array<Point> = [];
-        var idxBuf = new IndexBuffer();
+        var idxBuf:Array<Int> = [];
         var totalHalfW = HALF_WIDTH + BED_EXTRA_WIDTH;
 
         for (i in 0...count) {
@@ -146,7 +146,7 @@ class Track extends Object implements IGroundProvider {
             fwd.z = 0;
             fwd.normalize();
 
-            var right = new Vector(-fwd.y, fwd.x, 0);
+            var right = new Vec3(-fwd.y, fwd.x, 0);
             var leftPos = curr.add(right.scaled(-totalHalfW));
             var rightPos = curr.add(right.scaled(totalHalfW));
 
@@ -166,7 +166,7 @@ class Track extends Object implements IGroundProvider {
 
         var poly = new Polygon(pts, idxBuf);
         poly.addNormals();
-        bedMesh = new Mesh(poly, this);
+        bedMesh = new MeshNode(poly, this);
         bedMesh.material.color.setColor(0x1B1E24);
     }
 
@@ -176,7 +176,7 @@ class Track extends Object implements IGroundProvider {
     function buildRoadRibbon() {
         var count = waypoints.length;
         var pts:Array<Point> = [];
-        var idxBuf = new IndexBuffer();
+        var idxBuf:Array<Int> = [];
 
         for (i in 0...count) {
             var curr = waypoints[i];
@@ -187,7 +187,7 @@ class Track extends Object implements IGroundProvider {
             fwd.z = 0;
             fwd.normalize();
 
-            var right = new Vector(-fwd.y, fwd.x, 0);
+            var right = new Vec3(-fwd.y, fwd.x, 0);
             var leftPos = curr.add(right.scaled(-HALF_WIDTH));
             var rightPos = curr.add(right.scaled(HALF_WIDTH));
 
@@ -207,7 +207,7 @@ class Track extends Object implements IGroundProvider {
 
         var poly = new Polygon(pts, idxBuf);
         poly.addNormals();
-        roadMesh = new Mesh(poly, this);
+        roadMesh = new MeshNode(poly, this);
         roadMesh.material.color.setColor(0x282D35);
     }
 
@@ -220,8 +220,8 @@ class Track extends Object implements IGroundProvider {
 
         var leftPts:Array<Point> = [];
         var rightPts:Array<Point> = [];
-        var leftIdx = new IndexBuffer();
-        var rightIdx = new IndexBuffer();
+        var leftIdx:Array<Int> = [];
+        var rightIdx:Array<Int> = [];
 
         for (i in 0...count) {
             var curr = waypoints[i];
@@ -231,7 +231,7 @@ class Track extends Object implements IGroundProvider {
             var fwd = next.sub(prev);
             fwd.z = 0;
             fwd.normalize();
-            var right = new Vector(-fwd.y, fwd.x, 0);
+            var right = new Vec3(-fwd.y, fwd.x, 0);
 
             var lBase = curr.add(right.scaled(-HALF_WIDTH));
             var rBase = curr.add(right.scaled(HALF_WIDTH));
@@ -264,12 +264,12 @@ class Track extends Object implements IGroundProvider {
 
         var polyL = new Polygon(leftPts, leftIdx);
         polyL.addNormals();
-        leftRailMesh = new Mesh(polyL, this);
+        leftRailMesh = new MeshNode(polyL, this);
         leftRailMesh.material.color.setColor(0x9EACB8);
 
         var polyR = new Polygon(rightPts, rightIdx);
         polyR.addNormals();
-        rightRailMesh = new Mesh(polyR, this);
+        rightRailMesh = new MeshNode(polyR, this);
         rightRailMesh.material.color.setColor(0x9EACB8);
 
         // Vertical support stanchion post geometry
@@ -286,15 +286,15 @@ class Track extends Object implements IGroundProvider {
             var fwd = next.sub(prev);
             fwd.z = 0;
             fwd.normalize();
-            var right = new Vector(-fwd.y, fwd.x, 0);
+            var right = new Vec3(-fwd.y, fwd.x, 0);
 
             var pL = curr.add(right.scaled(-HALF_WIDTH - 0.12));
-            var postL = new Mesh(postPrim, this);
+            var postL = new MeshNode(postPrim, this);
             postL.material.color.setColor(0x5A626A);
             postL.x = pL.x; postL.y = pL.y; postL.z = pL.z + ROAD_LIFT + (RAIL_HEIGHT * 0.5);
 
             var pR = curr.add(right.scaled(HALF_WIDTH + 0.12));
-            var postR = new Mesh(postPrim, this);
+            var postR = new MeshNode(postPrim, this);
             postR.material.color.setColor(0x5A626A);
             postR.x = pR.x; postR.y = pR.y; postR.z = pR.z + ROAD_LIFT + (RAIL_HEIGHT * 0.5);
         }
@@ -319,7 +319,7 @@ class Track extends Object implements IGroundProvider {
         ];
 
         for (b in buildingLayouts) {
-            var bldg = new Mesh(bldgPrim, this);
+            var bldg = new MeshNode(bldgPrim, this);
             bldg.material.color.setColor(b.col);
             bldg.scaleX = b.w;
             bldg.scaleY = b.l;
@@ -368,7 +368,7 @@ class Track extends Object implements IGroundProvider {
             var fwd = next.sub(prev);
             fwd.z = 0;
             fwd.normalize();
-            var right = new Vector(-fwd.y, fwd.x, 0);
+            var right = new Vec3(-fwd.y, fwd.x, 0);
 
             // Alternate placement: even on right shoulder (+HALF_WIDTH + 0.85m), odd on left (-HALF_WIDTH - 0.85m)
             var isRightSide = (i % 2 == 0);
@@ -379,7 +379,7 @@ class Track extends Object implements IGroundProvider {
             var baseZ = curr.z + ROAD_LIFT;
 
             // 1. Vertical Steel Pole
-            var pole = new Mesh(polePrim, this);
+            var pole = new MeshNode(polePrim, this);
             pole.material.color.setColor(0x353B42);
             pole.material.shadows = false;
             pole.x = polePos.x;
@@ -389,7 +389,7 @@ class Track extends Object implements IGroundProvider {
 
             // 2. Overhanging Horizontal Cantilever Arm extending toward roadway center
             var armPos = polePos.add(right.scaled(-sideSign * (armReach * 0.5)));
-            var arm = new Mesh(armPrim, this);
+            var arm = new MeshNode(armPrim, this);
             arm.material.color.setColor(0x424A54);
             arm.material.shadows = false;
             arm.x = armPos.x;
@@ -401,7 +401,7 @@ class Track extends Object implements IGroundProvider {
 
             // 3. Luminaire Fixture Head Casing
             var headPos = polePos.add(right.scaled(-sideSign * armReach));
-            var head = new Mesh(headPrim, this);
+            var head = new MeshNode(headPrim, this);
             head.material.color.setColor(0x22262B);
             head.material.shadows = false;
             head.x = headPos.x;
@@ -411,7 +411,7 @@ class Track extends Object implements IGroundProvider {
             streetLights.push(head);
 
             // 4. Glowing Emissive Luminaire Lens (Warm high-efficiency street light phosphor)
-            var lum = new Mesh(lumPrim, this);
+            var lum = new MeshNode(lumPrim, this);
             lum.material.color.setColor(0xFFF2B0);
             lum.material.shadows = false;
             lum.x = headPos.x;
@@ -454,9 +454,9 @@ class Track extends Object implements IGroundProvider {
      *
      * @param x World X coordinate in meters.
      * @param y World Y coordinate in meters.
-     * @param outNormal Scratch vector populated with unit-length normal vector.
+     * @param outNormal Scratch vector populated with unit-length normal Vec3.
      */
-    public function getGroundNormal(x:Float, y:Float, outNormal:Vector):Void {
+    public function getGroundNormal(x:Float, y:Float, outNormal:Vec3):Void {
         scratchQuery.set(x, y, 0);
         var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
         var dist = Math.sqrt(proj.distSq);
@@ -509,7 +509,7 @@ class Track extends Object implements IGroundProvider {
      * @param {Float} lateralVelocity Current lateral speed in m/s.
      * @returns {{ hitWall:Bool, speedMult:Float, latMult:Float }} Containment response.
      */
-    public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
+    public function enforceBoundaries(pos:Vec3, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
         scratchQuery.set(pos.x, pos.y, 0);
         var proj = SplineMath.getClosestSegment(scratchQuery, waypoints);
 
@@ -563,5 +563,18 @@ class Track extends Object implements IGroundProvider {
             world.removeRigidBody(body);
         }
         rigidBodies = [];
+    }
+
+    /**
+     * Dispatches WGSL TrackComputeShader for GPU roadbed/asphalt/guardrail tessellation
+     * and disables duplicate CPU polygon submission during active GPU rendering.
+     */
+    public function syncGpuCompute(renderer:graphics.WebGpuRenderer):Void {
+        if (renderer == null || !renderer.initialized) return;
+        renderer.dispatchTrackCompute(waypoints, HALF_WIDTH, BED_EXTRA_WIDTH, ROAD_LIFT, RAIL_HEIGHT);
+        if (bedMesh != null) bedMesh.visible = false;
+        if (roadMesh != null) roadMesh.visible = false;
+        if (leftRailMesh != null) leftRailMesh.visible = false;
+        if (rightRailMesh != null) rightRailMesh.visible = false;
     }
 }

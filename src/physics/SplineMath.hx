@@ -1,6 +1,6 @@
 package physics;
 
-import h3d.Vector;
+import math.Vec3;
 
 /**
  * Result data structure describing the orthogonal projection of a point onto a track segment.
@@ -14,7 +14,7 @@ import h3d.Vector;
  */
 typedef SegmentProjection = {
     /** The closest 3D coordinate point located along the segment centerline. */
-    var centerPoint:Vector;
+    var centerPoint:Vec3;
 
     /** Squared euclidean distance from the query point to the closest segment point. */
     var distSq:Float;
@@ -59,11 +59,11 @@ class SplineMath {
      * Calculates the nearest point on the segment, squared distance, and segment tangent orientation.
      *
      * @param {Vector} p Query coordinate in world space.
-     * @param {Vector} a Segment starting node vector.
-     * @param {Vector} b Segment ending node vector.
-     * @returns {SegmentProjection} Closest point, squared distance, Z elevation, and heading vector.
+     * @param {Vector} a Segment starting node Vec3.
+     * @param {Vector} b Segment ending node Vec3.
+     * @returns {SegmentProjection} Closest point, squared distance, Z elevation, and heading Vec3.
      */
-    public static function projectOntoSegment(p:Vector, a:Vector, b:Vector):SegmentProjection {
+    public static function projectOntoSegment(p:Vec3, a:Vec3, b:Vec3):SegmentProjection {
         var abX = b.x - a.x;
         var abY = b.y - a.y;
         var abLenSq = abX * abX + abY * abY;
@@ -93,7 +93,7 @@ class SplineMath {
         var dirY = len > 0.0001 ? abY / len : 1.0;
 
         return {
-            centerPoint: new Vector(closestX, closestY, closestZ),
+            centerPoint: new Vec3(closestX, closestY, closestZ),
             distSq: dx * dx + dy * dy,
             z: closestZ,
             segDirX: dirX,
@@ -105,10 +105,10 @@ class SplineMath {
      * Identifies the closest adjacent track spline segment along a closed circular waypoint loop.
      *
      * @param {Vector} p Query coordinate in world space.
-     * @param {Array<Vector>} waypoints Ordered closed-loop track centerline waypoints.
+     * @param {Array<Vec3>} waypoints Ordered closed-loop track centerline waypoints.
      * @returns {SegmentProjection} Best matching segment projection record with minimum squared distance.
      */
-    public static function getClosestSegment(p:Vector, waypoints:Array<Vector>):SegmentProjection {
+    public static function getClosestSegment(p:Vec3, waypoints:Array<Vec3>):SegmentProjection {
         var count = waypoints.length;
         var bestDistSq = 1e12;
         var bestIdx = 0;

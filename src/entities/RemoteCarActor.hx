@@ -1,6 +1,6 @@
 package entities;
 
-import h3d.scene.Scene;
+import graphics.SceneGraph.Scene3D;
 import net.NetworkProtocol.NetCarState;
 
 /**
@@ -22,7 +22,7 @@ class RemoteCarActor {
     private var targetState:Null<NetCarState> = null;
     private var hasInitialized:Bool = false;
 
-    public function new(parent:Scene, peerId:String, name:String, colorHex:Int) {
+    public function new(parent:Scene3D, peerId:String, name:String, colorHex:Int) {
         this.peerId = peerId;
         this.name = name;
         this.colorHex = colorHex;

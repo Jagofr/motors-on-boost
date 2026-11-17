@@ -1,7 +1,7 @@
 package physics;
 
-import h3d.Vector;
-import oimo.common.Vec3;
+import oimo.common.Vec3 as OimoVec3;
+import math.Vec3;
 import oimo.collision.geometry.BoxGeometry;
 import oimo.dynamics.World;
 import oimo.dynamics.rigidbody.RigidBody;
@@ -50,7 +50,7 @@ class CarPhysics {
     public var groundProvider:IGroundProvider = null;
 
     /** Vehicle world position anchored at wheel-bottom contact elevation (m). */
-    public var pos:Vector;
+    public var pos:Vec3;
 
     /** Vehicle heading angle in radians (0 = +Y, negative = Left/-X, positive = Right/+X). */
     public var yaw:Float = 0.0;
@@ -129,8 +129,8 @@ class CarPhysics {
     var suspensionSolver:SuspensionSolver;
     var drivetrainSolver:DrivetrainSolver;
     var tireSlipSolver:TireSlipSolver;
-    var oimoPosScratch:Vec3;
-    var oimoVelScratch:Vec3;
+    var oimoPosScratch:OimoVec3;
+    var oimoVelScratch:OimoVec3;
 
     /**
      * Initializes a new 4-wheel raycast vehicle physics instance and Oimo collision world.
@@ -154,7 +154,7 @@ class CarPhysics {
             maxDt = worldConfig.maxDt > 0.005 ? worldConfig.maxDt : MAX_FRAME_DT;
         }
 
-        pos = new Vector(x, y, z);
+        pos = new Vec3(x, y, z);
         suspLength = [config.suspension.restLength, config.suspension.restLength, config.suspension.restLength, config.suspension.restLength];
         wheelNormalLoads = [0.0, 0.0, 0.0, 0.0];
         wheelFriction = [1.0, 1.0, 1.0, 1.0];
@@ -165,26 +165,26 @@ class CarPhysics {
         suspensionSolver = new SuspensionSolver();
         drivetrainSolver = new DrivetrainSolver();
         tireSlipSolver = new TireSlipSolver();
-        oimoPosScratch = new Vec3();
-        oimoVelScratch = new Vec3();
+        oimoPosScratch = new OimoVec3();
+        oimoVelScratch = new OimoVec3();
 
         physicsWorld = new World();
-        physicsWorld.setGravity(new Vec3(0.0, 0.0, gravityZ));
+        physicsWorld.setGravity(new OimoVec3(0.0, 0.0, gravityZ));
 
         // Create dynamic chassis rigid body with collider raised clear of tire ground contact
         var rbCfg = new RigidBodyConfig();
         rbCfg.type = RigidBodyType.DYNAMIC;
-        rbCfg.position = new Vec3(x, y, z + config.chassis.cogHeight);
+        rbCfg.position = new OimoVec3(x, y, z + config.chassis.cogHeight);
         chassisBody = new RigidBody(rbCfg);
 
         var shapeCfg = new ShapeConfig();
-        shapeCfg.geometry = new BoxGeometry(new Vec3(
+        shapeCfg.geometry = new BoxGeometry(new OimoVec3(
             CarConfig.CHASSIS_WIDTH * 0.46,
             CarConfig.CHASSIS_LENGTH * 0.46,
             0.34
         ));
         // Bottom of Oimo hull stays safely above TIRE_RADIUS so hills/ramps never snag the belly
-        shapeCfg.position = new Vec3(0.0, 0.0, 0.24);
+        shapeCfg.position = new OimoVec3(0.0, 0.0, 0.24);
         shapeCfg.restitution = 0.2;
         shapeCfg.friction = 0.2;
         chassisBody.addShape(new Shape(shapeCfg));
@@ -296,13 +296,13 @@ class CarPhysics {
      *
      * @param {Float} dt Elapsed frame time in seconds.
      * @param {InputController} input Conditioned multi-device input state.
-     * @param {Array<Vector>} waypoints Optional spline waypoints (passed by circuit world mode).
+     * @param {Array<Vec3>} waypoints Optional spline waypoints (passed by circuit world mode).
      * @param {IGroundProvider} ground Terrain height, normal, material friction, and boundary provider.
      */
     public function update(
         dt:Float,
         input:InputController,
-        ?waypoints:Array<Vector>,
+        ?waypoints:Array<Vec3>,
         ?ground:IGroundProvider
     ):Void {
         if (dt <= 0.0 || Math.isNaN(dt)) return;

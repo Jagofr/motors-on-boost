@@ -2,7 +2,7 @@ package tests.world;
 
 import utest.Test;
 import utest.Assert;
-import h3d.Vector;
+import math.Vec3;
 import world.SandboxMap;
 
 /**
@@ -55,7 +55,7 @@ class TestSandboxMap extends Test {
 
     public function testAnalyticalGroundNormals() {
         var map = new SandboxMap(null);
-        var norm = new Vector();
+        var norm = new Vec3();
 
         // Skidpad flat normal should point purely along +Z
         map.getGroundNormal(0.0, 0.0, norm);
@@ -74,21 +74,21 @@ class TestSandboxMap extends Test {
         var map = new SandboxMap(null);
 
         // Inside boundary
-        var pos = new Vector(50.0, 50.0, 0.0);
+        var pos = new Vec3(50.0, 50.0, 0.0);
         var res = map.enforceBoundaries(pos, 25.0, 0.0);
         Assert.isFalse(res.hitWall);
         Assert.floatEquals(50.0, pos.x, 0.001);
         Assert.floatEquals(50.0, pos.y, 0.001);
 
         // Penetrating East boundary (X > 195m)
-        var eastPos = new Vector(210.0, 0.0, 0.0);
+        var eastPos = new Vec3(210.0, 0.0, 0.0);
         var eastRes = map.enforceBoundaries(eastPos, 30.0, 5.0);
         Assert.isTrue(eastRes.hitWall);
         Assert.floatEquals(195.0, eastPos.x, 0.001);
         Assert.isTrue(eastRes.speedMult < 1.0);
 
         // Penetrating South boundary (Y < -195m)
-        var southPos = new Vector(0.0, -210.0, 0.0);
+        var southPos = new Vec3(0.0, -210.0, 0.0);
         var southRes = map.enforceBoundaries(southPos, 30.0, 0.0);
         Assert.isTrue(southRes.hitWall);
         Assert.floatEquals(-195.0, southPos.y, 0.001);

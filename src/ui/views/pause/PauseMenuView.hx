@@ -1,7 +1,7 @@
 package ui.views.pause;
 
-import h2d.Object;
-import h2d.Text;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
 import ui.FontManager;
 import ui.UIIcons;
 import ui.components.MenuItemRow;
@@ -12,7 +12,7 @@ import audio.AudioManager;
  * Mid-race pause menu modal overlay view.
  *
  * @class PauseMenuView
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/views/pause/PauseMenuView
  */
 @:keep

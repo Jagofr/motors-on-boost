@@ -23,7 +23,7 @@ if (!fs.existsSync(SCREENSHOT_DIR)) {
 const MIME_TYPES = {
   '.html': 'text/html',
   '.js': 'application/javascript',
-  '.css': 'text/css',
+  '.css': 'text/css', '.wasm': 'application/wasm', '.mjs': 'text/javascript',
   '.json': 'application/json',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -52,7 +52,7 @@ function startServer() {
 
       res.writeHead(200, {
         'Content-Type': contentType,
-        'Cache-Control': 'no-cache, no-store, must-revalidate'
+        'Cache-Control': 'no-cache, no-store, must-revalidate', 'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'require-corp', 'Cross-Origin-Resource-Policy': 'same-origin'
       });
       fs.createReadStream(filePath).pipe(res);
     });
@@ -153,7 +153,7 @@ function createInputDriver(page, profile) {
   async function focusCanvas() {
     if (profile !== 'touch') {
       await page.evaluate(() => {
-        const c = document.getElementById('webgl');
+        const c = (document.getElementById('screen') || document.getElementById('webgl'));
         if (c) c.focus();
       });
       await waitFrames(1);
@@ -223,7 +223,7 @@ function createInputDriver(page, profile) {
         }
       }
       if (!target) return null;
-      const canvas = document.getElementById('webgl');
+      const canvas = (document.getElementById('screen') || document.getElementById('webgl'));
       const rect = canvas.getBoundingClientRect();
       const s2d = app.s2d;
       const sx = target.absX + target.width * 0.5;
@@ -246,7 +246,7 @@ function createInputDriver(page, profile) {
       const app = window.app;
       const hud = app.ui.builder.touchControlsHUD;
       const s2d = app.s2d;
-      const rect = document.getElementById('webgl').getBoundingClientRect();
+      const rect = (document.getElementById('screen') || document.getElementById('webgl')).getBoundingClientRect();
       const hx = (typeof hud[propX] === 'number' ? hud[propX] : 0) + dx;
       const hy = (typeof hud[propY] === 'number' ? hud[propY] : 0) + dy;
       return {
@@ -258,7 +258,7 @@ function createInputDriver(page, profile) {
 
   async function dispatchCanvasTouch(type, activeTouchSpecs, changedTouchSpecs) {
     await page.evaluate(({ type, activeSpecs, changedSpecs }) => {
-      const canvas = document.getElementById('webgl');
+      const canvas = (document.getElementById('screen') || document.getElementById('webgl'));
       const makeTouch = (spec) => new Touch({
         identifier: spec.id,
         target: canvas,
@@ -1184,7 +1184,7 @@ async function clickInteractiveMouse(page, getterPath) {
       }
     }
     if (!target) return null;
-    const rect = document.getElementById('webgl').getBoundingClientRect();
+    const rect = (document.getElementById('screen') || document.getElementById('webgl')).getBoundingClientRect();
     const s2d = app.s2d;
     const sx = target.absX + target.width * 0.5;
     const sy = target.absY + target.height * 0.5;
@@ -1432,7 +1432,7 @@ async function runTests() {
   const browser = await playwright.chromium.launch({
     channel: 'msedge',
     headless: true,
-    args: ['--use-gl=angle']
+    args: ['--use-gl=angle', '--enable-unsafe-webgpu']
   });
 
   try {

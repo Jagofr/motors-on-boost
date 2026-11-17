@@ -1,8 +1,8 @@
 package entities;
 
 import config.WorldConfig;
-import h3d.scene.Object;
-import h3d.Vector;
+import graphics.SceneGraph.Object3D;
+import math.Vec3;
 import physics.CarPhysics;
 import physics.SplineMath;
 import camera.ChaseCamera;
@@ -27,7 +27,7 @@ class TrafficCar {
     public var carMesh:TrafficCarMesh;
 
     /** Current position in world coordinates. */
-    public var pos:Vector = new Vector();
+    public var pos:Vec3 = new Vec3();
 
     /** Yaw heading angle in radians. */
     public var yaw:Float = 0.0;
@@ -69,19 +69,19 @@ class TrafficCar {
     }
 
     /**
-     * Populates out vector with civilian traffic vehicle unit forward heading vector.
+     * Populates out vector with civilian traffic vehicle unit forward heading Vec3.
      */
-    public function getForwardVector(?out:Vector):Vector {
-        if (out == null) out = new Vector();
+    public function getForwardVector(?out:Vec3):Vec3 {
+        if (out == null) out = new Vec3();
         out.set(Math.cos(yaw), Math.sin(yaw), 0);
         return out;
     }
 
     /**
-     * Populates out vector with civilian traffic vehicle unit rightward vector.
+     * Populates out vector with civilian traffic vehicle unit rightward Vec3.
      */
-    public function getRightVector(?out:Vector):Vector {
-        if (out == null) out = new Vector();
+    public function getRightVector(?out:Vec3):Vec3 {
+        if (out == null) out = new Vec3();
         out.set(Math.sin(yaw), -Math.cos(yaw), 0);
         return out;
     }
@@ -96,20 +96,20 @@ class TrafficCar {
  * @extends h3d.scene.Object
  * @module entities/TrafficSystem
  */
-class TrafficSystem extends Object {
+class TrafficSystem extends Object3D {
     /** Collection of active traffic vehicle agents in the world. */
     public var trafficList:Array<TrafficCar> = [];
 
     /** Reference to circuit centerline waypoint spline coordinates. */
-    var trackWaypoints:Array<Vector>;
+    var trackWaypoints:Array<Vec3>;
 
     /** Active traffic simulation configuration parameters. */
     public var config:config.WorldConfig.TrafficConfig;
 
     /** Reusable scratch direction vector to eliminate per-frame allocations during track clamping. */
-    var scratchFromCenter:Vector = new Vector();
-    var scratchFwd:Vector = new Vector();
-    var scratchRight:Vector = new Vector();
+    var scratchFromCenter:Vec3 = new Vec3();
+    var scratchFwd:Vec3 = new Vec3();
+    var scratchRight:Vec3 = new Vec3();
 
     /** Half-width threshold of the roadway before collision contact with outer Armco rails. @default 9.7 */
     public static inline var ACTIVE_HALF_WIDTH:Float = 9.7;
@@ -135,11 +135,11 @@ class TrafficSystem extends Object {
     /**
      * Initializes the traffic system and populates the highway circuit with civilian vehicles.
      *
-     * @param {Array<Vector>} trackWaypoints Array of circuit spline waypoints.
+     * @param {Array<Vec3>} trackWaypoints Array of circuit spline waypoints.
      * @param {Null<Object>} [parent] Optional parent 3D scene graph node.
      * @param {Null<config.WorldConfig.TrafficConfig>} [config] Optional traffic configuration overrides.
      */
-    public function new(trackWaypoints:Array<Vector>, ?parent:Object, ?config:config.WorldConfig.TrafficConfig) {
+    public function new(trackWaypoints:Array<Vec3>, ?parent:Object3D, ?config:config.WorldConfig.TrafficConfig) {
         super(parent);
         this.trackWaypoints = trackWaypoints;
         this.config = config != null ? config : WorldConfig.getDefaultTraffic();
@@ -444,7 +444,7 @@ class TrafficSystem extends Object {
      * @param maxHalfWidth Permissible radial distance from the track centerline.
      * @return True if the point breached the boundary corridor and was repositioned.
      */
-    function clampToTrack(point:Vector, maxHalfWidth:Float):Bool {
+    function clampToTrack(point:Vec3, maxHalfWidth:Float):Bool {
         var proj = SplineMath.getClosestSegment(point, trackWaypoints);
         point.z = proj.z + world.Track.ROAD_LIFT;
 

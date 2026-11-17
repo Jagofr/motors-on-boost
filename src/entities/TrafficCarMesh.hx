@@ -1,10 +1,10 @@
 package entities;
 
-import h3d.scene.Object;
-import h3d.scene.Mesh;
-import h3d.prim.Cube;
-import h3d.prim.Cylinder;
-import h3d.prim.Disc;
+import graphics.SceneGraph.Object3D;
+import graphics.SceneGraph.MeshNode;
+import graphics.Primitives.Cube;
+import graphics.Primitives.Cylinder;
+import graphics.Primitives.Disc;
 
 /**
  * Procedural 3D composite mesh representation of civilian traffic vehicles.
@@ -14,21 +14,21 @@ import h3d.prim.Disc;
  * @extends h3d.scene.Object
  * @module entities/TrafficCarMesh
  */
-class TrafficCarMesh extends Object {
+class TrafficCarMesh extends Object3D {
     /** Main chassis body mesh rendered with assigned traffic paint color. */
-    public var body:Mesh;
+    public var body:MeshNode;
 
     /** Passenger cabin canopy mesh. */
-    public var cabin:Mesh;
+    public var cabin:MeshNode;
 
     /** Front bumper headlight illumination strip mesh. */
-    public var headlights:Mesh;
+    public var headlights:MeshNode;
 
     /** Rear bumper taillight strip mesh. */
-    public var taillights:Mesh;
+    public var taillights:MeshNode;
 
     /** Array of wheel meshes. */
-    public var wheels:Array<Mesh> = [];
+    public var wheels:Array<MeshNode> = [];
 
     /**
      * Constructs a civilian traffic vehicle mesh with the specified body color.
@@ -36,14 +36,14 @@ class TrafficCarMesh extends Object {
      * @param colorHex Hexadecimal color integer applied to the body material.
      * @param parent Optional parent 3D scene graph node.
      */
-    public function new(colorHex:Int, ?parent:Object) {
+    public function new(colorHex:Int, ?parent:Object3D) {
         super(parent);
 
         // 1. Traffic Vehicle Lower Body Chassis (1.8m width, 4.0m length, 0.55m height)
         var bodyPrim = new Cube(1.8, 4.0, 0.55, true);
         bodyPrim.unindex();
         bodyPrim.addNormals();
-        body = new Mesh(bodyPrim, this);
+        body = new MeshNode(bodyPrim, this);
         body.material.color.setColor(colorHex);
         body.z = 0.38;
 
@@ -51,7 +51,7 @@ class TrafficCarMesh extends Object {
         var cabinPrim = new Cube(1.4, 2.0, 0.45, true);
         cabinPrim.unindex();
         cabinPrim.addNormals();
-        cabin = new Mesh(cabinPrim, this);
+        cabin = new MeshNode(cabinPrim, this);
         cabin.material.color.setColor(0x15181C); // Dark tinted window glass
         cabin.y = -0.3;
         cabin.z = 0.85;
@@ -60,8 +60,9 @@ class TrafficCarMesh extends Object {
         var headPrim = new Cube(1.5, 0.15, 0.18, true);
         headPrim.unindex();
         headPrim.addNormals();
-        headlights = new Mesh(headPrim, this);
+        headlights = new MeshNode(headPrim, this);
         headlights.material.color.setColor(0xFFF2AA); // Warm halogen glow
+        headlights.material.emissive = 1.4;
         headlights.y = 2.0;
         headlights.z = 0.42;
 
@@ -69,8 +70,9 @@ class TrafficCarMesh extends Object {
         var tailPrim = new Cube(1.5, 0.15, 0.18, true);
         tailPrim.unindex();
         tailPrim.addNormals();
-        taillights = new Mesh(tailPrim, this);
+        taillights = new MeshNode(tailPrim, this);
         taillights.material.color.setColor(0xFF1100); // Vivid brake red
+        taillights.material.emissive = 1.6;
         taillights.y = -2.0;
         taillights.z = 0.42;
 
@@ -88,7 +90,7 @@ class TrafficCarMesh extends Object {
         ];
 
         for (off in offsets) {
-            var w = new Mesh(wheelPrim, this);
+            var w = new MeshNode(wheelPrim, this);
             w.material.color.setColor(0x1E2024);
             w.material.mainPass.culling = None;
             w.rotate(0, 1.5707963, 0);
@@ -96,7 +98,7 @@ class TrafficCarMesh extends Object {
             w.y = off.y;
             w.z = 0.34;
 
-            var rim = new Mesh(discPrim, w);
+            var rim = new MeshNode(discPrim, w);
             rim.material.color.setColor(0x8C9AA8);
             rim.material.mainPass.culling = None;
             if (off.isLeft) {

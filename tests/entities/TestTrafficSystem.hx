@@ -2,7 +2,7 @@ package tests.entities;
 
 import utest.Test;
 import utest.Assert;
-import h3d.Vector;
+import math.Vec3;
 import entities.TrafficSystem;
 
 /**
@@ -34,7 +34,7 @@ class TestTrafficSystem extends Test {
         var track = new world.Track(null);
         var ts = new TrafficSystem(track.waypoints, null);
         var player = new physics.CarPhysics(0, 0, 0);
-        var cam = new camera.ChaseCamera(new h3d.Camera(), 0, -10, 4);
+        var cam = new camera.ChaseCamera(new graphics.SceneGraph.Camera3D(), 0, -10, 4);
 
         Assert.isTrue(ts.trafficList.length >= 2);
 

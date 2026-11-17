@@ -8,11 +8,13 @@ import entities.CarMesh;
 import entities.RemoteCarActor;
 import entities.TrafficSystem;
 import graphics.PostProcessRenderer;
-import h3d.Vector;
-import h3d.scene.fwd.DirLight;
-import h3d.scene.Scene;
+import graphics.WebGpuRenderer;
+import math.Vec3;
+import graphics.SceneGraph.DirLightNode;
+import graphics.SceneGraph.Scene3D;
 import input.InputController;
 import net.NetworkProtocol.NetCarState;
+import physics.CarConfig;
 import physics.CarPhysics;
 
 /**
@@ -38,7 +40,7 @@ enum MapMode {
  */
 class WorldManager {
     /** Active 3D scene graph root. */
-    public var s3d:Scene;
+    public var s3d:Scene3D;
 
     /** Top-level runtime configuration profile. */
     public var config:GameConfigData;
@@ -50,13 +52,14 @@ class WorldManager {
     public var skybox:Skybox;
 
     /** Primary warm solar directional shadow-casting light source. */
-    public var dirLight:DirLight;
+    public var dirLight:DirLightNode;
 
     /** Secondary sky fill light softening sharp shadow boundaries. */
-    public var fillLight:DirLight;
+    public var fillLight:DirLightNode;
 
     /** Post-processing forward renderer providing speed-reactive radial blur. */
     public var postRenderer:PostProcessRenderer;
+    public var gpuRenderer:Null<WebGpuRenderer> = null;
 
     /** Highway circuit world and collider provider. */
     public var track:Track;
@@ -91,13 +94,17 @@ class WorldManager {
     /** Continuous showcase turntable angle in radians. */
     private var showcaseAngle:Float = 0.6;
 
+    /** Selected player car archetype ID and custom paint color hex. */
+    public var selectedCarId:String = CarConfig.ID_RACE_AWD;
+    public var selectedPaintHex:Int = 0xE64A19;
+
     /**
      * Constructs a 3D WorldManager bound to the target Heaps 3D scene.
      *
      * @param {Scene} s3d Target 3D scene graph.
      * @param {Null<GameConfigData>} [config] Optional configuration bundle overrides.
      */
-    public function new(s3d:Scene, ?config:GameConfigData) {
+    public function new(s3d:Scene3D, ?config:GameConfigData) {
         this.s3d = s3d;
         this.config = config != null ? config : GameConfig.getDefault();
         initializeWorld();
@@ -113,8 +120,7 @@ class WorldManager {
         chaseCam = new ChaseCamera(s3d.camera, 0.0, -10.0, 4.0);
 
         postRenderer = new PostProcessRenderer();
-        s3d.renderer = postRenderer;
-        s3d.camera.zFar = config.camera.farPlane;
+                s3d.camera.zFar = config.camera.farPlane;
 
         skybox = new Skybox(s3d, WorldConfig.getDefaultSkybox());
 
@@ -138,15 +144,15 @@ class WorldManager {
      */
     private function initLighting():Void {
         var lc = config.lighting;
-        var sunDir = new Vector(lc.sunDirX, lc.sunDirY, lc.sunDirZ);
+        var sunDir = new Vec3(lc.sunDirX, lc.sunDirY, lc.sunDirZ);
         sunDir.normalize();
-        dirLight = new DirLight(sunDir, s3d);
+        dirLight = new DirLightNode(sunDir, s3d);
         dirLight.setPosition(lc.sunX, lc.sunY, lc.sunZ);
         dirLight.color.setColor(0xFFF2D9);
 
-        var fillDir = new Vector(0.55, -0.78, 0.45);
+        var fillDir = new Vec3(0.55, -0.78, 0.45);
         fillDir.normalize();
-        fillLight = new DirLight(fillDir, s3d);
+        fillLight = new DirLightNode(fillDir, s3d);
         fillLight.color.setColor(0x788B9E);
         fillLight.enableSpecular = false;
     }
@@ -185,10 +191,16 @@ class WorldManager {
             if (track != null) track.visible = true;
             if (sandboxMap != null) sandboxMap.visible = false;
             if (traffic != null) traffic.visible = true;
+            if (gpuRenderer != null && gpuRenderer.initialized && track != null) {
+                track.syncGpuCompute(gpuRenderer);
+            }
         } else {
             if (track != null) track.visible = false;
             if (sandboxMap != null) sandboxMap.visible = true;
             if (traffic != null) traffic.visible = false;
+            if (gpuRenderer != null && gpuRenderer.initialized) {
+                gpuRenderer.clearTrack();
+            }
         }
     }
 
@@ -371,11 +383,22 @@ class WorldManager {
      */
     public function setPlayerPaintColor(colorHex:Int):Void {
         if (playerMesh == null) return;
-        if (playerMesh.bodyMesh != null && playerMesh.bodyMesh.material != null) {
-            playerMesh.bodyMesh.material.color.setColor(colorHex);
+        playerMesh.setPaintColor(colorHex);
+    }
+
+    /**
+     * Applies the chosen vehicle archetype (`race_awd`, `hatch_fwd`, `coupe_rwd`) and paint color
+     * to both physics solver config and 3D procedural CarMesh.
+     */
+    public function applyPlayerVehicle(carId:String, ?paintHex:Null<Int>):Void {
+        var meta = CarConfig.getPresetMeta(carId);
+        selectedCarId = meta.id;
+        selectedPaintHex = paintHex != null ? paintHex : meta.defaultColorHex;
+        if (carPhysics != null) {
+            carPhysics.setConfig(CarConfig.getPresetConfig(selectedCarId));
         }
-        if (playerMesh.hoodMesh != null && playerMesh.hoodMesh.material != null) {
-            playerMesh.hoodMesh.material.color.setColor(colorHex);
+        if (playerMesh != null) {
+            playerMesh.applyVisualPreset(selectedCarId, selectedPaintHex);
         }
     }
 
@@ -449,6 +472,27 @@ class WorldManager {
             if (actor != null) actor.destroy();
         }
         remoteCars.clear();
-        setPlayerPaintColor(0xE64A19);
+        setPlayerPaintColor(selectedPaintHex);
+    }
+
+    /** Binds the active WebGPU renderer and compiles/dispatches initial track geometry. */
+    public function attachGpuRenderer(renderer:WebGpuRenderer):Void {
+        gpuRenderer = renderer;
+        if (renderer == null || !renderer.initialized) return;
+        if (currentMapMode == Circuit && track != null) {
+            track.syncGpuCompute(renderer);
+        } else {
+            renderer.clearTrack();
+        }
+    }
+
+    /** Encodes and presents the active 3D frame via WebGPU. */
+    public function renderGpuFrame():Void {
+        if (gpuRenderer == null || !gpuRenderer.initialized || s3d == null) return;
+        var topHex = skybox != null ? skybox.skyShader.topHex : 0x1052B8;
+        var horHex = skybox != null ? skybox.skyShader.horizonHex : 0x7AC2F2;
+        var gndHex = skybox != null ? skybox.skyShader.groundHex : 0x141A24;
+        var trackOn = (currentMapMode == Circuit && track != null);
+        gpuRenderer.renderFrame(s3d, topHex, horHex, gndHex, trackOn, postRenderer);
     }
 }

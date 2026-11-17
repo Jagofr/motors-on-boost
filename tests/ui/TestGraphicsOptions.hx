@@ -57,17 +57,24 @@ class TestGraphicsOptions extends Test {
     }
 
     public function testAAMultiplierDependency() {
-        // By default, aaType is "FXAA", so aaLevel (idx 8) is enabled
+        // By default, aaType is "FXAA", so AA Quality (idx 8) is enabled
         Assert.isFalse(panel.isOptionDisabled(8));
 
         panel.settings.aaType = "None";
-        Assert.isTrue(panel.isOptionDisabled(8), "AA Multiplier must be disabled when Anti-Aliasing is None");
+        Assert.isTrue(panel.isOptionDisabled(8), "AA Quality must be disabled when Anti-Aliasing is None");
 
         var oldAALevel = panel.settings.aaLevel;
         panel.cycleOption(8, 1);
-        Assert.equals(oldAALevel, panel.settings.aaLevel, "Disabled AA Multiplier must not cycle");
+        Assert.equals(oldAALevel, panel.settings.aaLevel, "Disabled AA Quality must not cycle");
 
+        // Hardware MSAA in WebGPU is fixed 4x toggle with no multiplier
         panel.settings.aaType = "MSAA";
+        Assert.isTrue(panel.isOptionDisabled(8), "AA Quality must be disabled when Anti-Aliasing is fixed 4x MSAA");
+
+        panel.cycleOption(8, 1);
+        Assert.equals(oldAALevel, panel.settings.aaLevel, "Disabled AA Quality under MSAA must not cycle");
+
+        panel.settings.aaType = "SMAA";
         Assert.isFalse(panel.isOptionDisabled(8));
     }
 
@@ -99,6 +106,35 @@ class TestGraphicsOptions extends Test {
         Assert.isTrue(panel.items[6].text.indexOf("[DISABLED]") > 0, "Row 6 text must indicate [DISABLED]");
         Assert.isTrue(panel.items[8].text.indexOf("[DISABLED]") > 0, "Row 8 text must indicate [DISABLED]");
         Assert.isTrue(panel.items[11].text.indexOf("[DISABLED]") > 0, "Row 11 text must indicate [DISABLED]");
+    }
+
+    public function testAACyclingAndSettingsCallback() {
+        var gm = new graphics.GraphicsManager(null, null, null, panel.settings);
+        var gpu = new graphics.WebGpuRenderer();
+        gm.setWebGpuRenderer(gpu);
+
+        var changes = 0;
+        panel.onSettingsChanged = function() changes++;
+
+        Assert.equals("FXAA", panel.settings.aaType);
+        panel.cycleOption(7, 1);
+        Assert.equals("TSAA", panel.settings.aaType);
+        Assert.floatEquals(2.0, gpu.aaModeCode, 0.01);
+
+        panel.cycleOption(7, 1);
+        Assert.equals("SMAA", panel.settings.aaType);
+        Assert.floatEquals(3.0, gpu.aaModeCode, 0.01);
+
+        panel.cycleOption(8, 1);
+        Assert.equals(4, panel.settings.aaLevel);
+        Assert.floatEquals(0.72, gpu.aaStrength, 0.01);
+
+        panel.cycleOption(7, 1);
+        Assert.equals("MSAA", panel.settings.aaType);
+        panel.cycleOption(7, 1);
+        Assert.equals("None", panel.settings.aaType);
+        Assert.floatEquals(0.0, gpu.aaModeCode, 0.01);
+        Assert.isTrue(changes >= 5);
     }
 }
 

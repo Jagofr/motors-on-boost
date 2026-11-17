@@ -1,13 +1,13 @@
 package world;
 
 import config.WorldConfig;
-import h3d.scene.Object;
-import h3d.scene.Mesh;
-import h3d.prim.Polygon;
-import h3d.prim.Cube;
-import h3d.col.Point;
-import h3d.Vector;
-import hxd.IndexBuffer;
+import graphics.SceneGraph.Object3D;
+import graphics.SceneGraph.MeshNode;
+import graphics.Primitives.Polygon;
+import graphics.Primitives.Cube;
+import graphics.Primitives.Point;
+import math.Vec3;
+
 
 /**
  * Open Sandbox Proving Grounds environment for full-spectrum physics testing.
@@ -26,18 +26,18 @@ import hxd.IndexBuffer;
  * @implements IGroundProvider
  * @module world/SandboxMap
  */
-class SandboxMap extends Object implements IGroundProvider {
+class SandboxMap extends Object3D implements IGroundProvider {
     /** Primary terrain surface mesh. */
-    public var terrainMesh:Mesh;
+    public var terrainMesh:MeshNode;
 
     /** Center circular asphalt skidpad mesh. */
-    public var skidpadMesh:Mesh;
+    public var skidpadMesh:MeshNode;
 
     /** Array of perimeter floodlight stanchion meshes. */
-    public var floodlights:Array<Mesh> = [];
+    public var floodlights:Array<MeshNode> = [];
 
     /** Array of slalom and agility obstacle meshes. */
-    public var obstacles:Array<Mesh> = [];
+    public var obstacles:Array<MeshNode> = [];
 
     /** Array of registered OimoPhysics boundary rigid bodies. */
     public var rigidBodies:Array<oimo.dynamics.rigidbody.RigidBody> = [];
@@ -57,7 +57,7 @@ class SandboxMap extends Object implements IGroundProvider {
     /** Active configurable sandbox map parameters. */
     public var config:config.WorldConfig.SandboxConfig;
 
-    var scratchNormal:Vector = new Vector();
+    var scratchNormal:Vec3 = new Vec3();
 
     /**
      * Constructs and initializes the open sandbox proving grounds.
@@ -65,7 +65,7 @@ class SandboxMap extends Object implements IGroundProvider {
      * @param {Null<Object>} [parent] Optional parent 3D scene graph node.
      * @param {Null<config.WorldConfig.SandboxConfig>} [config] Optional arena feature & surface configuration.
      */
-    public function new(?parent:Object, ?config:config.WorldConfig.SandboxConfig) {
+    public function new(?parent:Object3D, ?config:config.WorldConfig.SandboxConfig) {
         super(parent);
         this.config = config != null ? config : WorldConfig.getDefaultSandbox();
         buildTerrainMesh();
@@ -136,7 +136,7 @@ class SandboxMap extends Object implements IGroundProvider {
      * @param y World Y coordinate in meters.
      * @param outNormal Scratch vector populated with unit-length normal.
      */
-    public function getGroundNormal(x:Float, y:Float, outNormal:Vector):Void {
+    public function getGroundNormal(x:Float, y:Float, outNormal:Vec3):Void {
         var eps = 0.15;
         var zCenter = getGroundElevation(x, y);
         var zDx = getGroundElevation(x + eps, y) - zCenter;
@@ -182,7 +182,7 @@ class SandboxMap extends Object implements IGroundProvider {
     /**
      * Enforces invisible boundary walls at +/-195 meters with elastic bumper restitution.
      */
-    public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
+    public function enforceBoundaries(pos:Vec3, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
         var hit = false;
         var sMult = 1.0;
         var lMult = 1.0;
@@ -272,8 +272,8 @@ class SandboxMap extends Object implements IGroundProvider {
         var step = (HALF_SPAN * 2.0) / divisions;
 
         var pts:Array<Point> = [];
-        var uvs:Array<h3d.prim.UV> = [];
-        var idxBuf = new IndexBuffer();
+        var uvs:Array<graphics.Primitives.UV> = [];
+        var idxBuf:Array<Int> = [];
 
         for (iy in 0...(divisions + 1)) {
             var y = -HALF_SPAN + (iy * step);
@@ -281,7 +281,7 @@ class SandboxMap extends Object implements IGroundProvider {
                 var x = -HALF_SPAN + (ix * step);
                 var z = getGroundElevation(x, y);
                 pts.push(new Point(x, y, z));
-                uvs.push(new h3d.prim.UV((x + HALF_SPAN) * 0.16, (y + HALF_SPAN) * 0.16));
+                uvs.push(new graphics.Primitives.UV((x + HALF_SPAN) * 0.16, (y + HALF_SPAN) * 0.16));
             }
         }
 
@@ -302,38 +302,11 @@ class SandboxMap extends Object implements IGroundProvider {
         var poly = new Polygon(pts, idxBuf);
         poly.uvs = uvs;
         poly.addNormals();
-        terrainMesh = new Mesh(poly, this);
+        terrainMesh = new MeshNode(poly, this);
         terrainMesh.material.mainPass.culling = None;
         terrainMesh.material.color.setColor(0xFFFFFF);
-
-        // Procedural high-contrast cyber coordinates grid texture
-        #if js
-        try {
-            var size = 256;
-            var pixels = hxd.Pixels.alloc(size, size, hxd.PixelFormat.ARGB);
-            for (py in 0...size) {
-                for (px in 0...size) {
-                    var isMajor = (px == 0 || px == size - 1 || py == 0 || py == size - 1 || px % 32 == 0 || py % 32 == 0);
-                    var isMinor = (px % 8 == 0 || py % 8 == 0);
-                    var col:Int = 0xFF222C28; // Deep slate-charcoal asphalt
-                    if (isMajor) {
-                        col = 0xFF3E5048; // Crisp terrain coordinate grid line
-                    } else if (isMinor) {
-                        col = 0xFF2A3632; // Subtle contour sub-grid
-                    }
-                    if (px % 32 == 0 && py % 32 == 0) {
-                        col = 0xFF00E5FF; // High-visibility electric cyan intersection node
-                    }
-                    pixels.setPixel(px, py, col);
-                }
-            }
-            var tex = h3d.mat.Texture.fromPixels(pixels);
-            tex.wrap = Repeat;
-            terrainMesh.material.texture = tex;
-        } catch (e:Dynamic) {
-            // Headless testing environment fallback
-        }
-        #end
+        terrainMesh.material.gridScale = 2.0;
+        terrainMesh.material.roughness = 0.65;
     }
 
     /**
@@ -343,17 +316,17 @@ class SandboxMap extends Object implements IGroundProvider {
         var segments = 32;
         var radius = 35.0;
         var pts:Array<Point> = [];
-        var uvs:Array<h3d.prim.UV> = [];
-        var idxBuf = new IndexBuffer();
+        var uvs:Array<graphics.Primitives.UV> = [];
+        var idxBuf:Array<Int> = [];
 
         pts.push(new Point(0, 0, 0.05));
-        uvs.push(new h3d.prim.UV(0.5, 0.5));
+        uvs.push(new graphics.Primitives.UV(0.5, 0.5));
         for (i in 0...segments) {
             var angle = (i / segments) * (Math.PI * 2.0);
             var px = Math.cos(angle) * radius;
             var py = Math.sin(angle) * radius;
             pts.push(new Point(px, py, 0.05));
-            uvs.push(new h3d.prim.UV(0.5 + Math.cos(angle) * 0.5, 0.5 + Math.sin(angle) * 0.5));
+            uvs.push(new graphics.Primitives.UV(0.5 + Math.cos(angle) * 0.5, 0.5 + Math.sin(angle) * 0.5));
         }
 
         for (i in 0...segments) {
@@ -366,7 +339,7 @@ class SandboxMap extends Object implements IGroundProvider {
         var poly = new Polygon(pts, idxBuf);
         poly.uvs = uvs;
         poly.addNormals();
-        skidpadMesh = new Mesh(poly, this);
+        skidpadMesh = new MeshNode(poly, this);
         skidpadMesh.material.mainPass.culling = None;
         skidpadMesh.material.color.setColor(0x2A2E35);
     }
@@ -400,7 +373,7 @@ class SandboxMap extends Object implements IGroundProvider {
             var groundZ = getGroundElevation(t.x, t.y);
 
             // 1. Tower Mast
-            var mast = new Mesh(mastPrim, this);
+            var mast = new MeshNode(mastPrim, this);
             mast.material.color.setColor(0x3B424A);
             mast.x = t.x;
             mast.y = t.y;
@@ -408,7 +381,7 @@ class SandboxMap extends Object implements IGroundProvider {
             floodlights.push(mast);
 
             // 2. Floodlight Head Housing angled downward into map center
-            var head = new Mesh(bankPrim, this);
+            var head = new MeshNode(bankPrim, this);
             head.material.color.setColor(0x202428);
             head.x = t.x;
             head.y = t.y;
@@ -418,7 +391,7 @@ class SandboxMap extends Object implements IGroundProvider {
             floodlights.push(head);
 
             // 3. Glowing Floodlight Luminaire Bank (High-output daylight floodlight)
-            var lum = new Mesh(lumPrim, this);
+            var lum = new MeshNode(lumPrim, this);
             lum.material.color.setColor(0xFFFDE6);
             lum.x = t.x;
             lum.y = t.y;
@@ -440,7 +413,7 @@ class SandboxMap extends Object implements IGroundProvider {
         for (i in -4...5) {
             if (i == 0) continue;
             var py = i * 6.5;
-            var pylon = new Mesh(pylonPrim, this);
+            var pylon = new MeshNode(pylonPrim, this);
             pylon.material.color.setColor(0xFF6B00); // High-visibility safety orange
             pylon.x = -6.0;
             pylon.y = py;
@@ -466,7 +439,7 @@ class SandboxMap extends Object implements IGroundProvider {
 
         for (m in perimeterMarkers) {
             var mz = getGroundElevation(m.x, m.y);
-            var post = new Mesh(postPrim, this);
+            var post = new MeshNode(postPrim, this);
             post.material.color.setColor(0x00E5FF); // Electric cyan boundary marker
             post.x = m.x;
             post.y = m.y;

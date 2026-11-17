@@ -1,9 +1,9 @@
 package ui.components;
 
-import h2d.Object;
-import h2d.Graphics;
-import h2d.Bitmap;
-import h2d.Tile;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIGraphics as Graphics;
+import ui.nodes.UINodes.UIBitmap as Bitmap;
+import ui.nodes.UINodes.UITile as Tile;
 import core.AssetPreloader;
 import input.InputController;
 import ui.components.UITheme;
@@ -20,7 +20,7 @@ import save.SaveSystem.TouchSettings;
  * (Gas + Steer, Gas + Nitro, Gas + Drift, Drift + Nitro, Brake + Nitro, etc.).
  *
  * @class TouchControlsHUD
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  */
 class TouchControlsHUD extends Object {
     /** Reference to active input controller. */
@@ -102,22 +102,14 @@ class TouchControlsHUD extends Object {
     var stickPointerId:Null<Int> = null;
 
     /** Window event listener function reference for cleanup. */
-    var windowEventTarget:hxd.Event->Void;
+    var windowEventTarget:ui.nodes.UINodes.UIEvent->Void;
 
     /** Scratch point reused across frame events to eliminate GC allocations. */
-    var scratchPoint:h2d.col.Point = new h2d.col.Point();
+    var scratchPoint:ui.nodes.UINodes.UIPoint = new ui.nodes.UINodes.UIPoint();
 
     /** Scratch event reused for camera coordinate transformations. */
-    var scratchEvent:hxd.Event = new hxd.Event(ECheck, 0, 0);
+    var scratchEvent:ui.nodes.UINodes.UIEvent = new ui.nodes.UINodes.UIEvent(ECheck, 0, 0);
 
-    #if js
-    var nativeCanvas:js.html.CanvasElement;
-    var nativeTouchStartHandler:js.html.TouchEvent->Void;
-    var nativeTouchMoveHandler:js.html.TouchEvent->Void;
-    var nativeTouchEndHandler:js.html.TouchEvent->Void;
-    var nativeTouchCancelHandler:js.html.TouchEvent->Void;
-    var nativeTouchesActive:Map<Int, Bool> = new Map();
-    #end
 
     /**
      * Instantiates the touch controls virtual HUD.
@@ -139,96 +131,17 @@ class TouchControlsHUD extends Object {
 
         // Register window event target for Heaps / desktop / test dispatching
         windowEventTarget = onWindowEvent;
-        hxd.Window.getInstance().addEventTarget(windowEventTarget);
+        
 
         // Register native DOM touch listeners on the canvas for mobile Web browsers
-        #if js
-        try {
-            nativeCanvas = cast js.Browser.document.getElementById("webgl");
-            if (nativeCanvas != null) {
-                nativeTouchStartHandler = function(e:js.html.TouchEvent) {
-                    inputRef.isTouchActive = true;
-                    if (parent == null || !parent.visible) return;
-                    if (!visible) {
-                        visible = true;
-                        var s2d = getScene();
-                        if (s2d != null) layout(s2d.width, s2d.height);
-                    }
-                    e.preventDefault();
-                    for (t in e.changedTouches) {
-                        nativeTouchesActive.set(t.identifier, true);
-                        var p = clientToHUD(t.clientX, t.clientY);
-                        handlePointerDown(t.identifier, p.x, p.y);
-                    }
-                };
-                nativeTouchMoveHandler = function(e:js.html.TouchEvent) {
-                    if (parent == null || !parent.visible || !visible) return;
-                    e.preventDefault();
-                    for (t in e.changedTouches) {
-                        var p = clientToHUD(t.clientX, t.clientY);
-                        handlePointerMove(t.identifier, p.x, p.y);
-                    }
-                };
-                nativeTouchEndHandler = function(e:js.html.TouchEvent) {
-                    if (parent == null || !parent.visible || !visible) {
-                        for (t in e.changedTouches) nativeTouchesActive.remove(t.identifier);
-                        return;
-                    }
-                    e.preventDefault();
-                    for (t in e.changedTouches) {
-                        nativeTouchesActive.remove(t.identifier);
-                        handlePointerUp(t.identifier);
-                    }
-                };
-                nativeTouchCancelHandler = function(e:js.html.TouchEvent) {
-                    if (parent == null || !parent.visible || !visible) {
-                        for (t in e.changedTouches) nativeTouchesActive.remove(t.identifier);
-                        return;
-                    }
-                    e.preventDefault();
-                    for (t in e.changedTouches) {
-                        nativeTouchesActive.remove(t.identifier);
-                        handlePointerCancel(t.identifier);
-                    }
-                };
-
-                nativeCanvas.addEventListener("touchstart", nativeTouchStartHandler, { passive: false });
-                nativeCanvas.addEventListener("touchmove", nativeTouchMoveHandler, { passive: false });
-                nativeCanvas.addEventListener("touchend", nativeTouchEndHandler, { passive: false });
-                nativeCanvas.addEventListener("touchcancel", nativeTouchCancelHandler, { passive: false });
-            }
-        } catch (e:haxe.Exception) {}
-        #end
     }
 
-    #if js
-    /**
-     * Maps browser client coordinates to local HUD scene coordinates.
-     */
-    function clientToHUD(clientX:Float, clientY:Float):h2d.col.Point {
-        if (nativeCanvas != null) {
-            var rect = nativeCanvas.getBoundingClientRect();
-            var s2d = getScene();
-            if (s2d != null && rect.width > 0 && rect.height > 0) {
-                var normX = (clientX - rect.left) / rect.width;
-                var normY = (clientY - rect.top) / rect.height;
-                scratchPoint.x = normX * s2d.width;
-                scratchPoint.y = normY * s2d.height;
-                globalToLocal(scratchPoint);
-                return scratchPoint;
-            }
-        }
-        scratchPoint.x = clientX;
-        scratchPoint.y = clientY;
-        return scratchPoint;
-    }
-    #end
 
     /**
      * Converts raw canvas buffer / window screen pixel coordinates into this object's
      * local scene coordinate system using the 2D scene interactive camera.
      */
-    function getLocalCoords(screenX:Float, screenY:Float, out:h2d.col.Point):Void {
+    function getLocalCoords(screenX:Float, screenY:Float, out:ui.nodes.UINodes.UIPoint):Void {
         var s2d = getScene();
         if (s2d == null) {
             out.x = screenX;
@@ -469,10 +382,10 @@ class TouchControlsHUD extends Object {
     /**
      * Dispatches window pointer events for desktop / simulator debugging.
      */
-    function onWindowEvent(e:hxd.Event) {
+    function onWindowEvent(e:ui.nodes.UINodes.UIEvent) {
         var isTouchKind = switch (e.kind) {
             case EPush, ERelease, EMove, EReleaseOutside:
-                (e.touchId != null && e.touchId >= 0);
+                (e.touchId >= 0);
             default:
                 false;
         };
@@ -484,10 +397,6 @@ class TouchControlsHUD extends Object {
             if (s2d != null) layout(s2d.width, s2d.height);
         }
 
-        #if js
-        // If native DOM touch is actively managing this touch ID, let native handler lead
-        if (isTouchKind && nativeTouchesActive.exists(e.touchId)) return;
-        #end
 
         if (!visible) {
             if (inputRef.isTouchActive && parent != null && parent.visible) {
@@ -521,7 +430,6 @@ class TouchControlsHUD extends Object {
     }
 
     override function onRemove() {
-        super.onRemove();
         dispose();
     }
 
@@ -531,24 +439,9 @@ class TouchControlsHUD extends Object {
     public function dispose():Void {
         resetTouchStates();
         if (windowEventTarget != null) {
-            hxd.Window.getInstance().removeEventTarget(windowEventTarget);
+            
             windowEventTarget = null;
         }
-        #if js
-        try {
-            if (nativeCanvas != null) {
-                if (nativeTouchStartHandler != null) nativeCanvas.removeEventListener("touchstart", nativeTouchStartHandler);
-                if (nativeTouchMoveHandler != null) nativeCanvas.removeEventListener("touchmove", nativeTouchMoveHandler);
-                if (nativeTouchEndHandler != null) nativeCanvas.removeEventListener("touchend", nativeTouchEndHandler);
-                if (nativeTouchCancelHandler != null) nativeCanvas.removeEventListener("touchcancel", nativeTouchCancelHandler);
-                nativeTouchStartHandler = null;
-                nativeTouchMoveHandler = null;
-                nativeTouchEndHandler = null;
-                nativeTouchCancelHandler = null;
-                nativeCanvas = null;
-            }
-        } catch (e:haxe.Exception) {}
-        #end
         if (nitroIconBmp != null) { nitroIconBmp.remove(); nitroIconBmp = null; }
         if (gasIconBmp != null) { gasIconBmp.remove(); gasIconBmp = null; }
         if (brakeIconBmp != null) { brakeIconBmp.remove(); brakeIconBmp = null; }
@@ -678,7 +571,7 @@ class TouchControlsHUD extends Object {
     inline function updateIconAppearance(bmp:Bitmap, isPressed:Bool, r:Float, g:Float, b:Float) {
         if (bmp == null) return;
         bmp.alpha = isPressed ? 0.95 : 0.60;
-        bmp.colorAdd = isPressed ? new h3d.Vector(r, g, b) : new h3d.Vector(0.18, 0.18, 0.20);
+        bmp.colorAdd = isPressed ? new math.Vec3(r, g, b) : new math.Vec3(0.18, 0.18, 0.20);
     }
 
     /**

@@ -1,8 +1,8 @@
 package ui;
 
-import h2d.Object;
-import h2d.Graphics;
-import h2d.Text;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIGraphics as Graphics;
+import ui.nodes.UINodes.UIText as Text;
 import save.SaveSystem.TouchSettings;
 
 /**
@@ -11,7 +11,7 @@ import save.SaveSystem.TouchSettings;
  * and desktop WASD / Arrow keyboard layouts with dynamic callouts.
  *
  * @class ControlDiagrams
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/ControlDiagrams
  */
 class ControlDiagrams extends Object {

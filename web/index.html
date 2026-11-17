@@ -3,21 +3,23 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-  <title>M.O.B. // Motors on Boost</title>
-
-  <!-- Web App Manifest -->
-  <link rel="manifest" href="manifest.json" />
-
-  <!-- iOS / Apple Specific PWA Tags -->
+  <meta name="theme-color" content="#00E5FF" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="M.O.B." />
+  <title>M.O.B. // Motors on Boost</title>
 
-  <!-- Standard & iOS Home Screen Icons -->
+  <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="./icons/icon-192.png" />
   <link rel="apple-touch-icon" sizes="512x512" href="./icons/icon-512.png" />
+  <link rel="preload" as="image" href="./intro/jagofr-rvl-splash.webp" />
+  <link rel="preload" as="image" href="./intro/icons/logo_hlwgpu.svg" />
+  <link rel="preload" as="image" href="./intro/icons/logo_webgpu.svg" />
+  <link rel="preload" as="image" href="./intro/icons/logo_haxe.webp" />
+  <link rel="stylesheet" href="ui-overlay.css" />
 
   <style>
     html, body {
@@ -25,324 +27,323 @@
       padding: 0;
       width: 100dvw;
       height: 100dvh;
+      background: #000;
       overflow: hidden;
-      background-color: #000;
       touch-action: none;
+      font-family: "Stack Sans Headline", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
 
-    #webgl {
-      width: 100%;
-      height: 100%;
-      display: block;
-      background-color: #000;
-      outline: none;
-    }
-
-    html.portrait-blocked #webgl {
-      visibility: hidden;
-      pointer-events: none;
-    }
-
-    /* Mobile & Tablet Landscape Enforcement Overlay */
-    #rotate-device-overlay {
-      display: none;
+    #mob-portrait-gate {
       position: fixed;
       inset: 0;
       width: 100dvw;
       height: 100dvh;
-      background-color: #08080c;
-      color: #fff;
-      z-index: 999999;
+      z-index: 99999;
+      background: #08080c;
+      color: #f4f7fb;
+      display: none;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       text-align: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       padding: max(1.25rem, env(safe-area-inset-top, 0px))
                max(1.25rem, env(safe-area-inset-right, 0px))
                max(1.25rem, env(safe-area-inset-bottom, 0px))
                max(1.25rem, env(safe-area-inset-left, 0px));
       box-sizing: border-box;
-      overflow-wrap: anywhere;
     }
 
-    html.portrait-blocked #rotate-device-overlay {
-      display: flex;
+    #mob-portrait-gate .gate-icon {
+      width: 64px;
+      height: 64px;
+      margin-bottom: 16px;
+      color: #00e5ff;
+      animation: rotatePhone 2s infinite ease-in-out;
     }
 
-    #rotate-device-overlay .rotate-icon {
-      font-size: clamp(2.5rem, 2rem + 2.5dvw, 4rem);
-      margin-bottom: 1rem;
-      animation: rotate-pulse 2s infinite ease-in-out;
-    }
-
-    #rotate-device-overlay h2 {
-      margin: 0 0 0.5rem 0;
-      font-size: clamp(1.25rem, 1rem + 2dvw, 2.25rem);
+    #mob-portrait-gate h2 {
+      margin: 0 0 8px 0;
+      font-size: clamp(1.2rem, 1rem + 2dvw, 2rem);
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: #ff0055;
-      text-wrap: balance;
+      color: #ff2e63;
     }
 
-    #rotate-device-overlay p {
+    #mob-portrait-gate p {
       margin: 0;
-      max-inline-size: 38ch;
-      font-size: clamp(0.95rem, 0.85rem + 0.8dvw, 1.35rem);
+      max-inline-size: 36ch;
+      color: #8fa1b3;
+      font-size: clamp(0.92rem, 0.85rem + 0.6dvw, 1.15rem);
       line-height: 1.45;
-      color: #8892b0;
-      text-wrap: pretty;
     }
 
-    #force-landscape-btn {
-      margin-top: 1.25rem;
-      min-block-size: 48px;
-      min-inline-size: 44px;
-      padding: 0.75rem 1.5rem;
-      font-size: clamp(0.95rem, 0.85rem + 0.5dvw, 1.15rem);
-      font-weight: 700;
+    #mob-force-landscape-btn {
+      margin-top: 18px;
+      padding: 12px 24px;
+      border-radius: 8px;
+      border: 0;
+      background: #00e5ff;
+      color: #08080c;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 800;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #08080c;
-      background-color: #00e5ff;
-      border: 0;
-      border-radius: 6px;
       cursor: pointer;
-      touch-action: manipulation;
     }
 
-    #force-landscape-btn[hidden] {
+    #mob-force-landscape-btn[hidden] {
       display: none;
     }
 
-    @keyframes rotate-pulse {
-      0%, 100% { transform: rotate(0deg); }
-      50% { transform: rotate(-90deg); }
+    #mob-fatal-banner {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top, 16px));
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100000;
+      max-width: min(640px, 92vw);
+      padding: 16px 22px;
+      border-radius: 12px;
+      background: rgba(24, 10, 16, 0.96);
+      border: 1.5px solid #ff2e63;
+      color: #f4f7fb;
+      display: none;
+      font-size: 14px;
+      line-height: 1.5;
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.78);
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      #rotate-device-overlay .rotate-icon {
-        animation: none;
-      }
+    @keyframes rotatePhone {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(-90deg); }
     }
   </style>
 </head>
 <body>
-  <!-- Mobile / Tablet Portrait Gate Overlay -->
-  <div id="rotate-device-overlay" role="status" aria-live="polite">
-    <div class="rotate-icon" aria-hidden="true">📱 ↷</div>
-    <h2 id="rotate-heading">Landscape Mode Required</h2>
-    <p id="rotate-message">Rotate your phone or tablet to landscape mode to load and play.</p>
-    <button id="force-landscape-btn" type="button" hidden>Switch to Landscape</button>
+  <canvas id="screen" data-xwindow="fit" width="1280" height="720" tabindex="0"></canvas>
+  <div id="ui-root"></div>
+
+  <div id="mob-portrait-gate" role="dialog" aria-modal="true" aria-label="Rotate Device">
+    <svg class="gate-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="7" y="2" width="10" height="20" rx="2" />
+      <line x1="12" y1="18" x2="12.01" y2="18" />
+    </svg>
+    <h2>Landscape Mode Required</h2>
+    <p>Rotate your phone or tablet to landscape mode to play M.O.B. // Motors on Boost.</p>
+    <button id="mob-force-landscape-btn" type="button" hidden>Switch to Landscape</button>
   </div>
 
-  <canvas id="webgl" tabindex="0"></canvas>
+  <div id="mob-fatal-banner" role="alert"></div>
 
   <script>
     (function () {
-      const overlayEl = document.getElementById('rotate-device-overlay');
-      const forceBtn = document.getElementById('force-landscape-btn');
-      const GAME_SCRIPT_SRC = 'game.js?v=0.6.0';
-
-      let gameScriptLoaded = false;
-      let evalSeq = 0;
-
+      var gate = document.getElementById("mob-portrait-gate");
+      var btn = document.getElementById("mob-force-landscape-btn");
+      var mq = window.matchMedia ? window.matchMedia("(max-width: 960px) and (orientation: portrait)") : null;
+      var isAppleMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent || "") ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
       window.__mobPortraitBlocked = false;
 
       function isMobileOrTablet() {
-        const ua = navigator.userAgent || '';
-        const match = window.matchMedia ? function (q) { return window.matchMedia(q).matches; } : function () { return false; };
-        const hasCoarsePrimary = match('(pointer: coarse)');
-        const hasHoverNone = match('(hover: none)');
-        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Tablet|PlayBook|Silk|Kindle|KF[A-Z]+/i.test(ua);
-        const isIPadDesktopUA = /Macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
-        return Boolean(hasCoarsePrimary || isMobileUA || isIPadDesktopUA || (hasHoverNone && navigator.maxTouchPoints > 0));
+        var isCoarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+        var hasTouch = (navigator.maxTouchPoints || 0) > 0;
+        var isMobUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Tablet/i.test(navigator.userAgent || "");
+        return Boolean(isCoarse || (hasTouch && (isMobUA || isAppleMobile)));
       }
 
-      function isPortraitOrientation() {
-        if (window.matchMedia && window.matchMedia('(orientation: portrait)').matches) {
-          return true;
+      function evaluateOrientation() {
+        var mobile = isMobileOrTablet();
+        var isPortrait = window.innerHeight > window.innerWidth && window.innerWidth <= 960;
+        var blocked = Boolean(mobile && isPortrait);
+        var wasBlocked = window.__mobPortraitBlocked;
+        window.__mobPortraitBlocked = blocked;
+        gate.style.display = blocked ? "flex" : "none";
+        if (btn) {
+          var canLock = !isAppleMobile && Boolean(window.screen && screen.orientation && typeof screen.orientation.lock === "function");
+          btn.hidden = !(blocked && canLock);
         }
-        return window.innerHeight > window.innerWidth;
-      }
-
-      function setAppPaused(paused) {
-        if (window.app && typeof window.app.setOrientationPaused === 'function') {
-          window.app.setOrientationPaused(Boolean(paused));
+        if (window.app && typeof window.app.setOrientationPaused === "function") {
+          window.app.setOrientationPaused(blocked);
         }
-      }
-
-      function applyBlockedState(blocked, canOfferForceButton) {
-        const isBlocked = Boolean(blocked);
-        window.__mobPortraitBlocked = isBlocked;
-        document.documentElement.classList.toggle('portrait-blocked', isBlocked);
-        if (overlayEl) {
-          overlayEl.setAttribute('aria-hidden', isBlocked ? 'false' : 'true');
-        }
-        if (forceBtn) {
-          forceBtn.hidden = !(isBlocked && canOfferForceButton);
-        }
-        setAppPaused(isBlocked);
-        if (!isBlocked) {
-          window.dispatchEvent(new CustomEvent('mob-orientation-unlocked'));
+        if (wasBlocked && !blocked) {
+          window.dispatchEvent(new Event("mob-orientation-unlocked"));
         }
       }
 
-      function ensureGameLoaded() {
-        if (gameScriptLoaded || window.__mobPortraitBlocked) return;
-        gameScriptLoaded = true;
-        const script = document.createElement('script');
-        script.src = GAME_SCRIPT_SRC;
-        script.async = false;
-        document.body.appendChild(script);
-      }
-
-      function waitForLandscapeTransition(timeoutMs) {
-        if (!isPortraitOrientation()) return Promise.resolve(true);
-        return new Promise(function (resolve) {
-          let settled = false;
-          let timerId = null;
-          function finish() {
-            if (settled) return;
-            if (!isPortraitOrientation()) {
-              settled = true;
-              cleanup();
-              resolve(true);
-            }
-          }
-          function cleanup() {
-            if (timerId !== null) clearTimeout(timerId);
-            window.removeEventListener('resize', finish);
-            window.removeEventListener('orientationchange', finish);
-            if (window.screen && window.screen.orientation && typeof window.screen.orientation.removeEventListener === 'function') {
-              window.screen.orientation.removeEventListener('change', finish);
-            }
-          }
-          window.addEventListener('resize', finish);
-          window.addEventListener('orientationchange', finish);
-          if (window.screen && window.screen.orientation && typeof window.screen.orientation.addEventListener === 'function') {
-            window.screen.orientation.addEventListener('change', finish);
-          }
-          timerId = setTimeout(function () {
-            if (settled) return;
-            settled = true;
-            cleanup();
-            resolve(!isPortraitOrientation());
-          }, timeoutMs);
-        });
-      }
-
-      async function attemptForceLandscape(fromUserGesture) {
-        if (!isPortraitOrientation()) return 'landscape';
-        const orientationApi = window.screen && window.screen.orientation;
-        const hasLockFn = Boolean(orientationApi && typeof orientationApi.lock === 'function');
-        if (!hasLockFn) {
-          return 'unsupported';
-        }
-
-        if (fromUserGesture && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+      if (btn) {
+        btn.addEventListener("click", function () {
           try {
-            await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+            if (document.documentElement.requestFullscreen) {
+              document.documentElement.requestFullscreen().catch(function () {});
+            }
+            if (screen.orientation && screen.orientation.lock) {
+              screen.orientation.lock("landscape").catch(function () {});
+            }
           } catch (_) {}
-        }
-
-        const modes = ['landscape', 'landscape-primary'];
-        for (let i = 0; i < modes.length; i++) {
-          try {
-            await orientationApi.lock(modes[i]);
-            const switched = await waitForLandscapeTransition(250);
-            if (switched) {
-              return 'forced';
-            }
-          } catch (err) {
-            const errName = err && err.name ? String(err.name) : '';
-            if (errName === 'NotSupportedError') {
-              return 'unsupported';
-            }
-            if (errName === 'SecurityError' || errName === 'InvalidStateError') {
-              return fromUserGesture ? 'unsupported' : 'needs-gesture';
-            }
-          }
-        }
-        return isPortraitOrientation() ? 'unsupported' : 'forced';
-      }
-
-      async function evaluateOrientation() {
-        const seq = ++evalSeq;
-        const mobileOrTablet = isMobileOrTablet();
-        const portrait = isPortraitOrientation();
-
-        if (!mobileOrTablet || !portrait) {
-          applyBlockedState(false, false);
-          if (mobileOrTablet && window.matchMedia &&
-              (window.matchMedia('(display-mode: fullscreen)').matches ||
-               window.matchMedia('(display-mode: standalone)').matches) &&
-              window.screen && window.screen.orientation &&
-              typeof window.screen.orientation.lock === 'function') {
-            try { window.screen.orientation.lock('landscape').catch(function () {}); } catch (_) {}
-          }
-          ensureGameLoaded();
-          return;
-        }
-
-        window.__mobPortraitBlocked = true;
-        setAppPaused(true);
-
-        const lockResult = await attemptForceLandscape(false);
-        if (seq !== evalSeq) return;
-
-        if (lockResult === 'forced' || lockResult === 'landscape' || !isPortraitOrientation()) {
-          applyBlockedState(false, false);
-          ensureGameLoaded();
-          return;
-        }
-
-        applyBlockedState(true, lockResult === 'needs-gesture');
-      }
-
-      if (forceBtn) {
-        forceBtn.addEventListener('click', async function () {
-          const result = await attemptForceLandscape(true);
-          if (result === 'forced' || result === 'landscape' || !isPortraitOrientation()) {
-            applyBlockedState(false, false);
-            ensureGameLoaded();
-          } else {
-            applyBlockedState(true, false);
-          }
+          evaluateOrientation();
         });
       }
 
       window.MOBOrientationGate = {
-        isMobileOrTablet: isMobileOrTablet,
-        isPortraitOrientation: isPortraitOrientation,
-        isGameLoaded: function () { return gameScriptLoaded; },
         evaluate: evaluateOrientation,
-        attemptForceLandscape: attemptForceLandscape
+        isBlocked: function () { return Boolean(window.__mobPortraitBlocked); }
       };
 
-      window.addEventListener('resize', evaluateOrientation);
-      window.addEventListener('orientationchange', evaluateOrientation);
-      if (window.screen && window.screen.orientation && typeof window.screen.orientation.addEventListener === 'function') {
-        window.screen.orientation.addEventListener('change', evaluateOrientation);
-      }
-
+      window.addEventListener("resize", evaluateOrientation);
+      window.addEventListener("orientationchange", evaluateOrientation);
+      if (mq && mq.addEventListener) mq.addEventListener("change", evaluateOrientation);
       evaluateOrientation();
     })();
   </script>
 
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then((reg) => {
-            console.log('[PWA] Service Worker registered successfully with scope:', reg.scope);
-            // Proactively check for live updates on every session
-            reg.update();
-          })
-          .catch((err) => {
-            console.warn('[PWA] Service Worker registration failed:', err);
-          });
-      });
+  <script src="ui-overlay.js?v=0.8.0-r1"></script>
+
+  <script type="module">
+    const banner = document.getElementById("mob-fatal-banner");
+    let hasBootFatal = false;
+
+    function showFatal(title, detail) {
+      hasBootFatal = true;
+      banner.style.display = "block";
+      banner.innerHTML = "<strong>" + title + "</strong><br/>" + (detail || "");
+    }
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./sw.js").then((reg) => {
+        if (reg && typeof reg.update === "function") reg.update();
+      }).catch(() => {});
+    }
+
+    const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || "") ||
+      (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isMobile = isIOS || /Android|webOS|Mobile/i.test(navigator.userAgent || "");
+
+    if (!window.crossOriginIsolated) {
+      showFatal(
+        "Cross-Origin Isolation Required",
+        "WebGPU threaded Wasm requires HTTPS with COOP (same-origin) and COEP (require-corp) headers."
+      );
+    } else if (!("gpu" in navigator)) {
+      showFatal(
+        "WebGPU Unavailable",
+        isIOS
+          ? "WebGPU is not exposed in Safari on this iOS version. Update to iOS 26+, or on iOS 18 enable WebGPU in Settings &rarr; Apps &rarr; Safari &rarr; Advanced &rarr; Feature Flags."
+          : "Your browser or GPU driver does not expose navigator.gpu. Try desktop Edge/Chrome/Safari with WebGPU enabled."
+      );
+    } else {
+      const canvas = document.getElementById("screen");
+      const threadWorkers = [];
+
+      // Follow Ash's non-blocking agent pool setup with timeout & mobile memory budget
+      function warmAgentPool(count) {
+        return Promise.all(
+          Array.from({ length: count }, () =>
+            new Promise((resolve) => {
+              let settled = false;
+              let w = null;
+              const finish = (port) => {
+                if (settled) return;
+                settled = true;
+                resolve(port);
+              };
+              const timer = setTimeout(() => {
+                if (!settled) {
+                  try { if (w) w.terminate(); } catch (_) {}
+                  finish(null);
+                }
+              }, 3500);
+              try {
+                w = new Worker("./thread.js", { type: "module" });
+                w.onmessage = ({ data }) => {
+                  if (data && data.kind === "agent" && data.state === "ready" && !settled) {
+                    clearTimeout(timer);
+                    const ch = new MessageChannel();
+                    w.postMessage({ port: ch.port2 }, [ch.port2]);
+                    threadWorkers.push(w);
+                    finish(ch.port1);
+                  } else if (data && data.kind === "err") {
+                    console.error("[thread]", data.text);
+                  }
+                };
+                w.onerror = (e) => {
+                  clearTimeout(timer);
+                  console.warn("[thread agent failed]", e && e.message ? e.message : e);
+                  finish(null);
+                };
+              } catch (err) {
+                clearTimeout(timer);
+                finish(null);
+              }
+            })
+          )
+        ).then((ports) => ports.filter(Boolean));
+      }
+
+      const poolCount = isMobile ? 1 : Math.min(2, Math.max(1, (navigator.hardwareConcurrency || 2) - 1));
+      const agentPorts = await warmAgentPool(poolCount);
+      const mainWorker = new Worker("./worker.js", { type: "module" });
+      let sawRendererInit = false;
+
+      mainWorker.onerror = (e) => {
+        showFatal(
+          "WebAssembly Worker Error",
+          String((e && e.message) || "The Wasm worker encountered an unexpected error.")
+        );
+      };
+
+      mainWorker.onmessage = async ({ data }) => {
+        if (!data || !data.kind) return;
+        if (data.kind === "spawn-agent") {
+          if (data.memory && window.MOBWebBridge) {
+            window.MOBWebBridge.attachMemory(data.memory);
+          }
+          try {
+            const mod = await import("./" + data.name + ".mjs");
+            if (typeof mod.start === "function") {
+              mod.start({
+                memory: data.memory,
+                address: data.address,
+                canvas: canvas,
+                report: showFatal,
+                fail: (reason) => showFatal("Runtime Agent Error (" + data.name + ")", reason)
+              });
+            }
+          } catch (e) {
+            showFatal("Agent Load Failed (" + data.name + ")", String(e && e.message ? e.message : e));
+          }
+        } else if (data.kind === "out") {
+          console.log("[wasm]", data.text);
+          if (String(data.text).indexOf("WebGpuRenderer.initAsync => true") >= 0) {
+            sawRendererInit = true;
+          } else if (String(data.text).indexOf("WebGpuRenderer.initAsync => false") >= 0) {
+            showFatal("WebGPU Initialization Failed", "Could not acquire a WebGPU adapter or device on this browser.");
+          }
+        } else if (data.kind === "err") {
+          console.error("[wasm]", data.text);
+          if (!sawRendererInit && !hasBootFatal) {
+            showFatal("Startup Error", String(data.text));
+          }
+        } else if (data.kind === "done") {
+          for (const tw of threadWorkers) {
+            try { tw.terminate(); } catch (_) {}
+          }
+          if (data.trapped) {
+            showFatal("Runtime Trapped", String(data.trapped));
+          }
+        }
+      };
+
+      mainWorker.postMessage(
+        {
+          module: "./game.wasm?v=0.8.0-r1",
+          args: ["./game.wasm"],
+          environ: [isMobile ? "ASH_GC_HEAP_MB=96" : "ASH_GC_HEAP_MB=128", "ASH_GC_HANDBACK=1"],
+          display: false,
+          agents: agentPorts
+        },
+        agentPorts
+      );
     }
   </script>
 </body>

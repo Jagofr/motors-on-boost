@@ -2,7 +2,8 @@ package tests.input;
 
 import utest.Test;
 import utest.Assert;
-import hxd.Key;
+import input.InputKey as Key;
+import input.GamepadDevice;
 import input.InputController;
 import input.InputController.ExclusiveDevice;
 
@@ -71,7 +72,7 @@ class TestInputController extends Test {
     }
 
     public function testAnalogGamepadAndTouchSteeringSignsAndDeadzone() {
-        var pad = hxd.Pad.createDummy();
+        var pad = GamepadDevice.createDummy();
         @:privateAccess input.pad = pad;
         input.exclusiveDevice = ExclusiveDevice.GamepadOnly;
         @:privateAccess pad.connected = true;
@@ -81,26 +82,26 @@ class TestInputController extends Test {
         input.update(1.0 / 60.0);
         Assert.floatEquals(0.0, input.steer, 0.0001);
 
-        // Analog stick pushed Left (-0.5) must produce positive steer (> 0)
+        // Analog stick pushed Left (-0.5) must produce negative steer (< 0)
         @:privateAccess pad.rawXAxis = -0.5;
         input.update(1.0 / 60.0);
         var leftHalf = input.steer;
-        Assert.isTrue(leftHalf > 0.15 && leftHalf < 0.7, "Analog partial left stick expected in (0.15, 0.7), got " + leftHalf);
+        Assert.isTrue(leftHalf < -0.15 && leftHalf > -0.7, "Analog partial left stick expected in (-0.7, -0.15), got " + leftHalf);
 
-        // Analog stick pushed Right (+0.5) must produce exact opposite negative steer (< 0)
+        // Analog stick pushed Right (+0.5) must produce exact opposite positive steer (> 0)
         @:privateAccess pad.rawXAxis = 0.5;
         input.update(1.0 / 60.0);
         var rightHalf = input.steer;
         Assert.floatEquals(-leftHalf, rightHalf, 0.001);
 
-        // Full left / full right analog stick must reach +1.0 and -1.0 cleanly
+        // Full left / full right analog stick must reach -1.0 and +1.0 cleanly
         @:privateAccess pad.rawXAxis = -1.0;
         input.update(1.0 / 60.0);
-        Assert.floatEquals(1.0, input.steer, 0.001);
+        Assert.floatEquals(-1.0, input.steer, 0.001);
 
         @:privateAccess pad.rawXAxis = 1.0;
         input.update(1.0 / 60.0);
-        Assert.floatEquals(-1.0, input.steer, 0.001);
+        Assert.floatEquals(1.0, input.steer, 0.001);
 
         // Releasing analog stick resets steer back to 0 cleanly
         @:privateAccess pad.rawXAxis = 0.0;
@@ -112,10 +113,10 @@ class TestInputController extends Test {
         input.steerSensitivity = 0.5;
         input.touchSteer = -1.0;
         for (_ in 0...15) input.update(1.0 / 60.0);
-        Assert.floatEquals(0.6, input.steer, 0.01);
+        Assert.floatEquals(-0.6, input.steer, 0.01);
 
         input.touchSteer = 1.0;
         for (_ in 0...15) input.update(1.0 / 60.0);
-        Assert.floatEquals(-0.6, input.steer, 0.01);
+        Assert.floatEquals(0.6, input.steer, 0.01);
     }
 }

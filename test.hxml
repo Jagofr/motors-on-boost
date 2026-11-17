@@ -1,14 +1,12 @@
 -cp src
 -cp tests
--lib heaps
--lib format
+-lib oimo
 -lib json2object
 -lib utest
--lib oimo
+-lib hlwgpu
+-lib hlwindow
+-lib ash-future
 -main TestMain
--js bin/test.js
--D js-es=6
--D resourcesPath=res
+-hl bin/test.hl
 -w -WDeprecatedEnumAbstract
 -w -WDeprecated
---cmd node tests/node-runner.js

@@ -9,20 +9,20 @@ import Version;
  */
 class TestVersion extends Test {
     public function testVersionComponents() {
-        Assert.equals("0.6.1", Version.NUMBER);
-        Assert.isTrue(Version.BUILD >= 1);
-        Assert.equals("0014", Version.BUILD_STRING);
+        Assert.equals("0.8.0", Version.NUMBER);
+        Assert.isTrue(Version.BUILD >= 16);
+        Assert.equals("0016", Version.BUILD_STRING);
         Assert.equals("Alpha", Version.CHANNEL);
         Assert.isTrue(Version.BUILD_DATE.length > 0);
     }
 
     public function testDisplayString() {
-        Assert.isTrue(Version.DISPLAY.indexOf("v0.6.1") == 0);
-        Assert.isTrue(Version.DISPLAY.indexOf("Build 0014") > 0);
+        Assert.isTrue(Version.DISPLAY.indexOf("v0.8.0") == 0);
+        Assert.isTrue(Version.DISPLAY.indexOf("Build 0016") > 0);
     }
 
     public function testShortString() {
-        Assert.equals("v0.6.1", Version.SHORT);
+        Assert.equals("v0.8.0", Version.SHORT);
     }
 }
 

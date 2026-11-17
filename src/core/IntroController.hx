@@ -2,12 +2,12 @@ package core;
 
 import config.GameConfig;
 import config.GameConfig.IntroConfig;
-import h2d.Bitmap;
-import h2d.Graphics;
-import h2d.Object;
-import h2d.Scene;
-import h2d.Text;
-import h2d.Tile;
+import ui.nodes.UINodes.UIBitmap as Bitmap;
+import ui.nodes.UINodes.UIGraphics as Graphics;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIScene2D as Scene;
+import ui.nodes.UINodes.UIText as Text;
+import ui.nodes.UINodes.UITile as Tile;
 import ui.FontManager;
 
 /**
@@ -178,8 +178,8 @@ class IntroController {
             "Created and developed by Gerard \"Jamie\" (Jagofr) Francis. Published by RvL // ROGUE.\n" +
             "All custom codebases, vehicles, handling physics, tracks, and original visual assets\n" +
             "are the intellectual property of their respective creators. All rights reserved.\n\n" +
-            "Haxe and Heaps.io are trademarks or registered trademarks of their respective owners.\n" +
-            "WebGL is a trademark of the Khronos Group Inc. Typography licensed under SIL OFL & Apache 2.0.\n" +
+            "Haxe, hlwgpu, and Ash are open-source technologies of their respective owners.\n" +
+            "WebGPU is a standard of the W3C GPU for the Web Community Group. Typography licensed under SIL OFL & Apache 2.0.\n" +
             "Any vehicular likenesses or architectural references are used strictly for artistic illustration.\n\n" +
             "HEALTH & SAFETY ADVISORY: Photosensitivity and seizure precautions apply.\n" +
             "Please play in a well-lit environment and take a 15-minute break for every hour of play.";
@@ -293,10 +293,10 @@ class IntroController {
      * Updates optional black fade curtain revealing the 3D showcase after intro completes.
      *
      * @param {Float} dt Elapsed frame time in seconds.
-     * @param {Null<h2d.Object>} [uiRoot] Root UI view fading in opposite the curtain.
+     * @param {Null<ui.nodes.UINodes.UIObject>} [uiRoot] Root UI view fading in opposite the curtain.
      * @returns {Void}
      */
-    public function updateShowcaseCurtain(dt:Float, ?uiRoot:h2d.Object):Void {
+    public function updateShowcaseCurtain(dt:Float, ?uiRoot:ui.nodes.UINodes.UIObject):Void {
         if (!isShowcaseFadingIn) return;
         showcaseFadeTimer += dt;
         var progress = Math.min(1.0, showcaseFadeTimer / config.showcaseFadeDuration);

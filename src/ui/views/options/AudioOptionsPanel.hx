@@ -1,9 +1,9 @@
 package ui.views.options;
 
-import h2d.Object;
-import h2d.Text;
-import h2d.Bitmap;
-import h2d.Interactive;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
+import ui.nodes.UINodes.UIBitmap as Bitmap;
+import ui.nodes.UINodes.UIInteractive as Interactive;
 import ui.FontManager;
 import ui.UIIcons;
 import ui.components.UITheme;
@@ -13,7 +13,7 @@ import audio.AudioManager;
  * Audio channels volume sliders configuration subpanel view.
  *
  * @class AudioOptionsPanel
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/views/options/AudioOptionsPanel
  */
 class AudioOptionsPanel extends Object {
@@ -28,6 +28,9 @@ class AudioOptionsPanel extends Object {
 
     /** Currently highlighted channel index. */
     public var selectedIndex:Int = 0;
+
+    /** Callback notified when master/music/sfx channel volume changes so saves persist. */
+    public var onVolumeChanged:Null<Void -> Void> = null;
 
     /** Interactive row hitzone width in pixels. */
     public static inline var ROW_WIDTH:Float = 560.0;
@@ -112,6 +115,7 @@ class AudioOptionsPanel extends Object {
         }
         am.playMenuBeep(480 + (channel * 60), 0.05);
         updateStyles();
+        if (onVolumeChanged != null) onVolumeChanged();
     }
 
     /**

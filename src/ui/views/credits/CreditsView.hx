@@ -1,9 +1,9 @@
 package ui.views.credits;
 
-import h2d.Object;
-import h2d.Text;
-import h2d.Bitmap;
-import h2d.Interactive;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
+import ui.nodes.UINodes.UIBitmap as Bitmap;
+import ui.nodes.UINodes.UIInteractive as Interactive;
 import ui.FontManager;
 import ui.UIIcons;
 import ui.components.UITheme;
@@ -13,7 +13,7 @@ import Version;
  * Game development credits, authorship attribution, and technology disclosure view.
  *
  * @class CreditsView
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/views/credits/CreditsView
  */
 class CreditsView extends Object {
@@ -93,7 +93,7 @@ class CreditsView extends Object {
         aiTitleText.textColor = UITheme.COLOR_TEXT_MUTED;
 
         aiNameText = new Text(FontManager.regularFont, this);
-        aiNameText.text = "Google Gemini 3.8 Flash";
+        aiNameText.text = "Google Gemini";
         aiNameText.textColor = COLOR_AI_COLLAB;
 
         techDetailsText = new Text(FontManager.regularFont, this);
@@ -101,8 +101,8 @@ class CreditsView extends Object {
         techDetailsText.maxWidth = MAX_TECH_DETAILS_WIDTH;
         techDetailsText.textColor = 0xA0B2C6;
         techDetailsText.text = 
-            "Built with Haxe, Heaps.io (Hardware-Accelerated WebGL) & Modern Shaders\n" +
-            "Typography: Stack Sans Headline & Material Symbols Sharp\n" +
+            "Built with Haxe, hlwgpu (Hardware-Accelerated WebGPU & Compute Shaders) & OimoPhysics\n" +
+            "Typography: Stack Sans Headline & Material Symbols Rounded\n" +
             "Homage & Inspiration: Need for Speed: Most Wanted (2005) & Burnout Revenge (2005)\n\n" +
             "Thank you for playing!";
 

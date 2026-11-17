@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 48" width="180" height="48">
+  <defs>
+    <linearGradient id="wgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00E5FF"/>
+      <stop offset="100%" stop-color="#0077FF"/>
+    </linearGradient>
+  </defs>
+  <polygon points="24,6 44,40 4,40" fill="none" stroke="url(#wgGrad)" stroke-width="3.2" stroke-linejoin="round"/>
+  <polygon points="34,14 48,40 20,40" fill="url(#wgGrad)" opacity="0.28"/>
+  <polygon points="24,18 33,34 15,34" fill="#00E5FF"/>
+  <text x="58" y="29" fill="#F4F7FB" font-family="system-ui, sans-serif" font-size="18" font-weight="800" letter-spacing="1.5">HLWGPU</text>
+  <text x="59" y="42" fill="#00E5FF" font-family="system-ui, sans-serif" font-size="9.5" font-weight="700" letter-spacing="2.2">XGPU // WGPU</text>
+</svg>

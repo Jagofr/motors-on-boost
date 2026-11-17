@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [0.8.0] - 2026-11-17
+### Added
+- **4-Mode WebGPU Anti-Aliasing Pipeline (`src/graphics/WebGpuRenderer.hx`, `PostProcessRenderer.hx`, `RadialBlurShader.hx`, `SmaaShader.hx`, `TaaResolveShader.hx`)**:
+  - Implemented WGSL post-processing & hardware antialiasing: **FXAA 3.11** (Low/Med/High), **SMAA 1x** 3-pass morphological blending (Low/Med/High), **Hardware 4x MSAA** (`sampleCount(4)` offscreen color/depth + resolve), and **TSAA** (8x/16x/32x Halton sub-pixel jitter + velocity reprojection + 3x3 history clamping), verified with pixel-edge analysis in `aitests/specs/aa-visual.spec.js`.
+- **Garage Car Selection & Paint Customization (`src/ui/views/carselect/CarSelectView.hx`, `CarConfig.hx`, `TireSlipSolver.hx`, `CarMesh.hx`)**:
+  - Inserted `CarSelect` screen after `MapSelect` with 3 selectable chassis/drivetrain cars — **GT Race Car (AWD 35/65)**, **Sports Hatch (FWD 100/0, compact `2.42m` wheelbase & `3.1m` tight turn)**, and **Low Sports Coupe (RWD 0/100, low CoG)** — plus an 8-swatch paint color picker persisted in `SaveSystem`.
+  - Updated `TireSlipSolver` to consume `frontDriveSplit` and `chassis.wheelbase` / `trackWidth` dynamically and sculpted per-car proportions & spoilers in `CarMesh`.
+- **Permanent Multi-Device Anti-Inversion Gates & VSCode Build Scripts (`tests/physics/TestCarPhysics.hx`, `tests/ui/TestTouchControls.hx`, `aitests/specs/controls-direction.spec.js`, `.vscode/`)**:
+  - Enforced canonical `- = Left`, `+ = Right` steering contract across Keyboard (`WASD`/`Arrows`), Gamepad (`Analog Stick`/`D-Pad`), and Virtual Analog Stick (`±45%`/`±100%`/continuous L→R slide) in both Haxe unit tests and Playwright E2E.
+### Fixed
+- **Steering Polarity & Virtual Analog Stick Resilience (`src/input/InputController.hx`, `web/ui-overlay.js`, `web/sw.js`, `web/web.config`)**:
+  - Corrected inverted `InputController` digital, analog stick, and touch steering signs (`Left -> -1.0`, `Right -> +1.0`).
+  - Moved `#touch-layer` into an isolated `#touch-root` container so `InGameHUD` state updates never wipe `#touch-stick-zone` mid-drag, added iOS `touchstart`/`touchmove` scroll lock, and added `no-cache` IIS/SW rules (`v0.8.0-r1`).
+  - Bumped semantic version to **`v0.8.0 (Build 0016)`**.
+
+*For detailed release notes, see [`changelogs/2026-11-17-v0.8.0-aa-pipeline-car-garage-and-steering-contract.md`](./changelogs/2026-11-17-v0.8.0-aa-pipeline-car-garage-and-steering-contract.md).*
+
+## [0.7.0] - 2026-11-16
+### Changed
+- **Complete Rewrite to `hlwgpu` (`xgpu`) WebGPU + `hlwindow` + Ash Wasm32 (`src/graphics/`, `src/math/`, `src/core/WebBridge.hx`, `web/ui-overlay.js`, `web/index.html`)**:
+  - Removed all `heaps` / `format` dependencies and replaced rendering with stateless WebGPU pipelines, `TrackComputeShader` `@compute` track/guardrail generation, `SkyShader`, `SceneLitShader`, and fiber-compiled `WebGpuRenderer`.
+  - Replaced Canvas2D UI on web with responsive glassmorphic HTML5/CSS3 overlays synchronized over a 128 KB SharedArrayBuffer `WebBridge` mailbox, restored RvL // ROGUE & Jagofr intro splash transitions through opaque black curtains, added decoupled `UI Interface Target` resolution scaling, iPhone/mobile main-thread fallback, and bumped version to **`v0.7.0 (Build 0015)`**.
+
+*For detailed release notes, see [`changelogs/2026-11-16-v0.7.0-webgpu-hlwgpu-ash-wasm-rewrite.md`](./changelogs/2026-11-16-v0.7.0-webgpu-hlwgpu-ash-wasm-rewrite.md).*
+
 ## [0.6.1] - 2026-11-15
 ### Added
 - **Cross-Device LAN/WAN Hybrid Relay (`web/relay.ashx`, `server/socket-relay.js`, `src/net/SocketTransport.hx`)**:

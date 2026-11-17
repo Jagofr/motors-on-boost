@@ -1,7 +1,7 @@
 package physics;
 
-import h3d.Vector;
-import oimo.common.Vec3;
+import oimo.common.Vec3 as OimoVec3;
+import math.Vec3;
 import oimo.collision.geometry.RayCastHit;
 import oimo.dynamics.World;
 import oimo.dynamics.callback.RayCastCallback;
@@ -103,9 +103,9 @@ class SuspensionSolver {
     var prevCompressions:Array<Float>;
     var prevGrounded:Array<Bool>;
     var rayCallback:WheelRayCallback;
-    var rayStart:Vec3;
-    var rayEnd:Vec3;
-    var scratchNormal:Vector;
+    var rayStart:OimoVec3;
+    var rayEnd:OimoVec3;
+    var scratchNormal:Vec3;
 
     /**
      * Constructs a reusable 4-wheel suspension solver with persistent bump/rebound history.
@@ -114,9 +114,9 @@ class SuspensionSolver {
         prevCompressions = [0.14, 0.14, 0.14, 0.14];
         prevGrounded = [true, true, true, true];
         rayCallback = new WheelRayCallback(null);
-        rayStart = new Vec3();
-        rayEnd = new Vec3();
-        scratchNormal = new Vector(0.0, 0.0, 1.0);
+        rayStart = new OimoVec3();
+        rayEnd = new OimoVec3();
+        scratchNormal = new Vec3(0.0, 0.0, 1.0);
     }
 
     /**
@@ -152,7 +152,7 @@ class SuspensionSolver {
     public function solve(
         dt:Float,
         cfg:VehicleConfigData,
-        pos:Vector,
+        pos:Vec3,
         vz:Float,
         yaw:Float,
         pitch:Float,

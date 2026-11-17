@@ -1,9 +1,9 @@
 package ui.views.hud;
 
-import h2d.Object;
-import h2d.Graphics;
-import h2d.Text;
-import h3d.Vector;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIGraphics as Graphics;
+import ui.nodes.UINodes.UIText as Text;
+import math.Vec3;
 import ui.FontManager;
 import ui.components.UITheme;
 import physics.CarPhysics;
@@ -18,7 +18,7 @@ import physics.CarPhysics;
  * Fully optimized for zero per-frame garbage collector allocations.
  *
  * @class InGameHUDView
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/views/hud/InGameHUDView
  */
 class InGameHUDView extends Object {
@@ -124,7 +124,7 @@ class InGameHUDView extends Object {
      *
      * @param waypoints Dense spline coordinates along track centerline.
      */
-    public function initWaypoints(waypoints:Array<Vector>) {
+    public function initWaypoints(waypoints:Array<Vec3>) {
         minimapPoints = [];
         if (waypoints == null || waypoints.length == 0) return;
 
@@ -170,11 +170,11 @@ class InGameHUDView extends Object {
      */
     public function initSandboxBounds(halfSpan:Float = 195.0) {
         var pts = [
-            new Vector(-halfSpan, -halfSpan, 0),
-            new Vector( halfSpan, -halfSpan, 0),
-            new Vector( halfSpan,  halfSpan, 0),
-            new Vector(-halfSpan,  halfSpan, 0),
-            new Vector(-halfSpan, -halfSpan, 0)
+            new Vec3(-halfSpan, -halfSpan, 0),
+            new Vec3( halfSpan, -halfSpan, 0),
+            new Vec3( halfSpan,  halfSpan, 0),
+            new Vec3(-halfSpan,  halfSpan, 0),
+            new Vec3(-halfSpan, -halfSpan, 0)
         ];
         initWaypoints(pts);
     }
@@ -245,7 +245,7 @@ class InGameHUDView extends Object {
         boostText.textColor = isBoosting ? UITheme.COLOR_ORANGE_WARNING : UITheme.COLOR_ACCENT_CYAN;
 
         // 7. Framerate Counter
-        var fps = Math.round(hxd.Timer.fps());
+        var fps = Math.round(graphics.SceneGraph.EngineStub.getCurrent().fps);
         if (fps != lastFps) {
             lastFps = fps;
             fpsText.text = "FPS: " + fps;

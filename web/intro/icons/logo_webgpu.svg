@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 168 48" width="168" height="48">
+  <defs>
+    <linearGradient id="gGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0093FF"/>
+      <stop offset="100%" stop-color="#00E5FF"/>
+    </linearGradient>
+  </defs>
+  <polygon points="22,8 38,38 6,38" fill="url(#gGrad)"/>
+  <polygon points="34,16 44,38 24,38" fill="#005A9C" opacity="0.9"/>
+  <polygon points="41,24 47,38 35,38" fill="#00E5FF" opacity="0.85"/>
+  <text x="56" y="30" fill="#F4F7FB" font-family="system-ui, sans-serif" font-size="19" font-weight="800" letter-spacing="1">WebGPU</text>
+</svg>

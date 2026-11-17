@@ -1,10 +1,10 @@
 package ui;
 
-import h2d.Object;
-import h2d.Text;
-import h2d.Graphics;
-import h2d.Bitmap;
-import h2d.Tile;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
+import ui.nodes.UINodes.UIGraphics as Graphics;
+import ui.nodes.UINodes.UIBitmap as Bitmap;
+import ui.nodes.UINodes.UITile as Tile;
 import input.InputController;
 import net.MultiplayerManager;
 import save.SaveSystem.GraphicsSettings;
@@ -17,6 +17,7 @@ import ui.components.CardBackplate;
 import ui.views.splash.SplashView;
 import ui.views.mainmenu.MainMenuView;
 import ui.views.mapselect.MapSelectView;
+import ui.views.carselect.CarSelectView;
 import ui.views.multiplayer.MultiplayerLobbyView;
 import ui.views.multiplayer.MultiplayerMenuView;
 import ui.views.pause.PauseMenuView;
@@ -29,7 +30,7 @@ import ui.components.TouchControlsHUD;
  * Assembles and lays out the title splash, main menu, map selection, pause menu, options, and credits views.
  *
  * @class UIBuilder
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/UIBuilder
  */
 @:keep
@@ -47,6 +48,7 @@ class UIBuilder extends Object {
     public var splashView:SplashView;
     public var mainMenuView:MainMenuView;
     public var mapSelectView:MapSelectView;
+    public var carSelectView:CarSelectView;
     public var multiplayerMenuView:MultiplayerMenuView;
     public var multiplayerLobbyView:MultiplayerLobbyView;
     public var pauseMenuView:PauseMenuView;
@@ -82,6 +84,8 @@ class UIBuilder extends Object {
         mainMenuView = new MainMenuView(this);
         mapSelectView = new MapSelectView(this);
         mapSelectView.visible = false;
+        carSelectView = new CarSelectView(this);
+        carSelectView.visible = false;
         multiplayerMenuView = new MultiplayerMenuView(this);
         multiplayerMenuView.visible = false;
         multiplayerLobbyView = new MultiplayerLobbyView(mp, this);
@@ -119,6 +123,8 @@ class UIBuilder extends Object {
                 CardBackplate.drawMainMenu(cardBg, sw, sh, mainMenuView.selectedIndex);
             case MapSelect:
                 CardBackplate.drawMapSelect(cardBg, sw, sh, mapSelectView.selectedIndex);
+            case CarSelect:
+                CardBackplate.drawMapSelect(cardBg, sw, sh, carSelectView.selectedCarIndex % 2);
             case MultiplayerMenu:
                 CardBackplate.drawMultiplayerMenu(cardBg, sw, sh, multiplayerMenuView.selectedIndex, multiplayerMenuView.enteredCode.length > 0);
             case MultiplayerLobby:
@@ -141,8 +147,8 @@ class UIBuilder extends Object {
      */
     public function layout(state:UIState) {
         var s2d = getScene();
-        var sw:Float = s2d != null ? s2d.width : hxd.Window.getInstance().width;
-        var sh:Float = s2d != null ? s2d.height : hxd.Window.getInstance().height;
+        var sw:Float = s2d != null ? s2d.width : graphics.SceneGraph.EngineStub.getCurrent().width;
+        var sh:Float = s2d != null ? s2d.height : graphics.SceneGraph.EngineStub.getCurrent().height;
 
         if (modalDimmer != null) {
             modalDimmer.scaleX = sw;
@@ -154,6 +160,7 @@ class UIBuilder extends Object {
         if (splashView != null && splashView.visible) splashView.layout(sw, sh);
         if (mainMenuView != null && mainMenuView.visible) mainMenuView.layout(sw, sh);
         if (mapSelectView != null && mapSelectView.visible) mapSelectView.layout(sw, sh);
+        if (carSelectView != null && carSelectView.visible) carSelectView.layout(sw, sh);
         if (multiplayerMenuView != null && multiplayerMenuView.visible) multiplayerMenuView.layout(sw, sh);
         if (multiplayerLobbyView != null && multiplayerLobbyView.visible) multiplayerLobbyView.layout(sw, sh);
         if (pauseMenuView != null && pauseMenuView.visible) pauseMenuView.layout(sw, sh);

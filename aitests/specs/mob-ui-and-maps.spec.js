@@ -1,6 +1,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
+const zlib = require('zlib');
 
 const SCREENSHOT_DIR = path.resolve(__dirname, '..', 'screenshots');
 
@@ -10,284 +11,497 @@ test.beforeAll(() => {
   }
 });
 
-test.describe('M.O.B. // UI, Full-Viewport Intro, Map Selection & Restart Verification', () => {
-  test('1. Boot intro screens fill the entire viewport (Studio, Engine, Disclaimer)', async ({ page }) => {
-    await page.goto('/');
+function sampleCornerPixelLuma(pngBuffer) {
+  let pos = 8, width = 0, height = 0, colorType = 6;
+  const idat = [];
+  while (pos < pngBuffer.length) {
+    const len = pngBuffer.readUInt32BE(pos);
+    const type = pngBuffer.slice(pos + 4, pos + 8).toString('ascii');
+    const data = pngBuffer.slice(pos + 8, pos + 8 + len);
+    if (type === 'IHDR') { width = data.readUInt32BE(0); height = data.readUInt32BE(4); colorType = data[9]; }
+    else if (type === 'IDAT') idat.push(data);
+    else if (type === 'IEND') break;
+    pos += 12 + len;
+  }
+  const bpp = colorType === 6 ? 4 : 3;
+  const stride = width * bpp + 1;
+  const raw = zlib.inflateSync(Buffer.concat(idat));
+  const recon = Buffer.alloc(height * width * bpp);
+  for (let y = 0; y < height; y++) {
+    const rowIn = y * stride, filter = raw[rowIn], rowOut = y * width * bpp, prev = (y - 1) * width * bpp;
+    for (let x = 0; x < width * bpp; x++) {
+      const val = raw[rowIn + 1 + x];
+      const a = x >= bpp ? recon[rowOut + x - bpp] : 0;
+      const b = y > 0 ? recon[prev + x] : 0;
+      const c = (x >= bpp && y > 0) ? recon[prev + x - bpp] : 0;
+      let o = val;
+      if (filter === 1) o = (val + a) & 0xff;
+      else if (filter === 2) o = (val + b) & 0xff;
+      else if (filter === 3) o = (val + ((a + b) >> 1)) & 0xff;
+      else if (filter === 4) {
+        const p = a + b - c;
+        const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+        o = (val + (pa <= pb && pa <= pc ? a : (pb <= pc ? b : c))) & 0xff;
+      }
+      recon[rowOut + x] = o;
+    }
+  }
+  // Top-left corner strip inside intro viewport (should stay near pure black during fade-to-black)
+  let maxCornerLuma = 0;
+  for (let y = 6; y < 28; y += 4) {
+    for (let x = 6; x < 28; x += 4) {
+      const idx = (y * width + x) * bpp;
+      const luma = recon[idx] + recon[idx + 1] + recon[idx + 2];
+      if (luma > maxCornerLuma) maxCornerLuma = luma;
+    }
+  }
+  return { maxCornerLuma };
+}
 
-    // Wait for Heaps app to initialize and WebP splash bitmaps to decode
-    await page.waitForFunction(() => {
-      return window.app && window.app.s2d && window.app.studioSplashBmp && window.app.engineSplashBmp;
-    }, { timeout: 15000 });
-
-    // Hold Studio splash at full opacity and verify it covers >= 100% of s2d viewport
-    const studioMetrics = await page.evaluate(() => {
-      const app = window.app;
-      app.setIntroScreen(window.IntroState.Studio);
-      app.introTimer = 1.2; // Hold phase (alpha = 1.0)
-      app.screenStudio.alpha = 1.0;
-      app.layoutIntro();
-
-      const sw = app.s2d.width;
-      const sh = app.s2d.height;
-      const bmp = app.studioSplashBmp;
-      const renderedW = bmp.tile.width * bmp.scaleX;
-      const renderedH = bmp.tile.height * bmp.scaleY;
-
-      return { sw, sh, renderedW, renderedH, x: bmp.x, y: bmp.y };
+test.describe('M.O.B. // WebGPU Full UI, Options, Cross-Input & Fade-to-Black Smoke Suite', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      // Inject controllable virtual W3C gamepad before app boots
+      window.__virtualPad = null;
+      const origGetGamepads = navigator.getGamepads ? navigator.getGamepads.bind(navigator) : () => [];
+      navigator.getGamepads = () => (window.__virtualPad ? [window.__virtualPad] : origGetGamepads());
     });
-
-    expect(studioMetrics.renderedW).toBeGreaterThanOrEqual(studioMetrics.sw - 0.5);
-    expect(studioMetrics.renderedH).toBeGreaterThanOrEqual(studioMetrics.sh - 0.5);
-    await page.waitForTimeout(150);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '01-intro-studio-fullscreen.png') });
-
-    // Hold Engine splash at full opacity and verify it covers >= 100% of s2d viewport
-    const engineMetrics = await page.evaluate(() => {
-      const app = window.app;
-      app.setIntroScreen(window.IntroState.Engine);
-      app.introTimer = 1.2; // Hold phase (alpha = 1.0)
-      app.screenEngine.alpha = 1.0;
-      app.layoutIntro();
-
-      const sw = app.s2d.width;
-      const sh = app.s2d.height;
-      const bmp = app.engineSplashBmp;
-      const renderedW = bmp.tile.width * bmp.scaleX;
-      const renderedH = bmp.tile.height * bmp.scaleY;
-
-      return { sw, sh, renderedW, renderedH, x: bmp.x, y: bmp.y };
-    });
-
-    expect(engineMetrics.renderedW).toBeGreaterThanOrEqual(engineMetrics.sw - 0.5);
-    expect(engineMetrics.renderedH).toBeGreaterThanOrEqual(engineMetrics.sh - 0.5);
-    await page.waitForTimeout(150);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '02-intro-engine-fullscreen.png') });
-
-    // Verify Disclaimer screen and full-viewport backplate
-    const disclaimerMetrics = await page.evaluate(() => {
-      const app = window.app;
-      app.setIntroScreen(window.IntroState.Disclaimer);
-      app.introTimer = 1.5;
-      app.screenDisclaimer.alpha = 1.0;
-      app.layoutIntro();
-
-      return {
-        visible: app.screenDisclaimer.visible,
-        bgW: app.introBg.scaleX,
-        bgH: app.introBg.scaleY,
-        sw: app.s2d.width,
-        sh: app.s2d.height,
-        headerText: app.discHeader.text
-      };
-    });
-
-    expect(disclaimerMetrics.visible).toBe(true);
-    expect(disclaimerMetrics.bgW).toBe(disclaimerMetrics.sw);
-    expect(disclaimerMetrics.bgH).toBe(disclaimerMetrics.sh);
-    expect(disclaimerMetrics.headerText).toContain('TRADEMARK & LEGAL DISCLOSURES');
-    await page.waitForTimeout(150);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '03-intro-disclaimer.png') });
   });
 
-  test('2. Redesigned Splash, Main Menu -> Play Singleplayer -> Map Selection & Map Restart', async ({ page }) => {
+  test('1. Intro sequences fade through opaque black without flashing 3D canvas', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+
     await page.goto('/');
+    await page.waitForFunction(() => window.MOBWebBridge && window.MOBWebBridge.debug().lastStateSeq > 0, { timeout: 20000 });
 
-    await page.waitForFunction(() => window.app && window.app.s2d, { timeout: 15000 });
+    const observedStages = [];
+    for (let i = 0; i < 65; i++) {
+      const snap = await page.evaluate(() => {
+        const il = document.getElementById('intro-layer');
+        const st = il ? il.querySelector('.intro-stage') : null;
+        return {
+          appState: window.app?.appState,
+          introState: window.app?.introState,
+          uiState: window.app?.ui?.currentState,
+          ilOpacity: il ? getComputedStyle(il).opacity : null,
+          ilBg: il ? getComputedStyle(il).backgroundColor : null,
+          stageOpacity: st ? st.style.opacity : null,
+          text: document.getElementById('ui-root')?.innerText || ''
+        };
+      });
 
-    // Complete intro and show Splash screen
-    await page.evaluate(() => {
-      const app = window.app;
-      app.finishIntroSequence();
-      app.update(1.5);
-      app.ui.showSplash();
-    });
+      if (snap.appState === 'IntroSequence' && snap.introState && snap.introState !== 'None') {
+        expect(snap.ilOpacity).toBe('1');
+        expect(snap.ilBg).toBe('rgb(0, 0, 0)');
+        expect(snap.text).not.toContain('M.O.B. STUDIOS');
+        expect(snap.text).not.toContain('Heaps.io');
+        expect(snap.text).not.toContain('WebGL');
 
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '04-title-splash-screen.png') });
-
-    // Transition to Main Menu and verify "PLAY SINGLEPLAYER" is the primary option
-    const mainMenuState = await page.evaluate(() => {
-      const app = window.app;
-      app.ui.showMainMenu();
-      const rows = app.ui.builder.mainMenuView.rows.map(r => r.labelTxt.text);
-      return {
-        rowCount: rows.length,
-        rows,
-        selectedIndex: app.ui.builder.mainMenuView.selectedIndex
-      };
-    });
-
-    expect(mainMenuState.rowCount).toBe(5);
-    expect(mainMenuState.rows[0]).toBe('PLAY SINGLEPLAYER');
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '05-main-menu-singleplayer.png') });
-
-    // Trigger "PLAY SINGLEPLAYER" and verify transition to Map Selection screen
-    const mapSelectState = await page.evaluate(() => {
-      const app = window.app;
-      app.ui.builder.mainMenuView.selectedIndex = 0;
-      app.ui.builder.mainMenuView.confirmSelection();
-      const ms = app.ui.builder.mapSelectView;
-      return {
-        uiStateName: app.ui.currentState._hx_name,
-        title: ms.titleText.text,
-        maps: ms.mapTitles.map(t => t.text),
-        selectedIndex: ms.selectedIndex
-      };
-    });
-
-    expect(mapSelectState.uiStateName).toBe('MapSelect');
-    expect(mapSelectState.maps).toEqual(['HIGHWAY CIRCUIT', 'SANDBOX PROVING GROUNDS']);
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '06-map-select-highway-circuit.png') });
-
-    // Navigate to Sandbox Proving Grounds card on Map Select screen
-    await page.evaluate(() => {
-      const app = window.app;
-      app.ui.builder.mapSelectView.navigate(1);
-    });
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '07-map-select-sandbox-proving-grounds.png') });
-
-    // Launch Sandbox Proving Grounds from Map Selection
-    const sandboxLaunch = await page.evaluate(() => {
-      const app = window.app;
-      app.ui.builder.mapSelectView.confirmSelection();
-      return {
-        mapModeName: app.currentMapMode._hx_name,
-        uiStateName: app.ui.currentState._hx_name,
-        posX: app.carPhysics.pos.x,
-        posY: app.carPhysics.pos.y
-      };
-    });
-
-    expect(sandboxLaunch.mapModeName).toBe('Sandbox');
-    expect(sandboxLaunch.uiStateName).toBe('InGameHUD');
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '08-ingame-sandbox-session.png') });
-
-    // Drive forward in Sandbox, open Pause Menu, and verify Restart keeps the user in Sandbox!
-    const sandboxRestartResult = await page.evaluate(() => {
-      const app = window.app;
-      app.input.touchThrottle = 1.0;
-      app.input.isTouchActive = true;
-      for (let i = 0; i < 60; i++) {
-        app.input.update(1 / 60);
-        app.carPhysics.update(1 / 60, app.input, null, app.sandboxMap);
+        if (!observedStages.includes(snap.introState)) {
+          observedStages.push(snap.introState);
+          const shot = await page.screenshot({ path: path.join(SCREENSHOT_DIR, `pw-intro-${snap.introState.toLowerCase()}.png`) });
+          const px = sampleCornerPixelLuma(shot);
+          // Even during fade transitions, background corner stays black/near-black (no 3D sky flash)
+          if (snap.introState === 'Studio') {
+            expect(px.maxCornerLuma).toBeLessThanOrEqual(45);
+          }
+        }
       }
-      app.input.flushInputs();
-      app.input.isTouchActive = false;
-      const movedDist = Math.hypot(app.carPhysics.pos.x, app.carPhysics.pos.y);
+      if (snap.appState === 'InGameUI') break;
+      await page.waitForTimeout(250);
+    }
 
-      // Open Pause Menu
-      app.ui.showPause();
-      return {
-        movedDist,
-        uiStateName: app.ui.currentState._hx_name,
-        restartLabel: app.ui.builder.pauseMenuView.rows[1].labelTxt.text
-      };
-    });
+    expect(observedStages.length).toBeGreaterThanOrEqual(1);
+    await page.waitForSelector('#splash-layer', { timeout: 15000 });
+    await page.waitForTimeout(950); // allow showcase black curtain to dissolve
+    expect(errors).toEqual([]);
+  });
 
-    expect(sandboxRestartResult.movedDist).toBeGreaterThan(2.0);
-    expect(sandboxRestartResult.uiStateName).toBe('PauseMenu');
-    expect(sandboxRestartResult.restartLabel).toBe('RESTART MAP');
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '09-pause-menu-in-sandbox.png') });
-
-    // Execute Restart from Pause Menu while in Sandbox
-    const afterSandboxRestart = await page.evaluate(() => {
-      const app = window.app;
-      app.ui.builder.pauseMenuView.selectedIndex = 1; // RESTART MAP
-      app.ui.builder.pauseMenuView.confirmSelection();
-      return {
-        mapModeName: app.currentMapMode._hx_name,
-        uiStateName: app.ui.currentState._hx_name,
-        distFromOrigin: Math.hypot(app.carPhysics.pos.x, app.carPhysics.pos.y),
-        speed: app.carPhysics.forwardSpeed
-      };
-    });
-
-    expect(afterSandboxRestart.mapModeName).toBe('Sandbox');
-    expect(afterSandboxRestart.uiStateName).toBe('InGameHUD');
-    expect(afterSandboxRestart.distFromOrigin).toBeLessThan(0.01);
-    expect(Math.abs(afterSandboxRestart.speed)).toBeLessThan(0.01);
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '10-sandbox-restarted-at-origin.png') });
-
-    // Now test selecting Highway Circuit via Map Select and restarting Highway Circuit
-    const afterCircuitRestart = await page.evaluate(() => {
-      const app = window.app;
-      app.ui.showMainMenu();
-      app.ui.builder.mainMenuView.selectedIndex = 0; // PLAY SINGLEPLAYER
-      app.ui.builder.mainMenuView.confirmSelection();
-
-      // Select Highway Circuit (index 0)
-      app.ui.builder.mapSelectView.selectedIndex = 0;
-      app.ui.builder.mapSelectView.confirmSelection();
-
-      // Drive forward on Highway Circuit
-      app.input.touchThrottle = 1.0;
-      app.input.isTouchActive = true;
-      for (let i = 0; i < 60; i++) {
-        app.input.update(1 / 60);
-        app.carPhysics.update(1 / 60, app.input, app.track.waypoints, app.track);
+  async function bootToMainMenu(page) {
+    await page.goto('/');
+    for (let i = 0; i < 65; i++) {
+      const state = await page.evaluate(() => ({
+        intro: window.app?.introState,
+        ui: window.app?.ui?.currentState,
+        app: window.app?.appState
+      }));
+      if (state.app === 'InGameUI' && state.ui === 'Splash') break;
+      if (state.app === 'IntroSequence' && (state.intro === 'Studio' || state.intro === 'Engine')) {
+        await page.evaluate(() => { const il = document.getElementById('intro-layer'); if (il) il.click(); });
       }
-      app.input.flushInputs();
-      app.input.isTouchActive = false;
-      const movedCircuitDist = Math.hypot(app.carPhysics.pos.x, app.carPhysics.pos.y);
+      await page.waitForTimeout(220);
+    }
+    await page.waitForSelector('#splash-layer', { timeout: 15000 });
+    await page.click('#btn-splash-enter');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
+  }
 
-      // Pause and Restart Highway Circuit
-      app.ui.showPause();
-      app.ui.builder.pauseMenuView.selectedIndex = 1; // RESTART MAP
-      app.ui.builder.pauseMenuView.confirmSelection();
+  test('2. Every Menu Button, Back Routing, Graphics 14 Rows & AA Modes, Pause-Options Lock & Reload Persistence', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
 
-      return {
-        movedCircuitDist,
-        mapModeName: app.currentMapMode._hx_name,
-        uiStateName: app.ui.currentState._hx_name,
-        distFromOrigin: Math.hypot(app.carPhysics.pos.x, app.carPhysics.pos.y),
-        speed: app.carPhysics.forwardSpeed
+    await bootToMainMenu(page);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'pw-main-menu.png') });
+
+    // Check 1:1 MainMenu button alignment & keyboard ArrowDown skips disabled Row 1
+    const mainBtns = await page.locator('.menu-list .mob-btn').allTextContents();
+    expect(mainBtns.length).toBe(6);
+    expect(mainBtns[0]).toContain('PLAY SINGLEPLAYER');
+    expect(mainBtns[1]).toContain('RESUME SAVED RACE');
+    expect(await page.locator('.menu-list .mob-btn').nth(1).isDisabled()).toBe(true);
+    expect(mainBtns[5]).toContain('EXIT TO SPLASH');
+
+    await page.keyboard.press('ArrowDown');
+    await page.waitForTimeout(150);
+    expect(await page.evaluate(() => window.app.state.mainMenuIdx)).toBe(2); // skipped idx 1
+    await page.keyboard.press('ArrowUp');
+    await page.waitForTimeout(150);
+    expect(await page.evaluate(() => window.app.state.mainMenuIdx)).toBe(0);
+
+    // Credits -> Back must return cleanly to MainMenu without creating a false active save
+    await page.click('[data-action="OpenCredits"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'CreditsScreen', { timeout: 5000 });
+    const credText = await page.locator('#ui-root').innerText();
+    expect(credText).toContain('Gerard "Jamie" (Jagofr) Francis');
+    expect(credText).toContain('RvL // ROGUE');
+    await page.click('#btn-cred-back');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
+    expect(await page.evaluate(() => window.app.state.hasSavedRun)).toBe(false);
+
+    // EXIT TO SPLASH works & re-enters cleanly
+    await page.click('[data-action="QuitToTitle"]');
+    await page.waitForSelector('#splash-layer', { timeout: 5000 });
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
+
+    // Open Options -> Graphics: verify ALL 14 options, AA cycling, dependent disables, & persistence
+    await page.click('[data-action="OpenOptions"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'OptionsMenu', { timeout: 5000 });
+    expect(await page.getAttribute('.opt-tab[data-tab="Graphics"]', 'aria-selected')).toBe('true');
+    expect(await page.locator('.opt-row').count()).toBe(14);
+
+    // Cycle Anti-Aliasing Pass (row 7): FXAA -> TSAA -> SMAA -> MSAA -> None -> FXAA -> SMAA
+    const clickGfxPlus = async (row) => {
+      await page.locator(`.opt-step-btn[data-step-row="${row}"][data-step-dir="1"]`).click();
+      await page.waitForTimeout(140);
+    };
+    const clickGfxMinus = async (row) => {
+      await page.locator(`.opt-step-btn[data-step-row="${row}"][data-step-dir="-1"]`).click();
+      await page.waitForTimeout(140);
+    };
+
+    expect(await page.evaluate(() => window.app.state.options.gfx.aaType)).toBe('FXAA');
+    await clickGfxPlus(7);
+    expect(await page.evaluate(() => window.app.state.options.gfx.aaType)).toBe('TSAA');
+    await clickGfxPlus(7);
+    expect(await page.evaluate(() => window.app.state.options.gfx.aaType)).toBe('SMAA');
+    await clickGfxPlus(7);
+    expect(await page.evaluate(() => window.app.state.options.gfx.aaType)).toBe('MSAA');
+    await clickGfxPlus(7);
+    expect(await page.evaluate(() => window.app.state.options.gfx.aaType)).toBe('None');
+    // Dependent AA Quality (row 8) must become disabled for None and fixed-4x MSAA!
+    expect(await page.locator('.opt-step-btn[data-step-row="8"][data-step-dir="1"]').isDisabled()).toBe(true);
+    await clickGfxMinus(7); // None -> MSAA
+    expect(await page.evaluate(() => window.app.state.options.gfx.aaType)).toBe('MSAA');
+    expect(await page.locator('.opt-step-btn[data-step-row="8"][data-step-dir="1"]').isDisabled()).toBe(true);
+    await clickGfxMinus(7); // MSAA -> SMAA
+    expect(await page.evaluate(() => window.app.state.options.gfx.aaType)).toBe('SMAA');
+    expect(await page.locator('.opt-step-btn[data-step-row="8"][data-step-dir="1"]').isDisabled()).toBe(false);
+    await clickGfxPlus(8); // Low -> Medium (2 -> 4)
+    expect(await page.evaluate(() => window.app.state.options.gfx.aaLevel)).toBe(4);
+    await clickGfxPlus(7); // SMAA -> MSAA
+    expect(await page.evaluate(() => window.app.state.options.gfx.aaType)).toBe('MSAA');
+
+    // Cycle Shadow Quality (row 1) -> Off disables Shadow Buffer (row 2), then restore High
+    await clickGfxMinus(1); // Normal -> Off
+    expect(await page.evaluate(() => window.app.state.options.gfx.shadowLevel)).toBe('Off');
+    expect(await page.locator('.opt-step-btn[data-step-row="2"][data-step-dir="1"]').isDisabled()).toBe(true);
+    await clickGfxPlus(1); // Off -> Normal
+    await clickGfxPlus(1); // Normal -> High
+    expect(await page.evaluate(() => window.app.state.options.gfx.shadowLevel)).toBe('High');
+
+    // Cycle Render Scale (row 12): 1.0 -> 2.0
+    await clickGfxPlus(12);
+    expect(await page.evaluate(() => window.app.state.options.gfx.renderScale)).toBe(2.0);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'pw-options-graphics.png') });
+
+    // Cycle UI Interface Target (row 13): verifies UI window card + font scale shrink/expand independently of 3D canvas
+    const measureUi = async () => ({
+      uiRes: await page.evaluate(() => window.app.state.options.gfx.uiResolution),
+      uiScale: await page.evaluate(() => window.app.uiScale),
+      cardBox: await page.locator('.menu-card').boundingBox(),
+      h2Box: await page.locator('.menu-header h2').boundingBox(),
+      canvasDims: await page.evaluate(() => {
+        const c = document.getElementById('screen');
+        return { w: c.width, h: c.height, cw: c.clientWidth, ch: c.clientHeight };
+      })
+    });
+    const m720 = await measureUi();
+    expect(m720.uiRes).toBe('720p (HD)');
+    expect(m720.uiScale).toBeCloseTo(1.0, 2);
+
+    await clickGfxPlus(13); // 1080p (FHD)
+    const m1080 = await measureUi();
+    expect(m1080.uiRes).toBe('1080p (FHD)');
+    expect(m1080.uiScale).toBeCloseTo(0.6667, 2);
+    expect(m1080.cardBox.width).toBeLessThan(m720.cardBox.width * 0.72);
+    expect(m1080.h2Box.height).toBeLessThan(m720.h2Box.height * 0.78);
+    expect(m1080.canvasDims).toEqual(m720.canvasDims);
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'pw-ui-scale-1080p.png') });
+
+    await clickGfxPlus(13); // 1440p (2K)
+    const m1440 = await measureUi();
+    expect(m1440.uiRes).toBe('1440p (2K)');
+    expect(m1440.cardBox.width).toBeLessThan(m1080.cardBox.width * 0.85);
+    expect(m1440.canvasDims).toEqual(m720.canvasDims);
+
+    await clickGfxPlus(13); // 2160p (4K)
+    const m2160 = await measureUi();
+    expect(m2160.uiRes).toBe('2160p (4K)');
+    expect(m2160.cardBox.width).toBeLessThan(m1440.cardBox.width * 0.92);
+
+    await clickGfxPlus(13); // Native / Match Window -> expands back cleanly to 1.0x
+    const mNative = await measureUi();
+    expect(mNative.uiRes).toBe('Native / Match Window');
+    expect(mNative.cardBox.width).toBeGreaterThan(m2160.cardBox.width * 1.8);
+
+    // Leave at 1080p (FHD) to verify UI scale also persists across reload
+    await clickGfxPlus(13); // 720p (HD)
+    await clickGfxPlus(13); // 1080p (FHD)
+    expect(await page.evaluate(() => window.app.state.options.gfx.uiResolution)).toBe('1080p (FHD)');
+
+    await page.click('#btn-opt-back');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
+
+    // Singleplayer Map Select -> Car Select (3 drivetrain archetypes + paint color) -> Sandbox -> Drive -> Pause
+    await page.click('[data-action="OpenMapSelect"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MapSelect', { timeout: 5000 });
+    await page.click('#card-map-sandbox');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'CarSelect', { timeout: 5000 });
+    expect(await page.locator('.car-card').count()).toBe(3);
+    expect(await page.locator('#card-car-race_awd').innerText()).toContain('AWD');
+    expect(await page.locator('#card-car-hatch_fwd').innerText()).toContain('FWD');
+    expect(await page.locator('#card-car-coupe_rwd').innerText()).toContain('RWD');
+
+    // Back from CarSelect returns cleanly to MapSelect, then re-enter & pick Sports Hatch FWD + Cobalt Blue
+    await page.click('#btn-car-back');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MapSelect', { timeout: 5000 });
+    await page.click('#card-map-sandbox');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'CarSelect', { timeout: 5000 });
+    await page.click('#card-car-hatch_fwd');
+    await page.locator('.paint-swatch[data-color-idx="4"]').click();
+    await page.waitForFunction(() => window.app?.state?.carSelect?.carId === 'hatch_fwd' && window.app?.state?.carSelect?.colorIdx === 4, { timeout: 4000 });
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'pw-car-select.png') });
+    await page.click('#btn-car-launch');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'InGameHUD' && window.app?.currentMapMode === 'Sandbox', { timeout: 8000 });
+    expect(await page.evaluate(() => window.app.state.selectedCarId)).toBe('hatch_fwd');
+
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(700);
+    await page.keyboard.up('KeyW');
+    expect(await page.evaluate(() => window.app.carPhysics.forwardSpeed)).toBeGreaterThan(0.5);
+
+    await page.click('#btn-hud-pause');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'PauseMenu', { timeout: 5000 });
+    await page.click('[data-action="OpenOptions"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'OptionsMenu' && window.app?.state?.isOpenedFromPause === true, { timeout: 5000 });
+    expect(await page.locator('.opt-badge-lock').count()).toBeGreaterThanOrEqual(4);
+    expect(await page.locator('.opt-step-btn[data-step-row="0"][data-step-dir="1"]').isDisabled()).toBe(true); // Texture Fidelity locked in pause
+    await page.click('#btn-opt-back');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'PauseMenu', { timeout: 5000 });
+
+    // Main Menu -> Credits -> Back must go to MainMenu (NOT stale PauseMenu!)
+    await page.click('[data-action="QuitToTitle"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu' && window.app?.state?.hasSavedRun === true, { timeout: 5000 });
+    await page.click('[data-action="OpenCredits"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'CreditsScreen', { timeout: 5000 });
+    await page.click('#btn-cred-back');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
+
+    // Reload persistence check for Graphics (aaType=MSAA, aaLevel=4, shadowLevel=High, renderScale=2)
+    await page.reload();
+    for (let i = 0; i < 65; i++) {
+      const s = await page.evaluate(() => ({ app: window.app?.appState, ui: window.app?.ui?.currentState, intro: window.app?.introState }));
+      if (s.app === 'InGameUI' && s.ui === 'Splash') break;
+      if (s.app === 'IntroSequence' && (s.intro === 'Studio' || s.intro === 'Engine')) {
+        await page.evaluate(() => { const il = document.getElementById('intro-layer'); if (il) il.click(); });
+      }
+      await page.waitForTimeout(220);
+    }
+    await page.waitForSelector('#splash-layer', { timeout: 15000 });
+    await page.click('#btn-splash-enter');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
+    await page.click('[data-action="OpenOptions"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'OptionsMenu', { timeout: 5000 });
+    const persisted = await page.evaluate(() => window.app.state.options.gfx);
+    expect(persisted.aaType).toBe('MSAA');
+    expect(persisted.aaLevel).toBe(4);
+    expect(persisted.renderScale).toBe(2);
+    expect(persisted.uiResolution).toBe('1080p (FHD)');
+    expect(await page.evaluate(() => window.app.state.selectedCarId)).toBe('hatch_fwd');
+    expect(await page.evaluate(() => window.app.uiScale)).toBeCloseTo(0.6667, 2);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('3. Audio Sliders, Keyboard/Gamepad Remapping & Nav, Touch Custom Layout & Multiplayer UI', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
+
+    await bootToMainMenu(page);
+    await page.click('[data-action="OpenOptions"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'OptionsMenu', { timeout: 5000 });
+
+    // Switch to Audio tab via keyboard 'e' key & adjust Master/Music/SFX
+    await page.keyboard.press('KeyE');
+    await page.waitForFunction(() => window.app?.state?.options?.tab === 'Audio', { timeout: 4000 });
+    const masterBefore = await page.evaluate(() => window.app.state.options.audio.master);
+    await page.locator('.opt-step-btn[data-step-row="0"][data-step-dir="-1"]').click();
+    await page.waitForTimeout(160);
+    expect(await page.evaluate(() => window.app.state.options.audio.master)).toBeLessThan(masterBefore);
+    await page.locator('.opt-step-btn[data-step-row="2"][data-step-dir="1"]').click();
+    await page.waitForTimeout(140);
+
+    // Switch to Keyboard tab & test Input Mode + Sensitivity + Key Remap + Reset Defaults
+    await page.click('.opt-tab[data-tab="Keyboard"]');
+    await page.waitForFunction(() => window.app?.state?.options?.tab === 'Keyboard', { timeout: 4000 });
+    await page.click('#btn-dev-toggle');
+    await page.waitForTimeout(160);
+    expect(await page.evaluate(() => window.app.state.options.device)).toBe('KeyboardOnly');
+    await page.click('#btn-dev-toggle');
+    await page.waitForTimeout(160);
+    expect(await page.evaluate(() => window.app.state.options.device)).toBe('Both');
+
+    const sensBefore = await page.evaluate(() => window.app.state.options.steerSens);
+    await page.locator('.opt-step-btn[data-sens-dir="-1"]').click();
+    await page.waitForTimeout(160);
+    const sensAfterDown = await page.evaluate(() => window.app.state.options.steerSens);
+    expect(sensAfterDown).toBeLessThan(sensBefore);
+    await page.locator('.opt-step-btn[data-sens-dir="1"]').click();
+    await page.waitForTimeout(160);
+    expect(await page.evaluate(() => window.app.state.options.steerSens)).toBeGreaterThan(sensAfterDown);
+
+    await page.locator('.opt-remap-btn[data-remap-row="0"]').click();
+    await page.waitForSelector('.remap-listen-banner', { timeout: 4000 });
+    await page.waitForTimeout(200);
+    await page.keyboard.press('KeyI');
+    await page.waitForFunction(() => window.app?.state?.options?.bindings?.throttle === 'I', { timeout: 5000 });
+    await page.locator('[data-remap-row="6"]').click();
+    await page.waitForFunction(() => window.app?.state?.options?.bindings?.throttle === 'W', { timeout: 5000 });
+
+    // Switch to Gamepad tab, inject virtual controller, verify nav & button remapping
+    await page.evaluate(() => {
+      window.__virtualPad = {
+        index: 0,
+        connected: true,
+        id: 'Xbox Mock Gamepad',
+        mapping: 'standard',
+        axes: [0, 0, 0, 0],
+        buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }))
       };
     });
+    await page.keyboard.press('KeyE'); // Keyboard -> Gamepad
+    await page.waitForFunction(() => window.app?.state?.options?.tab === 'Gamepad' && window.app?.state?.options?.gamepadConnected === true, { timeout: 5000 });
+    await page.locator('.opt-remap-btn[data-remap-row="4"]').click(); // Handbrake (idx 4)
+    await page.waitForSelector('.remap-listen-banner', { timeout: 4000 });
+    await page.waitForTimeout(220);
+    await page.evaluate(() => { window.__virtualPad.buttons[2] = { pressed: true, value: 1 }; }); // X (Left)
+    await page.waitForFunction(() => window.app?.state?.options?.bindings?.padHandbrake === 'X (Left)', { timeout: 5000 });
+    await page.evaluate(() => { window.__virtualPad.buttons[2] = { pressed: false, value: 0 }; });
+    await page.locator('[data-remap-row="6"]').click();
+    await page.waitForFunction(() => window.app?.state?.options?.bindings?.padHandbrake === 'B (Right)', { timeout: 5000 });
 
-    expect(afterCircuitRestart.movedCircuitDist).toBeGreaterThan(2.0);
-    expect(afterCircuitRestart.mapModeName).toBe('Circuit');
-    expect(afterCircuitRestart.uiStateName).toBe('InGameHUD');
-    expect(afterCircuitRestart.distFromOrigin).toBeLessThan(0.01);
+    // Test real Controller RB (buttons[5]) tab switch Gamepad -> Touch
+    await page.evaluate(() => { window.__virtualPad.buttons[5] = { pressed: true, value: 1 }; });
+    await page.waitForFunction(() => window.app?.state?.options?.tab === 'Touch', { timeout: 4000 });
+    await page.evaluate(() => { window.__virtualPad.buttons[5] = { pressed: false, value: 0 }; window.__virtualPad = null; });
+
+    // Verify Touch tab steppers + preview pad + mode + scale + reset
+    expect(await page.locator('.opt-row').count()).toBe(12); // 1 Sensitivity + 11 Touch rows
+    await page.locator('.opt-step-btn[data-step-row="0"][data-step-dir="1"]').click(); // Stick X +10px
+    await page.waitForTimeout(160);
+    expect(await page.evaluate(() => window.app.state.touchSettings.stickOffsetX)).toBe(10);
+    expect(await page.evaluate(() => window.app.state.touchSettings.mode)).toBe('Custom');
+
+    await page.locator('.opt-step-btn[data-step-row="10"][data-step-dir="-1"]').click(); // Scale -5%
+    await page.waitForTimeout(160);
+    expect(await page.evaluate(() => window.app.state.touchSettings.scale)).toBeCloseTo(0.95, 2);
+
+    // Drag GAS node on interactive preview pad
+    const gasNode = page.locator('.touch-preview-node[data-touch-part="gas"]');
+    const box = await gasNode.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 12, box.y + box.height / 2 - 12);
+    await page.mouse.up();
     await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '11-highway-circuit-restarted.png') });
+    await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'pw-options-touch.png') });
 
-    // Capture Options & Credits screens for visual UI verification
-    await page.evaluate(() => {
-      window.app.ui.openOptions(false);
-    });
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '12-options-menu-styled.png') });
+    // Multiplayer UI host / leave / back check
+    await page.click('#btn-opt-back');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
+    await page.click('[data-action="OpenMultiplayer"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MultiplayerMenu', { timeout: 5000 });
+    await page.click('#btn-mp-host-sandbox');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MultiplayerLobby', { timeout: 5000 });
+    await page.click('#btn-mp-leave');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MultiplayerMenu', { timeout: 5000 });
+    await page.click('#btn-mp-back');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
 
-    await page.evaluate(() => {
-      window.app.ui.showCredits();
-    });
-    await page.waitForTimeout(200);
-    await page.screenshot({ path: path.join(SCREENSHOT_DIR, '13-credits-screen-styled.png') });
+    expect(errors).toEqual([]);
+  });
 
-    // Verify steering direction (Right -> +X, Left -> -X) and wheel rim alignment
-    const steerRight = await page.evaluate(() => {
-      const app = window.app;
-      app.loadMap(window.MapMode.Sandbox);
-      app.resetCarToSandboxCenter();
-      app.ui.showInGame();
-      app.input.touchThrottle = 1.0;
-      app.input.touchSteer = 1.0;
-      app.input.isTouchActive = true;
-      for (let i = 0; i < 45; i++) app.update(1 / 60);
-      app.input.flushInputs();
-      app.input.isTouchActive = false;
-      app.input.touchThrottle = 0.0;
-      app.input.touchSteer = 0.0;
-      return { posX: app.carPhysics.pos.x, posY: app.carPhysics.pos.y, yaw: app.carPhysics.yaw };
+  test('4. Touch Device Layout, >=44px Coarse Targets & Custom Virtual Controls HUD Transform', async ({ browser }) => {
+    const context = await browser.newContext({
+      viewport: { width: 844, height: 390 },
+      hasTouch: true,
+      isMobile: true
     });
-    expect(steerRight.posX).toBeGreaterThan(0.5);
-    expect(steerRight.posY).toBeGreaterThan(5.0);
-    expect(steerRight.yaw).toBeGreaterThan(0.05);
+    const page = await context.newPage();
+    await page.goto('/');
+    await page.waitForSelector('#splash-layer', { timeout: 25000 });
+    await page.tap('#btn-splash-enter');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
+    await page.tap('[data-action="OpenOptions"]');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'OptionsMenu', { timeout: 5000 });
+
+    // Coarse-pointer tap target size compliance check (>= 44px)
+    const stepBox = await page.locator('.opt-step-btn').first().boundingBox();
+    expect(stepBox.width).toBeGreaterThanOrEqual(44);
+    expect(stepBox.height).toBeGreaterThanOrEqual(44);
+
+    // Adjust Touch stick offset & reset works cleanly on touch device
+    await page.tap('.opt-tab[data-tab="Touch"]');
+    await page.waitForFunction(() => window.app?.state?.options?.tab === 'Touch', { timeout: 4000 });
+    await page.tap('.opt-step-btn[data-step-row="0"][data-step-dir="1"]');
+    await page.waitForTimeout(180);
+    await page.tap('#btn-opt-back');
+    await page.tap('[data-action="OpenMapSelect"]');
+    await page.tap('#card-map-circuit');
+    await page.waitForFunction(() => window.app?.ui?.currentState === 'CarSelect', { timeout: 5000 });
+    const swatchBox = await page.locator('.paint-swatch').first().boundingBox();
+    expect(swatchBox.width).toBeGreaterThanOrEqual(44);
+    expect(swatchBox.height).toBeGreaterThanOrEqual(44);
+    await page.tap('#card-car-coupe_rwd');
+    await page.tap('.paint-swatch[data-color-idx="5"]');
+    await page.tap('#btn-car-launch');
+    await page.waitForSelector('#touch-layer #touch-stick-zone', { timeout: 8000 });
+    const stickStyle = await page.getAttribute('#touch-stick-zone', 'style');
+    expect(stickStyle).toContain('translate(10px,0px)');
+
+    // Reset touch defaults restores 0px
+    await page.tap('#btn-hud-pause');
+    await page.tap('[data-action="OpenOptions"]');
+    await page.tap('.opt-tab[data-tab="Touch"]');
+    await page.tap('#btn-touch-reset');
+    await page.waitForTimeout(160);
+    expect(await page.evaluate(() => window.app.state.touchSettings.stickOffsetX)).toBe(0);
+
+    await context.close();
   });
 });

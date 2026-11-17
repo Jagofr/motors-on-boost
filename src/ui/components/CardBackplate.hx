@@ -1,6 +1,6 @@
 package ui.components;
 
-import h2d.Graphics;
+import ui.nodes.UINodes.UIGraphics as Graphics;
 
 /**
  * Modal background frame and active item backdrop card renderer.

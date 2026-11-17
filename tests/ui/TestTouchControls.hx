@@ -94,6 +94,56 @@ class TestTouchControls extends Test {
         Assert.floatEquals(0.0, input.touchThrottle, 0.001);
     }
 
+    public function testVirtualAnalogStickLeftRightPartialAndKnobMovement() {
+        hud.layout(1280, 720);
+        var dt = 1.0 / 60.0;
+
+        // Multi-touch chord: Finger 1 holds Gas pedal, Finger 2 grabs Virtual Analog Stick center
+        hud.handlePointerDown(1, hud.gasX, hud.gasY);
+        hud.handlePointerDown(2, hud.stickBaseX, hud.stickBaseY);
+        Assert.floatEquals(0.0, input.touchSteer, 0.001);
+
+        // Partial Left analog deflection (50% of max travel)
+        hud.handlePointerMove(2, hud.stickBaseX - hud.stickMaxTravel * 0.5, hud.stickBaseY);
+        Assert.isTrue(hud.stickKnobX < hud.stickBaseX, "Virtual stick knob must move Left of center");
+        Assert.floatEquals(-0.5, input.touchSteer, 0.01);
+        for (_ in 0...10) input.update(dt);
+        var partialLeft = input.steer;
+        Assert.isTrue(partialLeft < -0.1 && partialLeft > -0.6, "Partial Left virtual stick expected in (-0.6, -0.1), got " + partialLeft);
+
+        // Full Left analog deflection
+        hud.handlePointerMove(2, hud.stickBaseX - hud.stickMaxTravel, hud.stickBaseY);
+        Assert.floatEquals(-1.0, input.touchSteer, 0.01);
+        for (_ in 0...10) input.update(dt);
+        var fullLeft = input.steer;
+        Assert.isTrue(fullLeft < partialLeft, "Full Left virtual stick must steer stronger negatively than partial Left");
+
+        // Partial Right analog deflection (50% of max travel)
+        hud.handlePointerMove(2, hud.stickBaseX + hud.stickMaxTravel * 0.5, hud.stickBaseY);
+        Assert.isTrue(hud.stickKnobX > hud.stickBaseX, "Virtual stick knob must move Right of center");
+        Assert.floatEquals(0.5, input.touchSteer, 0.01);
+        for (_ in 0...10) input.update(dt);
+        var partialRight = input.steer;
+        Assert.isTrue(partialRight > 0.1 && partialRight < 0.6, "Partial Right virtual stick expected in (0.1, 0.6), got " + partialRight);
+
+        // Full Right analog deflection
+        hud.handlePointerMove(2, hud.stickBaseX + hud.stickMaxTravel, hud.stickBaseY);
+        Assert.floatEquals(1.0, input.touchSteer, 0.01);
+        for (_ in 0...10) input.update(dt);
+        var fullRight = input.steer;
+        Assert.isTrue(fullRight > partialRight, "Full Right virtual stick must steer stronger positively than partial Right");
+
+        // Gas must still be held concurrently during entire stick sweep
+        Assert.isTrue(hud.isGasPressed);
+        Assert.floatEquals(1.0, input.touchThrottle, 0.001);
+
+        // Release Virtual Stick finger -> knob & touchSteer snap back to 0 cleanly
+        hud.handlePointerUp(2);
+        Assert.floatEquals(hud.stickBaseX, hud.stickKnobX, 0.001);
+        Assert.floatEquals(0.0, input.touchSteer, 0.001);
+        hud.handlePointerUp(1);
+    }
+
     public function testControlsPanelTouchCustomAdjustments() {
         controlsPanel.currentTab = Touch;
         controlsPanel.controlViewMode = "Custom";

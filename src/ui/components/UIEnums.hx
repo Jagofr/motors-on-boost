@@ -48,6 +48,9 @@ enum UIState {
     /** Singleplayer map selection screen before starting game session. */
     MapSelect;
 
+    /** Vehicle archetype & paint customization screen after selecting a map. */
+    CarSelect;
+
     /** Peer-to-peer multiplayer mode selection screen (Host a Match or Join by Invite Code). */
     MultiplayerMenu;
 

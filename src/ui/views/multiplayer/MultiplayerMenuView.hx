@@ -1,10 +1,10 @@
 package ui.views.multiplayer;
 
 import audio.AudioManager;
-import h2d.Bitmap;
-import h2d.Interactive;
-import h2d.Object;
-import h2d.Text;
+import ui.nodes.UINodes.UIBitmap as Bitmap;
+import ui.nodes.UINodes.UIInteractive as Interactive;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
 import net.MultiplayerManager;
 import ui.FontManager;
 import ui.UIIcons;
@@ -16,7 +16,7 @@ import ui.components.UITheme;
  * joining an existing lobby directly by entering or pasting a 6-character Invite Code.
  *
  * @class MultiplayerMenuView
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/views/multiplayer/MultiplayerMenuView
  */
 @:keep
@@ -170,17 +170,6 @@ class MultiplayerMenuView extends Object {
             selectedIndex = 1;
             codeHintText.text = defaultHintMessage;
             codeHintText.textColor = UITheme.COLOR_TEXT_MUTED;
-            #if js
-            var hasWin:Bool = js.Syntax.code("typeof window !== 'undefined' && typeof window.prompt === 'function'");
-            if (hasWin) {
-                var entered:String = js.Browser.window.prompt("Enter Invite Code or Paste Invite Link (e.g. X5VC8D):", enteredCode);
-                if (entered != null) {
-                    setInviteCode(entered);
-                    AudioManager.inst.playMenuBeep(480.0, 0.05);
-                    return;
-                }
-            }
-            #end
             updateStyles();
             if (onSelectionChanged != null) onSelectionChanged();
         };
@@ -209,42 +198,6 @@ class MultiplayerMenuView extends Object {
         codeHintText.textColor = UITheme.COLOR_TEXT_MUTED;
         codeHintText.scale(0.76);
 
-        #if js
-        var hasDom:Bool = js.Syntax.code("typeof window !== 'undefined' && typeof window.addEventListener === 'function'");
-        if (hasDom) {
-            js.Browser.window.addEventListener("paste", function(ev:Dynamic) {
-                if (!visible) return;
-                try {
-                    var clip:String = ev != null && ev.clipboardData != null ? ev.clipboardData.getData("text") : "";
-                    if (clip != null && StringTools.trim(clip) != "") {
-                        setInviteCode(clip);
-                        AudioManager.inst.playMenuBeep(520.0, 0.05);
-                    }
-                } catch (_e:Dynamic) {}
-            }, true);
-
-            js.Browser.window.addEventListener("keydown", function(ev:Dynamic) {
-                if (!visible || ev == null) return;
-                if (ev.ctrlKey || ev.altKey || ev.metaKey) return;
-                var key:String = ev.key != null ? Std.string(ev.key) : "";
-                if (key == "Backspace") {
-                    if (selectedIndex == 1 && enteredCode.length > 0) {
-                        if (backspaceCode() && ev.preventDefault != null) ev.preventDefault();
-                    }
-                    return;
-                }
-                if (key.length == 1) {
-                    var code = key.charCodeAt(0);
-                    var isAlphaNum = (code >= 48 && code <= 57) || (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
-                    if (!isAlphaNum) return;
-                    var upper = key.toUpperCase();
-                    if (selectedIndex == 1 || (upper != "W" && upper != "A" && upper != "S" && upper != "D")) {
-                        appendCodeChar(upper);
-                    }
-                }
-            }, true);
-        }
-        #end
 
         updateStyles();
     }
@@ -352,16 +305,6 @@ class MultiplayerMenuView extends Object {
 
         var code = MultiplayerManager.extractRoomCode(enteredCode);
         if (code == "") {
-            #if js
-            var hasWin:Bool = js.Syntax.code("typeof window !== 'undefined' && typeof window.prompt === 'function'");
-            if (hasWin) {
-                var prompted:String = js.Browser.window.prompt("Enter 6-character Invite Code or Paste Invite Link:", "");
-                if (prompted != null && StringTools.trim(prompted) != "") {
-                    code = MultiplayerManager.extractRoomCode(prompted);
-                    enteredCode = code;
-                }
-            }
-            #end
         }
 
         if (code != "") {

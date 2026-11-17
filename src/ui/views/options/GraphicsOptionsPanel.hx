@@ -1,8 +1,8 @@
 package ui.views.options;
 
-import h2d.Object;
-import h2d.Text;
-import h2d.Interactive;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
+import ui.nodes.UINodes.UIInteractive as Interactive;
 import ui.FontManager;
 import ui.components.UITheme;
 import save.SaveSystem.GraphicsSettings;
@@ -35,7 +35,7 @@ typedef GraphicsOptionDef = {
  * Graphics hardware and rendering quality settings subpanel view.
  *
  * @class GraphicsOptionsPanel
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  */
 class GraphicsOptionsPanel extends Object {
     /** Graphics option label text objects. */
@@ -66,7 +66,10 @@ class GraphicsOptionsPanel extends Object {
         {
             name: "Textures", label: "Texture Fidelity:    ", menuOnly: true,
             formatValue: s -> s.textures,
-            cycle: (s, d) -> s.textures = cycleArray(["Off", "Very Low", "Low", "Medium", "High", "Ultra", "Unreal"], s.textures, d)
+            cycle: (s, d) -> {
+                s.textures = cycleArray(["Off", "Very Low", "Low", "Medium", "High", "Ultra", "Unreal"], s.textures, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyTexturesAndFiltering();
+            }
         },
         {
             name: "Shadow Level", label: "Shadow Quality:      ",
@@ -96,45 +99,69 @@ class GraphicsOptionsPanel extends Object {
         {
             name: "Lighting Res", label: "Light Buffer:        ",
             formatValue: s -> s.lightingRes + "p",
-            cycle: (s, d) -> s.lightingRes = cycleArray([512, 1024, 2048], s.lightingRes, d)
+            cycle: (s, d) -> {
+                s.lightingRes = cycleArray([512, 1024, 2048], s.lightingRes, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyLighting();
+            }
         },
         {
             name: "Mipmapping", label: "Mipmapping Filters:  ", menuOnly: true,
             formatValue: s -> s.mipmapping ? "Enabled" : "Disabled",
-            cycle: (s, _) -> s.mipmapping = !s.mipmapping
+            cycle: (s, _) -> {
+                s.mipmapping = !s.mipmapping;
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyTexturesAndFiltering();
+            }
         },
         {
             name: "Anisotropy", label: "Anisotropy Sampling: ", menuOnly: true,
             disabledWhen: s -> !s.mipmapping,
             formatValue: s -> s.anisotropic + "x",
-            cycle: (s, d) -> s.anisotropic = cycleArray([1, 2, 4, 8, 16], s.anisotropic, d)
+            cycle: (s, d) -> {
+                s.anisotropic = cycleArray([1, 2, 4, 8, 16], s.anisotropic, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyTexturesAndFiltering();
+            }
         },
         {
             name: "Anti-Aliasing", label: "Anti-Aliasing Pass:  ",
             formatValue: s -> s.aaType,
-            cycle: (s, d) -> s.aaType = cycleArray(["None", "FXAA", "TSAA", "SMAA", "MSAA"], s.aaType, d)
+            cycle: (s, d) -> {
+                s.aaType = cycleArray(["None", "FXAA", "TSAA", "SMAA", "MSAA"], s.aaType, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyAntiAliasing();
+            }
         },
         {
-            name: "AA Level", label: "AA Multiplier:       ",
-            disabledWhen: s -> s.aaType == "None",
-            formatValue: s -> s.aaLevel + "x",
-            cycle: (s, d) -> s.aaLevel = cycleArray([2, 4, 8], s.aaLevel, d)
+            name: "AA Level", label: "AA Quality:          ",
+            disabledWhen: s -> s.aaType == "None" || s.aaType == "MSAA",
+            formatValue: s -> formatAAQuality(s.aaType, s.aaLevel),
+            cycle: (s, d) -> {
+                s.aaLevel = cycleArray([2, 4, 8], s.aaLevel, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyAntiAliasing();
+            }
         },
         {
             name: "Model Geometry", label: "Model Geometry LOD:  ", menuOnly: true,
             formatValue: s -> s.modelGeometry,
-            cycle: (s, d) -> s.modelGeometry = cycleArray(["Very Low", "Low", "Medium", "High", "Ultra"], s.modelGeometry, d)
+            cycle: (s, d) -> {
+                s.modelGeometry = cycleArray(["Very Low", "Low", "Medium", "High", "Ultra"], s.modelGeometry, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyModelGeometry();
+            }
         },
         {
             name: "Reflections", label: "Screen Reflections:  ",
             formatValue: s -> s.modelReflections ? "Active" : "Disabled",
-            cycle: (s, _) -> s.modelReflections = !s.modelReflections
+            cycle: (s, _) -> {
+                s.modelReflections = !s.modelReflections;
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyReflections();
+            }
         },
         {
             name: "Reflection Level", label: "Reflection Updates:  ",
             disabledWhen: s -> !s.modelReflections,
             formatValue: s -> s.reflectionLevel,
-            cycle: (s, d) -> s.reflectionLevel = cycleArray(["Low", "Medium", "High", "Ultra"], s.reflectionLevel, d)
+            cycle: (s, d) -> {
+                s.reflectionLevel = cycleArray(["Low", "Medium", "High", "Ultra"], s.reflectionLevel, d);
+                if (GraphicsManager.inst != null) GraphicsManager.inst.applyReflections();
+            }
         },
         {
             name: "Render Scale", label: "3D Render Resolution:",
@@ -156,6 +183,9 @@ class GraphicsOptionsPanel extends Object {
 
     /** Ordered display names corresponding to each option index. */
     public static var NAMES:Array<String> = [for (def in OPTION_DEFS) def.name];
+
+    /** Callback notified whenever a graphics option value is modified so saves persist. */
+    public var onSettingsChanged:Null<Void -> Void> = null;
 
     /** Callback invoked when UI resolution changes so the parent options view and UI can immediately re-layout. */
     public var onUIResolutionChanged:Void->Void;
@@ -213,7 +243,7 @@ class GraphicsOptionsPanel extends Object {
             inter.onClick = function(_) {
                 if (visible) cycleOption(i, 1);
             };
-            inter.onWheel = function(e:hxd.Event) {
+            inter.onWheel = function(e:ui.nodes.UINodes.UIEvent) {
                 if (visible) {
                     if (e.wheelDelta > 0) scroll(-1);
                     else if (e.wheelDelta < 0) scroll(1);
@@ -233,6 +263,14 @@ class GraphicsOptionsPanel extends Object {
         if (idx < 0 || idx >= OPTION_DEFS.length) return false;
         var pred = OPTION_DEFS[idx].disabledWhen;
         return (pred != null) ? pred(settings) : false;
+    }
+
+    /**
+     * Checks if an option requires returning to main menu to modify during an active run.
+     */
+    public function isOptionMenuOnly(idx:Int):Bool {
+        if (idx < 0 || idx >= OPTION_DEFS.length) return false;
+        return OPTION_DEFS[idx].menuOnly == true;
     }
 
     /**
@@ -257,6 +295,7 @@ class GraphicsOptionsPanel extends Object {
             onUIResolutionChanged();
         }
         updateStyles();
+        if (onSettingsChanged != null) onSettingsChanged();
     }
 
     static function cycleArray<T>(arr:Array<T>, curr:T, dir:Int):T {
@@ -398,5 +437,25 @@ class GraphicsOptionsPanel extends Object {
                 scrollDownHint.y = startY + (maxVisibleRows * ROW_HEIGHT) + 2.0;
             }
         }
+    }
+
+    /** Formats the AA Quality / Scale readout appropriately per anti-aliasing algorithm. */
+    public static function formatAAQuality(aaType:String, aaLevel:Int):String {
+        return switch (aaType) {
+            case "FXAA" | "SMAA": switch (aaLevel) {
+                case 2: "Low";
+                case 4: "Medium";
+                case 8: "High";
+                default: "Medium";
+            };
+            case "TSAA": switch (aaLevel) {
+                case 2: "8x";
+                case 4: "16x";
+                case 8: "32x";
+                default: "16x";
+            };
+            case "MSAA": "4x (Fixed)";
+            default: aaLevel + "x";
+        };
     }
 }

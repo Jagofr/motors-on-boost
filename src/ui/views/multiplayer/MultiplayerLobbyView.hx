@@ -1,9 +1,9 @@
 package ui.views.multiplayer;
 
 import audio.AudioManager;
-import h2d.Interactive;
-import h2d.Object;
-import h2d.Text;
+import ui.nodes.UINodes.UIInteractive as Interactive;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
 import net.MultiplayerManager;
 import net.NetworkProtocol;
 import net.NetworkProtocol.LobbyStatus;
@@ -173,17 +173,6 @@ class MultiplayerLobbyView extends Object {
         joinCodeInteractive = new Interactive(170, 38, this);
         joinCodeInteractive.onClick = function(_) {
             if (!visible || mp == null) return;
-            #if js
-            var hasWin:Bool = js.Syntax.code("typeof window !== 'undefined' && typeof window.prompt === 'function'");
-            if (hasWin) {
-                var entered:String = js.Browser.window.prompt("Paste Invite URL or Room Code (e.g. ABC123):", "");
-                if (entered != null && StringTools.trim(entered) != "") {
-                    var parsed = MultiplayerManager.extractRoomCode(entered);
-                    AudioManager.inst.playMenuBeep(480.0, 0.07);
-                    mp.joinRoom(parsed);
-                }
-            }
-            #end
         };
         joinCodeText = new Text(FontManager.regularFont, this);
         joinCodeText.text = "JOIN BY CODE";

@@ -169,11 +169,16 @@ class TireSlipSolver {
         var frontAxleTransfer = -0.5 * dFzTotal; // Accelerating (longAccel > 0) unloads front
         var rearAxleTransfer = 0.5 * dFzTotal;   // Accelerating loads rear
 
-        // Split tractive drive force 35% Front / 65% Rear across grounded wheels (sporty AWD balance)
+        // Drivetrain torque split across grounded wheels: FWD = 1.0/0.0, AWD = 0.35/0.65, RWD = 0.0/1.0
+        var fSplit = cfg.drivetrain.frontDriveSplit != null ? cfg.drivetrain.frontDriveSplit : 0.35;
+        fSplit = Math.max(0.0, Math.min(1.0, fSplit));
+        var rSplit = 1.0 - fSplit;
         var frontGrounded = (wheels[0].grounded ? 1 : 0) + (wheels[1].grounded ? 1 : 0);
         var rearGrounded = (wheels[2].grounded ? 1 : 0) + (wheels[3].grounded ? 1 : 0);
-        var frontShare = frontGrounded > 0 ? (rearGrounded > 0 ? 0.35 : 1.0) / frontGrounded : 0.0;
-        var rearShare = rearGrounded > 0 ? (frontGrounded > 0 ? 0.65 : 1.0) / rearGrounded : 0.0;
+        var frontShare = frontGrounded > 0 ? (rearGrounded > 0 ? fSplit : (fSplit > 0.0 ? 1.0 : 0.0)) / frontGrounded : 0.0;
+        var rearShare = rearGrounded > 0 ? (frontGrounded > 0 ? rSplit : (rSplit > 0.0 ? 1.0 : 0.0)) / rearGrounded : 0.0;
+        var halfWheelbase = chassisCfg.wheelbase * 0.5;
+        var halfTrack = chassisCfg.trackWidth * 0.5;
 
         var totalForceFwd = 0.0;
         var totalForceRight = 0.0;
@@ -194,7 +199,9 @@ class TireSlipSolver {
             }
 
             var isFront = i < 2;
-            var offset = CarMesh.WHEEL_OFFSETS[i];
+            var isLeft = (i == 0 || i == 2);
+            var offsetX = isLeft ? -halfTrack : halfTrack;
+            var offsetY = isFront ? halfWheelbase : -halfWheelbase;
             var fz = wc.normalLoad + (isFront ? frontAxleTransfer : rearAxleTransfer);
             if (fz < 150.0) fz = 150.0;
 
@@ -204,8 +211,8 @@ class TireSlipSolver {
 
             // Rigid body velocity at wheel patch (wx, wy) in chassis horizontal (Fwd, Right) frame
             // d/dt(forward) = +yawRate * right => vFwd = vLong - yawRate * wx; vRight = vLat + yawRate * wy
-            var vPatchFwd = vLong - yawRate * offset.x;
-            var vPatchRight = vLat + yawRate * offset.y;
+            var vPatchFwd = vLong - yawRate * offsetX;
+            var vPatchRight = vLat + yawRate * offsetY;
 
             // Project onto wheel local axes
             var vWheelFwd = vPatchFwd * cosD + vPatchRight * sinD;
@@ -264,7 +271,7 @@ class TireSlipSolver {
             totalForceFwd += fxChassis;
             totalForceRight += fyChassis;
             // Yaw moment (+ = clockwise toward +Right / +X): front pushed +Right => +, right pushed +Fwd => -
-            totalYawTorque += offset.y * fyChassis - offset.x * fxChassis;
+            totalYawTorque += offsetY * fyChassis - offsetX * fxChassis;
         }
 
         // Subtle aerodynamic rolling drag and quadratic aero drag

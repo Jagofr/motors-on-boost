@@ -1,6 +1,6 @@
 package net;
 
-import h3d.Vector;
+import math.Vec3;
 import input.InputController;
 import net.NetworkProtocol.ClientInputPacket;
 import net.NetworkProtocol.NetCarState;
@@ -99,18 +99,6 @@ class MultiplayerManager {
     public function new(transport:ISocketTransport) {
         this.transport = transport;
         bindTransportEvents();
-        #if js
-        var hasBrowserDoc:Bool = js.Syntax.code("typeof window !== 'undefined' && typeof document !== 'undefined' && typeof window.setInterval === 'function'");
-        if (hasBrowserDoc) {
-            bgTimerId = js.Browser.window.setInterval(function() {
-                var hidden:Bool = js.Syntax.code("Boolean(document.hidden)");
-                var nowMs:Float = Date.now().getTime();
-                if (hidden || (lastFrameUpdateMs > 0.0 && (nowMs - lastFrameUpdateMs) > 350.0)) {
-                    update(0.4, true);
-                }
-            }, 400);
-        }
-        #end
     }
 
     private function sendJoinRequestToHost():Void {
@@ -201,7 +189,7 @@ class MultiplayerManager {
                 var dtWindow = Math.max(0.016, elapsedMatchTime - prevTime);
                 if (validateClientPacket(fromId, payload, activeGroundProvider, dtWindow) != null) {
                     peerLastPacketTime.set(fromId, elapsedMatchTime);
-                    #if js
+                    
                     if (status == InMatch && lastFrameUpdateMs > 0.0) {
                         var nowMs:Float = Date.now().getTime();
                         if ((nowMs - lastFrameUpdateMs) > 65.0) {
@@ -209,7 +197,6 @@ class MultiplayerManager {
                             broadcastHostWorldSnapshot();
                         }
                     }
-                    #end
                 }
             }
         };
@@ -634,7 +621,7 @@ class MultiplayerManager {
         // Active map boundary & ground floor validation
         var finalZ:Float = pz;
         if (ground != null) {
-            var checkPos = new Vector(finalX, finalY, finalZ);
+            var checkPos = new Vec3(finalX, finalY, finalZ);
             ground.enforceBoundaries(checkPos, clampedSpeed, clampedLat);
             finalX = checkPos.x;
             finalY = checkPos.y;
@@ -921,14 +908,10 @@ class MultiplayerManager {
     public static function buildInviteLink(targetRoomId:String):String {
         if (targetRoomId == null || StringTools.trim(targetRoomId) == "") return "";
         var code = StringTools.trim(targetRoomId).toUpperCase();
-        #if js
-        var hasValidLoc:Bool = js.Syntax.code("typeof window !== 'undefined' && window.location && typeof window.location.origin === 'string' && window.location.origin !== 'null' && typeof window.location.pathname === 'string'");
-        if (hasValidLoc) {
-            var origin:String = js.Syntax.code("window.location.origin");
-            var pathname:String = js.Syntax.code("window.location.pathname");
-            return origin + pathname + "?room=" + code;
+        var baseUrl = core.WebBridge.inst.localStorageCache.get("__mob_base_url");
+        if (baseUrl != null && baseUrl != "") {
+            return baseUrl + "?room=" + code;
         }
-        #end
         return "?room=" + code;
     }
 
@@ -936,25 +919,18 @@ class MultiplayerManager {
      * Reads `?room=<ROOM_ID>` from the active browser URL if present.
      */
     public static function detectInviteRoomFromUrl():Null<String> {
-        #if js
-        var hasSearch:Bool = js.Syntax.code("typeof window !== 'undefined' && window.location && typeof window.location.search === 'string'");
-        if (hasSearch) {
-            var search:String = js.Syntax.code("window.location.search");
-            if (search != null && search.length > 1) {
-                var query = search.substr(1);
-                for (pair in query.split("&")) {
-                    var eq = pair.indexOf("=");
-                    if (eq > 0) {
-                        var k = StringTools.urlDecode(pair.substr(0, eq));
-                        if (k == "room") {
-                            var val = StringTools.trim(StringTools.urlDecode(pair.substr(eq + 1))).toUpperCase();
-                            if (val != "") return val;
-                        }
-                    }
+        var search = core.WebBridge.inst.readUrlSearch();
+        if (search != null && search.length > 1) {
+            var query = search.charAt(0) == "?" ? search.substr(1) : search;
+            for (pair in query.split("&")) {
+                var eq = pair.indexOf("=");
+                if (eq > 0 && pair.substr(0, eq) == "room") {
+                    var val = StringTools.urlDecode(pair.substr(eq + 1));
+                    var extracted = extractRoomCode(val);
+                    if (extracted != "") return extracted;
                 }
             }
         }
-        #end
         return null;
     }
 
@@ -995,13 +971,8 @@ class MultiplayerManager {
      * Copies the invite link to the system clipboard when available in the browser.
      */
     public static function copyInviteLinkToClipboard(link:String):Void {
-        #if js
-        try {
-            var hasClip:Bool = js.Syntax.code("typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText");
-            if (hasClip && link != null && link != "") {
-                js.Syntax.code("navigator.clipboard.writeText({0})", link);
-            }
-        } catch (_e:Dynamic) {}
-        #end
+        if (link != null && link != "") {
+            core.WebBridge.inst.pushEvent({ type: "clipboard_copy", text: link });
+        }
     }
 }

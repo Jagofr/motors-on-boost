@@ -1,9 +1,9 @@
 package ui.views.splash;
 
-import h2d.Object;
-import h2d.Text;
-import h2d.Graphics;
-import h2d.Interactive;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
+import ui.nodes.UINodes.UIGraphics as Graphics;
+import ui.nodes.UINodes.UIInteractive as Interactive;
 import ui.FontManager;
 import ui.components.UITheme;
 import ui.components.CardBackplate;
@@ -12,7 +12,7 @@ import ui.components.CardBackplate;
  * Title splash screen with game logo, cyber backing badge, and animated pulsating entrance prompt.
  *
  * @class SplashView
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/views/splash/SplashView
  */
 class SplashView extends Object {

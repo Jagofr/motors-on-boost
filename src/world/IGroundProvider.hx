@@ -1,6 +1,6 @@
 package world;
 
-import h3d.Vector;
+import math.Vec3;
 
 /**
  * Polymorphic terrain and track surface contract decoupling `CarPhysics`
@@ -27,7 +27,7 @@ interface IGroundProvider {
      * @param {Vector} outNormal Scratch vector populated in-place with surface normal.
      * @returns {Void}
      */
-    public function getGroundNormal(x:Float, y:Float, outNormal:Vector):Void;
+    public function getGroundNormal(x:Float, y:Float, outNormal:Vec3):Void;
 
     /**
      * Evaluates local surface tire friction multiplier (`mu`).
@@ -46,7 +46,7 @@ interface IGroundProvider {
      * @param {Float} lateralVelocity Current lateral velocity in m/s.
      * @returns {{ hitWall:Bool, speedMult:Float, latMult:Float }} Contact outcome and velocity multipliers.
      */
-    public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float };
+    public function enforceBoundaries(pos:Vec3, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float };
 
     /**
      * Registers static physical foundation or boundary colliders in an Oimo world.

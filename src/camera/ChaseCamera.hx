@@ -1,7 +1,7 @@
 package camera;
 
-import h3d.Camera;
-import h3d.Vector;
+import graphics.SceneGraph.Camera3D;
+import math.Vec3;
 import physics.CarPhysics;
 
 /**
@@ -36,10 +36,10 @@ class ChaseCamera {
     /** Normalized collision/bump camera shake intensity [0.0, 1.0]. */
     public var trauma:Float = 0.0;
 
-    var cam:Camera;
-    var camPos:Vector;
-    var camVel:Vector;
-    var lookTarget:Vector;
+    var cam:Camera3D;
+    var camPos:Vec3;
+    var camVel:Vec3;
+    var lookTarget:Vec3;
     var chaseDirX:Float = 0.0;
     var chaseDirY:Float = 1.0;
     var currentFov:Float = BASE_FOV;
@@ -54,11 +54,11 @@ class ChaseCamera {
      * @param {Float} startY Initial world camera Y coordinate.
      * @param {Float} startZ Initial world camera Z coordinate.
      */
-    public function new(camera:Camera, startX:Float, startY:Float, startZ:Float) {
+    public function new(camera:Camera3D, startX:Float, startY:Float, startZ:Float) {
         this.cam = camera;
-        this.camPos = new Vector(startX, startY, startZ);
-        this.camVel = new Vector(0.0, 0.0, 0.0);
-        this.lookTarget = new Vector(startX, startY + BASE_DISTANCE, startZ - 1.2);
+        this.camPos = new Vec3(startX, startY, startZ);
+        this.camVel = new Vec3(0.0, 0.0, 0.0);
+        this.lookTarget = new Vec3(startX, startY + BASE_DISTANCE, startZ - 1.2);
         syncToCamera();
     }
 

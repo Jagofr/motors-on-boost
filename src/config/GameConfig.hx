@@ -199,11 +199,11 @@ class GameConfig {
                 disclaimerFadeOutDuration: 1.0,
                 showcaseFadeDuration: 1.2,
                 studioSplashPath: "intro/jagofr-rvl-splash.webp",
-                engineSplashPath: "intro/heaps-haxe-splash.webp",
+                engineSplashPath: "intro/icons/logo_hlwgpu.svg",
                 engineLogoPaths: [
-                    "intro/icons/logo_heaps.webp",
                     "intro/icons/logo_haxe.webp",
-                    "intro/icons/logo_webgl.webp"
+                    "intro/icons/logo_hlwgpu.svg",
+                    "intro/icons/logo_webgpu.svg"
                 ],
                 touchIconPaths: [
                     "icons/burn.png",

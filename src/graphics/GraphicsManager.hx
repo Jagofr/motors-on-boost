@@ -1,49 +1,36 @@
 package graphics;
 
-import h3d.Engine;
-import h3d.scene.Scene;
-import h3d.scene.fwd.DirLight;
+import graphics.SceneGraph.DirLightNode;
+import graphics.SceneGraph.EngineStub;
+import graphics.SceneGraph.Scene3D;
 import save.SaveSystem.GraphicsSettings;
+import ui.nodes.UINodes.UIScene2D;
+import ui.nodes.UINodes.UIScaleMode;
 
 /**
- * Virtual 2D UI scale resolution descriptor.
- *
- * @typedef {Object} UIResolutionPreset
- * @property {Bool} isNative True for 1:1 native pixel Resize scaling.
- * @property {Int} width Virtual baseline width when `isNative` is false.
- * @property {Int} height Virtual baseline height when `isNative` is false.
+ * Resolution scaling preset record for 2D UI layout.
  */
 typedef UIResolutionPreset = {
     var isNative:Bool;
     var width:Int;
     var height:Int;
-}
+};
 
 /**
- * Scene illumination preset pairing solar tint with softened ambient sky fill.
- *
- * @typedef {Object} LightingPreset
- * @property {Int} sunColor Primary directional solar color hex.
- * @property {Int} ambientColor Global ambient scene fill color hex.
+ * Directional sun and ambient illumination preset record.
  */
 typedef LightingPreset = {
     var sunColor:Int;
     var ambientColor:Int;
-}
+};
 
 /**
- * Graphics pipeline controller and hardware quality manager.
- * Applies render scaling, virtual UI scale modes, shadows, lighting temperatures,
- * and MSAA hardware sampling declaratively.
- *
- * @class GraphicsManager
- * @module graphics/GraphicsManager
+ * Centralized graphics pipeline coordinator managing WebGPU resolution scaling,
+ * virtual UI layout resolution, directional/ambient lighting presets, and post-processing.
  */
 class GraphicsManager {
-    /** Global singleton instance for settings panels and resize listeners. */
     public static var inst:GraphicsManager;
 
-    /** Declarative lookup table mapping UI resolution labels to Heaps ScaleMode settings. */
     private static var UI_RES_PRESETS:Map<String, UIResolutionPreset> = [
         "720p (HD)" => { isNative: false, width: 1280, height: 720 },
         "1080p (FHD)" => { isNative: false, width: 1920, height: 1080 },
@@ -52,7 +39,6 @@ class GraphicsManager {
         "Native / Match Window" => { isNative: true, width: 0, height: 0 }
     ];
 
-    /** Declarative lookup table mapping lighting quality labels to solar & ambient hex colors. */
     private static var LIGHTING_PRESETS:Map<String, LightingPreset> = [
         "Low" => { sunColor: 0xEADBB8, ambientColor: 0x708294 },
         "Medium" => { sunColor: 0xFFECC8, ambientColor: 0x869BB0 },
@@ -60,121 +46,162 @@ class GraphicsManager {
         "Ultra (RTX/Path)" => { sunColor: 0xFFF9EE, ambientColor: 0xB2C8DC }
     ];
 
-    /** Active user graphics quality configuration record. */
     public var settings:GraphicsSettings;
+    private var s3d:Null<Scene3D>;
+    private var s2d:Null<UIScene2D>;
+    private var sunLight:Null<DirLightNode>;
+    private var postRenderer:Null<PostProcessRenderer>;
+    private var gpuRenderer:Null<WebGpuRenderer>;
 
-    /** Target 3D scene instance. */
-    var s3d:Scene;
+    public var shadowsEnabled:Bool = true;
+    public var shadowSize:Int = 1024;
+    public var mipmapping:Bool = true;
+    public var maxAnisotropy:Int = 4;
 
-    /** Target 2D UI scene instance. */
-    var s2d:h2d.Scene;
-
-    /** Primary solar directional light source. */
-    var light:DirLight;
-
-    /** Post-processing offscreen forward renderer. */
-    var postRenderer:PostProcessRenderer;
-
-    /**
-     * Initializes the GraphicsManager singleton and commits initial hardware preferences.
-     *
-     * @param {Scene} s3d Active 3D scene graph.
-     * @param {h2d.Scene} s2d Active 2D UI scene graph.
-     * @param {DirLight} light Primary solar directional light.
-     * @param {GraphicsSettings} initialSettings Loaded or default graphics configuration.
-     * @param {Null<PostProcessRenderer>} [post] Optional post-process renderer override.
-     */
-    public function new(s3d:Scene, s2d:h2d.Scene, light:DirLight, initialSettings:GraphicsSettings, ?post:PostProcessRenderer) {
-        inst = this;
+    public function new(
+        s3d:Null<Scene3D>,
+        s2d:Null<UIScene2D>,
+        light:Null<DirLightNode>,
+        initialSettings:GraphicsSettings,
+        ?postRenderer:PostProcessRenderer,
+        ?gpuRenderer:WebGpuRenderer
+    ) {
         this.s3d = s3d;
         this.s2d = s2d;
-        this.light = light;
+        this.sunLight = light;
         this.settings = initialSettings;
-        this.postRenderer = (post != null) ? post : (Std.isOfType(s3d.renderer, PostProcessRenderer) ? cast s3d.renderer : null);
+        this.postRenderer = postRenderer;
+        this.gpuRenderer = gpuRenderer;
+        inst = this;
         applyAll();
     }
 
-    /**
-     * Commits all graphics sub-pipelines simultaneously.
-     *
-     * @returns {Void}
-     */
+    public function setWebGpuRenderer(renderer:Null<WebGpuRenderer>):Void {
+        this.gpuRenderer = renderer;
+        applyAll();
+    }
+
     public function applyAll():Void {
         applyRenderScale();
         applyUIResolution();
         applyShadows();
         applyLighting();
         applyTexturesAndFiltering();
+        applyAntiAliasing();
+        applyReflections();
+        applyModelGeometry();
+        syncRendererFxState();
     }
 
-    /**
-     * Updates 3D offscreen render buffer resolution scaling independently of native UI clarity.
-     *
-     * @returns {Void}
-     */
     public function applyRenderScale():Void {
+        var scale = Math.max(0.25, Math.min(4.0, settings.renderScale));
         if (postRenderer != null) {
-            postRenderer.renderScale = settings.renderScale;
+            postRenderer.setRenderScale(scale);
         }
-        #if js
-        var engine = Engine.getCurrent();
-        var win = hxd.Window.getInstance();
-        if (engine != null && win != null) {
-            engine.resize(win.width, win.height);
+        if (gpuRenderer != null) {
+            gpuRenderer.setRenderScale(scale);
         }
-        #end
     }
 
-    /**
-     * Applies UI resolution preset to the 2D Scene `scaleMode`.
-     *
-     * @returns {Void}
-     */
     public function applyUIResolution():Void {
         if (s2d == null) return;
-        var preset = UI_RES_PRESETS.get(settings.uiResolution);
-        if (preset == null) preset = UI_RES_PRESETS.get("720p (HD)");
-        s2d.scaleMode = preset.isNative ? Resize : AutoZoom(preset.width, preset.height, false);
-        @:privateAccess {
-            s2d.offsetX = 0;
-            s2d.offsetY = 0;
+        var resKey = settings.uiResolution != null ? settings.uiResolution : "720p (HD)";
+        var preset = UI_RES_PRESETS.get(resKey);
+        if (preset == null) {
+            s2d.scaleMode = UIScaleMode.LetterBox(1280, 720, true);
+        } else if (preset.isNative) {
+            s2d.scaleMode = UIScaleMode.Resize;
+            var eng = EngineStub.getCurrent();
+            if (eng != null && eng.width > 0 && eng.height > 0) {
+                s2d.width = eng.width;
+                s2d.height = eng.height;
+            }
+        } else {
+            s2d.scaleMode = UIScaleMode.LetterBox(preset.width, preset.height, true);
+            s2d.width = preset.width;
+            s2d.height = preset.height;
         }
         s2d.checkResize();
     }
 
-    /**
-     * Enables or disables specular highlights and shadow map behavior based on shadow tier.
-     *
-     * @returns {Void}
-     */
     public function applyShadows():Void {
-        if (light == null) return;
-        light.enableSpecular = (settings.shadowLevel != "Off");
-    }
-
-    /**
-     * Applies solar beam temperature and ambient fill intensity from lighting tier presets.
-     *
-     * @returns {Void}
-     */
-    public function applyLighting():Void {
-        if (light == null) return;
-        var fwd = (s3d != null && s3d.lightSystem != null) ? Std.downcast(s3d.lightSystem, h3d.scene.fwd.LightSystem) : null;
-        var preset = LIGHTING_PRESETS.get(settings.lightingLevel);
-        if (preset == null) preset = LIGHTING_PRESETS.get("Medium");
-
-        light.color.setColor(preset.sunColor);
-        if (fwd != null) {
-            fwd.ambientLight.setColor(preset.ambientColor);
+        if (settings.shadowLevel == "Off") {
+            shadowsEnabled = false;
+            shadowSize = 256;
+        } else {
+            shadowsEnabled = true;
+            shadowSize = Std.int(Math.max(256, Math.min(4096, settings.shadowRes)));
         }
+        syncRendererFxState();
     }
 
-    /**
-     * Configures MSAA multi-sampling anti-aliasing buffer samples.
-     *
-     * @returns {Void}
-     */
+    public function applyLighting():Void {
+        var preset = LIGHTING_PRESETS.get(settings.lightingLevel);
+        if (preset == null) {
+            preset = LIGHTING_PRESETS.get("Medium");
+        }
+
+        if (sunLight != null) {
+            sunLight.color.setColor(preset.sunColor);
+            sunLight.enableSpecular = (settings.lightingLevel != "Low");
+        }
+        if (s3d != null && s3d.lightSystem != null) {
+            s3d.lightSystem.ambientLight.setColor(preset.ambientColor);
+        }
+        syncRendererFxState();
+    }
+
     public function applyTexturesAndFiltering():Void {
-        Engine.ANTIALIASING = (settings.aaType != "None") ? settings.aaLevel : 0;
+        mipmapping = settings.mipmapping;
+        maxAnisotropy = settings.mipmapping ? Std.int(Math.max(1, settings.anisotropic)) : 1;
+        syncRendererFxState();
+    }
+
+    public function applyAntiAliasing():Void {
+        syncRendererFxState();
+    }
+
+    public function applyReflections():Void {
+        syncRendererFxState();
+    }
+
+    public function applyModelGeometry():Void {
+        syncRendererFxState();
+    }
+
+    function syncRendererFxState():Void {
+        if (gpuRenderer == null) return;
+        gpuRenderer.setAntiAliasing(settings.aaType, settings.aaLevel);
+        var reflScale = if (!settings.modelReflections) 0.0 else switch (settings.reflectionLevel) {
+            case "Low": 0.45;
+            case "High": 1.05;
+            case "Ultra": 1.35;
+            default: 0.78;
+        };
+        var shadowStr = if (!shadowsEnabled) 0.0 else switch (settings.shadowLevel) {
+            case "High": 0.72;
+            case "Ultra": 0.90;
+            case "Dynamic": 1.0;
+            default: 0.55;
+        };
+        var detailScale = switch (settings.textures) {
+            case "Off": 0.0;
+            case "Very Low": 0.25;
+            case "Low": 0.50;
+            case "Medium": 0.75;
+            case "High": 1.0;
+            case "Ultra": 1.18;
+            case "Unreal": 1.32;
+            default: 1.0;
+        };
+        if (mipmapping && maxAnisotropy > 4) detailScale *= 1.1;
+        var lightScale = switch (settings.lightingLevel) {
+            case "Low": 0.85;
+            case "High": 1.08;
+            case "Ultra (RTX/Path)": 1.18;
+            default: 1.0;
+        };
+        if (settings.lightingRes >= 2048) lightScale *= 1.05;
+        gpuRenderer.setQualityParams(reflScale, shadowStr, detailScale, lightScale);
     }
 }

@@ -1,7 +1,7 @@
 package ui.views.mainmenu;
 
-import h2d.Object;
-import h2d.Text;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
 import ui.FontManager;
 import ui.UIIcons;
 import ui.components.MenuItemRow;
@@ -13,7 +13,7 @@ import audio.AudioManager;
  * Main menu panel view providing navigation across play, resume, options, credits, and exit.
  *
  * @class MainMenuView
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/views/mainmenu/MainMenuView
  */
 @:keep
@@ -149,7 +149,11 @@ class MainMenuView extends Object {
      * @param dir Navigation offset (-1 for up, +1 for down).
      */
     public function navigate(dir:Int) {
-        selectedIndex = (selectedIndex + dir + rows.length) % rows.length;
+        var step = dir >= 0 ? 1 : -1;
+        for (_ in 0...rows.length) {
+            selectedIndex = (selectedIndex + step + rows.length) % rows.length;
+            if (selectedIndex != 1 || hasActiveSave) break;
+        }
         AudioManager.inst.playMenuBeep(AUDIO_BEEP_NAV_FREQ, 0.04);
         updateStyles();
         if (onSelectionChanged != null) onSelectionChanged();

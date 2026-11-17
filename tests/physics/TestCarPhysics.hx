@@ -2,9 +2,13 @@ package tests.physics;
 
 import utest.Test;
 import utest.Assert;
-import h3d.Vector;
+import math.Vec3;
 import oimo.dynamics.World;
 import input.InputController;
+import input.InputKey;
+import input.GamepadDevice;
+import graphics.SceneGraph.Camera3D;
+import ui.components.TouchControlsHUD;
 import physics.CarConfig;
 import physics.CarPhysics;
 import world.IGroundProvider;
@@ -34,7 +38,7 @@ class MockGroundProvider implements IGroundProvider {
         return 0.0;
     }
 
-    public function getGroundNormal(x:Float, y:Float, out:Vector):Void {
+    public function getGroundNormal(x:Float, y:Float, out:Vec3):Void {
         var active = (mode == "hill") || (mode == "ramp" && y > rampStartY);
         if (active) {
             out.set(0.0, -Math.sin(slopeRadians), Math.cos(slopeRadians));
@@ -47,7 +51,7 @@ class MockGroundProvider implements IGroundProvider {
         return friction;
     }
 
-    public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
+    public function enforceBoundaries(pos:Vec3, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
         return { hitWall: false, speedMult: 1.0, latMult: 1.0 };
     }
 
@@ -258,5 +262,191 @@ class TestCarPhysics extends Test {
         Assert.floatEquals(-45.0, car.chassisBody.getPosition().y, 0.001);
         Assert.floatEquals(2.0 + car.config.chassis.cogHeight, car.chassisBody.getPosition().z, 0.001);
         Assert.floatEquals(24.0, car.chassisBody.getLinearVelocity().y, 0.01);
+    }
+
+    /**
+     * Core anti-inversion regression contract:
+     * Ensures EVERY supported input modality (Keyboard WASD, Keyboard Arrows,
+     * Gamepad Analog Stick, Gamepad D-Pad, and Virtual Touch Stick) obeys:
+     *   - Turn Left  => steer < 0, car.yaw < 0, car.pos.x < 0, camera screen ndc.x < 0
+     *   - Turn Right => steer > 0, car.yaw > 0, car.pos.x > 0, camera screen ndc.x > 0
+     */
+    public function testCoreAllInputDevicesSteeringDirectionNeverInverted() {
+        var ground = new MockGroundProvider("flat", 1.0);
+        var fixedDt = 1.0 / 60.0;
+        var cam = new Camera3D();
+        cam.pos.set(0.0, -10.0, 4.0, 1.0);
+        cam.target.set(0.0, 20.0, 1.0, 1.0);
+        cam.up.set(0.0, 0.0, 1.0, 0.0);
+        cam.updateMatrices(16.0 / 9.0);
+
+        function projectScreenNdcX(worldPos:Vec3):Float {
+            var p = new Vec3(worldPos.x, worldPos.y, worldPos.z, 1.0).transformed(cam.unjitteredViewProjMat);
+            return p.x / p.w;
+        }
+
+        function runDriveCase(label:String, expectedDir:Int, applyFn:InputController->Void):Void {
+            InputKey.clearAll();
+            GamepadDevice.applyExternalSnapshot(false, [], [], []);
+            var ctrl = new InputController();
+            car.resetState(0.0, 0.0, 0.0, 0.0);
+            for (_ in 0...65) {
+                applyFn(ctrl);
+                ctrl.update(fixedDt);
+                car.update(fixedDt, ctrl, null, ground);
+            }
+            InputKey.clearAll();
+            GamepadDevice.applyExternalSnapshot(false, [], [], []);
+            var ndcX = projectScreenNdcX(car.pos);
+            if (expectedDir < 0) {
+                Assert.isTrue(ctrl.steer < -0.2, label + " must emit negative steer (< -0.2) for Left, got " + ctrl.steer);
+                Assert.isTrue(car.yaw < -0.15, label + " must rotate car yaw negative for Left, got " + car.yaw);
+                Assert.isTrue(car.pos.x < -1.0, label + " must move car toward -X (Left), got x=" + car.pos.x);
+                Assert.isTrue(ndcX < -0.04, label + " must move car to Screen Left (ndcX < -0.04), got ndcX=" + ndcX);
+            } else {
+                Assert.isTrue(ctrl.steer > 0.2, label + " must emit positive steer (> 0.2) for Right, got " + ctrl.steer);
+                Assert.isTrue(car.yaw > 0.15, label + " must rotate car yaw positive for Right, got " + car.yaw);
+                Assert.isTrue(car.pos.x > 1.0, label + " must move car toward +X (Right), got x=" + car.pos.x);
+                Assert.isTrue(ndcX > 0.04, label + " must move car to Screen Right (ndcX > 0.04), got ndcX=" + ndcX);
+            }
+            var arcDist = Math.sqrt(car.pos.x * car.pos.x + car.pos.y * car.pos.y);
+            Assert.isTrue(car.pos.y > 1.0 && arcDist > 1.8, label + " must travel forward along turning arc, got pos=" + car.pos.toString());
+        }
+
+        // 1. Keyboard WASD
+        runDriveCase("Keyboard WASD Left (A)", -1, function(_) {
+            InputKey.setKeyState(InputKey.W, true);
+            InputKey.setKeyState(InputKey.A, true);
+        });
+        runDriveCase("Keyboard WASD Right (D)", 1, function(_) {
+            InputKey.setKeyState(InputKey.W, true);
+            InputKey.setKeyState(InputKey.D, true);
+        });
+
+        // 2. Keyboard Arrow Keys
+        runDriveCase("Keyboard Arrow Left", -1, function(_) {
+            InputKey.setKeyState(InputKey.UP, true);
+            InputKey.setKeyState(InputKey.LEFT, true);
+        });
+        runDriveCase("Keyboard Arrow Right", 1, function(_) {
+            InputKey.setKeyState(InputKey.UP, true);
+            InputKey.setKeyState(InputKey.RIGHT, true);
+        });
+
+        // 3. Gamepad Analog Left Stick + Right Trigger Throttle
+        function makePadButtons(?dpadIdx:Int = -1):Array<Bool> {
+            var b = [for (_ in 0...17) false];
+            if (dpadIdx >= 0) b[dpadIdx] = true;
+            b[7] = true; // RT
+            return b;
+        }
+        function makePadValues():Array<Float> {
+            var v = [for (_ in 0...17) 0.0];
+            v[7] = 1.0; // RT analog 100%
+            return v;
+        }
+        runDriveCase("Gamepad Analog Left", -1, function(_) {
+            GamepadDevice.applyExternalSnapshot(true, [-0.85, 0.0, 0.0, 0.0], makePadButtons(), makePadValues());
+        });
+        runDriveCase("Gamepad Analog Right", 1, function(_) {
+            GamepadDevice.applyExternalSnapshot(true, [0.85, 0.0, 0.0, 0.0], makePadButtons(), makePadValues());
+        });
+
+        // 4. Gamepad D-Pad
+        runDriveCase("Gamepad D-Pad Left", -1, function(_) {
+            GamepadDevice.applyExternalSnapshot(true, [0.0, 0.0, 0.0, 0.0], makePadButtons(14), makePadValues());
+        });
+        runDriveCase("Gamepad D-Pad Right", 1, function(_) {
+            GamepadDevice.applyExternalSnapshot(true, [0.0, 0.0, 0.0, 0.0], makePadButtons(15), makePadValues());
+        });
+
+        // 5. Mobile / Virtual Analog Touch Stick via TouchControlsHUD widget (Gas + Stick multi-touch)
+        function runVirtualAnalogStickCase(label:String, expectedDir:Int, frac:Float):Void {
+            InputKey.clearAll();
+            GamepadDevice.applyExternalSnapshot(false, [], [], []);
+            var ctrl = new InputController();
+            var hud = new TouchControlsHUD(ctrl, null);
+            hud.layout(1280, 720);
+            car.resetState(0.0, 0.0, 0.0, 0.0);
+
+            hud.handlePointerDown(1, hud.gasX, hud.gasY);
+            hud.handlePointerDown(2, hud.stickBaseX, hud.stickBaseY);
+            hud.handlePointerMove(2, hud.stickBaseX + expectedDir * frac * hud.stickMaxTravel, hud.stickBaseY);
+            if (expectedDir < 0) {
+                Assert.isTrue(hud.stickKnobX < hud.stickBaseX, label + " virtual knob must move Left");
+            } else {
+                Assert.isTrue(hud.stickKnobX > hud.stickBaseX, label + " virtual knob must move Right");
+            }
+            for (_ in 0...65) {
+                ctrl.isTouchActive = true;
+                ctrl.update(fixedDt);
+                car.update(fixedDt, ctrl, null, ground);
+            }
+            hud.handlePointerUp(2);
+            hud.handlePointerUp(1);
+            var ndcX = projectScreenNdcX(car.pos);
+            if (expectedDir < 0) {
+                Assert.isTrue(ctrl.steer < -0.1, label + " steer must be negative, got " + ctrl.steer);
+                Assert.isTrue(car.yaw < -0.08, label + " yaw must be negative, got " + car.yaw);
+                Assert.isTrue(car.pos.x < -0.5, label + " must steer toward -X (Left), got x=" + car.pos.x);
+                Assert.isTrue(ndcX < -0.02, label + " must steer Screen Left, got ndcX=" + ndcX);
+            } else {
+                Assert.isTrue(ctrl.steer > 0.1, label + " steer must be positive, got " + ctrl.steer);
+                Assert.isTrue(car.yaw > 0.08, label + " yaw must be positive, got " + car.yaw);
+                Assert.isTrue(car.pos.x > 0.5, label + " must steer toward +X (Right), got x=" + car.pos.x);
+                Assert.isTrue(ndcX > 0.02, label + " must steer Screen Right, got ndcX=" + ndcX);
+            }
+            var arcDist = Math.sqrt(car.pos.x * car.pos.x + car.pos.y * car.pos.y);
+            Assert.isTrue(car.pos.y > 1.0 && arcDist > 1.8, label + " must travel forward along turning arc, got pos=" + car.pos.toString());
+        }
+
+        runVirtualAnalogStickCase("Virtual Analog Stick Partial Left (45%)", -1, 0.45);
+        runVirtualAnalogStickCase("Virtual Analog Stick Partial Right (45%)", 1, 0.45);
+        runVirtualAnalogStickCase("Virtual Analog Stick Full Left (100%)", -1, 1.0);
+        runVirtualAnalogStickCase("Virtual Analog Stick Full Right (100%)", 1, 1.0);
+
+        // Also assert zero inversion across all 3 car presets (Race AWD, Hatch FWD, Coupe RWD)
+        for (presetId in [CarConfig.ID_RACE_AWD, CarConfig.ID_HATCH_FWD, CarConfig.ID_COUPE_RWD]) {
+            car.setConfig(CarConfig.getPresetConfig(presetId));
+            runDriveCase(presetId + " Left", -1, function(_) {
+                InputKey.setKeyState(InputKey.W, true);
+                InputKey.setKeyState(InputKey.A, true);
+            });
+            runDriveCase(presetId + " Right", 1, function(_) {
+                InputKey.setKeyState(InputKey.W, true);
+                InputKey.setKeyState(InputKey.D, true);
+            });
+        }
+        car.setConfig(CarConfig.getDefault());
+    }
+
+    public function testTurningRadiusTighterOnCompactFwdHatchThanAwdRaceCar() {
+        var ground = new MockGroundProvider("flat", 1.0);
+        var fixedDt = 1.0 / 60.0;
+
+        function measureYawAtCorner(presetId:String):Float {
+            InputKey.clearAll();
+            GamepadDevice.applyExternalSnapshot(false, [], [], []);
+            var ctrl = new InputController();
+            car.setConfig(CarConfig.getPresetConfig(presetId));
+            car.resetState(0.0, 0.0, 0.0, 0.0);
+            // Accelerate slightly then hold full right cornering
+            for (i in 0...95) {
+                InputKey.setKeyState(InputKey.W, true);
+                InputKey.setKeyState(InputKey.D, i >= 20);
+                ctrl.update(fixedDt);
+                car.update(fixedDt, ctrl, null, ground);
+            }
+            InputKey.clearAll();
+            return car.yaw;
+        }
+
+        var awdYaw = measureYawAtCorner(CarConfig.ID_RACE_AWD);
+        var fwdYaw = measureYawAtCorner(CarConfig.ID_HATCH_FWD);
+        var rwdYaw = measureYawAtCorner(CarConfig.ID_COUPE_RWD);
+
+        Assert.isTrue(fwdYaw > awdYaw + 0.05, "Compact FWD Hatch (" + fwdYaw + ") must turn tighter than AWD Race Car (" + awdYaw + ")");
+        Assert.isTrue(rwdYaw > awdYaw + 0.03, "Low RWD Coupe (" + rwdYaw + ") must rotate sharper than AWD Race Car (" + awdYaw + ")");
+        car.setConfig(CarConfig.getDefault());
     }
 }

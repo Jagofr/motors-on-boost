@@ -4,7 +4,10 @@ import utest.Test;
 import utest.Assert;
 import audio.AudioManager;
 import input.InputController;
+import input.InputController.InputAction;
 import input.InputController.ExclusiveDevice;
+import input.InputKey;
+import input.GamepadDevice;
 import save.SaveSystem;
 import ui.FontManager;
 import ui.UIManager;
@@ -147,5 +150,50 @@ class TestFullMenuAndOptionsFlow extends Test {
         ui.builder.pauseMenuView.selectedIndex = 3;
         ui.builder.pauseMenuView.confirmSelection();
         Assert.equals(MenuAction.QuitToTitle, emittedActions[2]);
+    }
+
+    public function testMainMenuSkipsDisabledResumeAndResetsPauseFlag() {
+        ui.setHasActiveSave(false);
+        ui.showMainMenu();
+        Assert.equals(0, ui.builder.mainMenuView.selectedIndex);
+        ui.builder.mainMenuView.navigate(1);
+        Assert.equals(2, ui.builder.mainMenuView.selectedIndex, "Navigate Down must skip disabled row 1 when no save exists");
+        ui.builder.mainMenuView.navigate(-1);
+        Assert.equals(0, ui.builder.mainMenuView.selectedIndex, "Navigate Up must skip disabled row 1 when no save exists");
+
+        // Enter Pause -> Options -> MainMenu -> Credits -> Back must reset isOpenedFromPause
+        ui.showPause();
+        ui.openOptions(true);
+        Assert.isTrue(ui.isOpenedFromPause);
+        ui.showMainMenu();
+        Assert.isFalse(ui.isOpenedFromPause, "Leaving Options/Pause to MainMenu must clear isOpenedFromPause");
+    }
+
+    public function testKeyRemapIgnoresMouseClicksAndAcceptsGamepadSnapshot() {
+        input.startListening(InputAction.Throttle, false);
+        @:privateAccess input.inputCooldown = 0.0;
+        InputKey.setKeyState(InputKey.MOUSE_LEFT, true);
+        input.update(1 / 60);
+        Assert.isTrue(input.isListeningForRemap, "Mouse left click must not be captured as keyboard key bind");
+        InputKey.setKeyState(InputKey.MOUSE_LEFT, false);
+
+        InputKey.setKeyState(InputKey.K, true);
+        input.update(1 / 60);
+        Assert.isFalse(input.isListeningForRemap);
+        Assert.equals(InputKey.K, input.bindings.keyGas);
+        InputKey.setKeyState(InputKey.K, false);
+
+        // External gamepad snapshot binds controller button
+        GamepadDevice.applyExternalSnapshot(true, [0.0, 0.0], [for (_ in 0...17) false], [for (_ in 0...17) 0.0]);
+        Assert.isTrue(input.isPadConnected());
+        input.startListening(InputAction.Boost, true);
+        @:privateAccess input.inputCooldown = 0.0;
+        var btns = [for (_ in 0...17) false];
+        btns[3] = true; // BTN_NORTH / Y
+        GamepadDevice.applyExternalSnapshot(true, [0.0, 0.0], btns, [for (b in btns) b ? 1.0 : 0.0]);
+        input.update(1 / 60);
+        Assert.isFalse(input.isListeningForRemap);
+        Assert.equals(3, input.bindings.padBoost);
+        GamepadDevice.applyExternalSnapshot(false, [], [], []);
     }
 }

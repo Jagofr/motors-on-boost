@@ -73,4 +73,21 @@ class TestCarConfig extends Test {
         var fallbackCorrupt = CarConfig.fromJson("{ broken json !!!");
         Assert.floatEquals(1450.0, fallbackCorrupt.chassis.massKg, 0.01);
     }
+
+    public function testThreeCarPresetsAndPaintPalette() {
+        Assert.equals(3, CarConfig.VEHICLE_PRESETS.length);
+        Assert.isTrue(CarConfig.PAINT_PALETTE.length >= 6);
+
+        var awd = CarConfig.getPresetConfig(CarConfig.ID_RACE_AWD);
+        var fwd = CarConfig.getPresetConfig(CarConfig.ID_HATCH_FWD);
+        var rwd = CarConfig.getPresetConfig(CarConfig.ID_COUPE_RWD);
+
+        Assert.floatEquals(0.35, awd.drivetrain.frontDriveSplit, 0.001);
+        Assert.floatEquals(1.0, fwd.drivetrain.frontDriveSplit, 0.001);
+        Assert.floatEquals(0.0, rwd.drivetrain.frontDriveSplit, 0.001);
+
+        Assert.isTrue(fwd.chassis.wheelbase < awd.chassis.wheelbase, "Sports Hatch FWD must have shorter wheelbase than AWD Race Car");
+        Assert.isTrue(fwd.tires.maxSteerAngle > awd.tires.maxSteerAngle, "Sports Hatch FWD must have sharper steering lock");
+        Assert.isTrue(rwd.chassis.cogHeight < awd.chassis.cogHeight, "Low Sports Coupe RWD must have lower CoG");
+    }
 }

@@ -2,20 +2,20 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/Version-0.4.1--Alpha%20(Build%200007)-00E5FF?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-0.8.0--Alpha%20(Build%200016)-00E5FF?style=for-the-badge)
 ![Haxe](https://img.shields.io/badge/Haxe-4.3%2B-FA7E0A?style=for-the-badge&logo=haxe&logoColor=white)
-![Heaps.io](https://img.shields.io/badge/Engine-Heaps.io-00E5FF?style=for-the-badge&logo=opengl&logoColor=white)
-![Platform](https://img.shields.io/badge/Platform-Web%20%2F%20PWA-111418?style=for-the-badge&logo=pwa&logoColor=00E5FF)
-![Graphics](https://img.shields.io/badge/Graphics-WebGL%202.0-990000?style=for-the-badge&logo=webgl&logoColor=white)
+![WebGPU](https://img.shields.io/badge/Engine-hlwgpu%20%2F%20Ash%20Wasm32-00E5FF?style=for-the-badge&logo=webgpu&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-WebGPU%20%2F%20PWA-111418?style=for-the-badge&logo=pwa&logoColor=00E5FF)
+![Graphics](https://img.shields.io/badge/Graphics-WebGPU%20%2B%20WGSL-1E88E5?style=for-the-badge)
 ![Status](https://img.shields.io/badge/Status-Active%20Prototype-FF9800?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-Proprietary%20%2F%20All%20Rights%20Reserved-red?style=for-the-badge)
-![Controller](https://img.shields.io/badge/Input-Gamepad%20%26%20Keyboard-4CAF50?style=for-the-badge&logo=gamepad&logoColor=white)
+![Controller](https://img.shields.io/badge/Input-Gamepad%2C%20Keyboard%20%26%20Touch-4CAF50?style=for-the-badge&logo=gamepad&logoColor=white)
 ![Audio](https://img.shields.io/badge/Audio-Web%20Audio%20Synth-9C27B0?style=for-the-badge)
-![AI Collaboration](https://img.shields.io/badge/AI%20Engineering-Google%20Gemini%203.8%20Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)
+![AI Collaboration](https://img.shields.io/badge/AI%20Engineering-Google%20Gemini-4285F4?style=for-the-badge&logo=google&logoColor=white)
 
 <p align="center">
-  <strong>High-octane browser-native arcade highway racing prototype.</strong><br>
-  Built from scratch with <strong>Haxe</strong> and <strong>Heaps.io</strong>, engineered for ultra-responsive 60+ FPS browser performance without third-party runtimes.
+  <strong>High-octane browser-native WebGPU &amp; Ash WebAssembly arcade racing prototype.</strong><br>
+  Built with <strong>Haxe</strong>, <strong>hlwgpu (xgpu)</strong>, <strong>hlwindow</strong>, and <strong>OimoPhysics</strong>, compiled AOT to multi-threaded Wasm32.
 </p>
 
 [Overview](#overview) • [Key Features](#key-features) • [Architecture](#architecture--systems) • [Controls](#controls--hardware-support) • [Installation](#installation--setup) • [Repository Governance](#repository-governance--ip) • [Credits](#credits--attributions)
@@ -26,36 +26,24 @@
 
 ## Overview
 
-**M.O.B. (Motors on Boost)** is an aggressive arcade highway racing baseline inspired by legendary mid-2000s classics—principally *Need for Speed: Most Wanted (2005)* and *Burnout Revenge (2005)*. 
+**M.O.B. (Motors on Boost)** is an aggressive arcade highway racing prototype inspired by mid-2000s classics—principally *Need for Speed: Most Wanted (2005)* and *Burnout Revenge (2005)*.
 
-Engineered directly on top of Haxe 4.3+ and the Heaps.io framework, **M.O.B.** runs natively in modern Chromium, Gecko, and WebKit browsers via hardware-accelerated WebGL 2.0. The engine combines custom raycast vehicle dynamics, high-speed lateral drift modeling, procedural endless multi-lane highway track generation, autonomous highway traffic AI, dynamic trauma-based camera shake, and a built-in Web Audio procedural tone synthesizer into an installable Progressive Web Application (PWA).
-
-This project represents the primary WebGL foundation of the *M.O.B.* racing line, setting the architectural foundation for upcoming sister iterations (such as the planned Godot-powered desktop title, *M.O.B. // Sektr*).
+Built in Haxe 4.3+ and compiled AOT via **Ash** (`wasm32-wasip1-threads`) onto hardware-accelerated **WebGPU (`hlwgpu` / `xgpu`)** and **WGSL** shaders, **M.O.B.** combines 240 Hz 4-wheel raycast vehicle physics (`AWD`, `FWD`, and `RWD` drivetrain layouts), procedural compute-generated multi-lane highway tracks, an open stunt sandbox proving grounds, autonomous traffic AI, P2P multiplayer via `/relay.ashx`, Web Audio procedural synthesis, and responsive HTML5/CSS3 overlays synchronized over a zero-copy SharedArrayBuffer `WebBridge`.
 
 ---
 
 ## Key Features
 
-* **High-Density In-Game HUD (`InGameHUDView.hx`)**: Angled digital speedometer with gear and drifting badges, lap and race time counter, procedural real-time circuit minimap with glowing position dot and directional heading tick, curved tachometer RPM arc gauge (1k-8k RPM), curved nitro capacity arc gauge with dual-layer flame icon, and discreet real-time FPS counter.
-* **Limited & Regenerating Nitrous Boost (`CarPhysics.hx`)**: Capacity model (`boostFuel`) with 0.25/s active burn consumption (4.0s sustained full boost), 0.10/s passive idle recharge, and automatic cutoff on empty.
-* **Granular Steering Sensitivity (`ControlsOptionsPanel.hx` & `InputController.hx`)**: Configurable steering sensitivity setting scalable from 0% to 100% in 2% steps.
-* **Decoupled 3D Render Scale (`PostProcessRenderer.hx` & `GraphicsManager.hx`)**: Independent 3D offscreen render target scaling (0.50x to 1.50x) while keeping 2D canvas and text at native 1:1 window resolution for ultra-sharp UI typography.
-* **Responsive Options UI & Viewport Scrolling (`OptionsView.hx` & `GraphicsOptionsPanel.hx`)**: Scrolling menu viewport with navigation hints, adaptive card backplates, and fixed Back button hitzone avoiding tab collisions.
-* **Hybrid OimoPhysics Rigid Body & Arcade Raycast Dynamics (`CarPhysics.hx`)**: OimoPhysics 3D rigid body collision backbone coupled with four-wheel independent spring-damper suspension integration along road surface normals, anti-roll bar torque distribution across wheel pairs, slip-angle cornering grip evaluated via normalized Pacejka-like curves, front vs rear tire slip bias (`tireSlipBias: [-1.0 .. 1.0]`), dedicated handbrake breakaway, automatic drift engagement at threshold slip angles (`driftTriggerAngle: 0.22 rad`), Criterion-style (*NFS: Most Wanted 2012*) counter-steer torque assist and forward velocity biasing, dynamic body roll scaling (`bodyRollScale: 1.0`), ground friction scaling (`groundFriction: 1.0`), and burnout wheelspin simulation (`wheelspinAmount: 1.2`).
-* **Powertrain & Transmission Simulation**: Dynamic engine RPM flywheel calculation, progressive 6-speed gear ratios, automatic transmission up/down-shift logic, and simulated limited-slip differential (LSD).
-* **Dynamic Speed Chase Camera (`ChaseCamera.hx`)**: Spring-damped target follow with controlled acceleration pull-back (+0.55m max), velocity feedforward anchoring (0.65), speed-dependent dynamic FOV (65.0° base smoothly scaling to 77.0° cruising at top speed with +3.5° boost, bounded to prevent fisheye distortion), and toned-down collision trauma dampening with rapid exponential decay (`3.8 * dt`).
-* **Dual-Tier Automated Testing Infrastructure**: Headless unit test suite (`tests/`) powered by `utest` across 12 fixtures (200/200 assertions passed in under 0.06s) and automated browser testing suite (`web/test-suite.html` & `tests/run-browser-tests.js`) driven via Microsoft Edge and Chrome DevTools Protocol (CDP).
-* **High-Speed Radial Motion Blur (`RadialBlurShader.hx`)**: Custom HxSL screen post-processing shader with runtime `blurOrigin` and `blurIntensity` scaled dynamically with forward vehicle velocity via `PostProcessRenderer.hx`.
-* **Procedural Gradient Blue Skybox (`Skybox.hx`)**: Geodesic celestial dome with custom HxSL shader blending deep azure zenith blue (`#1052B8`), bright atmospheric horizon cyan (`#7AC2F2`), and dusk nadir tones.
-* **Apex Summit Solar Lighting**: Scene directional sunlight positioned at the highest south-east elevation of the circuit map (`X: +350, Y: -250, Z: 140`) providing crisp directional illumination.
-* **Autonomous Highway Traffic AI**: Multi-lane procedural obstacle vehicles traversing route waypoints with dynamic spatial proximity checks, lane-following, and collision boundaries.
-* **Cinematic 3-Stage Boot Sequence**: Studio, Engine, and locked Legal Disclaimer preload sequence transitioning via a 1.2-second smooth cross-fade curtain into the interactive 3D showcase.
-* **Procedural Vector Iconography & PNG Asset Integration (`TouchControlsHUD.hx`, `UIIcons.hx`)**: Native loading of PNG button icons from `res/icons/` with immediate automatic fallback to resolution-independent procedural vector graphics.
-* **Bumper-Navigated Glassmorphic UI**: High-contrast UI featuring edge-triggered bumper/tab navigation (`LB`/`RB` or `Q`/`E`), discrete block audio volume gauges (`■` / `□`), and real-time graphics adjustments.
-* **Dual-Scheme Hardware Diagrams**: Procedural vector controller diagrams (PXN P50L / standard Xbox layouts) and keyboard diagrams with in-game button remapping and device isolation modes (`Both`, `Keyboard Only`, `Gamepad Only`).
-* **Web Audio Synthesis Engine**: Custom square, sawtooth, and noise tone generators producing procedural engine RPM frequency modulation, tire screeches, and UI chime sound effects without external audio files.
-* **Frosted Glass Multi-Touch Driving HUD (`TouchControlsHUD.hx`)**: Proportional virtual analog steering joystick for left thumb, left-hand Nitro button with flame icon, high-capacity Gas pad with pedal icon, disc brake pad with red caliper, and arched Drift button with native DOM TouchEvent integration and true multi-touch concurrency across all simultaneous chords.
-* **State Persistence & Version Migration (`SaveSystem.hx`)**: Browser `LocalStorage` v4 schema caching for hardware graphics levels, audio channels, steering sensitivity, and mid-run race checkpoints with automated forward migration.
+* **WebGPU Forward+ & Post-Processing Pipeline (`WebGpuRenderer.hx`)**: Native `hlwgpu` (`xgpu`) + WGSL shader pipeline compiled to WebAssembly via Ash, featuring atmospheric procedural `SkyShader`, directional Blinn-Phong lighting (`SceneLitShader`), compute track mesh generation (`TrackComputeShader`), dynamic radial speed blur (`RadialBlurShader`), and runtime-selectable **FXAA 3.11**, **SMAA 1x** (3-pass edge/blend/neighborhood), **Hardware 4x MSAA** (multisample color/depth + resolve), and **TSAA** (8x/16x/32x temporal reprojection).
+* **Hybrid OimoPhysics Rigid Body & 4-Wheel Raycast Dynamics (`CarPhysics.hx`)**: OimoPhysics rigid body collision backbone coupled with independent four-wheel spring-damper suspension (`SuspensionSolver.hx`), normalized Pacejka-style tire grip & dynamic drivetrain torque split (`TireSlipSolver.hx`, `DrivetrainSolver.hx`), front/rear slip bias, drift angle engagement, counter-steer stability assist, and nitro boost (`boostFuel`).
+* **Garage Vehicle Class Selection & Paint Customization (`CarSelectView.hx`, `CarConfig.hx`)**: Post-map car selector with 3 distinct chassis presets — **GT Race Car (AWD 35/65)**, **Sports Hatch (FWD 100/0)**, and **Low Sports Coupe (RWD 0/100)** — custom `CarMesh` proportions, live 8-swatch paint customization, and persistent garage saves via `SaveSystem.hx`.
+* **SharedArrayBuffer HTML5/CSS3 Overlay HUD & UI (`WebBridge.hx`, `web/ui-overlay.js`)**: Zero-GC-stall Worker-to-DOM SharedArrayBuffer IPC driving crisp glassmorphic UI views, angled digital speedometer, curved tachometer RPM & nitro arcs, real-time procedural circuit minimap, black-curtain transitions, and independent `UI Interface Target` scaling alongside `3D Render Resolution`.
+* **P2P LAN & Relay Multiplayer (`MultiplayerManager.hx`, `web/relay.ashx`)**: Cross-device client-server lobby flow with invite codes, state synchronization (`NetworkProtocol.hx`), WebSocket/HTTP relay transport (`SocketTransport.hx`), and remote racer rendering (`RemoteCarActor.hx`).
+* **Multi-Device Input & Frosted Glass Touch HUD (`InputController.hx`, `TouchControlsHUD.hx`)**: Unified steering contract (`- = Left`, `+ = Right`) across Keyboard (`WASD`/Arrows with custom remapping), Gamepad (analog stick + D-Pad), and an isolated DOM `#touch-stick-zone` virtual analog stick plus concurrent multi-touch Gas, Brake, Drift, and Nitro pads.
+* **Dynamic Speed Chase Camera (`ChaseCamera.hx`)**: Velocity-aligned damped chase camera with speed-dependent dynamic FOV dilation, boost pull-back, and exponential trauma decay.
+* **Two-World Architecture (`Track.hx`, `SandboxMap.hx`, `TrafficSystem.hx`)**: Closed-loop curved Highway Circuit with barriers, apex solar lighting, and autonomous multi-lane traffic AI, plus an open Sandbox Proving Grounds test facility with ramps and dynamic props.
+* **Dual-Tier Automated Testing (`tests/`, `aitests/`)**: Headless HashLink/Ash unit test suite via `utest` covering physics, multi-device anti-inversion contracts, UI flows, and persistence (`ash bin/test.hl`), paired with automated Chromium/Edge WebGPU Playwright E2E specs (`aitests/specs/`).
+* **Web Audio Synthesis & Persistence (`AudioManager.hx`, `SaveSystem.hx`)**: Procedural Web Audio engine RPM synthesis, tire screech, and UI audio feedback with schema-migrated `LocalStorage` settings and mid-race checkpoints.
 
 ---
 
@@ -64,19 +52,19 @@ This project represents the primary WebGL foundation of the *M.O.B.* racing line
 ```
                               ┌────────────────────────┐
                               │        Main.hx         │
-                              │  (Boot & State Machine) │
+                              │ (Ash Wasm / Boot Loop) │
                               └───────────┬────────────┘
                                           │
             ┌─────────────────────────────┼────────────────────────────┐
             ▼                             ▼                            ▼
   ┌───────────────────┐         ┌───────────────────┐        ┌───────────────────┐
-  │   IntroSequence   │         │    Physics & 3D   │        │     UI & Audio    │
+  │   Graphics & 3D   │         │    Physics & AI   │        │   UI & IPC / Net  │
   ├───────────────────┤         ├───────────────────┤        ├───────────────────┤
-  │ • Studio Splash   │         │ • CarPhysics.hx   │        │ • UIManager.hx    │
-  │ • Engine Splash   │         │ • Track.hx        │        │ • UIIcons.hx      │
-  │ • Disclaimer/FOSS │         │ • TrafficSystem.hx│        │ • ControlDiagrams │
-  │ • Async Preload   │         │ • ChaseCamera.hx  │        │ • AudioManager.hx │
-  │ • Showcase Curtain│         │ • GraphicsManager │        │ • SaveSystem.hx   │
+  │ • WebGpuRenderer  │         │ • CarPhysics.hx   │        │ • WebBridge.hx    │
+  │ • WGSL Shaders    │         │ • TireSlipSolver  │        │ • ui-overlay.js   │
+  │ • FXAA/SMAA/MSAA/ │         │ • CarConfig.hx    │        │ • UIManager.hx    │
+  │   TSAA Passes     │         │ • Track/Sandbox   │        │ • TouchControls   │
+  │ • ChaseCamera.hx  │         │ • TrafficSystem   │        │ • MultiplayerMgr  │
   └───────────────────┘         └───────────────────┘        └───────────────────┘
 ```
 
@@ -84,74 +72,66 @@ This project represents the primary WebGL foundation of the *M.O.B.* racing line
 
 | Module | Location | Responsibility |
 |---|---|---|
-| **Entry Point** | `src/Main.hx` | Boot state machine, canvas resize lifecycle, showcase rotation, and async asset loading. |
-| **Physics** | `src/physics/CarPhysics.hx` | Velocity integration, lateral tire slip friction, chassis roll/pitch, and drift transitions. |
-| **World** | `src/world/Track.hx` | Procedural multi-lane spline road generation, asphalt shaders, and ground lift constants. |
-| **Traffic** | `src/entities/TrafficSystem.hx` | Autonomous obstacle spawning, waypoint trajectory math, and collision volumes. |
-| **Vehicle Mesh** | `src/entities/CarMesh.hx` | Procedural 3D chassis geometry, materials, and steerable front wheel assemblies. |
-| **Camera** | `src/core/ChaseCamera.hx` | Damped spring chase camera with dynamic FOV dilation and non-linear trauma shake decay. |
-| **UI Management** | `src/core/UIManager.hx` | Menus, sliders, credits view, bumper tab navigation, and modal containment. |
-| **Vector Icons** | `src/core/UIIcons.hx` | Procedural vector icon generation via `h2d.Graphics` cached to `h2d.Tile`. |
-| **Input Handler** | `src/input/InputController.hx` | Edge-detection polling for Gamepad API and keyboard with remapping registers. |
-| **Audio Synth** | `src/core/AudioManager.hx` | Web Audio tone synthesis for engine frequencies, tire friction, and UI beeps. |
-| **Persistence** | `src/core/SaveSystem.hx` | Serialization of graphics settings, audio gains, and in-progress race saves. |
+| **Entry Point** | `src/Main.hx` | Ash Wasm/HL runtime entry point, fixed-step simulation loop, and showcase state machine. |
+| **WebGPU Renderer** | `src/graphics/WebGpuRenderer.hx` | `hlwgpu` (`xgpu`) forward 3D pass, FXAA/SMAA/4x MSAA/TSAA AA pipeline, and radial blur. |
+| **WGSL Shaders** | `src/graphics/shaders/` | Skybox, lit 3D material, SMAA 3-pass, temporal TSAA resolve, and compute track shaders. |
+| **Vehicle Dynamics** | `src/physics/CarPhysics.hx` | OimoPhysics rigid body + raycast suspension, drift states, boost, and preset integration. |
+| **Car Specs & Tire Solver** | `src/physics/CarConfig.hx`, `TireSlipSolver.hx` | AWD/FWD/RWD vehicle presets, wheelbase leverage, Pacejka slip grip, and paint colors. |
+| **World & Traffic** | `src/world/`, `src/entities/TrafficSystem.hx` | Highway Circuit, Sandbox Proving Grounds, waypoints, barriers, and autonomous traffic AI. |
+| **Camera** | `src/camera/ChaseCamera.hx` | Velocity-aligned damped chase camera with dynamic FOV dilation and collision trauma. |
+| **HTML5 UI & Bridge** | `src/core/WebBridge.hx`, `web/ui-overlay.js` | SharedArrayBuffer Worker-to-DOM HUD/menus, car garage UI, and isolated touch controls. |
+| **UI State & Views** | `src/ui/UIManager.hx`, `src/ui/views/` | Navigation state machine (`MapSelect -> CarSelect -> Drive`), options, and pause/credits. |
+| **Input Handler** | `src/input/InputController.hx` | Keyboard, Gamepad API, and virtual touch stick input with enforced left/right polarity. |
+| **Multiplayer** | `src/net/MultiplayerManager.hx`, `web/relay.ashx` | P2P host/join lobby, invite codes, socket/relay transport, and remote racer replication. |
+| **Audio & Persistence** | `src/audio/AudioManager.hx`, `src/save/SaveSystem.hx` | Web Audio procedural engine/tire synthesis and versioned `LocalStorage` persistence. |
 
 ---
 
 ## Project Structure
 
 ```text
-├── CHANGELOG.md                   # Chronological version changelog
+├── CHANGELOG.md                   # Chronological milestone changelog
 ├── CONTRIBUTING                   # Project contribution and governance terms
 ├── LICENSE                        # Custom proprietary software license
 ├── README                         # This README document
 ├── SECURITY.md                    # Security vulnerability reporting policy
-├── compile.hxml                   # Haxe compiler build configuration
+├── compile.hxml                   # Ash Wasm32 + HL compiler configuration
+├── test.hxml                      # Headless utest configuration (bin/test.hl)
 ├── changelogs/                    # Detailed milestone release records
-│   └── 2026-10-06-v0.1.0-initial.md
-├── res/                           # Embedded assets
-│   └── fonts/
-│       ├── stack_sans.ttf
-│       └── symbols.ttf
 ├── src/
-│   ├── Main.hx                    # Entry point & intro sequence controller
-│   ├── core/                      # Architecture and boot packages
-│   ├── entities/                  # Vehicle meshes and traffic simulation
-│   ├── input/                     # Gamepad, keyboard, and touch controller
-│   ├── physics/                   # Vehicle dynamics, raycast suspension, drift
-│   ├── ui/                        # High-density HUD, options panels, and controls
-│   └── world/                     # Highway circuit geometry & boundaries
-├── tests/                         # Dual-tier automated testing infrastructure
-│   ├── TestMain.hx                # Headless unit test runner (utest)
-│   ├── node-runner.js             # Node.js DOM/storage shims for Heaps JS
-│   ├── run-browser-tests.js       # Headless Edge CDP automation runner
-│   ├── audio/                     # Audio manager test cases
-│   ├── camera/                    # Chase camera FOV & trauma test cases
-│   ├── core/                      # Version and core system test cases
-│   ├── entities/                  # Traffic AI and vehicle mesh test cases
-│   ├── input/                     # Sensitivity & input controller test cases
-│   ├── physics/                   # Raycast suspension & drift test cases
-│   ├── save/                      # Save schema migration & touch settings tests
-│   ├── ui/                        # Graphics options & touch HUD test cases
-│   └── world/                     # Track spline & waypoint test cases
-├── compile.hxml                   # Production JS compilation configuration
-├── test.hxml                      # Headless unit testing compilation configuration
-└── web/                           # Production web root & PWA distribution bundle
-    ├── index.html                 # App shell with noscript fallback & canvas
-    ├── test-suite.html            # Interactive browser test suite & visual verification
-    ├── manifest.json              # Web App Manifest (standalone landscape)
-    ├── sw.js                      # Cache-first Service Worker
-    ├── game.js                    # Compiled JavaScript bundle (generated)
-    ├── icons/
-    │   ├── icon-192.png            # High-DPI PWA icon (192x192)
-    │   └── icon-512.png            # High-DPI PWA icon (512x512)
-    └── intro/                     # Sequential splash branding
-        ├── jagofr-rvl-splash.webp # Studio & developer splash graphic (1080p)
-        ├── heaps-haxe-splash.webp # Heaps engine splash graphic (1080p)
-        └── icons/                 # Screen 3 attribution badge logos
-            ├── logo_haxe.webp
-            ├── logo_heaps.webp
-            └── logo_webgl.webp
+│   ├── Main.hx                    # Entry point & simulation loop
+│   ├── Version.hx                 # Semantic version & build number constants
+│   ├── audio/                     # Web Audio engine & tire synthesizers
+│   ├── camera/                    # Velocity-aligned damped chase camera
+│   ├── config/                    # Game & world configuration constants
+│   ├── core/                      # Preloader, intro controller, WebBridge IPC
+│   ├── entities/                  # CarMesh presets, remote actors, traffic AI
+│   ├── graphics/                  # WebGpuRenderer, SceneGraph, WGSL shaders
+│   ├── input/                     # Keyboard, gamepad, and touch input pipeline
+│   ├── math/                      # Vec3, Mat4, and SoA memory helpers
+│   ├── net/                       # Multiplayer manager, protocol, and transport
+│   ├── physics/                   # CarConfig, CarPhysics, TireSlip, Suspension
+│   ├── save/                      # LocalStorage persistence & schema migration
+│   ├── ui/                        # UIManager, views (incl. CarSelectView), HUD
+│   └── world/                     # Track, SandboxMap, Skybox, WorldManager
+├── tests/                         # Headless Ash/HL unit tests (utest)
+│   ├── TestMain.hx                # Master unit test suite runner
+│   └── ...                        # audio, camera, core, entities, input, net, physics, save, ui, world
+├── aitests/                       # Automated WebGPU Playwright E2E suite
+│   ├── playwright.config.js       # Chromium WebGPU + local COOP/COEP server config
+│   ├── server.js                  # Local development & Playwright COOP/COEP server
+│   ├── verify-iis-webgpu.js       # Live IIS HTTPS WebGPU verification script
+│   └── specs/                     # aa-visual, controls-direction, mob-ui-and-maps specs
+└── web/                           # Production web root & IIS / PWA bundle
+    ├── index.html                 # COOP/COEP Worker launcher & orientation gate
+    ├── ui-overlay.js              # Responsive DOM menu/HUD/touch overlay runtime
+    ├── ui-overlay.css             # Glassmorphic overlay styling & virtual stick
+    ├── game.wasm                  # Compiled Ash WebAssembly binary (generated)
+    ├── game.hl                    # Compiled HashLink bytecode binary (generated)
+    ├── hlwgpu.js / xgpu.wasm      # hlwgpu WebGPU host bridge & Wasm bindings
+    ├── relay.ashx / web.config    # IIS multiplayer relay & COOP/COEP/cache headers
+    ├── manifest.json / sw.js      # PWA manifest & Service Worker
+    ├── fonts/ / icons/ / intro/   # Stack Sans / Symbols fonts, icons, splash assets
 ```
 
 ---
@@ -183,49 +163,41 @@ Under **Options $\to$ Keyboard / Gamepad**, players can toggle between `BOTH ACT
 
 ### Prerequisites
 1. **Haxe Compiler:** [Haxe 4.3.0+](https://haxe.org/download/)
-2. **Heaps Engine Library:**
-   ```bash
-   haxelib install heaps
-   ```
+2. **Ash Wasm32 & WebGPU Libraries:** `hlwgpu`, `hlwindow`, `ash-future`, `oimo`, `utest`
 
-### 1. Compilation
-Build the production JavaScript bundle from the root of the project:
-```bash
+### 1. Compilation & IIS Deployment
+Build the HashLink bytecode and link the threaded WebGPU Wasm module from the project root:
+```powershell
+$env:PATH="$env:USERPROFILE\.ash\bin;$env:PATH"
+$env:ASH_WASM_FIBERS="1"
 haxe compile.hxml
+ash --build web/game.wasm --target wasm32-wasip1-threads web/game.hl
 ```
-The output file `web/game.js` will be created or updated automatically.
+Or run the default VSCode build task (`Ctrl+Shift+B`), which executes `.vscode/build-deploy.ps1` and syncs `web/*` to `C:\inetpub\mob-web`.
 
 ### 2. Running Automated Tests
 
-#### Headless Unit Test Suite (`utest`)
-```bash
+#### Haxe Unit Test Suite (`utest` via Ash)
+```powershell
+$env:PATH="$env:USERPROFILE\.ash\bin;$env:PATH"
 haxe test.hxml
+ash bin/test.hl
 ```
-Executes 197 assertions across 12 test fixtures (Audio, Camera, Version, Entities, Input, Physics, SplineMath, Save, Graphics, Touch, Track) in under 0.10s via Node.js. Fully compatible with the VSCode `Haxe Test Explorer` plugin (`test-adapter`).
+Executes **611 assertions** across all physics, input, UI, multiplayer, world, and camera suites (including the 3-car drivetrain/turning-radius and multi-device anti-inversion regression contract).
 
-#### Browser Visual & UI Automation Suite
-```bash
-node tests/run-browser-tests.js
+#### Playwright E2E WebGPU & Controls Suite
+```powershell
+cd aitests
+playwright test
 ```
-Launches Microsoft Edge in headless mode with an isolated profile and runs automated scenarios via Chrome DevTools Protocol (CDP) testing startup resolution, decoupled UI vs 3D render scaling, graphics dependency locking, global sensitivity slider persistence, touch layout customization, and simulated in-game track driving with nitrous depletion/recharge.
-
-You can also open `web/test-suite.html` directly in any web browser to view the interactive test dashboard and embedded live game execution.
+Verifies **FXAA / SMAA / MSAA / TSAA** visual smoothing (`specs/aa-visual.spec.js`), Desktop + Mobile **anti-inversion controls** (`specs/controls-direction.spec.js`), and UI/options/car-select workflows (`specs/mob-ui-and-maps.spec.js`).
 
 ### 3. Running Locally
-Because WebGL, Web Audio, Service Workers, and Canvas WebP decoding require a valid HTTP origin, serve the `web/` directory using any local development server:
-
-#### Using Python 3:
-```bash
-cd web
-python -m http.server 8000
+Because multi-threaded WebAssembly (`SharedArrayBuffer`) and WebGPU require `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, use the included COI static/relay server:
+```powershell
+node aitests/server.js
 ```
-
-#### Using Node.js (`npx`):
-```bash
-npx serve web
-```
-
-Navigate to `http://localhost:8000` in any modern Chromium, Firefox, or WebKit browser.
+Navigate to `http://127.0.0.1:7725` in a WebGPU-capable browser (Edge, Chrome, or Safari iOS 18+/26+).
 
 ---
 
@@ -233,7 +205,7 @@ Navigate to `http://localhost:8000` in any modern Chromium, Firefox, or WebKit b
 
 This repository is maintained as an **in-house commercial prototype**. 
 
-* **Contributions**: External contributions, unsolicited pull requests, and public feature branches are **strictly not accepted**. Please review [`CONTRIBUTING.md`](./CONTRIBUTING.md) for further details.
+* **Contributions**: External contributions, unsolicited pull requests, and public feature branches are **strictly not accepted**. Please review [`CONTRIBUTING`](./CONTRIBUTING) for further details.
 * **License**: All custom source code, shaders, procedural track logic, vehicle handling models, audio synthesizers, and graphic assets are licensed under a **Strict Proprietary License**. See [`LICENSE`](./LICENSE) for terms.
 * **Security**: For responsible disclosure of vulnerabilities or defects, please consult [`SECURITY.md`](./SECURITY.md).
 
@@ -243,8 +215,7 @@ This repository is maintained as an **in-house commercial prototype**.
 
 * **Lead Architect & Technical Designer:** Gerard "Jamie" (Jagofr) Francis
 * **Published & Developed In-House By:** RvL // ROGUE
-* **AI Engineering Collaboration:** Google Gemini 3.8 Flash
-* **Engine Framework:** [Heaps.io](https://heaps.io/) by Nicolas Cannasse / Haxe Foundation (MIT License)
+* **Graphics & Runtime Stack:** Haxe + Ash Wasm32 + `hlwgpu` / `hlwindow` (WebGPU) + OimoPhysics
 * **Typography & Icons:**
   * *Stack Sans Headline* (SIL Open Font License)
   * *Material Symbols Sharp* (Apache License 2.0)

@@ -1,11 +1,12 @@
 -cp src
--lib heaps
--lib format
 -lib oimo
+-lib hlwgpu
+-lib hlwindow
+-lib ash-future
 -main Main
--js web/game.js
+-hl web/game.hl
 -dce full
--D webgl
+-D wasm
 -D analyzer-optimize
--D resourcesPath=res
+-w -WDeprecatedEnumAbstract
 -w -WDeprecated

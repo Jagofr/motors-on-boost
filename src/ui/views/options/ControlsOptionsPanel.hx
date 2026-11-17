@@ -1,9 +1,9 @@
 package ui.views.options;
 
-import h2d.Object;
-import h2d.Text;
-import h2d.Graphics;
-import h2d.Interactive;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
+import ui.nodes.UINodes.UIGraphics as Graphics;
+import ui.nodes.UINodes.UIInteractive as Interactive;
 import ui.FontManager;
 import ui.ControlDiagrams;
 import ui.components.CardBackplate;
@@ -23,7 +23,7 @@ import save.SaveSystem.TouchSettings;
  * Features an independent persistent steering sensitivity slider active across all control modes.
  *
  * @class ControlsOptionsPanel
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  */
 @:keep
 class ControlsOptionsPanel extends Object {
@@ -476,6 +476,30 @@ class ControlsOptionsPanel extends Object {
     }
 
     /**
+     * Directly updates an X/Y offset pair for a virtual touch element (from drag/touch preview).
+     */
+    public function setTouchControlOffset(part:String, ox:Float, oy:Float):Void {
+        var d = loadActiveSave();
+        var ts = d.touchSettings;
+        ts.mode = "Custom";
+        controlViewMode = "Custom";
+        var cx = Math.max(-100.0, Math.min(100.0, Math.round(ox)));
+        var cy = Math.max(-100.0, Math.min(100.0, Math.round(oy)));
+        switch (part) {
+            case "stick": ts.stickOffsetX = cx; ts.stickOffsetY = cy; remapIndex = 0;
+            case "nitro": ts.nitroOffsetX = cx; ts.nitroOffsetY = cy; remapIndex = 2;
+            case "gas":   ts.gasOffsetX = cx;   ts.gasOffsetY = cy;   remapIndex = 4;
+            case "brake": ts.brakeOffsetX = cx; ts.brakeOffsetY = cy; remapIndex = 6;
+            case "drift": ts.driftOffsetX = cx; ts.driftOffsetY = cy; remapIndex = 8;
+            default:
+        }
+        d.touchSettings = ts;
+        persistActiveSave(d);
+        if (onTouchSettingsChanged != null) onTouchSettingsChanged();
+        updateControlViewMode();
+    }
+
+    /**
      * Toggles between Default layout diagram and Custom layout adjustment list.
      */
     public function toggleCustomMode() {
@@ -497,6 +521,7 @@ class ControlsOptionsPanel extends Object {
      */
     public function cycleCustomTouchRow(row:Int, dir:Int) {
         remapIndex = row;
+        controlViewMode = "Custom";
         adjustCurrentCustomOption(dir);
     }
 

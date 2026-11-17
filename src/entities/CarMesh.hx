@@ -1,10 +1,10 @@
 package entities;
 
-import h3d.scene.Object;
-import h3d.scene.Mesh;
-import h3d.prim.Cube;
-import h3d.prim.Cylinder;
-import h3d.prim.Disc;
+import graphics.SceneGraph.Object3D;
+import graphics.SceneGraph.MeshNode;
+import graphics.Primitives.Cube;
+import graphics.Primitives.Cylinder;
+import graphics.Primitives.Disc;
 import physics.CarConfig;
 
 /**
@@ -13,7 +13,7 @@ import physics.CarConfig;
  * @class CarMesh
  * @module entities/CarMesh
  */
-class CarMesh extends Object {
+class CarMesh extends Object3D {
     /** Tire rolling radius in meters shared with physics config. @default 0.36 */
     public static inline var TIRE_RADIUS:Float = CarConfig.TIRE_RADIUS;
 
@@ -38,52 +38,58 @@ class CarMesh extends Object {
     ];
 
     /** Primary lower chassis body mesh. */
-    public var bodyMesh:Mesh;
+    public var bodyMesh:MeshNode;
 
     /** Sculpted front nose and hood wedge mesh. */
-    public var hoodMesh:Mesh;
+    public var hoodMesh:MeshNode;
 
     /** Upper cockpit canopy and tinted cabin greenhouse mesh. */
-    public var cabinMesh:Mesh;
+    public var cabinMesh:MeshNode;
 
     /** Front aerodynamic ground-effect splitter mesh. */
-    public var frontSplitter:Mesh;
+    public var frontSplitter:MeshNode;
 
     /** Rear aerodynamic diffuser undertray mesh. */
-    public var rearDiffuser:Mesh;
+    public var rearDiffuser:MeshNode;
 
     /** Left and right side skirt aero ground-effect blades. */
-    public var leftSkirt:Mesh;
-    public var rightSkirt:Mesh;
+    public var leftSkirt:MeshNode;
+    public var rightSkirt:MeshNode;
 
     /** Rear downforce wing spoiler blade mesh. */
-    public var spoilerMesh:Mesh;
+    public var spoilerMesh:MeshNode;
 
     /** Left and right vertical stanchions supporting the wing. */
-    public var leftStanchion:Mesh;
-    public var rightStanchion:Mesh;
+    public var leftStanchion:MeshNode;
+    public var rightStanchion:MeshNode;
 
     /** Front dual LED headlight cluster mesh. */
-    public var headlights:Mesh;
+    public var headlights:MeshNode;
 
     /** Rear full-width neon brake light bar mesh. */
-    public var taillights:Mesh;
+    public var taillights:MeshNode;
 
     /** Quad performance exhaust tips. */
-    public var exhausts:Array<Mesh> = [];
+    public var exhausts:Array<MeshNode> = [];
 
     /** Array of wheel cylinder meshes representing front and rear wheels. */
-    public var wheels:Array<Mesh> = [];
+    public var wheels:Array<MeshNode> = [];
+
+    /** Active archetype preset ID ("race_awd", "hatch_fwd", or "coupe_rwd"). */
+    public var currentPresetId:String = "race_awd";
+
+    /** Active body paint color hex. */
+    public var currentPaintColor:Int = 0xE64A19;
 
     /** Array of wheel outer rim face caps. */
-    public var rimCaps:Array<Mesh> = [];
+    public var rimCaps:Array<MeshNode> = [];
 
     /**
      * Constructs and attaches the composite vehicle hierarchy to the scene graph.
      *
      * @param parent Optional parent 3D scene graph node.
      */
-    public function new(?parent:Object) {
+    public function new(?parent:Object3D) {
         super(parent);
 
         // Sports car body styling colors
@@ -99,7 +105,7 @@ class CarMesh extends Object {
         var bodyPrim = new Cube(1.84, 2.8, 0.44, true);
         bodyPrim.unindex();
         bodyPrim.addNormals();
-        bodyMesh = new Mesh(bodyPrim, this);
+        bodyMesh = new MeshNode(bodyPrim, this);
         bodyMesh.material.color.setColor(colorBodyPaint);
         bodyMesh.y = 0.0;
         bodyMesh.z = 0.42;
@@ -108,7 +114,7 @@ class CarMesh extends Object {
         var hoodPrim = new Cube(1.76, 1.40, 0.34, true);
         hoodPrim.unindex();
         hoodPrim.addNormals();
-        hoodMesh = new Mesh(hoodPrim, this);
+        hoodMesh = new MeshNode(hoodPrim, this);
         hoodMesh.material.color.setColor(colorBodyPaint);
         hoodMesh.y = 1.40;
         hoodMesh.z = 0.35;
@@ -117,7 +123,7 @@ class CarMesh extends Object {
         var splitterPrim = new Cube(1.88, 0.45, 0.08, true);
         splitterPrim.unindex();
         splitterPrim.addNormals();
-        frontSplitter = new Mesh(splitterPrim, this);
+        frontSplitter = new MeshNode(splitterPrim, this);
         frontSplitter.material.color.setColor(colorCarbonAero);
         frontSplitter.y = 1.98;
         frontSplitter.z = 0.16;
@@ -126,7 +132,7 @@ class CarMesh extends Object {
         var skirtPrimL = new Cube(0.12, 2.3, 0.14, true);
         skirtPrimL.unindex();
         skirtPrimL.addNormals();
-        leftSkirt = new Mesh(skirtPrimL, this);
+        leftSkirt = new MeshNode(skirtPrimL, this);
         leftSkirt.material.color.setColor(colorCarbonAero);
         leftSkirt.x = -0.96;
         leftSkirt.y = 0.0;
@@ -135,7 +141,7 @@ class CarMesh extends Object {
         var skirtPrimR = new Cube(0.12, 2.3, 0.14, true);
         skirtPrimR.unindex();
         skirtPrimR.addNormals();
-        rightSkirt = new Mesh(skirtPrimR, this);
+        rightSkirt = new MeshNode(skirtPrimR, this);
         rightSkirt.material.color.setColor(colorCarbonAero);
         rightSkirt.x = 0.96;
         rightSkirt.y = 0.0;
@@ -145,7 +151,7 @@ class CarMesh extends Object {
         var diffuserPrim = new Cube(1.82, 0.55, 0.18, true);
         diffuserPrim.unindex();
         diffuserPrim.addNormals();
-        rearDiffuser = new Mesh(diffuserPrim, this);
+        rearDiffuser = new MeshNode(diffuserPrim, this);
         rearDiffuser.material.color.setColor(colorCarbonAero);
         rearDiffuser.y = -1.92;
         rearDiffuser.z = 0.28;
@@ -154,7 +160,7 @@ class CarMesh extends Object {
         var cabinPrim = new Cube(1.34, 2.15, 0.46, true);
         cabinPrim.unindex();
         cabinPrim.addNormals();
-        cabinMesh = new Mesh(cabinPrim, this);
+        cabinMesh = new MeshNode(cabinPrim, this);
         cabinMesh.material.color.setColor(colorDarkGlass);
         cabinMesh.y = -0.22;
         cabinMesh.z = 0.82;
@@ -163,7 +169,7 @@ class CarMesh extends Object {
         var spoilerPrim = new Cube(1.94, 0.38, 0.08, true);
         spoilerPrim.unindex();
         spoilerPrim.addNormals();
-        spoilerMesh = new Mesh(spoilerPrim, this);
+        spoilerMesh = new MeshNode(spoilerPrim, this);
         spoilerMesh.material.color.setColor(colorCarbonAero);
         spoilerMesh.y = -1.98;
         spoilerMesh.z = 1.12;
@@ -172,7 +178,7 @@ class CarMesh extends Object {
         var stanchionPrimL = new Cube(0.06, 0.18, 0.38, true);
         stanchionPrimL.unindex();
         stanchionPrimL.addNormals();
-        leftStanchion = new Mesh(stanchionPrimL, this);
+        leftStanchion = new MeshNode(stanchionPrimL, this);
         leftStanchion.material.color.setColor(colorCarbonAero);
         leftStanchion.x = -0.55;
         leftStanchion.y = -1.92;
@@ -181,7 +187,7 @@ class CarMesh extends Object {
         var stanchionPrimR = new Cube(0.06, 0.18, 0.38, true);
         stanchionPrimR.unindex();
         stanchionPrimR.addNormals();
-        rightStanchion = new Mesh(stanchionPrimR, this);
+        rightStanchion = new MeshNode(stanchionPrimR, this);
         rightStanchion.material.color.setColor(colorCarbonAero);
         rightStanchion.x = 0.55;
         rightStanchion.y = -1.92;
@@ -191,8 +197,9 @@ class CarMesh extends Object {
         var headPrim = new Cube(1.58, 0.12, 0.12, true);
         headPrim.unindex();
         headPrim.addNormals();
-        headlights = new Mesh(headPrim, this);
+        headlights = new MeshNode(headPrim, this);
         headlights.material.color.setColor(colorLedHeadlight);
+        headlights.material.emissive = 1.8;
         headlights.y = 2.12;
         headlights.z = 0.42;
 
@@ -200,8 +207,9 @@ class CarMesh extends Object {
         var tailPrim = new Cube(1.64, 0.12, 0.10, true);
         tailPrim.unindex();
         tailPrim.addNormals();
-        taillights = new Mesh(tailPrim, this);
+        taillights = new MeshNode(tailPrim, this);
         taillights.material.color.setColor(colorLedTaillight);
+        taillights.material.emissive = 2.0;
         taillights.y = -1.98;
         taillights.z = 0.54;
 
@@ -210,7 +218,7 @@ class CarMesh extends Object {
         for (exX in exhaustOffsets) {
             var exPrim = new Cylinder(16, 0.065, 0.22, true);
             exPrim.addNormals();
-            var exMesh = new Mesh(exPrim, this);
+            var exMesh = new MeshNode(exPrim, this);
             exMesh.material.color.setColor(colorRimAlloy);
             exMesh.rotate(1.5707963, 0, 0); // Point exhaust outwards toward -Y
             exMesh.x = exX;
@@ -226,7 +234,7 @@ class CarMesh extends Object {
             // High-density cylinder for tire rubber tread: centered = true along Z-axis (height: TIRE_WIDTH)
             var wheelPrim = new Cylinder(cylinderSegments, TIRE_RADIUS, TIRE_WIDTH, true);
             wheelPrim.addNormals();
-            var wheel = new Mesh(wheelPrim, this);
+            var wheel = new MeshNode(wheelPrim, this);
             wheel.material.color.setColor(colorTireRubber);
             wheel.material.mainPass.culling = None;
 
@@ -244,13 +252,13 @@ class CarMesh extends Object {
             // 11a. Outer & Inner Tire Rubber Sidewall Discs (closes the open cylinder ends completely)
             var tireSidewallDisc = new Disc(TIRE_RADIUS, cylinderSegments);
             tireSidewallDisc.addNormals();
-            var outerSidewall = new Mesh(tireSidewallDisc, wheel);
+            var outerSidewall = new MeshNode(tireSidewallDisc, wheel);
             outerSidewall.material.color.setColor(colorTireRubber);
             outerSidewall.material.mainPass.culling = None;
             if (offset.isLeft) outerSidewall.rotate(0, Math.PI, 0);
             outerSidewall.z = outerSign * (TIRE_WIDTH * 0.49);
 
-            var innerSidewall = new Mesh(tireSidewallDisc, wheel);
+            var innerSidewall = new MeshNode(tireSidewallDisc, wheel);
             innerSidewall.material.color.setColor(colorTireRubber);
             innerSidewall.material.mainPass.culling = None;
             if (!offset.isLeft) innerSidewall.rotate(0, Math.PI, 0);
@@ -259,7 +267,7 @@ class CarMesh extends Object {
             // 11b. Outer Machined Silver Alloy Rim Face Disc (Left wheels at -Z = Left -X side; Right wheels at +Z = Right +X side)
             var rimDisc = new Disc(TIRE_RADIUS * 0.72, 24);
             rimDisc.addNormals();
-            var rimMesh = new Mesh(rimDisc, wheel);
+            var rimMesh = new MeshNode(rimDisc, wheel);
             rimMesh.material.color.setColor(colorRimAlloy);
             rimMesh.material.mainPass.culling = None;
             if (offset.isLeft) {
@@ -273,11 +281,11 @@ class CarMesh extends Object {
             var spokeBarPrim = new Cube(TIRE_RADIUS * 1.32, 0.055, 0.02, true);
             spokeBarPrim.unindex();
             spokeBarPrim.addNormals();
-            var spokeBarA = new Mesh(spokeBarPrim, rimMesh);
+            var spokeBarA = new MeshNode(spokeBarPrim, rimMesh);
             spokeBarA.material.color.setColor(colorCarbonAero);
             spokeBarA.z = 0.012;
 
-            var spokeBarB = new Mesh(spokeBarPrim, rimMesh);
+            var spokeBarB = new MeshNode(spokeBarPrim, rimMesh);
             spokeBarB.material.color.setColor(colorCarbonAero);
             spokeBarB.rotate(0, 0, 1.5707963);
             spokeBarB.z = 0.012;
@@ -302,6 +310,114 @@ class CarMesh extends Object {
         wheel.rotate(-spinAngle, 0, 0);
         if (steerAngle != 0.0) {
             wheel.rotate(0, 0, steerAngle);
+        }
+    }
+
+    /** Updates primary body & hood paint color without altering structural geometry. */
+    public function setPaintColor(colorHex:Int):Void {
+        currentPaintColor = colorHex;
+        if (bodyMesh != null && bodyMesh.material != null) bodyMesh.material.color.setColor(colorHex);
+        if (hoodMesh != null && hoodMesh.material != null) hoodMesh.material.color.setColor(colorHex);
+    }
+
+    /**
+     * Sculpts proportions, aero components, wheelbases, and paint for each selectable vehicle type.
+     */
+    public function applyVisualPreset(presetId:String, ?paintHex:Null<Int>):Void {
+        currentPresetId = presetId != null ? presetId : CarConfig.ID_RACE_AWD;
+        if (paintHex != null) setPaintColor(paintHex);
+
+        inline function setScale(node:MeshNode, sx:Float, sy:Float, sz:Float):Void {
+            if (node == null) return;
+            node.scaleX = sx;
+            node.scaleY = sy;
+            node.scaleZ = sz;
+        }
+
+        switch (currentPresetId) {
+            case "hatch_fwd":
+                // Compact agile hot hatch with extended upright greenhouse and short front overhang
+                setScale(bodyMesh, 0.96, 0.86, 1.04);
+                if (bodyMesh != null) { bodyMesh.y = -0.04; bodyMesh.z = 0.44; }
+                setScale(hoodMesh, 0.94, 0.72, 1.06);
+                if (hoodMesh != null) { hoodMesh.y = 1.12; hoodMesh.z = 0.38; }
+                setScale(cabinMesh, 1.02, 1.10, 1.22);
+                if (cabinMesh != null) { cabinMesh.y = -0.40; cabinMesh.z = 0.88; }
+                setScale(frontSplitter, 0.94, 0.72, 0.95);
+                if (frontSplitter != null) { frontSplitter.y = 1.66; frontSplitter.z = 0.19; }
+                setScale(rearDiffuser, 0.94, 0.82, 0.95);
+                if (rearDiffuser != null) { rearDiffuser.y = -1.62; rearDiffuser.z = 0.30; }
+                setScale(leftSkirt, 1.0, 0.82, 1.0);
+                if (leftSkirt != null) leftSkirt.x = -0.92;
+                setScale(rightSkirt, 1.0, 0.82, 1.0);
+                if (rightSkirt != null) rightSkirt.x = 0.92;
+                setScale(spoilerMesh, 0.76, 0.56, 0.85);
+                if (spoilerMesh != null) { spoilerMesh.visible = true; spoilerMesh.y = -1.52; spoilerMesh.z = 1.16; }
+                if (leftStanchion != null) leftStanchion.visible = false;
+                if (rightStanchion != null) rightStanchion.visible = false;
+                if (headlights != null) headlights.y = 1.78;
+                if (taillights != null) taillights.y = -1.66;
+                for (i in 0...wheels.length) {
+                    var off = WHEEL_OFFSETS[i];
+                    wheels[i].x = off.x * 0.94;
+                    wheels[i].y = off.y * 0.90;
+                }
+
+            case "coupe_rwd":
+                // Slammed low sports coupe with sleek low roofline & ducktail lip
+                setScale(bodyMesh, 1.0, 0.98, 0.84);
+                if (bodyMesh != null) { bodyMesh.y = 0.0; bodyMesh.z = 0.36; }
+                setScale(hoodMesh, 1.0, 1.02, 0.84);
+                if (hoodMesh != null) { hoodMesh.y = 1.38; hoodMesh.z = 0.30; }
+                setScale(cabinMesh, 0.98, 0.94, 0.82);
+                if (cabinMesh != null) { cabinMesh.y = -0.26; cabinMesh.z = 0.70; }
+                setScale(frontSplitter, 1.02, 1.05, 0.90);
+                if (frontSplitter != null) { frontSplitter.y = 1.98; frontSplitter.z = 0.13; }
+                setScale(rearDiffuser, 1.0, 1.0, 0.90);
+                if (rearDiffuser != null) { rearDiffuser.y = -1.92; rearDiffuser.z = 0.24; }
+                setScale(leftSkirt, 1.0, 0.98, 0.85);
+                if (leftSkirt != null) leftSkirt.x = -0.96;
+                setScale(rightSkirt, 1.0, 0.98, 0.85);
+                if (rightSkirt != null) rightSkirt.x = 0.96;
+                setScale(spoilerMesh, 0.88, 0.50, 0.75);
+                if (spoilerMesh != null) { spoilerMesh.visible = true; spoilerMesh.y = -1.88; spoilerMesh.z = 0.62; }
+                if (leftStanchion != null) leftStanchion.visible = false;
+                if (rightStanchion != null) rightStanchion.visible = false;
+                if (headlights != null) headlights.y = 2.08;
+                if (taillights != null) taillights.y = -1.96;
+                for (i in 0...wheels.length) {
+                    var off = WHEEL_OFFSETS[i];
+                    wheels[i].x = off.x;
+                    wheels[i].y = off.y * 0.98;
+                }
+
+            case _:
+                // GT Race Car (AWD): standard full-width aero & tall rear GT wing
+                setScale(bodyMesh, 1.0, 1.0, 1.0);
+                if (bodyMesh != null) { bodyMesh.y = 0.0; bodyMesh.z = 0.42; }
+                setScale(hoodMesh, 1.0, 1.0, 1.0);
+                if (hoodMesh != null) { hoodMesh.y = 1.40; hoodMesh.z = 0.35; }
+                setScale(cabinMesh, 1.0, 1.0, 1.0);
+                if (cabinMesh != null) { cabinMesh.y = -0.22; cabinMesh.z = 0.82; }
+                setScale(frontSplitter, 1.0, 1.0, 1.0);
+                if (frontSplitter != null) { frontSplitter.y = 1.98; frontSplitter.z = 0.16; }
+                setScale(rearDiffuser, 1.0, 1.0, 1.0);
+                if (rearDiffuser != null) { rearDiffuser.y = -1.92; rearDiffuser.z = 0.28; }
+                setScale(leftSkirt, 1.0, 1.0, 1.0);
+                if (leftSkirt != null) leftSkirt.x = -0.96;
+                setScale(rightSkirt, 1.0, 1.0, 1.0);
+                if (rightSkirt != null) rightSkirt.x = 0.96;
+                setScale(spoilerMesh, 1.0, 1.0, 1.0);
+                if (spoilerMesh != null) { spoilerMesh.visible = true; spoilerMesh.y = -1.98; spoilerMesh.z = 1.12; }
+                if (leftStanchion != null) leftStanchion.visible = true;
+                if (rightStanchion != null) rightStanchion.visible = true;
+                if (headlights != null) headlights.y = 2.12;
+                if (taillights != null) taillights.y = -1.98;
+                for (i in 0...wheels.length) {
+                    var off = WHEEL_OFFSETS[i];
+                    wheels[i].x = off.x;
+                    wheels[i].y = off.y;
+                }
         }
     }
 }

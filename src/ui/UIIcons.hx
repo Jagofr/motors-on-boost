@@ -1,7 +1,7 @@
 package ui;
 
-import h2d.Tile;
-import h2d.Graphics;
+import ui.nodes.UINodes.UITile as Tile;
+import ui.nodes.UINodes.UIGraphics as Graphics;
 
 /**
  * Enumeration of vector-drawn UI iconography types rendered procedurally into cached textures.
@@ -239,8 +239,8 @@ class UIIcons {
 
         // Render vector graphics directly onto GPU render target texture (or fallback tile in headless Node.js)
         var tile:Tile = null;
-        if (h3d.Engine.getCurrent() != null) {
-            var tex = new h3d.mat.Texture(size, size, [Target]);
+        if (graphics.SceneGraph.EngineStub.getCurrent() != null) {
+            var tex = new graphics.SceneGraph.TextureHandle(size, size);
             g.drawTo(tex);
             tile = Tile.fromTexture(tex);
         } else {

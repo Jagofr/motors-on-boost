@@ -1,9 +1,9 @@
 package ui.views.mapselect;
 
-import h2d.Object;
-import h2d.Text;
-import h2d.Bitmap;
-import h2d.Interactive;
+import ui.nodes.UINodes.UIObject as Object;
+import ui.nodes.UINodes.UIText as Text;
+import ui.nodes.UINodes.UIBitmap as Bitmap;
+import ui.nodes.UINodes.UIInteractive as Interactive;
 import ui.FontManager;
 import ui.UIIcons;
 import ui.components.UITheme;
@@ -16,7 +16,7 @@ import audio.AudioManager;
  * before starting a singleplayer driving session.
  *
  * @class MapSelectView
- * @extends h2d.Object
+ * @extends ui.nodes.UINodes.UIObject
  * @module ui/views/mapselect/MapSelectView
  */
 @:keep

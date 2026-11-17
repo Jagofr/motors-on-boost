@@ -1,6 +1,6 @@
 package tests.net;
 
-import h3d.Vector;
+import math.Vec3;
 import input.InputController;
 import net.MultiplayerManager;
 import net.NetworkProtocol;
@@ -24,7 +24,7 @@ private class MockArenaGround implements IGroundProvider {
         return 0.06;
     }
 
-    public function getGroundNormal(x:Float, y:Float, outNormal:Vector):Void {
+    public function getGroundNormal(x:Float, y:Float, outNormal:Vec3):Void {
         outNormal.set(0, 0, 1);
     }
 
@@ -32,7 +32,7 @@ private class MockArenaGround implements IGroundProvider {
         return 1.0;
     }
 
-    public function enforceBoundaries(pos:Vector, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
+    public function enforceBoundaries(pos:Vec3, forwardSpeed:Float, lateralVelocity:Float):{ hitWall:Bool, speedMult:Float, latMult:Float } {
         var hit = false;
         if (pos.x > boundaryHalfWidth) {
             pos.x = boundaryHalfWidth;

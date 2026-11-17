@@ -112,6 +112,12 @@ typedef GameSaveData = {
 
     /** Optional persisted exclusive hardware device filter ("Both", "KeyboardOnly", "GamepadOnly"). */
     var ?exclusiveDevice:String;
+
+    /** Selected player car archetype ("race_awd", "hatch_fwd", "coupe_rwd"). */
+    var ?selectedCarId:String;
+
+    /** Selected custom player paint color hex (0xRRGGBB). */
+    var ?selectedPaintHex:Int;
 }
 
 /**
@@ -259,15 +265,14 @@ class SaveSystem {
      * @returns {GameSaveData} Parsed GameSaveData record or clean defaults.
      */
     public static function load():GameSaveData {
-        #if js
         try {
-            var storage = js.Browser.getLocalStorage();
+            var storage = core.WebBridge.inst.localStorageCache;
             var raw:Null<String> = null;
             var isLegacy = false;
             var orderedKeys = [STORAGE_KEY_V4, STORAGE_KEY_V3, STORAGE_KEY_V2, STORAGE_KEY_V1, LEGACY_STORAGE_KEY];
 
             for (i in 0...orderedKeys.length) {
-                raw = storage.getItem(orderedKeys[i]);
+                raw = storage.get(orderedKeys[i]);
                 if (raw != null) {
                     isLegacy = (i > 0);
                     break;
@@ -291,6 +296,12 @@ class SaveSystem {
                 if (data.touchSettings == null) {
                     data.touchSettings = getDefaultTouchSettings();
                 }
+                if (data.selectedCarId == null) {
+                    data.selectedCarId = "race_awd";
+                }
+                if (data.selectedPaintHex == null) {
+                    data.selectedPaintHex = 0xE64A19;
+                }
 
                 // Step 8: Schema version migration to v4
                 if (data.version == null || data.version < SAVE_VERSION || isLegacy) {
@@ -302,7 +313,6 @@ class SaveSystem {
                 return data;
             }
         } catch (e:haxe.Exception) {}
-        #end
 
         return {
             version: SAVE_VERSION,
@@ -314,7 +324,9 @@ class SaveSystem {
             sfxVol: 0.9,
             steerSensitivity: 1.0,
             graphics: getDefaultGraphics(),
-            touchSettings: getDefaultTouchSettings()
+            touchSettings: getDefaultTouchSettings(),
+            selectedCarId: "race_awd",
+            selectedPaintHex: 0xE64A19
         };
     }
 
@@ -324,7 +336,6 @@ class SaveSystem {
      * @param data Game save state to persist.
      */
     public static function save(data:GameSaveData) {
-        #if js
         try {
             data.version = SAVE_VERSION;
             data.buildNumber = Version.BUILD;
@@ -336,11 +347,10 @@ class SaveSystem {
             }
 
             var raw = Json.stringify(data);
-            var storage = js.Browser.getLocalStorage();
-            storage.setItem(STORAGE_KEY_V4, raw);
-            storage.setItem(STORAGE_KEY_V3, raw); // Backwards compatibility mirror
+            var storage = core.WebBridge.inst.localStorageCache;
+            storage.set(STORAGE_KEY_V4, raw); core.WebBridge.inst.pushEvent({ type: "save_set", key: STORAGE_KEY_V4, value: raw });
+            storage.set(STORAGE_KEY_V3, raw); core.WebBridge.inst.pushEvent({ type: "save_set", key: STORAGE_KEY_V3, value: raw }); // Backwards compatibility mirror
         } catch (e:haxe.Exception) {}
-        #end
     }
 
     /**
