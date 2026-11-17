@@ -197,7 +197,8 @@
     })();
   </script>
 
-  <script src="ui-overlay.js?v=0.8.0-r1"></script>
+  <script src="mob-env.js?v=0.8.0-r2"></script>
+  <script src="ui-overlay.js?v=0.8.0-r2"></script>
 
   <script type="module">
     const banner = document.getElementById("mob-fatal-banner");
@@ -209,20 +210,68 @@
       banner.innerHTML = "<strong>" + title + "</strong><br/>" + (detail || "");
     }
 
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./sw.js").then((reg) => {
-        if (reg && typeof reg.update === "function") reg.update();
-      }).catch(() => {});
+    const mobEnv = window.__MOB_ENV__ || {};
+    const isGithubPagesHost = /\.github\.io$/i.test(window.location.hostname || "");
+    const coiSwEnabled = Boolean(mobEnv.enableCoiServiceWorker || isGithubPagesHost);
+
+    async function ensureCrossOriginIsolation() {
+      const reloadKey = "mob_coi_reload_attempted:" + window.location.pathname;
+      if (window.crossOriginIsolated) {
+        try { sessionStorage.removeItem(reloadKey); } catch (_) {}
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.register("./sw.js", { scope: "./" }).then((reg) => {
+            if (reg && typeof reg.update === "function") reg.update();
+          }).catch(() => {});
+        }
+        return true;
+      }
+
+      if (!coiSwEnabled || !("serviceWorker" in navigator)) {
+        return false;
+      }
+
+      let alreadyAttempted = false;
+      try { alreadyAttempted = sessionStorage.getItem(reloadKey) === "1"; } catch (_) {}
+      if (alreadyAttempted && navigator.serviceWorker.controller) {
+        return false;
+      }
+
+      try {
+        window.__mobPendingCoiReload = true;
+        const reg = await navigator.serviceWorker.register("./sw.js", { scope: "./" });
+        try { if (typeof reg.update === "function") await reg.update(); } catch (_) {}
+        if (!navigator.serviceWorker.controller) {
+          await new Promise((resolve) => {
+            let settled = false;
+            const done = () => { if (!settled) { settled = true; resolve(); } };
+            navigator.serviceWorker.addEventListener("controllerchange", done, { once: true });
+            navigator.serviceWorker.ready.then(() => setTimeout(done, 120)).catch(done);
+            setTimeout(done, 4500);
+          });
+        }
+        if (!alreadyAttempted) {
+          try { sessionStorage.setItem(reloadKey, "1"); } catch (_) {}
+          window.location.reload();
+          return "reloading";
+        }
+      } catch (err) {
+        console.warn("[sw] COI registration failed:", err);
+      }
+      window.__mobPendingCoiReload = false;
+      return Boolean(window.crossOriginIsolated);
     }
 
     const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent || "") ||
       (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
     const isMobile = isIOS || /Android|webOS|Mobile/i.test(navigator.userAgent || "");
 
-    if (!window.crossOriginIsolated) {
+    const isoState = await ensureCrossOriginIsolation();
+    if (isoState === "reloading") {
+      // Service Worker activated; waiting for automatic one-time reload to establish crossOriginIsolated.
+    } else if (!isoState || !window.crossOriginIsolated) {
       showFatal(
         "Cross-Origin Isolation Required",
-        "WebGPU threaded Wasm requires HTTPS with COOP (same-origin) and COEP (require-corp) headers."
+        "WebGPU threaded Wasm requires HTTPS with COOP (same-origin) and COEP (require-corp) headers (or an active COI Service Worker)."
       );
     } else if (!("gpu" in navigator)) {
       showFatal(
@@ -336,7 +385,7 @@
 
       mainWorker.postMessage(
         {
-          module: "./game.wasm?v=0.8.0-r1",
+          module: "./game.wasm?v=0.8.0-r2",
           args: ["./game.wasm"],
           environ: [isMobile ? "ASH_GC_HEAP_MB=96" : "ASH_GC_HEAP_MB=128", "ASH_GC_HANDBACK=1"],
           display: false,

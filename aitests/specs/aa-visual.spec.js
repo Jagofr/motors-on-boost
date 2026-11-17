@@ -2,13 +2,12 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
+const { getScreenshotDir, gotoGame } = require('./test-helpers');
 
-const SCREENSHOT_DIR = path.resolve(__dirname, '..', 'screenshots');
+let SCREENSHOT_DIR = path.resolve(__dirname, '..', 'screenshots');
 
-test.beforeAll(() => {
-  if (!fs.existsSync(SCREENSHOT_DIR)) {
-    fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
-  }
+test.beforeEach(async ({}, testInfo) => {
+  SCREENSHOT_DIR = getScreenshotDir(testInfo);
 });
 
 // Pure-JS lossless RGBA PNG decoder (supports standard colorType 2/6 and filter types 0-4)
@@ -184,7 +183,7 @@ async function triggerBtn(locator, useTap) {
 }
 
 async function bootToMap(page, mapCardSelector, expectedMode, useTap = false) {
-  await page.goto('/');
+  await gotoGame(page);
   for (let i = 0; i < 65; i++) {
     const s = await page.evaluate(() => ({
       app: window.app?.appState,

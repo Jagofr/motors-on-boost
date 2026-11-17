@@ -2,14 +2,9 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
+const { getScreenshotDir, gotoGame } = require('./test-helpers');
 
-const SCREENSHOT_DIR = path.resolve(__dirname, '..', 'screenshots');
-
-test.beforeAll(() => {
-  if (!fs.existsSync(SCREENSHOT_DIR)) {
-    fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
-  }
-});
+let SCREENSHOT_DIR = path.resolve(__dirname, '..', 'screenshots');
 
 function sampleCornerPixelLuma(pngBuffer) {
   let pos = 8, width = 0, height = 0, colorType = 6;
@@ -59,7 +54,8 @@ function sampleCornerPixelLuma(pngBuffer) {
 }
 
 test.describe('M.O.B. // WebGPU Full UI, Options, Cross-Input & Fade-to-Black Smoke Suite', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, testInfo) => {
+    SCREENSHOT_DIR = getScreenshotDir(testInfo);
     await page.addInitScript(() => {
       // Inject controllable virtual W3C gamepad before app boots
       window.__virtualPad = null;
@@ -72,8 +68,7 @@ test.describe('M.O.B. // WebGPU Full UI, Options, Cross-Input & Fade-to-Black Sm
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
 
-    await page.goto('/');
-    await page.waitForFunction(() => window.MOBWebBridge && window.MOBWebBridge.debug().lastStateSeq > 0, { timeout: 20000 });
+    await gotoGame(page);
 
     const observedStages = [];
     for (let i = 0; i < 65; i++) {
@@ -119,7 +114,7 @@ test.describe('M.O.B. // WebGPU Full UI, Options, Cross-Input & Fade-to-Black Sm
   });
 
   async function bootToMainMenu(page) {
-    await page.goto('/');
+    await gotoGame(page);
     for (let i = 0; i < 65; i++) {
       const state = await page.evaluate(() => ({
         intro: window.app?.introState,
@@ -137,12 +132,26 @@ test.describe('M.O.B. // WebGPU Full UI, Options, Cross-Input & Fade-to-Black Sm
     await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });
   }
 
-  test('2. Every Menu Button, Back Routing, Graphics 14 Rows & AA Modes, Pause-Options Lock & Reload Persistence', async ({ page }) => {
+  test('2. Every Menu Button, Back Routing, Graphics 14 Rows & AA Modes, Pause-Options Lock & Reload Persistence', async ({ page }, testInfo) => {
     const errors = [];
     page.on('pageerror', (e) => errors.push(e.message));
     page.on('console', (msg) => { if (msg.type() === 'error') errors.push(msg.text()); });
 
     await bootToMainMenu(page);
+    const hostCheck = await page.evaluate(() => ({
+      env: window.__MOB_ENV__,
+      coi: window.crossOriginIsolated,
+      hasSwController: Boolean(navigator.serviceWorker && navigator.serviceWorker.controller),
+      pathname: window.location.pathname
+    }));
+    expect(hostCheck.coi).toBe(true);
+    if (testInfo.project.name === 'iis' || testInfo.project.name === 'gh-pages') {
+      expect(hostCheck.env && hostCheck.env.target).toBe(testInfo.project.name);
+    }
+    if (testInfo.project.name === 'gh-pages') {
+      expect(hostCheck.pathname.startsWith('/motors-on-boost/')).toBe(true);
+      expect(hostCheck.hasSwController).toBe(true);
+    }
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, 'pw-main-menu.png') });
 
     // Check 1:1 MainMenu button alignment & keyboard ArrowDown skips disabled Row 1
@@ -463,7 +472,7 @@ test.describe('M.O.B. // WebGPU Full UI, Options, Cross-Input & Fade-to-Black Sm
       isMobile: true
     });
     const page = await context.newPage();
-    await page.goto('/');
+    await gotoGame(page);
     await page.waitForSelector('#splash-layer', { timeout: 25000 });
     await page.tap('#btn-splash-enter');
     await page.waitForFunction(() => window.app?.ui?.currentState === 'MainMenu', { timeout: 5000 });

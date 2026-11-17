@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const { gotoGame } = require('./test-helpers');
 
 async function triggerBtn(locator, useTap) {
   if (useTap) {
@@ -44,7 +45,7 @@ async function installGamepadMock(page) {
 }
 
 async function bootSandbox(page, useTap = false) {
-  await page.goto('/');
+  await gotoGame(page);
   for (let i = 0; i < 65; i++) {
     const s = await page.evaluate(() => ({
       app: window.app?.appState,

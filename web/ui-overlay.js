@@ -361,8 +361,32 @@
       if (state.bcTimer) { clearTimeout(state.bcTimer); state.bcTimer = null; }
     }
 
+    function resolveRelayBase() {
+      const env = window.__MOB_ENV__ || {};
+      const host = window.location && window.location.hostname ? window.location.hostname : "";
+      if (env.relayMode === "broadcast") {
+        return { mode: "broadcast", origin: "" };
+      }
+      if (
+        env.target === "gh-pages" &&
+        Array.isArray(env.staticOfflineHosts) &&
+        env.staticOfflineHosts.indexOf(host) >= 0
+      ) {
+        return { mode: "broadcast", origin: "" };
+      }
+      if (env.relayMode === "remote" && env.relayOrigin) {
+        return { mode: "remote", origin: String(env.relayOrigin).replace(/\/+$/, "") };
+      }
+      return { mode: "same-origin", origin: "" };
+    }
+
     function resolveWsUrl(explicit) {
       if (explicit) return explicit;
+      const cfg = resolveRelayBase();
+      if (cfg.mode === "remote" && cfg.origin) {
+        if (cfg.origin.startsWith("https://")) return "wss://" + cfg.origin.slice(8) + "/relay.ashx";
+        if (cfg.origin.startsWith("http://")) return "ws://" + cfg.origin.slice(7) + "/relay.ashx";
+      }
       const loc = window.location;
       if (loc.protocol === "http:" || loc.protocol === "https:") {
         const proto = loc.protocol === "https:" ? "wss:" : "ws:";
@@ -375,6 +399,10 @@
       if (explicit) {
         if (explicit.startsWith("wss://")) return "https://" + explicit.slice(6);
         if (explicit.startsWith("ws://")) return "http://" + explicit.slice(5);
+      }
+      const cfg = resolveRelayBase();
+      if (cfg.mode === "remote" && cfg.origin) {
+        return cfg.origin + "/relay.ashx";
       }
       const loc = window.location;
       if (loc.protocol === "http:" || loc.protocol === "https:") {
@@ -541,7 +569,12 @@
     return {
       handle: function (ev) {
         switch (ev.op) {
-          case "connect":
+          case "connect": {
+            const relayCfg = resolveRelayBase();
+            if (!ev.url && relayCfg.mode === "broadcast") {
+              startBroadcastFallback();
+              break;
+            }
             state.httpUrl = resolveHttpUrl(ev.url);
             try {
               const wsUrl = resolveWsUrl(ev.url);
@@ -573,6 +606,7 @@
               startHttpFallback();
             }
             break;
+          }
           case "disconnect":
             stopTimers();
             if (state.ws) { try { state.ws.close(); } catch (_) {} state.ws = null; }

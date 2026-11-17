@@ -117,20 +117,25 @@ Built in Haxe 4.3+ and compiled AOT via **Ash** (`wasm32-wasip1-threads`) onto h
 ├── tests/                         # Headless Ash/HL unit tests (utest)
 │   ├── TestMain.hx                # Master unit test suite runner
 │   └── ...                        # audio, camera, core, entities, input, net, physics, save, ui, world
-├── aitests/                       # Automated WebGPU Playwright E2E suite
-│   ├── playwright.config.js       # Chromium WebGPU + local COOP/COEP server config
-│   ├── server.js                  # Local development & Playwright COOP/COEP server
+├── aitests/                       # Automated WebGPU Playwright E2E suite (IIS + gh-pages)
+│   ├── playwright.config.js       # Dual-project WebGPU matrix (iis + gh-pages)
+│   ├── server.js                  # Local IIS & gh-pages subpath/header simulator
 │   ├── verify-iis-webgpu.js       # Live IIS HTTPS WebGPU verification script
 │   └── specs/                     # aa-visual, controls-direction, mob-ui-and-maps specs
+├── scripts/
+│   └── prepare-gh-pages.js        # Packages web/ -> dist/gh-pages with SW COI injection
+├── .github/workflows/
+│   └── deploy-pages.yml           # Automatic main -> GitHub Pages mirror workflow
 └── web/                           # Production web root & IIS / PWA bundle
-    ├── index.html                 # COOP/COEP Worker launcher & orientation gate
+    ├── index.html                 # COOP/COEP Worker launcher & COI SW bootstrapper
+    ├── mob-env.js                 # Host environment descriptor (iis vs gh-pages)
     ├── ui-overlay.js              # Responsive DOM menu/HUD/touch overlay runtime
     ├── ui-overlay.css             # Glassmorphic overlay styling & virtual stick
     ├── game.wasm                  # Compiled Ash WebAssembly binary (generated)
     ├── game.hl                    # Compiled HashLink bytecode binary (generated)
     ├── hlwgpu.js / xgpu.wasm      # hlwgpu WebGPU host bridge & Wasm bindings
-    ├── relay.ashx / web.config    # IIS multiplayer relay & COOP/COEP/cache headers
-    ├── manifest.json / sw.js      # PWA manifest & Service Worker
+    ├── relay.ashx / web.config    # IIS multiplayer relay (CORS) & COOP/COEP headers
+    ├── manifest.json / sw.js      # PWA manifest & Service Worker (optional COI mode)
     ├── fonts/ / icons/ / intro/   # Stack Sans / Symbols fonts, icons, splash assets
 ```
 
@@ -165,39 +170,44 @@ Under **Options $\to$ Keyboard / Gamepad**, players can toggle between `BOTH ACT
 1. **Haxe Compiler:** [Haxe 4.3.0+](https://haxe.org/download/)
 2. **Ash Wasm32 & WebGPU Libraries:** `hlwgpu`, `hlwindow`, `ash-future`, `oimo`, `utest`
 
-### 1. Compilation & IIS Deployment
-Build the HashLink bytecode and link the threaded WebGPU Wasm module from the project root:
+### 1. Compilation & Dual-Target Packaging (IIS + GitHub Pages)
+Build the HashLink bytecode, link the threaded WebGPU Wasm module, deploy to IIS, and package the static GitHub Pages mirror (`dist/gh-pages`):
 ```powershell
 $env:PATH="$env:USERPROFILE\.ash\bin;$env:PATH"
 $env:ASH_WASM_FIBERS="1"
 haxe compile.hxml
 ash --build web/game.wasm --target wasm32-wasip1-threads web/game.hl
+node scripts/prepare-gh-pages.js dist/gh-pages
 ```
-Or run the default VSCode build task (`Ctrl+Shift+B`), which executes `.vscode/build-deploy.ps1` and syncs `web/*` to `C:\inetpub\mob-web`.
+Or run the default VSCode build task (`Ctrl+Shift+B`), which executes `.vscode/build-deploy.ps1` to sync `web/*` to `C:\inetpub\mob-web` **and** build `dist/gh-pages` (`sw.js` COOP/COEP header injection + `.nojekyll` + cross-origin relay config). Pushing `main` triggers `.github/workflows/deploy-pages.yml` automatically.
 
 ### 2. Running Automated Tests
 
 #### Haxe Unit Test Suite (`utest` via Ash)
 ```powershell
-$env:PATH="$env:USERPROFILE\.ash\bin;$env:PATH"
-haxe test.hxml
-ash bin/test.hl
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .vscode\run-tests.ps1
 ```
 Executes **611 assertions** across all physics, input, UI, multiplayer, world, and camera suites (including the 3-car drivetrain/turning-radius and multi-device anti-inversion regression contract).
 
-#### Playwright E2E WebGPU & Controls Suite
+#### Dual-Target Playwright E2E Suite (`iis` + `gh-pages`)
 ```powershell
-cd aitests
-playwright test
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .vscode\run-e2e.ps1
 ```
-Verifies **FXAA / SMAA / MSAA / TSAA** visual smoothing (`specs/aa-visual.spec.js`), Desktop + Mobile **anti-inversion controls** (`specs/controls-direction.spec.js`), and UI/options/car-select workflows (`specs/mob-ui-and-maps.spec.js`).
+Runs every spec against **both** targets automatically:
+* **`[iis]`** (`http://127.0.0.1:7725/`): native COOP/COEP headers + `/relay.ashx` WS/HTTP relay.
+* **`[gh-pages]`** (`http://127.0.0.1:7726/motors-on-boost/`): static host simulation with zero HTTP COOP/COEP headers, exercising `sw.js` isolation injection, one-time reload, subpath routing, and static fallback.
+
+Covers **FXAA / SMAA / MSAA / TSAA** (`specs/aa-visual.spec.js`), Desktop + Mobile **anti-inversion controls** (`specs/controls-direction.spec.js`), and UI/options/car-select workflows (`specs/mob-ui-and-maps.spec.js`).
 
 ### 3. Running Locally
-Because multi-threaded WebAssembly (`SharedArrayBuffer`) and WebGPU require `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, use the included COI static/relay server:
 ```powershell
-node aitests/server.js
+# IIS simulation (native COOP/COEP + relay on port 7725):
+node aitests/server.js --mode=iis --port=7725
+
+# GitHub Pages mirror simulation (no HTTP COOP/COEP + /motors-on-boost/ subpath on port 7726):
+node aitests/server.js --mode=gh-pages --port=7726
 ```
-Navigate to `http://127.0.0.1:7725` in a WebGPU-capable browser (Edge, Chrome, or Safari iOS 18+/26+).
+Navigate to `http://127.0.0.1:7725` or `http://127.0.0.1:7726/motors-on-boost/` in a WebGPU-capable browser (Edge, Chrome, or Safari iOS 18+/26+).
 
 ---
 

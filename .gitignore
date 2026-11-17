@@ -1,6 +1,7 @@
 .agents
 .vscode
 bin/
+dist/
 .unittest/
 node_modules/
 aitests/node_modules/
